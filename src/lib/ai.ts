@@ -136,13 +136,13 @@ export async function aiSuggestSubjects(
       {
         role: "user",
         content: `Course/exam: "${courseName}". Education level: ${level}. 
-        You MUST fetch the EXACT, authentic, real-world syllabus for this specific course and institution from your knowledge base. 
-        Do NOT provide generic subjects. 
-        If the institution is NMIMS CDOE, output the exact semester-wise subjects for this specific specialization (e.g., Management Theory and Practice, Corporate Social Responsibility, Consumer Behaviour, Digital Marketing, etc.).
-        List the actual core and specialization subjects (Minimum 12 subjects, maximum 20 subjects) as a strict JSON array. 
+        You MUST fetch the EXACT, authentic, real-world syllabus for the FIRST SEMESTER (or current relevant term) of this specific course. 
+        Do NOT combine all semesters into one list. A student only studies 5 to 7 subjects per semester. 
+        If the institution is NMIMS CDOE, output exactly the Semester 1 subjects (Business Communication, Financial Accounting, Micro Economics & Macro Economics, Organizational Behavior, Marketing Management, Quantitative Methods).
+        Return EXACTLY 5 to 7 subjects as a strict JSON array. 
         "units" MUST be the realistic number of chapters for that subject (strictly between 6 to 15). 
         Format: [{"name":"Exact Subject Name","units":10,"difficulty":"Medium","color":"#6366f1"}]. 
-        JSON array only.`
+        JSON array only, no extra text.`
       }
     ],
     2500
@@ -155,7 +155,8 @@ export async function aiSuggestSubjects(
     if (Array.isArray(parsed) && parsed.length >= 2) {
       const palette = ["#6366f1", "#10b981", "#f59e0b", "#ef4444", "#06b6d4", "#ec4899", "#84cc16"];
       return {
-        subjects: parsed.slice(0, 24).map((s, i) => ({
+        // Fixed: Sliced to 7 instead of 16 to ensure only one semester is loaded
+        subjects: parsed.slice(0, 7).map((s, i) => ({
           name: String(s.name).slice(0, 80),
           units: Math.min(30, Math.max(2, Number(s.units) || 8)),
           difficulty: (["Easy", "Medium", "Hard"].includes(String(s.difficulty)) ? s.difficulty : "Medium") as SeedSubject["difficulty"],
