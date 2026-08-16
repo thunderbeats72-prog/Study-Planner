@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { api, addDays, today, dayDiff, prettyLong, type AppState } from "@/lib/client";
+import { api, addDays, today, dayDiff, parseDate, prettyLong, type AppState } from "@/lib/client";
 import { IconCheck } from "./icons";
 
 type Level = { id: string; label: string; sub: string };
@@ -31,6 +31,7 @@ export default function Onboarding({ onDone }: { onDone: (s: AppState) => void }
   const [goalText, setGoalText] = useState("");
   const [suggesting, setSuggesting] = useState(false);
   const [suggestSource, setSuggestSource] = useState("");
+
   // adaptive course-detail fields
   const [institution, setInstitution] = useState("");
   const [specialisation, setSpecialisation] = useState("");
@@ -81,7 +82,7 @@ export default function Onboarding({ onDone }: { onDone: (s: AppState) => void }
   const isDegree = level === "ug" || level === "pg";
   const isSchool = level === "school" || level === "nursery";
 
-  /** Assemble every relevant detail so the engine can assess accurately. */
+  /** Assemble details for authentic syllabus retrieval */
   const buildAssessmentText = (title: string, goal: string) => {
     const parts = [title.trim()];
     if (specialisation.trim()) parts.push(`specialisation: ${specialisation.trim()}`);
@@ -93,7 +94,7 @@ export default function Onboarding({ onDone }: { onDone: (s: AppState) => void }
     return parts.join(" — ");
   };
 
-  /** Ask the engine to build a relevant subject list for any typed course. */
+  /** Deep Knowledge Retrieval for course syllabus */
   const suggestFor = async (typed: string, goal = goalText) => {
     const titleText = typed.trim();
     if (!titleText) return;
@@ -118,12 +119,31 @@ export default function Onboarding({ onDone }: { onDone: (s: AppState) => void }
     }
   };
 
+  // Strict Mathematical Projected Date Output
   const totalUnits = subs.reduce((a, s) => a + (Number(s.units) || 0), 0);
-  const availDays = Math.max(1, dayDiff(start, exam));
-  const estMinutes = totalUnits * 50;
-  const capacity = availDays * hrs * 60 * 0.78;
-  const feasible = capacity >= estMinutes;
-  const projected = addDays(start, Math.min(availDays, Math.ceil(estMinutes / Math.max(1, hrs * 60 * 0.78))));
+  const estMinutes = totalUnits * 45;
+  const dailyMins = Math.max(15, hrs * 60);
+  const totalStudyDaysRequired = Math.max(1, Math.ceil(estMinutes / dailyMins));
+
+  const projected = useMemo(() => {
+    let cursor = start;
+    let count = 0;
+    let guard = 0;
+    while (guard < 3650) {
+      const dow = parseDate(cursor).getDay();
+      const isStudy = sdays === "weekdays" ? (dow >= 1 && dow <= 5) : sdays === "6days" ? (dow !== 0) : true;
+      if (isStudy) {
+        count++;
+        if (count >= totalStudyDaysRequired) return cursor;
+      }
+      cursor = addDays(cursor, 1);
+      guard++;
+    }
+    return cursor;
+  }, [start, totalStudyDaysRequired, sdays]);
+
+  const daysToExam = dayDiff(start, exam);
+  const feasible = dayDiff(start, projected) <= daysToExam;
 
   const next = async () => {
     setErr("");
@@ -132,8 +152,7 @@ export default function Onboarding({ onDone }: { onDone: (s: AppState) => void }
     if (step === 3 && !course) return setErr("Choose a course, search for yours, or add a custom one.");
     if (step === 3 && course === "custom" && !customName.trim())
       return setErr("Type the name of your course or exam first.");
-    // Step 4 = adaptive course details. Leaving it (re)assesses subjects so
-    // institution/specialisation/board actually influence the syllabus.
+
     if (step === 4) {
       const title = course === "custom" ? customName : (courseById.get(course)?.name || customName);
       if (title.trim()) {
@@ -144,7 +163,7 @@ export default function Onboarding({ onDone }: { onDone: (s: AppState) => void }
             body: JSON.stringify({ courseName: buildAssessmentText(title, goalText), level }),
           });
           if (r.subjects?.length) { setSubs(r.subjects.map((x) => ({ ...x }))); setSuggestSource(r.source); }
-        } catch { /* keep whatever we have */ } finally { setSuggesting(false); }
+        } catch { /* keep existing */ } finally { setSuggesting(false); }
       }
     }
     if (step === 5 && subs.length === 0) return setErr("Add at least one subject.");
@@ -156,7 +175,7 @@ export default function Onboarding({ onDone }: { onDone: (s: AppState) => void }
   const addSubject = () => {
     const n = newSub.trim();
     if (!n) return;
-    setSubs((s) => [...s, { name: n, units: 6, difficulty: "Medium", color: PALETTE[s.length % PALETTE.length] }]);
+    setSubs((s) => [...s, { name: n, units: 8, difficulty: "Medium", color: PALETTE[s.length % PALETTE.length] }]);
     setNewSub("");
   };
 
@@ -199,12 +218,12 @@ export default function Onboarding({ onDone }: { onDone: (s: AppState) => void }
         {step === 1 && (
           <>
             <h1>Welcome to Study Planner Pro</h1>
-            <p>Your AI study architect. In 7 quick steps I&apos;ll read your syllabus, break it into lessons and build a day-by-day plan you can actually follow.</p>
+            <p>Your AI study architect. In 7 quick steps I&apos;ll retrieve your official syllabus, break it into sequenced lessons, and build a mathematically balanced daily schedule.</p>
             <label className="lbl">Your Name</label>
-            <input className="ob-name-input" autoFocus value={name} placeholder="e.g. Rakshit"
+            <input className="ob-name-input" autoFocus value={name} placeholder="e.g. Alex"
               onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && next()} />
             <div className="ob-hint">
-              {provider ? `AETHER engine online — connected to ${provider}.` : "AETHER hybrid engine online — curriculum synthesis runs locally, no API key needed."}
+              {provider ? `AETHER engine online — connected to ${provider}.` : "AETHER hybrid engine online — Deep Knowledge Retrieval active."}
             </div>
           </>
         )}
@@ -212,7 +231,7 @@ export default function Onboarding({ onDone }: { onDone: (s: AppState) => void }
         {step === 2 && (
           <>
             <h1>What are you studying?</h1>
-            <p>From nursery to doctoral research — pick where you are and I&apos;ll adapt the depth, pacing and language.</p>
+            <p>From nursery to doctoral research — pick where you are and the engine will adapt the syllabus depth and pacing.</p>
             <div className="ob-level-grid">
               {levels.map((l) => (
                 <button key={l.id} className={`ob-level-btn${level === l.id ? " selected" : ""}`}
@@ -227,8 +246,8 @@ export default function Onboarding({ onDone }: { onDone: (s: AppState) => void }
         {step === 3 && (
           <>
             <h1>Your Course / Exam</h1>
-            <p>Select your programme. I&apos;ll auto-load its subjects and syllabus structure.</p>
-            <input className="ob-course-search" placeholder="Search any course or exam..." value={search}
+            <p>Select your programme or type any specific university/exam title.</p>
+            <input className="ob-course-search" placeholder="Search any course, university, or exam..." value={search}
               onChange={(e) => setSearch(e.target.value)} />
             <div className="ob-course-list">
               {visibleCourses.map((c) => (
@@ -241,34 +260,31 @@ export default function Onboarding({ onDone }: { onDone: (s: AppState) => void }
                 <div className="ob-course-item" style={{ borderColor: "var(--accent)" }}
                   onClick={() => suggestFor(search)}>
                   <div className="ob-course-check" />
-                  {suggesting ? "Building your syllabus…" : <>Use <strong>&ldquo;{search.trim()}&rdquo;</strong> — AI will build the subject list</>}
+                  {suggesting ? "Retrieving syllabus…" : <>Use <strong>&ldquo;{search.trim()}&rdquo;</strong> — AI will retrieve exact subjects</>}
                 </div>
               )}
               <div className={`ob-course-item${course === "custom" ? " selected" : ""}`}
                 onClick={() => { setCourse("custom"); setCustomName(search.trim()); setSubs([]); }}>
                 <div className="ob-course-check">{course === "custom" && <IconCheck size={11} />}</div>
-                Not listed? Let the AI build it from scratch
+                Not listed? Let AI retrieve and build it from scratch
               </div>
             </div>
 
             {course === "custom" && (
               <div className="slide-in" style={{ marginBottom: 14 }}>
-                <label className="lbl">Course / exam title</label>
+                <label className="lbl">Course / Exam Title</label>
                 <div className="ob-add-sub-row">
                   <input className="ob-add-sub-input" autoFocus placeholder="e.g. MBA in Marketing from NMIMS CDOE"
                     value={customName} onChange={(e) => setCustomName(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && suggestFor(customName, goalText)} />
                   <button className="ob-btn ob-btn-primary" style={{ padding: "10px 16px" }}
                     disabled={suggesting || !customName.trim()} onClick={() => suggestFor(customName, goalText)}>
-                    {suggesting ? "Working…" : "AI: Assess & Build Subjects"}
+                    {suggesting ? "Retrieving…" : "AI: Retrieve Syllabus"}
                   </button>
                 </div>
                 <label className="lbl" style={{ marginTop: 12 }}>Describe your goal (optional)</label>
-                <textarea className="input-field" rows={3} placeholder="e.g. I want to complete the course, prepare for exams, and revise weak topics"
+                <textarea className="input-field" rows={3} placeholder="e.g. Complete first semester syllabus, prepare for midterms, and focus on weak topics"
                   value={goalText} onChange={(e) => setGoalText(e.target.value)} />
-                <div className="ob-hint" style={{ marginTop: 8, marginBottom: 0 }}>
-                  The engine uses the course title first, then the goal as extra context. You can edit every subject on the next screen.
-                </div>
               </div>
             )}
           </>
@@ -277,12 +293,12 @@ export default function Onboarding({ onDone }: { onDone: (s: AppState) => void }
         {step === 4 && (
           <>
             <h1>Tell me the specifics</h1>
-            <p>These details let me assess the <em>exact</em> syllabus — the right papers, board pattern and specialisation — instead of a generic list.</p>
+            <p>These details let the Deep Knowledge Retrieval engine fetch the <em>exact</em> papers, board pattern, and term modules.</p>
             <div className="ob-schedule-grid" style={{ gridTemplateColumns: "1fr" }}>
               {isDegree && (
                 <>
                   <div className="ob-field">
-                    <label>Institution / University (optional but improves accuracy)</label>
+                    <label>Institution / University</label>
                     <input className="input-field" placeholder="e.g. NMIMS CDOE, IGNOU, Delhi University"
                       value={institution} onChange={(e) => setInstitution(e.target.value)} />
                   </div>
@@ -292,7 +308,7 @@ export default function Onboarding({ onDone }: { onDone: (s: AppState) => void }
                       value={specialisation} onChange={(e) => setSpecialisation(e.target.value)} />
                   </div>
                   <div className="ob-field">
-                    <label>Year / Semester (narrows to that term)</label>
+                    <label>Year / Semester</label>
                     <select value={year} onChange={(e) => setYear(e.target.value)}>
                       <option value="0">Full course (all terms)</option>
                       <option value="1">Year 1 / Semester 1-2</option>
@@ -328,58 +344,37 @@ export default function Onboarding({ onDone }: { onDone: (s: AppState) => void }
                 <>
                   <div className="ob-field">
                     <label>Specific post / specialisation / optional subject</label>
-                    <input className="input-field" placeholder="e.g. UPSC optional: PSIR · SSC CGL · GATE CSE · CA Inter"
+                    <input className="input-field" placeholder="e.g. UPSC optional: PSIR · GATE CSE · CA Inter"
                       value={specialisation} onChange={(e) => setSpecialisation(e.target.value)} />
                   </div>
                   <div className="ob-field">
-                    <label>Coaching / exam body (optional)</label>
+                    <label>Exam Body</label>
                     <input className="input-field" placeholder="e.g. ICAI, IBPS, UPSC, NTA"
                       value={institution} onChange={(e) => setInstitution(e.target.value)} />
-                  </div>
-                  <div className="ob-field">
-                    <label>Which attempt is this?</label>
-                    <select value={attempt} onChange={(e) => setAttempt(e.target.value)}>
-                      <option value="first">First attempt</option>
-                      <option value="repeat">Repeat attempt</option>
-                      <option value="final">Final / last attempt</option>
-                    </select>
-                  </div>
-                  <div className="ob-field">
-                    <label>How much have you already prepared?</label>
-                    <select value={priorPrep} onChange={(e) => setPriorPrep(e.target.value)}>
-                      <option value="fresh">Starting fresh (0-20%)</option>
-                      <option value="partial">Partly done (20-60%)</option>
-                      <option value="revision">Mostly done, need revision (60%+)</option>
-                    </select>
                   </div>
                 </>
               )}
               <div className="ob-field">
-                <label>Your goal (optional — shapes the plan&apos;s emphasis)</label>
+                <label>Your Goal</label>
                 <textarea className="input-field" rows={2}
-                  placeholder="e.g. Clear the exam in first attempt, focus on weak areas, finish syllabus then revise"
+                  placeholder="e.g. Complete syllabus with high retention and structured spaced recall"
                   value={goalText} onChange={(e) => setGoalText(e.target.value)} />
               </div>
-            </div>
-            <div className="ob-hint" style={{ marginTop: 4 }}>
-              {suggesting ? "Assessing your exact syllabus…" : "When you continue, I'll assess these details and build the precise subject list."}
             </div>
           </>
         )}
 
         {step === 5 && (
           <>
-            <h1>Review Your Subjects</h1>
-            <p>{course && course !== "custom"
-              ? "Suggested syllabus loaded. Adjust the number of units — each unit becomes a scheduled lesson."
-              : "Add your subjects. Each unit becomes an individually scheduled lesson."}</p>
+            <h1>Review Your Subjects &amp; Units</h1>
+            <p>Authentic syllabus retrieved. Adjust the exact number of units/chapters as needed.</p>
             <div className="ob-subs-grid">
               {subs.map((s, i) => (
                 <div className="ob-sub-row" key={i}>
                   <div style={{ width: 10, height: 10, borderRadius: 99, background: s.color || PALETTE[i % 8] }} />
                   <input type="text" value={s.name}
                     onChange={(e) => setSubs((p) => p.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))} />
-                  <input type="number" min={1} max={40} value={s.units}
+                  <input type="number" min={1} max={50} value={s.units} title="Units/Chapters"
                     onChange={(e) => setSubs((p) => p.map((x, j) => (j === i ? { ...x, units: Number(e.target.value) } : x)))} />
                   <select value={s.difficulty}
                     onChange={(e) => setSubs((p) => p.map((x, j) => (j === i ? { ...x, difficulty: e.target.value } : x)))}>
@@ -388,7 +383,7 @@ export default function Onboarding({ onDone }: { onDone: (s: AppState) => void }
                   <button className="btn btn-xs btn-danger" onClick={() => setSubs((p) => p.filter((_, j) => j !== i))}>✕</button>
                 </div>
               ))}
-              {!subs.length && <div style={{ fontSize: ".82rem", color: "var(--text-dim)", padding: "10px 2px" }}>No subjects yet — add one below.</div>}
+              {!subs.length && <div style={{ fontSize: ".84rem", color: "var(--text-dim)", padding: "10px 2px" }}>No subjects yet — add one below.</div>}
             </div>
             <div className="ob-add-sub-row">
               <input className="ob-add-sub-input" placeholder="+ Add a subject..." value={newSub}
@@ -398,14 +393,14 @@ export default function Onboarding({ onDone }: { onDone: (s: AppState) => void }
             <div className="flex-row gap-sm" style={{ flexWrap: "wrap", marginTop: 10 }}>
               <button className="btn btn-sm btn-secondary" disabled={suggesting}
                 onClick={() => suggestFor(resolvedCourseName, goalText)}>
-                {suggesting ? "Rebuilding…" : "↻ Re-assess subjects with AI"}
+                {suggesting ? "Retrieving…" : "↻ Re-retrieve with AI"}
               </button>
               {suggestSource && (
                 <span className="chip chip-kind">source: {suggestSource}</span>
               )}
             </div>
-            <div className="ob-hint" style={{ marginTop: 10 }}>
-              {subs.length} subjects · <strong>{totalUnits} lessons</strong> will be generated by the AI curriculum engine.
+            <div className="ob-hint" style={{ marginTop: 12 }}>
+              {subs.length} subjects · <strong>{totalUnits} lessons</strong> will be generated and scheduled.
             </div>
           </>
         )}
@@ -413,25 +408,25 @@ export default function Onboarding({ onDone }: { onDone: (s: AppState) => void }
         {step === 6 && (
           <>
             <h1>How do you learn best?</h1>
-            <p>This tunes how much time each lesson gets and where the extra weight goes.</p>
+            <p>Fine-tune study weights, revision blocks, and pedagogical style.</p>
             <div className="ob-schedule-grid" style={{ gridTemplateColumns: "1fr" }}>
               <div className="ob-field">
-                <label>Weakest Subject (gets extra time)</label>
+                <label>Weakest Subject (gets priority weight)</label>
                 <select value={weak} onChange={(e) => setWeak(e.target.value)}>
-                  <option value="-1">None / not sure</option>
+                  <option value="-1">None / Balanced focus</option>
                   {subs.map((s, i) => <option key={i} value={String(i)}>{s.name}</option>)}
                 </select>
               </div>
               <div className="ob-field">
                 <label>Study Style</label>
                 <select value={style} onChange={(e) => setStyle(e.target.value)}>
-                  <option value="balanced">Balanced (theory + practice)</option>
-                  <option value="theory">Theory heavy (concept first)</option>
-                  <option value="practice">Practice heavy (question first)</option>
+                  <option value="balanced">Balanced (Theory + Practice)</option>
+                  <option value="theory">Theory Heavy (Foundations first)</option>
+                  <option value="practice">Practice Heavy (Problem-first)</option>
                 </select>
               </div>
               <div className="ob-field">
-                <label>Pre-Exam Revision Block</label>
+                <label>Pre-Exam Dedicated Revision Block</label>
                 <select value={revision} onChange={(e) => setRevision(e.target.value)}>
                   <option value="1">Last 1 week</option>
                   <option value="2">Last 2 weeks</option>
@@ -442,9 +437,9 @@ export default function Onboarding({ onDone }: { onDone: (s: AppState) => void }
               <div className="ob-field">
                 <label>Plan Mode</label>
                 <select value={planMode} onChange={(e) => setPlanMode(e.target.value)}>
-                  <option value="syllabus">Syllabus — learn everything from scratch</option>
-                  <option value="revision">Revision — I&apos;ve studied it once already</option>
-                  <option value="mock">Mock-heavy — test &amp; fix weak areas</option>
+                  <option value="syllabus">Syllabus — Learn from start to finish</option>
+                  <option value="revision">Revision — Fast review of all units</option>
+                  <option value="mock">Mock-Heavy — Test &amp; fix weaknesses</option>
                 </select>
               </div>
             </div>
@@ -453,8 +448,8 @@ export default function Onboarding({ onDone }: { onDone: (s: AppState) => void }
 
         {step === 7 && (
           <>
-            <h1>Your Schedule</h1>
-            <p>Be honest about the hours. A plan you follow beats a plan that looks impressive.</p>
+            <h1>Your Study Commitment</h1>
+            <p>Set your daily study hours and timetable. The mathematical scheduler will divide your time perfectly.</p>
             <div className="ob-schedule-grid">
               <div className="ob-field"><label>Start Date</label>
                 <input type="date" value={start} onChange={(e) => setStart(e.target.value)} /></div>
@@ -472,18 +467,18 @@ export default function Onboarding({ onDone }: { onDone: (s: AppState) => void }
                 <select value={sdays} onChange={(e) => setSdays(e.target.value)}>
                   <option value="all">All 7 days</option>
                   <option value="6days">6 days (Sunday off)</option>
-                  <option value="weekdays">Weekdays only</option>
+                  <option value="weekdays">Weekdays only (Mon-Fri)</option>
                 </select></div>
               <div className="ob-field"><label>Buffer Days</label>
                 <input type="number" min={0} max={30} value={buffer} onChange={(e) => setBuffer(Number(e.target.value))} /></div>
             </div>
-            <div style={{ background: "var(--row-bg)", border: "1px solid var(--glass-border)", padding: 16, borderRadius: 12, textAlign: "center" }}>
-              <div style={{ fontSize: ".68rem", fontWeight: 800, textTransform: "uppercase", color: "var(--text-muted)", letterSpacing: 1 }}>Projected Syllabus Completion</div>
-              <div style={{ fontSize: "1.7rem", fontWeight: 800, marginTop: 4 }}>{prettyLong(projected)}</div>
-              <div style={{ fontSize: ".82rem", fontWeight: 650, marginTop: 4, color: feasible ? "var(--success-accent)" : "var(--danger-accent)" }}>
+            <div style={{ background: "var(--row-bg)", border: "1px solid var(--glass-border)", padding: 18, borderRadius: 14, textAlign: "center" }}>
+              <div style={{ fontSize: ".7rem", fontWeight: 800, textTransform: "uppercase", color: "var(--text-muted)", letterSpacing: 1 }}>Strict Mathematical Projected Finish</div>
+              <div style={{ fontSize: "1.75rem", fontWeight: 800, marginTop: 4 }}>{prettyLong(projected)}</div>
+              <div style={{ fontSize: ".84rem", fontWeight: 650, marginTop: 6, color: feasible ? "var(--success-accent)" : "var(--danger-accent)" }}>
                 {feasible
-                  ? `Comfortable — ${availDays} days available, ${Math.round(estMinutes / 60)}h of content.`
-                  : `Tight — needs ~${Math.round(estMinutes / 60)}h but you only have ~${Math.round(capacity / 60)}h. I'll compress lessons.`}
+                  ? `Comfortable timeline — ${totalStudyDaysRequired} study days needed (${Math.round(estMinutes / 60)}h of content) for ${daysToExam} days available.`
+                  : `Intensive timeline — requires ${totalStudyDaysRequired} study days (${Math.round(estMinutes / 60)}h of content). Consider increasing daily hours to finish before the exam.`}
               </div>
             </div>
           </>
@@ -492,35 +487,34 @@ export default function Onboarding({ onDone }: { onDone: (s: AppState) => void }
         {step === 8 && (
           <>
             <h1>Ready to build your plan</h1>
-            <p>The AI engine will break every subject into ordered lessons, sequence them by difficulty, weave in spaced-recall checkpoints and weekly tests, then map it all to your calendar.</p>
-            <div style={{ marginBottom: 18 }}>
+            <p>The mathematical curriculum engine will sequence all {totalUnits} lessons, divide daily study time equally across active subjects, and schedule spaced-repetition checkpoints.</p>
+            <div style={{ marginBottom: 20 }}>
               <div className="ob-summary-row"><span>Learner</span><span>{name}</span></div>
               <div className="ob-summary-row"><span>Programme</span><span>{resolvedCourseName}</span></div>
               {specialisation.trim() && <div className="ob-summary-row"><span>Specialisation</span><span>{specialisation}</span></div>}
               {institution.trim() && <div className="ob-summary-row"><span>Institution</span><span>{institution}</span></div>}
               <div className="ob-summary-row"><span>Subjects</span><span>{subs.length}</span></div>
-              <div className="ob-summary-row"><span>Lessons to generate</span><span>{totalUnits}</span></div>
+              <div className="ob-summary-row"><span>Lessons</span><span>{totalUnits}</span></div>
               <div className="ob-summary-row"><span>Window</span><span>{prettyLong(start)} → {prettyLong(exam)}</span></div>
-              <div className="ob-summary-row"><span>Daily commitment</span><span>{hrs}h · {spd} subjects/day</span></div>
-              <div className="ob-summary-row"><span>Revision block</span><span>{revision === "0" ? "None" : `Last ${revision} week(s)`}</span></div>
-              <div className="ob-summary-row"><span>Buffer days</span><span>{buffer}</span></div>
+              <div className="ob-summary-row"><span>Daily Commitment</span><span>{hrs}h · {spd} subjects/day</span></div>
+              <div className="ob-summary-row"><span>Projected Finish</span><span>{prettyLong(projected)}</span></div>
             </div>
             {busy && (
-              <div style={{ background: "var(--accent-glow)", padding: 14, borderRadius: 12, fontSize: ".84rem", fontWeight: 650, marginBottom: 16 }}>
-                AETHER is analysing your syllabus and sequencing {totalUnits} lessons… this takes a few seconds.
+              <div style={{ background: "var(--accent-glow)", padding: 16, borderRadius: 12, fontSize: ".86rem", fontWeight: 650, marginBottom: 16 }}>
+                AETHER is sequencing your lessons and building your mathematically sound schedule…
               </div>
             )}
           </>
         )}
 
-        {err && <div style={{ color: "var(--danger-accent)", fontSize: ".8rem", fontWeight: 700, marginBottom: 12 }}>{err}</div>}
+        {err && <div style={{ color: "var(--danger-accent)", fontSize: ".82rem", fontWeight: 700, marginBottom: 12 }}>{err}</div>}
 
         <div className="ob-btn-row mt-md">
           {step > 1 && <button className="ob-btn ob-btn-secondary" onClick={back} disabled={busy || suggesting}>Back</button>}
-          {step < total && <button className="ob-btn ob-btn-primary" onClick={next} disabled={suggesting}>{suggesting ? "Assessing…" : step === 1 ? "Let's Start" : step === 4 ? "Assess & Continue" : "Continue"}</button>}
+          {step < total && <button className="ob-btn ob-btn-primary" onClick={next} disabled={suggesting}>{suggesting ? "Retrieving…" : step === 1 ? "Let's Start" : step === 4 ? "Assess & Continue" : "Continue"}</button>}
           {step === total && (
             <button className="ob-btn ob-btn-primary" onClick={launch} disabled={busy}>
-              {busy ? "Generating…" : "Generate My AI Plan"}
+              {busy ? "Generating Schedule…" : "Generate My AI Plan"}
             </button>
           )}
         </div>
