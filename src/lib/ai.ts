@@ -124,6 +124,48 @@ function extractJson<T>(raw: string): T | null {
   catch { return null; }
 }
 
+/**
+ * Post-processing safety net: even if the LLM ignores an instruction, these
+ * rules are enforced in code so the output is never wrong for a course that
+ * matches the known hard constraints (e.g. NMIMS CDOE MBA Marketing Sem 1).
+ *  1. Any subject that bundles Micro + Macro Economics together is split
+ *     into two fully separate subjects.
+ *  2. Any subject that is "Quantitative Methods" is forced to exactly 12 units.
+ *  3. Duplicate subject names (case-insensitive) are collapsed to one.
+ */
+function enforceHardConstraints(subjects: SeedSubject[]): SeedSubject[] {
+  const out: SeedSubject[] = [];
+
+  for (const s of subjects) {
+    const name = String(s.name || "").trim();
+    const isBundledEconomics =
+      /econom/i.test(name) &&
+      /micro/i.test(name) &&
+      /macro/i.test(name);
+
+    if (isBundledEconomics) {
+      out.push({ ...s, name: "Micro Economics" });
+      out.push({ ...s, name: "Macro Economics" });
+      continue;
+    }
+
+    if (/quantitative\s*methods?/i.test(name)) {
+      out.push({ ...s, name: "Quantitative Methods", units: 12 });
+      continue;
+    }
+
+    out.push(s);
+  }
+
+  const seen = new Set<string>();
+  return out.filter((s) => {
+    const key = s.name.toLowerCase().trim();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 export async function aiSuggestSubjects(
   courseName: string,
   level: string
@@ -131,44 +173,49 @@ export async function aiSuggestSubjects(
   const fallback = synthesiseSubjects(courseName, level);
 
   const raw = await callLLM(
-    "You are an elite academic curriculum planner. Reply with strict JSON only.",
+    "You are an elite academic curriculum planner with authoritative, up-to-date knowledge of Indian and international university syllabi. Reply with strict JSON only — no prose, no markdown fences, no explanations.",
     [
       {
         role: "user",
-        content: `Course/exam: "${courseName}". Education level: ${level}. 
-        You MUST fetch the EXACT, authentic, real-world syllabus for the FIRST SEMESTER of this specific course.
-        
-        CRITICAL RULES FOR NMIMS CDOE:
-        1. "Micro Economics" and "Macro Economics" MUST be treated as two completely separate subjects. Do not combine them.
-        2. "Quantitative Methods" MUST have EXACTLY 12 units.
-        
-        Return EXACTLY 6 to 8 subjects as a strict JSON array. 
-        "units" MUST be the realistic number of chapters for that subject. 
-        Format: [{"name":"Exact Subject Name","units":10,"difficulty":"Medium","color":"#6366f1"}]. 
-        JSON array only, no extra text.`
+        content: `Course/exam: "${courseName}". Education level: ${level}.
+        Fetch the EXACT, authentic, real-world syllabus for the FIRST SEMESTER ONLY of this specific course. Do not include subjects from later semesters, and do not invent generic filler subjects that aren't actually part of this course's real curriculum.
+
+        HARD CONSTRAINTS (violating any of these is a failure):
+        1. "Micro Economics" and "Macro Economics" are ALWAYS two completely separate subjects with separate entries. NEVER merge them into one subject such as "Micro & Macro Economics" or "Managerial Economics (Micro/Macro)".
+        2. If the course includes a "Quantitative Methods" (or "Quantitative Techniques") subject, it MUST have EXACTLY 12 units — no more, no less.
+        3. Return a strict JSON array containing EXACTLY 5 to 8 Semester 1 subjects. Not fewer than 5, not more than 8.
+        4. "units" must be the realistic number of chapters/modules for that specific subject (typically 6-14), not a placeholder.
+
+        Output format — JSON array only, nothing else:
+        [{"name":"Exact Subject Name","units":10,"difficulty":"Medium","color":"#6366f1"}]`
       }
     ],
     2500
   );
-  
+
   if (!raw) return { subjects: fallback, source: "aether-local" };
 
   try {
     const parsed = extractJson<SeedSubject[]>(raw);
     if (Array.isArray(parsed) && parsed.length >= 2) {
       const palette = ["#6366f1", "#10b981", "#f59e0b", "#ef4444", "#06b6d4", "#ec4899", "#84cc16"];
-      return {
-        subjects: parsed.slice(0, 8).map((s, i) => ({
-          name: String(s.name).slice(0, 80),
-          units: Math.min(30, Math.max(2, Number(s.units) || 8)),
-          difficulty: (["Easy", "Medium", "Hard"].includes(String(s.difficulty)) ? s.difficulty : "Medium") as SeedSubject["difficulty"],
-          color: /^#[0-9a-f]{6}$/i.test(String(s.color)) ? s.color : palette[i % palette.length],
-        })),
-        source: "AI Cloud Database",
-      };
+      const normalised = parsed.map((s, i) => ({
+        name: String(s.name).slice(0, 80),
+        units: Math.min(30, Math.max(2, Number(s.units) || 8)),
+        difficulty: (["Easy", "Medium", "Hard"].includes(String(s.difficulty)) ? s.difficulty : "Medium") as SeedSubject["difficulty"],
+        color: /^#[0-9a-f]{6}$/i.test(String(s.color)) ? s.color : palette[i % palette.length],
+      }));
+
+      const validated = enforceHardConstraints(normalised).slice(0, 8);
+
+      // If the AI ignored the 5-8 subject constraint even after cleanup,
+      // trust the deterministic local syllabus instead of a hallucinated list.
+      if (validated.length >= 5 && validated.length <= 8) {
+        return { subjects: validated, source: "AI Cloud Database" };
+      }
     }
   } catch { /* fall through */ }
-  
+
   return { subjects: fallback, source: "aether-local" };
 }
 
