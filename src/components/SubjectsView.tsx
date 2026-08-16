@@ -15,7 +15,7 @@ export default function SubjectsView({
   onAskTutor: (q: string) => void;
 }) {
   const [name, setName] = useState("");
-  const [units, setUnits] = useState(6);
+  const [units, setUnits] = useState(8);
   const [difficulty, setDifficulty] = useState("Medium");
   const [color, setColor] = useState("#6366f1");
   const [editing, setEditing] = useState<SubjectRow | null>(null);
@@ -29,12 +29,12 @@ export default function SubjectsView({
         <div>
           <h1 className="page-title">Subjects &amp; Lessons</h1>
           <p className="page-subtitle">
-            {state.subjects.length} subjects · {state.topics.length} AI-generated lessons. Editing anything rebalances the plan.
+            {state.subjects.length} subjects · {state.topics.length} AI-generated lessons. Editing rebalances the schedule.
           </p>
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr", gap: 16 }} className="subs-wrap">
+      <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr", gap: 18 }} className="subs-wrap">
         <div className="flex-col gap-md">
           {state.subjects.map((s) => {
             const list = state.topics.filter((x) => x.subjectId === s.id);
@@ -42,8 +42,8 @@ export default function SubjectsView({
             const pct = list.length ? Math.round((done / list.length) * 100) : 0;
             const open = openTopics === s.id;
             return (
-              <div className="glass-panel tilt-card" key={s.id} style={{ padding: 18, borderLeft: `4px solid ${s.color}` }}>
-                <div className="day-head" style={{ marginBottom: 8 }}>
+              <div className="glass-panel tilt-card" key={s.id} style={{ padding: 20, borderLeft: `4px solid ${s.color}` }}>
+                <div className="day-head" style={{ marginBottom: 10 }}>
                   <div>
                     <div className="day-date">{s.name}</div>
                     <div className="day-meta">{list.length} lessons · {s.difficulty} · {done} completed</div>
@@ -58,28 +58,32 @@ export default function SubjectsView({
                 </div>
                 <div className="bar-track"><div className="bar-fill" style={{ width: `${pct}%`, background: s.color }} /></div>
                 {open && (
-                  <div className="slide-in" style={{ marginTop: 14 }}>
+                  <div className="slide-in" style={{ marginTop: 16 }}>
                     {list.map((tp, i) => (
-                      <div className="task-row" key={tp.id} style={{ alignItems: "flex-start" }}>
-                        <div style={{ fontSize: ".72rem", fontWeight: 800, color: "var(--text-dim)", width: 22, marginTop: 2 }}>{i + 1}</div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div className="task-title">{tp.title}</div>
-                          <div className="task-sub">{tp.unit} · {tp.difficulty} · {tp.estMinutes} min · mastery {tp.mastery}%</div>
+                      <div className="task-row" key={tp.id}>
+                        <div className="task-info-top">
+                          <div style={{ fontSize: ".76rem", fontWeight: 800, color: "var(--text-dim)", width: 24, marginTop: 2 }}>{i + 1}</div>
+                          <div className="task-info">
+                            <div className="task-title">{tp.title}</div>
+                            <div className="task-sub">{tp.unit} · {tp.difficulty} · {tp.estMinutes} min · mastery {tp.mastery}%</div>
+                          </div>
                         </div>
-                        <button className="btn btn-xs btn-secondary"
-                          onClick={() => onAskTutor(`Teach me "${tp.title}" from ${s.name}. Explain from first principles with a worked example.`)}>
-                          <IconSpark size={12} /> Teach
-                        </button>
+                        <div className="task-actions">
+                          <button className="btn btn-xs btn-secondary"
+                            onClick={() => onAskTutor(`Teach me "${tp.title}" from ${s.name}. Explain from first principles with a worked example.`)}>
+                            <IconSpark size={12} /> Teach
+                          </button>
+                        </div>
                       </div>
                     ))}
-                    {!list.length && <div style={{ fontSize: ".8rem", color: "var(--text-dim)" }}>No lessons generated yet.</div>}
+                    {!list.length && <div style={{ fontSize: ".82rem", color: "var(--text-dim)" }}>No lessons generated yet.</div>}
                   </div>
                 )}
               </div>
             );
           })}
           {!state.subjects.length && (
-            <div className="glass-panel" style={{ padding: 24, fontSize: ".86rem", color: "var(--text-muted)" }}>
+            <div className="glass-panel" style={{ padding: 28, fontSize: ".88rem", color: "var(--text-muted)", textAlign: "center" }}>
               No subjects yet — add your first one on the right.
             </div>
           )}
@@ -89,11 +93,11 @@ export default function SubjectsView({
           <h3 style={{ fontSize: "1rem", fontWeight: 800, margin: "0 0 18px" }}>Add New Subject</h3>
           <div className="mb-md">
             <label className="lbl">Subject Name</label>
-            <input className="input-field" value={name} placeholder="e.g. Organic Chemistry" onChange={(e) => setName(e.target.value)} />
+            <input className="input-field" value={name} placeholder="e.g. Organizational Behavior" onChange={(e) => setName(e.target.value)} />
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }} className="mb-md">
-            <div><label className="lbl">Lessons</label>
-              <input type="number" className="input-field" min={1} max={40} value={units} onChange={(e) => setUnits(Number(e.target.value))} /></div>
+            <div><label className="lbl">Units / Lessons</label>
+              <input type="number" className="input-field" min={1} max={50} value={units} onChange={(e) => setUnits(Number(e.target.value))} /></div>
             <div><label className="lbl">Colour</label>
               <input type="color" className="input-field" style={{ height: 44, padding: 3 }} value={color} onChange={(e) => setColor(e.target.value)} /></div>
           </div>
@@ -107,8 +111,8 @@ export default function SubjectsView({
             onClick={() => { onAdd({ name: name.trim(), units, difficulty, color }); setName(""); }}>
             <IconSpark size={14} />{busy ? "Generating…" : "Add & Rebalance Engine"}
           </button>
-          <p style={{ fontSize: ".75rem", color: "var(--text-dim)", marginTop: 12, lineHeight: 1.5 }}>
-            The AI curriculum engine will break this subject into an ordered lesson list and weave it into your existing schedule.
+          <p style={{ fontSize: ".76rem", color: "var(--text-dim)", marginTop: 12, lineHeight: 1.55 }}>
+            The AI curriculum engine will break this subject into an authentic ordered lesson list and integrate it seamlessly into your schedule.
           </p>
         </div>
       </div>
@@ -124,8 +128,8 @@ export default function SubjectsView({
               <div><label className="lbl">Subject Name</label>
                 <input className="input-field" value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} /></div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-                <div><label className="lbl">Lessons</label>
-                  <input type="number" className="input-field" min={1} max={40} value={editing.units}
+                <div><label className="lbl">Units / Lessons</label>
+                  <input type="number" className="input-field" min={1} max={50} value={editing.units}
                     onChange={(e) => setEditing({ ...editing, units: Number(e.target.value) })} /></div>
                 <div><label className="lbl">Colour</label>
                   <input type="color" className="input-field" style={{ height: 44, padding: 4 }} value={editing.color}
