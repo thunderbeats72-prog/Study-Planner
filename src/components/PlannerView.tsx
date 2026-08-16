@@ -178,7 +178,7 @@ export default function PlannerView({
               No upcoming tasks. Hit <strong>Re-plan</strong> to generate the next stretch of your schedule.
             </div>
           )}
-          {upcoming.slice(0, 30).map(([date, list]) => {
+          {upcoming.map(([date, list]) => {
             const done = list.filter((x) => x.status === "done").length;
             const mins = list.reduce((a, x) => a + x.plannedMinutes, 0);
             return (
