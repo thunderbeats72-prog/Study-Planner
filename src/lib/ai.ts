@@ -6,11 +6,9 @@ import { lookupKnowledge, teachFromKnowledge } from "./knowledge";
 ============================================================ */
 function getSafeKey(keyName: string): string | null {
   try {
-    // 1. Try Next.js / Create React App format
     if (typeof process !== "undefined" && process.env && process.env[keyName]) {
       return process.env[keyName] as string;
     }
-    // 2. Try Vite format (fallback)
     // @ts-ignore
     if (typeof import.meta !== "undefined" && import.meta.env && import.meta.env[keyName]) {
       // @ts-ignore
@@ -138,15 +136,16 @@ export async function aiSuggestSubjects(
       {
         role: "user",
         content: `Course/exam: "${courseName}". Education level: ${level}. 
-        You must act as the official syllabus generator for this exact institution and specialization. 
-        List ALL the actual core and specialization subjects (Minimum 8 subjects, maximum 16 subjects) as a strict JSON array. 
-        For example, if the course is "MBA Marketing NMIMS CDOE", you MUST explicitly output the real subjects such as 'Business Communication', 'Financial Accounting', 'Micro & Macro Economics', 'Organizational Behavior', 'Marketing Management', 'Operations Management', etc. 
-        "units" MUST be the realistic number of chapters or modules for that specific subject (strictly choose a number between 6 to 15). 
-        Format: [{"name":"Marketing Management","units":10,"difficulty":"Medium","color":"#6366f1"}]. 
-        JSON array only, no other text.`
+        You MUST fetch the EXACT, authentic, real-world syllabus for this specific course and institution from your knowledge base. 
+        Do NOT provide generic subjects. 
+        If the institution is NMIMS CDOE, output the exact semester-wise subjects for this specific specialization (e.g., Management Theory and Practice, Corporate Social Responsibility, Consumer Behaviour, Digital Marketing, etc.).
+        List the actual core and specialization subjects (Minimum 12 subjects, maximum 20 subjects) as a strict JSON array. 
+        "units" MUST be the realistic number of chapters for that subject (strictly between 6 to 15). 
+        Format: [{"name":"Exact Subject Name","units":10,"difficulty":"Medium","color":"#6366f1"}]. 
+        JSON array only.`
       }
     ],
-    2000
+    2500
   );
   
   if (!raw) return { subjects: fallback, source: "aether-local" };
@@ -156,7 +155,7 @@ export async function aiSuggestSubjects(
     if (Array.isArray(parsed) && parsed.length >= 2) {
       const palette = ["#6366f1", "#10b981", "#f59e0b", "#ef4444", "#06b6d4", "#ec4899", "#84cc16"];
       return {
-        subjects: parsed.slice(0, 16).map((s, i) => ({
+        subjects: parsed.slice(0, 24).map((s, i) => ({
           name: String(s.name).slice(0, 80),
           units: Math.min(30, Math.max(2, Number(s.units) || 8)),
           difficulty: (["Easy", "Medium", "Hard"].includes(String(s.difficulty)) ? s.difficulty : "Medium") as SeedSubject["difficulty"],
@@ -289,7 +288,6 @@ export async function localTutor(q: string, ctx: TutorContext): Promise<TutorRep
     return { text: `### How to approach: this\n\n**1. Decode the command word.**\n**2. Plan for 60 seconds before writing.**\n**3. Open with a precise 1-line definition.**` };
   }
 
-  // AI CLOUD CONVERSATION FORWARDING
   const aiResponse = await callLLM(
     tutorSystemPrompt(ctx),
     [{ role: "user", content: q }],
