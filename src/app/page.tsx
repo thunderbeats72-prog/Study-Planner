@@ -61,13 +61,13 @@ export default function Home() {
     []
   );
 
-  // 1) the study clock — records real studied minutes
+  // 1) The study clock — tracks actual studied time
   const clock = useStudyClock(logSession);
 
-  // 2) the focus timer — an independent pomodoro ritual
+  // 2) Focus timer — pomodoro ritual
   const onBlockComplete = useCallback((mode: TimerMode, minutes: number) => {
-    if (mode === "short" || mode === "long") { notify("Break over — back to it."); return; }
-    notify(`Focus block finished (${minutes} min).`);
+    if (mode === "short" || mode === "long") { notify("Break complete — back to studying."); return; }
+    notify(`Focus block completed (${minutes} min). Great job!`);
   }, []);
 
   const timer = useFocusTimer(
@@ -83,16 +83,15 @@ export default function Home() {
     try {
       const s = await api<AppState>("/api/tasks", { method: "PATCH", body: JSON.stringify({ id, status }) });
       setState(s);
-      if (status === "done") notify("Nice — logged and mastery updated.");
+      if (status === "done") notify("Lesson marked done — mastery updated.");
     } catch { notify("Update failed."); }
   };
-
 
   const updateTask = async (id: number, patch: TaskPatch) => {
     try {
       const s = await api<AppState>("/api/tasks", { method: "PATCH", body: JSON.stringify({ id, ...patch }) });
       setState(s);
-      notify("Task updated.");
+      notify("Task updated successfully.");
     } catch { notify("Could not update task."); }
   };
 
@@ -113,7 +112,7 @@ export default function Home() {
     try {
       const s = await api<AppState>("/api/replan", { method: "POST" });
       setState(s);
-      notify("Schedule rebalanced from today onward.");
+      notify("Schedule mathematically rebalanced from today.");
     } catch { notify("Re-plan failed."); } finally { setBusy(false); }
   };
 
@@ -125,24 +124,32 @@ export default function Home() {
         body: JSON.stringify({ ...patch, _replan: replanIt }),
       });
       setState(s);
-      notify(replanIt ? "Settings saved — plan regenerated." : "Saved.");
+      notify(replanIt ? "Settings saved — schedule regenerated." : "Saved.");
     } catch { notify("Save failed."); } finally { setBusy(false); }
   };
 
   const addSubject = async (payload: { name: string; units: number; difficulty: string; color: string }) => {
     setBusy(true);
-    try { setState(await api<AppState>("/api/subjects", { method: "POST", body: JSON.stringify(payload) })); notify("Subject added and lessons generated."); }
-    catch { notify("Could not add subject."); } finally { setBusy(false); }
+    try {
+      setState(await api<AppState>("/api/subjects", { method: "POST", body: JSON.stringify(payload) }));
+      notify("Subject added and lessons generated.");
+    } catch { notify("Could not add subject."); } finally { setBusy(false); }
   };
+
   const editSubject = async (payload: { id: number; name: string; units: number; difficulty: string; color: string }) => {
     setBusy(true);
-    try { setState(await api<AppState>("/api/subjects", { method: "PATCH", body: JSON.stringify(payload) })); notify("Subject updated, plan rebalanced."); }
-    catch { notify("Could not update."); } finally { setBusy(false); }
+    try {
+      setState(await api<AppState>("/api/subjects", { method: "PATCH", body: JSON.stringify(payload) }));
+      notify("Subject updated, schedule rebalanced.");
+    } catch { notify("Could not update."); } finally { setBusy(false); }
   };
+
   const deleteSubject = async (id: number) => {
     setBusy(true);
-    try { setState(await api<AppState>(`/api/subjects?id=${id}`, { method: "DELETE" })); notify("Subject removed."); }
-    catch { notify("Could not delete."); } finally { setBusy(false); }
+    try {
+      setState(await api<AppState>(`/api/subjects?id=${id}`, { method: "DELETE" }));
+      notify("Subject removed.");
+    } catch { notify("Could not delete."); } finally { setBusy(false); }
   };
 
   const startSmartClock = () => {
@@ -151,7 +158,7 @@ export default function Home() {
       state?.tasks.find((x) => x.date === t);
     if (task) {
       clock.clockIn({ taskId: task.id, subjectId: task.subjectId ?? null });
-      notify(`Clocked in to: ${task.title.slice(0, 48)}`);
+      notify(`Clocked in: ${task.title.slice(0, 48)}`);
     } else {
       const sub = state?.subjects[0];
       clock.clockIn({ subjectId: sub?.id ?? null, taskId: null });
@@ -159,12 +166,10 @@ export default function Home() {
     }
   };
 
-  // "Clock in" on a task = start the study clock against it. It never
-  // touches the Focus Studio pomodoro timer and never navigates away.
   const focusTask = (taskId: number) => {
     const task = state?.tasks.find((x) => x.id === taskId);
     clock.clockIn({ taskId, subjectId: task?.subjectId ?? null });
-    notify(`Clocked in: ${task ? task.title.slice(0, 42) : "session"} — timer is recording.`);
+    notify(`Clocked in: ${task ? task.title.slice(0, 42) : "session"} — timer recording.`);
   };
 
   const askTutor = useCallback(
@@ -198,8 +203,7 @@ export default function Home() {
           ...prev,
           {
             id: -Date.now() - 1, userId: 0, role: "assistant",
-            content:
-              "I couldn't reach the tutor service just now. Check your connection and send that again — your question wasn't lost.",
+            content: "I couldn't reach the tutor service just now. Please try asking again.",
             createdAt: new Date().toISOString(),
           },
         ]);
@@ -213,7 +217,7 @@ export default function Home() {
       <div className="loader-screen">
         <div className="loader-ring"><IconLogo size={28} /></div>
         <div className="loader-title">Study Planner Pro</div>
-        <div className="loader-sub">Starting the AETHER engine…</div>
+        <div className="loader-sub">Initializing mathematical curriculum engine…</div>
       </div>
     );
   }
@@ -246,25 +250,24 @@ export default function Home() {
     { id: "clock-in", group: "Study Clock", label: clock.running ? "Clock Out" : "Clock In", hint: clock.running ? "Stop & log" : "Start recording", keywords: "timer record attendance", run: () => (clock.running ? clock.clockOut() : startSmartClock()) },
     { id: "clock-break", group: "Study Clock", label: clock.onBreak ? "Resume from break" : "Take a break", keywords: "pause rest", run: () => (clock.onBreak ? clock.endBreak() : clock.takeBreak()) },
     { id: "zen", group: "Focus", label: "Enter Zen mode", hint: "Distraction-free", keywords: "fullscreen minimal", run: () => setZen(true) },
-    { id: "ai", group: "AI Tutor", label: "Ask the AI tutor", hint: "Open chat", keywords: "help question doubt", run: () => setChatOpen(true) },
+    { id: "ai", group: "AI Tutor", label: "Ask AI Tutor", hint: "Open chat", keywords: "help question doubt", run: () => setChatOpen(true) },
     { id: "ai-today", group: "AI Tutor", label: "What should I study today?", keywords: "plan today", run: () => askTutor("What should I study today and in what order?") },
-    { id: "replan", group: "Plan", label: "Re-plan with AI", hint: "Rebalance", keywords: "regenerate schedule", run: () => { setPage("planner"); replan(); } },
-    { id: "setup", group: "Plan", label: "Re-run setup wizard", keywords: "onboarding restart course", run: () => setForceWizard(true) },
+    { id: "replan", group: "Plan", label: "Re-plan Mathematically", hint: "Rebalance", keywords: "regenerate schedule", run: () => { setPage("planner"); replan(); } },
+    { id: "setup", group: "Plan", label: "Re-run Setup Wizard", keywords: "onboarding restart course", run: () => setForceWizard(true) },
   ];
-
 
   return (
     <>
       <header className="mobile-header">
         <div className="flex-row gap-sm">
-          <div className="brand-logo-icon" style={{ width: 28, height: 28 }}><IconLogo size={14} /></div>
-          <span style={{ fontSize: ".9rem", fontWeight: 800 }}>Study Planner Pro</span>
+          <div className="brand-logo-icon" style={{ width: 30, height: 30 }}><IconLogo size={16} /></div>
+          <span style={{ fontSize: ".92rem", fontWeight: 800 }}>Study Planner Pro</span>
         </div>
-        <span className="streak-badge"><IconFlame /> {state.user.streak}</span>
+        <span className="streak-badge"><IconFlame /> {state.user.streak}d</span>
       </header>
 
       <div className="app-wrapper">
-        <aside className="sidebar glass-panel">
+        <aside className="sidebar">
           <div className="brand-header">
             <div className="brand-logo-icon"><IconLogo /></div>
             <div>
@@ -284,11 +287,11 @@ export default function Home() {
               <div className="streak-badge" style={{ marginBottom: 10 }}>
                 <IconFlame /> {state.user.streak} Day Streak
               </div>
-              <h4 style={{ fontSize: ".88rem", fontWeight: 800, margin: "0 0 4px" }}>Stay consistent</h4>
-              <p style={{ fontSize: ".74rem", color: "var(--text-muted)", lineHeight: 1.45, margin: "0 0 12px" }}>
-                {ctx.daysLeft} days left · {ctx.progressPct}% of syllabus done.
+              <h4 style={{ fontSize: ".88rem", fontWeight: 800, margin: "0 0 4px" }}>Keep Moving</h4>
+              <p style={{ fontSize: ".76rem", color: "var(--text-muted)", lineHeight: 1.45, margin: "0 0 12px" }}>
+                {ctx.daysLeft} days left · {ctx.progressPct}% syllabus completed.
               </p>
-              <button className="btn btn-secondary w-full" style={{ fontSize: ".76rem", padding: 8 }} onClick={() => setForceWizard(true)}>
+              <button className="btn btn-secondary w-full" style={{ fontSize: ".78rem", padding: 8 }} onClick={() => setForceWizard(true)}>
                 Re-run Setup
               </button>
             </div>
@@ -296,20 +299,20 @@ export default function Home() {
         </aside>
 
         <main className="main-workspace">
-          <div className="glass-panel tracker-bar">
+          <div className="tracker-bar">
             <div className="flex-row gap-md" style={{ flexWrap: "wrap" }}>
               <div className={`pulse-dot${clock.running ? " live" : ""}`} />
               <div>
-                <div style={{ fontSize: ".78rem", fontWeight: 800 }}>
+                <div style={{ fontSize: ".8rem", fontWeight: 800 }}>
                   {clock.running ? "Clocked in" : clock.onBreak ? "On break" : "Not clocked in"}
                 </div>
-                <div style={{ fontSize: ".7rem", color: "var(--text-muted)", fontWeight: 650 }}>
-                  {state.tasks.find((x) => x.id === clock.taskId)?.title.slice(0, 34) ||
+                <div style={{ fontSize: ".72rem", color: "var(--text-muted)", fontWeight: 650 }}>
+                  {state.tasks.find((x) => x.id === clock.taskId)?.title.slice(0, 36) ||
                     state.subjects.find((x) => x.id === clock.subjectId)?.name ||
                     "Free session"}
                 </div>
               </div>
-              <div className="mono" style={{ fontSize: "1.15rem", fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>
+              <div className="mono" style={{ fontSize: "1.2rem", fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>
                 {mmss(clock.elapsed)}
               </div>
             </div>
@@ -365,11 +368,11 @@ export default function Home() {
 
       {zen && (
         <div className="zen">
-          <div style={{ fontSize: ".72rem", letterSpacing: 3, textTransform: "uppercase", opacity: 0.6 }}>
-            {state.subjects.find((x) => x.id === clock.subjectId)?.name || "Deep Work"}
+          <div style={{ fontSize: ".78rem", letterSpacing: 3, textTransform: "uppercase", opacity: 0.7 }}>
+            {state.subjects.find((x) => x.id === clock.subjectId)?.name || "Deep Focus Session"}
           </div>
           <div className="zen-digits mono">{mmss(timer.seconds)}</div>
-          <div style={{ fontSize: ".8rem", opacity: 0.55, fontWeight: 700 }}>
+          <div style={{ fontSize: ".84rem", opacity: 0.65, fontWeight: 700 }}>
             Study clock: {clock.running ? "recording" : clock.onBreak ? "on break" : "not clocked in"} · {mmss(clock.elapsed)}
           </div>
           <div className="flex-row gap-md" style={{ flexWrap: "wrap", justifyContent: "center" }}>
@@ -384,8 +387,9 @@ export default function Home() {
 
       {toast && (
         <div className="glass-panel slide-in" style={{
-          position: "fixed", bottom: 96, left: "50%", transform: "translateX(-50%)", zIndex: 250,
-          padding: "11px 18px", fontSize: ".82rem", fontWeight: 700,
+          position: "fixed", bottom: 96, left: "50%", transform: "translateX(-50%)", zIndex: 350,
+          padding: "12px 22px", fontSize: ".86rem", fontWeight: 700, background: "var(--surface-solid)",
+          boxShadow: "0 10px 30px rgba(0,0,0,0.15)", borderRadius: 12
         }}>{toast}</div>
       )}
     </>
