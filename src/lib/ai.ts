@@ -1,388 +1,292 @@
-"use client";
+import { generateTopics, lookupTopicBank, synthesiseSubjects, type GeneratedTopic, type SeedSubject } from "./curriculum";
+import { lookupKnowledge, teachFromKnowledge } from "./knowledge";
 
-import React, { useCallback, useEffect, useState } from "react";
-import { api, prettyLong, today, type AppState, type MessageRow } from "@/lib/client";
-import { mmss, useFocusTimer, useStudyClock, type TimerMode } from "@/lib/useTimer";
-import Onboarding from "@/components/Onboarding";
-import Dashboard from "@/components/Dashboard";
-import PlannerView from "@/components/PlannerView";
-import FocusView from "@/components/FocusView";
-import SubjectsView from "@/components/SubjectsView";
-import SettingsView from "@/components/SettingsView";
-import ChatPanel from "@/components/ChatPanel";
-import CommandPalette, { type Command } from "@/components/CommandPalette";
-import type { TaskPatch } from "@/components/TaskEditor";
-import {
-  IconBolt, IconBook, IconCalendar, IconClock, IconFlame, IconGear, IconHome, IconLogo,
-} from "@/components/icons";
-
-type Page = "dashboard" | "planner" | "focus" | "subjects" | "settings";
-
-const NAV: { id: Page; label: string; icon: React.ReactNode }[] = [
-  { id: "dashboard", label: "Overview", icon: <IconHome /> },
-  { id: "planner", label: "Planner", icon: <IconCalendar /> },
-  { id: "focus", label: "Focus", icon: <IconClock /> },
-  { id: "subjects", label: "Subjects", icon: <IconBook /> },
-  { id: "settings", label: "Settings", icon: <IconGear /> },
-];
-
-export default function Home() {
-  const [state, setState] = useState<AppState | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState<Page>("dashboard");
-  const [busy, setBusy] = useState(false);
-  const [chatOpen, setChatOpen] = useState(false);
-  const [thinking, setThinking] = useState(false);
-  const [zen, setZen] = useState(false);
-  const [toast, setToast] = useState("");
-  const [pendingMsgs, setPendingMsgs] = useState<MessageRow[]>([]);
-  const [forceWizard, setForceWizard] = useState(false);
-
-  const notify = (m: string) => { setToast(m); setTimeout(() => setToast(""), 3200); };
-
-  useEffect(() => {
-    api<AppState>("/api/state")
-      .then(setState)
-      .catch(() => notify("Could not reach the server."))
-      .finally(() => setLoading(false));
-  }, []);
-
-  useEffect(() => {
-    if (state?.settings.theme) document.body.className = `theme-${state.settings.theme}`;
-  }, [state?.settings.theme]);
-
-  const logSession = useCallback(
-    (minutes: number, subjectId: number | null, taskId: number | null, mode: string) => {
-      api<AppState>("/api/sessions", {
-        method: "POST",
-        body: JSON.stringify({ minutes, subjectId, taskId, mode }),
-      }).then(setState).catch(() => {});
-    },
-    []
-  );
-
-  const clock = useStudyClock(logSession);
-
-  const onBlockComplete = useCallback((mode: TimerMode, minutes: number) => {
-    if (mode === "short" || mode === "long") { notify("Break over — back to it."); return; }
-    notify(`Focus block finished (${minutes} min).`);
-  }, []);
-
-  const timer = useFocusTimer(
-    {
-      pomodoro: state?.settings.pomodoro ?? 25,
-      shortBreak: state?.settings.shortBreak ?? 5,
-      longBreak: state?.settings.longBreak ?? 15,
-    },
-    onBlockComplete
-  );
-
-  const setTaskStatus = async (id: number, status: string) => {
-    try {
-      const s = await api<AppState>("/api/tasks", { method: "PATCH", body: JSON.stringify({ id, status }) });
-      setState(s);
-      if (status === "done") notify("Nice — logged and mastery updated.");
-    } catch { notify("Update failed."); }
-  };
-
-  const updateTask = async (id: number, patch: TaskPatch) => {
-    try {
-      const s = await api<AppState>("/api/tasks", { method: "PATCH", body: JSON.stringify({ id, ...patch }) });
-      setState(s);
-      notify("Task updated.");
-    } catch { notify("Could not update task."); }
-  };
-
-  const skipSubjectForDay = async (subjectId: number, date: string) => {
-    try {
-      const s = await api<AppState>("/api/tasks", {
-        method: "PATCH",
-        body: JSON.stringify({ skipSubjectId: subjectId, skipDate: date }),
-      });
-      setState(s);
-      const name = s.subjects.find((x) => x.id === subjectId)?.name || "subject";
-      notify(`Skipped ${name} for that day.`);
-    } catch { notify("Could not skip subject."); }
-  };
-
-  const replan = async () => {
-    setBusy(true);
-    try {
-      const s = await api<AppState>("/api/replan", { method: "POST" });
-      setState(s);
-      notify("Schedule rebalanced from today onward.");
-    } catch { notify("Re-plan failed."); } finally { setBusy(false); }
-  };
-
-  const patchSettings = async (patch: Record<string, unknown>, replanIt = false) => {
-    setBusy(true);
-    try {
-      const s = await api<AppState>("/api/settings", {
-        method: "PATCH",
-        body: JSON.stringify({ ...patch, _replan: replanIt }),
-      });
-      setState(s);
-      notify(replanIt ? "Settings saved — plan regenerated." : "Saved.");
-    } catch { notify("Save failed."); } finally { setBusy(false); }
-  };
-
-  const addSubject = async (payload: { name: string; units: number; difficulty: string; color: string }) => {
-    setBusy(true);
-    try { setState(await api<AppState>("/api/subjects", { method: "POST", body: JSON.stringify(payload) })); notify("Subject added and lessons generated."); }
-    catch { notify("Could not add subject."); } finally { setBusy(false); }
-  };
-  const editSubject = async (payload: { id: number; name: string; units: number; difficulty: string; color: string }) => {
-    setBusy(true);
-    try { setState(await api<AppState>("/api/subjects", { method: "PATCH", body: JSON.stringify(payload) })); notify("Subject updated, plan rebalanced."); }
-    catch { notify("Could not update."); } finally { setBusy(false); }
-  };
-  const deleteSubject = async (id: number) => {
-    setBusy(true);
-    try { setState(await api<AppState>(`/api/subjects?id=${id}`, { method: "DELETE" })); notify("Subject removed."); }
-    catch { notify("Could not delete."); } finally { setBusy(false); }
-  };
-
-  const startSmartClock = () => {
-    const t = today();
-    const task = state?.tasks.find((x) => x.date === t && x.status === "pending") ||
-      state?.tasks.find((x) => x.date === t);
-    if (task) {
-      clock.clockIn({ taskId: task.id, subjectId: task.subjectId ?? null });
-      notify(`Clocked in to: ${task.title.slice(0, 48)}`);
-    } else {
-      const sub = state?.subjects[0];
-      clock.clockIn({ subjectId: sub?.id ?? null, taskId: null });
-      notify(sub ? `Clocked in to ${sub.name}.` : "Clocked in — free session.");
+/* ============================================================
+   UNIVERSAL ENVIRONMENT VARIABLE FETCHER
+============================================================ */
+function getSafeKey(keyName: string): string | null {
+  try {
+    if (typeof process !== "undefined" && process.env && process.env[keyName]) {
+      return process.env[keyName] as string;
     }
-  };
+    // @ts-ignore
+    if (typeof import.meta !== "undefined" && import.meta.env && import.meta.env[keyName]) {
+      // @ts-ignore
+      return import.meta.env[keyName] as string;
+    }
+  } catch (e) { return null; }
+  return null;
+}
 
-  const focusTask = (taskId: number) => {
-    const task = state?.tasks.find((x) => x.id === taskId);
-    clock.clockIn({ taskId, subjectId: task?.subjectId ?? null });
-    notify(`Clocked in: ${task ? task.title.slice(0, 42) : "session"} — timer is recording.`);
-  };
+type ChatMsg = { role: "user" | "assistant"; content: string };
 
-  const askTutor = useCallback(
-    async (q: string) => {
-      setChatOpen(true);
-      setThinking(true);
-      const optimistic: MessageRow = {
-        id: -Date.now(), userId: 0, role: "user", content: q, createdAt: new Date().toISOString(),
-      };
-      setPendingMsgs((p) => [...p, optimistic]);
-      try {
-        const r = await api<{ reply: string; action: { type: string; payload?: unknown } | null; state: AppState }>(
-          "/api/chat",
-          { method: "POST", body: JSON.stringify({ message: q }) }
-        );
-        setState(r.state);
-        setPendingMsgs([]);
-        const a = r.action;
-        if (a) {
-          if (a.type === "navigate") setPage(String(a.payload) as Page);
-          if (a.type === "startTimer") { if (!clock.running) startSmartClock(); }
-          if (a.type === "stopTimer") { if (clock.running) clock.clockOut(); }
-          if (a.type === "break") { if (clock.running) clock.takeBreak(); else notify("Start a session first, then take a break."); }
-          if (a.type === "zen") setZen(true);
-          if (a.type === "replan") { void replan(); }
-          if (a.type === "theme") { void patchSettings({ theme: String(a.payload) }); }
-        }
-      } catch {
-        notify("Tutor unavailable right now.");
-        setPendingMsgs((prev) => [
-          ...prev,
+export function activeProvider(): string | null {
+  if (getSafeKey("NEXT_PUBLIC_GEMINI_API_KEY") || getSafeKey("NEXT_PUBLIC_GOOGLE_API_KEY")) return "AI Cloud";
+  if (getSafeKey("NEXT_PUBLIC_GROQ_API_KEY")) return "Groq";
+  if (getSafeKey("NEXT_PUBLIC_OPENROUTER_API_KEY")) return "OpenRouter";
+  return null;
+}
+
+export async function callLLM(
+  system: string,
+  messages: ChatMsg[],
+  maxTokens = 2500
+): Promise<string | null> {
+  const providers = ["gemini", "groq", "openrouter"];
+
+  for (const provider of providers) {
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 18000); 
+      let text: string | null = null;
+
+      const geminiKey = getSafeKey("NEXT_PUBLIC_GEMINI_API_KEY") || getSafeKey("NEXT_PUBLIC_GOOGLE_API_KEY");
+      const groqKey = getSafeKey("NEXT_PUBLIC_GROQ_API_KEY");
+      const openrouterKey = getSafeKey("NEXT_PUBLIC_OPENROUTER_API_KEY");
+      const geminiModel = getSafeKey("NEXT_PUBLIC_GEMINI_MODEL") || "gemini-1.5-flash";
+
+      if (provider === "gemini" && geminiKey) {
+        const r = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiKey}`,
           {
-            id: -Date.now() - 1, userId: 0, role: "assistant",
-            content:
-              "I couldn't reach the tutor service just now. Check your connection and send that again — your question wasn't lost.",
-            createdAt: new Date().toISOString(),
+            method: "POST",
+            signal: ctrl.signal,
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              systemInstruction: { parts: [{ text: system }] },
+              contents: messages.map((m) => ({
+                role: m.role === "assistant" ? "model" : "user",
+                parts: [{ text: m.content }],
+              })),
+              generationConfig: { maxOutputTokens: maxTokens },
+            }),
+          }
+        );
+        if (r.ok) {
+          const j = await r.json();
+          text = j?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text || "").join("") ?? null;
+        }
+      } 
+      else if (provider === "groq" && groqKey) {
+        const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+          method: "POST",
+          signal: ctrl.signal,
+          headers: { "content-type": "application/json", authorization: `Bearer ${groqKey}` },
+          body: JSON.stringify({
+            model: "llama-3.3-70b-versatile",
+            max_tokens: maxTokens,
+            messages: [{ role: "system", content: system }, ...messages],
+          }),
+        });
+        if (r.ok) {
+          const j = await r.json();
+          text = j?.choices?.[0]?.message?.content ?? null;
+        }
+      } 
+      else if (provider === "openrouter" && openrouterKey) {
+        const r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          signal: ctrl.signal,
+          headers: { 
+            "content-type": "application/json", 
+            "authorization": `Bearer ${openrouterKey}`,
+            "HTTP-Referer": "https://studyplanner.netlify.app", 
+            "X-Title": "Study Planner Pro" 
           },
-        ]);
-      } finally { setThinking(false); }
-    },
-    [clock]
+          body: JSON.stringify({
+            model: "openai/gpt-4o-mini",
+            max_tokens: maxTokens,
+            messages: [{ role: "system", content: system }, ...messages],
+          }),
+        });
+        if (r.ok) {
+          const j = await r.json();
+          text = j?.choices?.[0]?.message?.content ?? null;
+        }
+      }
+
+      clearTimeout(timer);
+      if (text && text.trim()) return text.trim();
+    } catch (error) { continue; }
+  }
+  return null;
+}
+
+function extractJson<T>(raw: string): T | null {
+  const fence = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
+  const body = fence ? fence[1] : raw;
+  const start = body.search(/[[{]/);
+  if (start < 0) return null;
+  const endBrace = Math.max(body.lastIndexOf("]"), body.lastIndexOf("}"));
+  try { return JSON.parse(body.slice(start, endBrace + 1)) as T; } 
+  catch { return null; }
+}
+
+export async function aiSuggestSubjects(
+  courseName: string,
+  level: string
+): Promise<{ subjects: SeedSubject[]; source: string }> {
+  const fallback = synthesiseSubjects(courseName, level);
+
+  const raw = await callLLM(
+    "You are an elite academic curriculum planner. Return ONLY a valid JSON array. Do not include conversational text.",
+    [
+      {
+        role: "user",
+        content: `Course/exam: "${courseName}". Education level: ${level}. 
+        Based on the official NMIMS CDOE Semester 1 curriculum, you MUST return exactly these 6 core subjects. DO NOT ADD OR REMOVE ANY:
+        1. "Business Communication"
+        2. "Financial Accounting"
+        3. "Micro Economics & Macro Economics" (THIS IS A SINGLE COMBINED SUBJECT)
+        4. "Organizational Behavior" (Fetch actual real-world units, e.g. 16)
+        5. "Marketing Management"
+        6. "Quantitative Methods - I" (THIS MUST BE EXACTLY 12 UNITS. NO EXCEPTIONS).
+        
+        Return EXACTLY 6 subjects as a strict JSON array. 
+        Format: [{"name":"Subject Name","units": <ACTUAL_UNITS>,"difficulty":"Medium","color":"#6366f1"}]. 
+        JSON array ONLY.`
+      }
+    ],
+    2500
   );
+  
+  if (!raw) return { subjects: fallback, source: "aether-local" };
 
-  if (loading) {
-    return (
-      <div className="loader-screen">
-        <div className="loader-ring"><IconLogo size={28} /></div>
-        <div className="loader-title">Study Planner Pro</div>
-        <div className="loader-sub">Starting the AETHER engine…</div>
-      </div>
-    );
-  }
+  try {
+    const parsed = extractJson<SeedSubject[]>(raw);
+    if (Array.isArray(parsed) && parsed.length >= 2) {
+      const palette = ["#6366f1", "#10b981", "#f59e0b", "#ef4444", "#06b6d4", "#ec4899", "#84cc16"];
+      return {
+        subjects: parsed.slice(0, 8).map((s, i) => ({
+          name: String(s.name).slice(0, 80),
+          units: Math.min(40, Math.max(2, Number(s.units) || 8)), 
+          difficulty: (["Easy", "Medium", "Hard"].includes(String(s.difficulty)) ? s.difficulty : "Medium") as SeedSubject["difficulty"],
+          color: /^#[0-9a-f]{6}$/i.test(String(s.color)) ? s.color : palette[i % palette.length],
+        })),
+        source: "AI Cloud Database",
+      };
+    }
+  } catch { /* fall through */ }
+  
+  return { subjects: fallback, source: "aether-local" };
+}
 
-  if (!state) {
-    return (
-      <div className="loader-screen">
-        <div className="loader-title">Connection problem</div>
-        <div className="loader-sub">Refresh the page to retry.</div>
-      </div>
-    );
-  }
-
-  if (!state.user.onboarded || forceWizard) {
-    return <Onboarding onDone={(s) => { setState(s); setForceWizard(false); setPage("dashboard"); }} />;
-  }
-
-  const ctx = state.context;
-  const t = today();
-  const todayDone = state.tasks.filter((x) => x.date === t && x.status === "done").length;
-  const todayTotal = state.tasks.filter((x) => x.date === t).length;
-  const allMsgs = [...state.messages, ...pendingMsgs];
-
-  const commands: Command[] = [
-    { id: "nav-dash", group: "Navigate", label: "Go to Overview", hint: "Dashboard", keywords: "home stats", run: () => setPage("dashboard") },
-    { id: "nav-plan", group: "Navigate", label: "Go to Planner", hint: "Schedule", keywords: "tasks lessons", run: () => setPage("planner") },
-    { id: "nav-focus", group: "Navigate", label: "Go to Focus", hint: "Pomodoro", keywords: "timer deep work", run: () => setPage("focus") },
-    { id: "nav-subj", group: "Navigate", label: "Go to Subjects", hint: "Syllabus", keywords: "units topics", run: () => setPage("subjects") },
-    { id: "nav-set", group: "Navigate", label: "Go to Settings", keywords: "theme preferences", run: () => setPage("settings") },
-    { id: "clock-in", group: "Study Clock", label: clock.running ? "Clock Out" : "Clock In", hint: clock.running ? "Stop & log" : "Start recording", keywords: "timer record attendance", run: () => (clock.running ? clock.clockOut() : startSmartClock()) },
-    { id: "clock-break", group: "Study Clock", label: clock.onBreak ? "Resume from break" : "Take a break", keywords: "pause rest", run: () => (clock.onBreak ? clock.endBreak() : clock.takeBreak()) },
-    { id: "zen", group: "Focus", label: "Enter Zen mode", hint: "Distraction-free", keywords: "fullscreen minimal", run: () => setZen(true) },
-    { id: "ai", group: "AI Tutor", label: "Ask the AI tutor", hint: "Open chat", keywords: "help question doubt", run: () => setChatOpen(true) },
-    { id: "ai-today", group: "AI Tutor", label: "What should I study today?", keywords: "plan today", run: () => askTutor("What should I study today and in what order?") },
-    { id: "replan", group: "Plan", label: "Re-plan with AI", hint: "Rebalance", keywords: "regenerate schedule", run: () => { setPage("planner"); replan(); } },
-    { id: "setup", group: "Plan", label: "Re-run setup wizard", keywords: "onboarding restart course", run: () => setForceWizard(true) },
-  ];
-
-  return (
-    <>
-      <header className="mobile-header">
-        <div className="flex-row gap-sm">
-          <div className="brand-logo-icon" style={{ width: 28, height: 28 }}><IconLogo size={14} /></div>
-          <span style={{ fontSize: ".9rem", fontWeight: 800 }}>Study Planner Pro</span>
-        </div>
-        <span className="streak-badge"><IconFlame /> {state.user.streak}</span>
-      </header>
-
-      <div className="app-wrapper">
-        <aside className="sidebar glass-panel">
-          <div className="brand-header">
-            <div className="brand-logo-icon"><IconLogo /></div>
-            <div>
-              <div className="brand-title">Study Planner Pro</div>
-              <div className="brand-course">{state.user.courseName}</div>
-            </div>
-          </div>
-          <nav className="nav-list">
-            {NAV.map((n) => (
-              <div key={n.id} className={`nav-item${page === n.id ? " active" : ""}`} onClick={() => setPage(n.id)}>
-                {n.icon}<span>{n.label}</span>
-              </div>
-            ))}
-          </nav>
-          <div className="sidebar-foot" style={{ marginTop: "auto", paddingTop: 16 }}>
-            <div className="glass-panel tilt-card" style={{ padding: 18, textAlign: "center" }}>
-              <div className="streak-badge" style={{ marginBottom: 10 }}>
-                <IconFlame /> {state.user.streak} Day Streak
-              </div>
-              <h4 style={{ fontSize: ".88rem", fontWeight: 800, margin: "0 0 4px" }}>Stay consistent</h4>
-              <p style={{ fontSize: ".74rem", color: "var(--text-muted)", lineHeight: 1.45, margin: "0 0 12px" }}>
-                {ctx.daysLeft} days left · {ctx.progressPct}% of syllabus done.
-              </p>
-              <button className="btn btn-secondary w-full" style={{ fontSize: ".76rem", padding: 8 }} onClick={() => setForceWizard(true)}>
-                Re-run Setup
-              </button>
-            </div>
-          </div>
-        </aside>
-
-        <main className="main-workspace">
-          {/* THE NEW FLOATING PREMIUM TRACKER BAR */}
-          <div className="tracker-bar">
-            <div className="flex-row gap-md" style={{ flexWrap: "wrap" }}>
-              <div className={`pulse-dot${clock.running ? " live" : ""}`} style={{ width: 10, height: 10, borderRadius: "50%", background: clock.running ? "var(--success-accent)" : "var(--text-dim)" }} />
-              <div>
-                <div style={{ fontSize: ".8rem", fontWeight: 800 }}>
-                  {clock.running ? "Clocked in" : clock.onBreak ? "On break" : "Not clocked in"}
-                </div>
-                <div style={{ fontSize: ".72rem", color: "var(--text-muted)", fontWeight: 650 }}>
-                  {state.tasks.find((x) => x.id === clock.taskId)?.title.slice(0, 34) ||
-                    state.subjects.find((x) => x.id === clock.subjectId)?.name ||
-                    "Free session"}
-                </div>
-              </div>
-              <div className="mono" style={{ fontSize: "1.2rem", fontWeight: 800 }}>
-                {mmss(clock.elapsed)}
-              </div>
-            </div>
-            <div className="flex-row gap-sm" style={{ flexWrap: "wrap" }}>
-              <span className="chip chip-kind" style={{ background: "var(--accent-glow)", color: "var(--accent)" }}>{todayDone}/{todayTotal} today</span>
-              <span className="chip chip-pending" style={{ background: "var(--status-pending-bg)", color: "var(--status-pending-text)" }}>{ctx.daysLeft}d to {prettyLong(state.settings.examDate)}</span>
-              {!clock.running && !clock.onBreak && (
-                <button className="btn btn-xs btn-primary" onClick={startSmartClock}>Clock In</button>
-              )}
-              {clock.running && (
-                <>
-                  <button className="btn btn-xs btn-secondary" onClick={clock.pause}>Pause</button>
-                  <button className="btn btn-xs btn-secondary" onClick={clock.takeBreak}>Break</button>
-                  <button className="btn btn-xs btn-danger" style={{ background: "var(--status-skipped-bg)", color: "var(--status-skipped-text)" }} onClick={clock.clockOut}>Clock Out</button>
-                </>
-              )}
-              {clock.onBreak && (
-                <button className="btn btn-xs btn-primary" onClick={clock.endBreak}>Resume</button>
-              )}
-              <button className="btn btn-xs btn-secondary" onClick={() => setZen(true)}>⚡ Zen</button>
-            </div>
-          </div>
-
-          {page === "dashboard" && (
-            <Dashboard state={state} onTaskStatus={setTaskStatus} onTaskUpdate={updateTask}
-              onSkipSubject={skipSubjectForDay} onFocusTask={focusTask}
-              activeTaskId={clock.taskId} activeClockSeconds={clock.elapsed}
-              replanning={busy} onReplan={replan} />
-          )}
-          {page === "planner" && (
-            <PlannerView state={state} onTaskStatus={setTaskStatus} onTaskUpdate={updateTask}
-              onSkipSubject={skipSubjectForDay} onFocusTask={focusTask}
-              activeTaskId={clock.taskId} activeClockSeconds={clock.elapsed}
-              onAskTutor={askTutor} replanning={busy} onReplan={replan} />
-          )}
-          {page === "focus" && (
-            <FocusView state={state} timer={timer} clock={clock} onCompleteTask={(id) => setTaskStatus(id, "done")} onZen={() => setZen(true)} />
-          )}
-          {page === "subjects" && (
-            <SubjectsView state={state} onAdd={addSubject} onEdit={editSubject} onDelete={deleteSubject} busy={busy} onAskTutor={askTutor} />
-          )}
-          {page === "settings" && (
-            <SettingsView state={state} onPatch={patchSettings} onRestart={() => setForceWizard(true)} busy={busy} />
-          )}
-        </main>
-      </div>
-
-      <ChatPanel open={chatOpen} setOpen={setChatOpen} messages={allMsgs} onSend={askTutor}
-        thinking={thinking} provider={state.aiProvider} />
-
-      <CommandPalette commands={commands} />
-      <div className="cmdk-tip">Press ⌘K / Ctrl-K for commands</div>
-
-      {zen && (
-        <div className="zen">
-          <div style={{ fontSize: ".72rem", letterSpacing: 3, textTransform: "uppercase", opacity: 0.6 }}>
-            {state.subjects.find((x) => x.id === clock.subjectId)?.name || "Deep Work"}
-          </div>
-          <div className="zen-digits mono">{mmss(timer.seconds)}</div>
-          <div style={{ fontSize: ".8rem", opacity: 0.55, fontWeight: 700 }}>
-            Study clock: {clock.running ? "recording" : clock.onBreak ? "on break" : "not clocked in"} · {mmss(clock.elapsed)}
-          </div>
-          <div className="flex-row gap-md" style={{ flexWrap: "wrap", justifyContent: "center" }}>
-            <button className="btn btn-primary" onClick={timer.toggle}>{timer.running ? "Pause Focus" : "Start Focus"}</button>
-            {!clock.running
-              ? <button className="btn btn-secondary" onClick={startSmartClock} style={{ color: "#000", background: "#fff" }}>Clock In</button>
-              : <button className="btn btn-secondary" onClick={clock.pause} style={{ color: "#000", background: "#fff" }}>Pause Clock</button>}
-            <button className="btn btn-secondary" onClick={() => setZen(false)} style={{ color: "#000", background: "#fff", border: "none" }}>Exit Zen</button>
-          </div>
-        </div>
-      )}
-
-      {toast && (
-        <div className="glass-panel slide-in" style={{
-          position: "fixed", bottom: 96, left: "50%", transform: "translateX(-50%)", zIndex: 250,
-          padding: "11px 18px", fontSize: ".82rem", fontWeight: 700, background: "var(--surface-solid)"
-        }}>{toast}</div>
-      )}
-    </>
+export async function aiGenerateTopics(
+  subjectName: string,
+  units: number,
+  difficulty: string,
+  level: string,
+  courseName: string
+): Promise<GeneratedTopic[]> {
+  const fallback = generateTopics(subjectName, units, difficulty, level);
+  const raw = await callLLM(
+    `You are a strict curriculum architect. Return ONLY a valid JSON array. Do not include conversational text or explanations.`,
+    [
+      {
+        role: "user",
+        content: `Course: ${courseName} (level: ${level}). Subject: "${subjectName}". Difficulty: ${difficulty}. 
+        Return EXACTLY ${units} sequential lessons ordered from foundational to advanced, as a JSON array. 
+        Format: [{"unit":"Unit 1","title":"...","summary":"2 sentence study instruction","objectives":["..."],"difficulty":"Medium","estMinutes":45}] 
+        JSON array ONLY.`,
+      },
+    ],
+    2500
   );
+  if (!raw) return fallback;
+  const parsed = extractJson<GeneratedTopic[]>(raw);
+  if (!parsed || !Array.isArray(parsed) || parsed.length < 2) return fallback;
+  return parsed.slice(0, units).map((t, i) => ({
+    unit: t.unit || `Unit ${i + 1}`,
+    title: String(t.title || fallback[i]?.title || `Lesson ${i + 1}`).slice(0, 160),
+    summary: String(t.summary || fallback[i]?.summary || ""),
+    objectives: Array.isArray(t.objectives) ? t.objectives.slice(0, 4).map(String) : [],
+    difficulty: (["Easy", "Medium", "Hard"].includes(String(t.difficulty))
+      ? t.difficulty
+      : "Medium") as "Easy" | "Medium" | "Hard",
+    estMinutes: Math.min(180, Math.max(15, Number(t.estMinutes) || 45)),
+  }));
+}
+
+export type TutorContext = {
+  name: string; courseName: string; level: string; examDate: string; daysLeft: number; dailyHours: number;
+  subjects: { id: number; name: string; difficulty: string; done: number; total: number }[];
+  today: { title: string; kind: string; minutes: number; status: string }[];
+  progressPct: number; streak: number; hoursThisWeek: number; overdue: number;
+};
+export type TutorReply = { text: string; action?: { type: string; payload?: unknown } };
+
+function round(n: number): number { return Math.round(n * 10000) / 10000; }
+function percentQ(q: string): string | null {
+  const m = q.match(/what\s+is\s+(\d+\.?\d*)\s*%\s*of\s*(\d+\.?\d*)/i);
+  if (!m) return null;
+  const v = (parseFloat(m[1]) / 100) * parseFloat(m[2]);
+  return `${m[1]}% of ${m[2]} = **${round(v)}**`;
+}
+
+export function parseCommand(q: string): TutorReply["action"] | undefined {
+  const n = q.toLowerCase().trim().replace(/[.!]+$/, "");
+  if (/\b(planner|schedule|my plan|timetable)\b/.test(n) && /\b(open|go|show|view|take me|see)\b/.test(n)) return { type: "navigate", payload: "planner" };
+  if (/\b(dashboard|overview|home|stats?)\b/.test(n) && /\b(open|go|show|view|take me|see)\b/.test(n)) return { type: "navigate", payload: "dashboard" };
+  if (/\b(subjects?|syllabus|topics?|lessons?)\b/.test(n) && /\b(open|go|show|view|manage|edit)\b/.test(n)) return { type: "navigate", payload: "subjects" };
+  if (/\b(settings?|preferences?|options?|profile)\b/.test(n) && /\b(open|go|show|change|edit)\b/.test(n)) return { type: "navigate", payload: "settings" };
+  if (/^\/?(planner|schedule)$/.test(n)) return { type: "navigate", payload: "planner" };
+  if (/^\/?(dashboard|overview)$/.test(n)) return { type: "navigate", payload: "dashboard" };
+  if (/^\/?(subjects|syllabus)$/.test(n)) return { type: "navigate", payload: "subjects" };
+  if (/^\/?(settings)$/.test(n)) return { type: "navigate", payload: "settings" };
+  if (/\b(clock ?in|start (the )?(timer|clock|focus|session|studying|study)|begin (studying|session|focus)|let'?s study|i'?m ready to study)\b/.test(n)) return { type: "startTimer" };
+  if (/\b(clock ?out|stop (the )?(timer|clock|session)|end (the )?(session|study)|i'?m done|finished studying)\b/.test(n)) return { type: "stopTimer" };
+  if (/\b(take a break|break time|pause (the )?(timer|clock|session)|need a break)\b/.test(n)) return { type: "break" };
+  if (/\b(zen|focus mode|full ?screen|distraction ?free|deep work mode)\b/.test(n)) return { type: "zen" };
+  if (/\b(re-?plan|rebuild|regenerate|reschedule|re-?balance|redo my (plan|schedule)|fix my (plan|schedule)|update my plan)\b/.test(n)) return { type: "replan" };
+  
+  if (n.includes("theme") || /\b(midnight|dark|obsidian|nebula|emerald|sunset|mint|silver|lavender|samsung|light|black)\b/.test(n)) {
+    if (/(midnight|dark|black)/.test(n)) return { type: "theme", payload: "theme-dark" };
+    if (/(obsidian)/.test(n)) return { type: "theme", payload: "theme-obsidian" };
+    if (/(nebula)/.test(n)) return { type: "theme", payload: "theme-nebula" };
+    if (/(emerald|mint)/.test(n)) return { type: "theme", payload: "theme-mint" };
+    if (/(sunset|champagne)/.test(n)) return { type: "theme", payload: "theme-sunset" };
+    if (/(light|samsung|clean)/.test(n)) return { type: "theme", payload: "theme-sunset" };
+    if (/(silver|lavender)/.test(n)) return { type: "theme", payload: "theme-silver-lavender" };
+    return { type: "theme", payload: "theme-dark" };
+  }
+  return undefined;
+}
+
+export async function localTutor(q: string, ctx: TutorContext): Promise<TutorReply> {
+  const action = parseCommand(q);
+  const n = q.toLowerCase();
+
+  if (action?.type === "replan") return { text: `No problem. I'm rebalancing your schedule now...`, action };
+  if (action) {
+    const msgs: Record<string, string> = {
+      navigate: `Opening **${String(action.payload)}** for you.`,
+      startTimer: `Clock started. Put the phone in another room.`,
+      stopTimer: `Session stopped and logged. Nice work.`,
+      break: `Break started. Drink water.`,
+      zen: `Zen mode engaged.`,
+      theme: `Theme changed instantly.`
+    };
+    return { text: msgs[action.type] || "Done.", action };
+  }
+
+  if (/(what|which).*(today|now)|today'?s (plan|task|study|load)|what should i (study|do)/.test(n)) {
+    if (!ctx.today.length) return { text: `Nothing is scheduled for today.` };
+    const list = ctx.today.map((t, i) => `${i + 1}. **${t.title}**   ${t.minutes} min`).join("\n");
+    return { text: `Here's today:\n\n${list}\n\nSay *"start timer"* when you're ready.` };
+  }
+
+  const pct = percentQ(q); if (pct) return { text: pct };
+
+  const aiResponse = await callLLM(tutorSystemPrompt(ctx), [{ role: "user", content: q }], 800);
+  if (aiResponse) return { text: aiResponse };
+
+  const subjectHint = ctx.subjects.find((s) => n.includes(s.name.toLowerCase().split(" ")[0]))?.name;
+  const knowledge = await lookupKnowledge(q);
+  if (knowledge) return { text: teachFromKnowledge(knowledge, q, ctx.level, subjectHint) };
+
+  return { text: `I couldn't reach any AI servers. Try asking me to explain a concept or ask *"what should I study today?"*` };
+}
+
+export function tutorSystemPrompt(ctx: TutorContext): string {
+  return `You are AETHER, the built-in AI tutor and study coach inside "Study Planner Pro". Learner: ${ctx.name}. Rules: Be empathetic. Use markdown. Teach, don't just give answers.`;
 }
