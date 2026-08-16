@@ -64,46 +64,41 @@ export default function PlannerView({
     const subj = subjFor(task);
     const topic = topicFor(task);
     const open = expanded === task.id;
-
     return (
       <div key={task.id}>
         <div className={`task-row${task.status === "done" ? " done" : ""}${activeTaskId === task.id ? " active-clock" : ""}`}>
-          <div className="task-info-top">
-            <div className="task-dot" style={{ background: subj?.color || meta.color, marginTop: 5 }} />
-            <div className="task-info" style={{ cursor: topic ? "pointer" : "default" }}
-              onClick={() => topic && setExpanded(open ? null : task.id)}>
-              <div className="task-title">{task.title}</div>
-              <div className="task-sub">
-                <span className="chip chip-kind" style={{ marginRight: 6 }}>{meta.label}</span>
-                {task.plannedMinutes} min
-                {topic ? ` · ${topic.unit} · ${topic.difficulty}` : ""}
-                {taskLogged(task.id) ? ` · ${fmtMin(taskLogged(task.id))} logged` : task.actualMinutes ? ` · ${task.actualMinutes}m logged` : ""}
-                {activeTaskId === task.id && activeClockSeconds ? ` · live +${Math.floor(activeClockSeconds / 60)}m ${activeClockSeconds % 60}s` : ""}
-              </div>
+          <div className="task-dot" style={{ background: subj?.color || meta.color }} />
+          <div style={{ flex: 1, minWidth: 0, cursor: topic ? "pointer" : "default" }}
+            onClick={() => topic && setExpanded(open ? null : task.id)}>
+            <div className="task-title">{task.title}</div>
+            <div className="task-sub">
+              <span className="chip chip-kind" style={{ marginRight: 6 }}>{meta.label}</span>
+              {task.plannedMinutes} min
+              {topic ? ` · ${topic.unit} · ${topic.difficulty}` : ""}
+              {taskLogged(task.id) ? ` · ${fmtMin(taskLogged(task.id))} logged` : task.actualMinutes ? ` · ${task.actualMinutes}m logged` : ""}
+              {activeTaskId === task.id && activeClockSeconds ? ` · live +${Math.floor(activeClockSeconds / 60)}m ${activeClockSeconds % 60}s` : ""}
             </div>
           </div>
           <span className={`chip chip-${task.status}`}>{task.status}</span>
-          <div className="task-actions">
-            <button className="btn btn-xs btn-secondary" onClick={() => setEditingTaskId(task.id)}>Edit</button>
-            {subj && task.status !== "skipped" && (
-              <button className="btn btn-xs btn-secondary" title="Skip all tasks for this subject today"
-                onClick={() => onSkipSubject(subj.id, task.date)}>Skip subject</button>
-            )}
-            <button className="btn btn-xs btn-secondary" onClick={() => onFocusTask(task.id)}>Clock in</button>
-            <button className={`btn btn-xs ${task.status === "done" ? "btn-secondary" : "btn-primary"}`}
-              onClick={() => onTaskStatus(task.id, task.status === "done" ? "pending" : "done")}>
-              {task.status === "done" ? "Undo" : "Done"}
-            </button>
-            {task.status !== "skipped" && (
-              <button className="btn btn-xs btn-secondary" title="Skip"
-                onClick={() => onTaskStatus(task.id, "skipped")}>Skip</button>
-            )}
-          </div>
+          <button className="btn btn-xs btn-secondary" onClick={() => setEditingTaskId(task.id)}>Edit</button>
+          {subj && task.status !== "skipped" && (
+            <button className="btn btn-xs btn-secondary" title="Skip all tasks for this subject today"
+              onClick={() => onSkipSubject(subj.id, task.date)}>Skip subject</button>
+          )}
+          <button className="btn btn-xs btn-secondary" onClick={() => onFocusTask(task.id)}>Clock in</button>
+          <button className={`btn btn-xs ${task.status === "done" ? "btn-secondary" : "btn-primary"}`}
+            onClick={() => onTaskStatus(task.id, task.status === "done" ? "pending" : "done")}>
+            {task.status === "done" ? "Undo" : "Done"}
+          </button>
+          {task.status !== "skipped" && (
+            <button className="btn btn-xs btn-secondary" title="Skip"
+              onClick={() => onTaskStatus(task.id, "skipped")}>Skip</button>
+          )}
         </div>
         {open && topic && (
           <div className="glass-panel slide-in" style={{ padding: 16, margin: "0 0 10px 22px", borderLeft: `3px solid ${subj?.color || "var(--accent)"}` }}>
             <div style={{ fontSize: ".74rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: ".7px", color: "var(--text-muted)", marginBottom: 6 }}>
-              Lesson Brief · {topic.unit}
+              Lesson brief · {topic.unit}
             </div>
             <div style={{ fontSize: ".86rem", fontWeight: 650, marginBottom: 10, lineHeight: 1.55 }}>{topic.summary}</div>
             {!!topic.objectives?.length && (
@@ -126,7 +121,7 @@ export default function PlannerView({
     );
   };
 
-  // Calendar Grid
+  // calendar grid
   const first = new Date(month.y, month.m, 1);
   const startPad = first.getDay();
   const daysInMonth = new Date(month.y, month.m + 1, 0).getDate();
@@ -154,7 +149,7 @@ export default function PlannerView({
               </div>
             ))}
           </div>
-          <select className="input-field" style={{ width: "auto", minHeight: 38 }} value={filter} onChange={(e) => setFilter(e.target.value)}>
+          <select className="input-field" style={{ width: "auto", height: 38 }} value={filter} onChange={(e) => setFilter(e.target.value)}>
             <option value="all">All subjects</option>
             {state.subjects.map((s) => <option key={s.id} value={String(s.id)}>{s.name}</option>)}
           </select>
@@ -165,21 +160,21 @@ export default function PlannerView({
       </div>
 
       {overdue.length > 0 && (
-        <div className="glass-panel" style={{ padding: 18, marginBottom: 18, borderLeft: "4px solid var(--warning-accent)" }}>
-          <div style={{ fontSize: ".88rem", fontWeight: 750 }}>
-            {overdue.length} task{overdue.length > 1 ? "s" : ""} from earlier days are pending.
+        <div className="glass-panel" style={{ padding: 16, marginBottom: 16, borderLeft: "4px solid var(--warning-accent)" }}>
+          <div style={{ fontSize: ".85rem", fontWeight: 750 }}>
+            {overdue.length} task{overdue.length > 1 ? "s" : ""} from earlier days are still pending.
           </div>
-          <div style={{ fontSize: ".8rem", color: "var(--text-muted)", marginTop: 4, marginBottom: 12 }}>
-            Don&apos;t cram them into today — let the algorithm redistribute them evenly across your remaining days.
+          <div style={{ fontSize: ".78rem", color: "var(--text-muted)", marginTop: 4, marginBottom: 10 }}>
+            Don&apos;t cram them into today — let the engine redistribute them across your remaining days.
           </div>
-          <button className="btn btn-sm btn-primary" onClick={onReplan} disabled={replanning}>Rebalance schedule</button>
+          <button className="btn btn-sm btn-primary" onClick={onReplan} disabled={replanning}>Rebalance my schedule</button>
         </div>
       )}
 
       {view === "list" && (
         <div>
           {!upcoming.length && (
-            <div className="glass-panel" style={{ padding: 28, fontSize: ".88rem", color: "var(--text-muted)", textAlign: "center" }}>
+            <div className="glass-panel" style={{ padding: 24, fontSize: ".86rem", color: "var(--text-muted)" }}>
               No upcoming tasks. Hit <strong>Re-plan</strong> to generate the next stretch of your schedule.
             </div>
           )}
@@ -207,7 +202,7 @@ export default function PlannerView({
       )}
 
       {view === "calendar" && (
-        <div className="glass-panel" style={{ padding: 20 }}>
+        <div className="glass-panel" style={{ padding: 18 }}>
           <div className="day-head">
             <div className="day-date">{first.toLocaleDateString(undefined, { month: "long", year: "numeric" })}</div>
             <div className="flex-row gap-sm">
@@ -215,7 +210,7 @@ export default function PlannerView({
               <button className="btn btn-xs btn-secondary" onClick={() => setMonth((mm) => (mm.m === 11 ? { y: mm.y + 1, m: 0 } : { ...mm, m: mm.m + 1 }))}>Next ›</button>
             </div>
           </div>
-          <div className="cal-grid" style={{ marginBottom: 8 }}>
+          <div className="cal-grid" style={{ marginBottom: 6 }}>
             {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => <div className="cal-dow" key={d}>{d}</div>)}
           </div>
           <div className="cal-grid">
@@ -229,7 +224,7 @@ export default function PlannerView({
                     const c = subjFor(task)?.color || (KIND_META[task.kind] || KIND_META.learn).color;
                     return <div key={task.id} className="cal-pill" style={{ background: c, opacity: task.status === "done" ? 0.45 : 1 }}>{task.title}</div>;
                   })}
-                  {list.length > 3 && <div style={{ fontSize: ".62rem", fontWeight: 750, color: "var(--text-muted)" }}>+{list.length - 3} more</div>}
+                  {list.length > 3 && <div style={{ fontSize: ".6rem", fontWeight: 700, color: "var(--text-muted)" }}>+{list.length - 3} more</div>}
                 </div>
               );
             })}
@@ -247,23 +242,21 @@ export default function PlannerView({
                 {list.map((task) => {
                   const c = subjFor(task)?.color || (KIND_META[task.kind] || KIND_META.learn).color;
                   return (
-                    <div className="task-row" key={task.id}>
-                      <div className="task-info-top">
-                        <div className="task-dot" style={{ background: c, marginTop: 5 }} />
-                        <div className="task-info">
-                          <div className="task-title">{task.title}</div>
-                          <div className="task-sub">{prettyDate(task.date)} · {task.plannedMinutes}m</div>
+                    <div className="task-row" key={task.id} style={{ alignItems: "flex-start" }}>
+                      <div className="task-dot" style={{ background: c, marginTop: 5 }} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div className="task-title">{task.title}</div>
+                        <div className="task-sub">{prettyDate(task.date)} · {task.plannedMinutes}m</div>
+                        <div className="flex-row gap-sm" style={{ marginTop: 6 }}>
+                          <button className="btn btn-xs btn-secondary" onClick={() => setEditingTaskId(task.id)}>Edit</button>
+                          {col !== "done" && <button className="btn btn-xs btn-primary" onClick={() => onTaskStatus(task.id, "done")}>Done</button>}
+                          {col !== "pending" && <button className="btn btn-xs btn-secondary" onClick={() => onTaskStatus(task.id, "pending")}>Reopen</button>}
                         </div>
-                      </div>
-                      <div className="task-actions">
-                        <button className="btn btn-xs btn-secondary" onClick={() => setEditingTaskId(task.id)}>Edit</button>
-                        {col !== "done" && <button className="btn btn-xs btn-primary" onClick={() => onTaskStatus(task.id, "done")}>Done</button>}
-                        {col !== "pending" && <button className="btn btn-xs btn-secondary" onClick={() => onTaskStatus(task.id, "pending")}>Reopen</button>}
                       </div>
                     </div>
                   );
                 })}
-                {!list.length && <div style={{ fontSize: ".8rem", color: "var(--text-dim)", padding: "12px 0" }}>Nothing in this column.</div>}
+                {!list.length && <div style={{ fontSize: ".78rem", color: "var(--text-dim)" }}>Nothing here.</div>}
               </div>
             );
           })}
