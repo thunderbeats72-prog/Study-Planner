@@ -221,7 +221,7 @@ select.input-field{appearance:none;background-image:linear-gradient(45deg,transp
 @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(34,197,94,.55)}70%{box-shadow:0 0 0 9px rgba(34,197,94,0)}100%{box-shadow:0 0 0 0 rgba(34,197,94,0)}}
 
 /* ============ ZEN ============ */
-.zen{position:fixed;inset:0;z-index:500;background:#05060a;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px}
+.zen{position:fixed;inset:0;z-index:999999;background:#05060a;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px}
 .zen .zen-digits{font-size:min(22vw,10rem);font-weight:800;letter-spacing:-6px;font-variant-numeric:tabular-nums}
 
 .slide-in{animation:slideIn .4s cubic-bezier(.22,1,.36,1)}
@@ -259,8 +259,8 @@ select.input-field{appearance:none;background-image:linear-gradient(45deg,transp
   .ai-fab{bottom:76px;right:14px;width:50px;height:50px}
   .cal-cell{min-height:62px;padding:5px}
   .timer-ring-wrap{width:220px;height:220px}
-  .task-row{flex-wrap:wrap}
-  .task-row > .btn,.task-row > .chip{flex-shrink:0}
+  .task-row{flex-wrap:wrap;align-items:center}
+  .task-row > .btn,.task-row > .chip{flex-shrink:0;flex-grow:0}
   textarea.input-field{resize:vertical;min-height:86px}
 }
 @media(max-width:640px){
@@ -269,11 +269,13 @@ select.input-field{appearance:none;background-image:linear-gradient(45deg,transp
   .tracker-bar > .flex-row:last-child{flex-wrap:wrap;gap:8px}
   .tracker-bar .btn-xs{flex:1;min-width:88px;justify-content:center}
   .heat-cell{width:11px;height:11px}
-  .task-row{align-items:flex-start;gap:8px;padding:10px}
+  .task-row{align-items:center;gap:8px;padding:10px}
+  .task-row > div[style*="flex: 1"]{flex-basis:100%;order:-1;margin-bottom:2px}
+  .task-row .task-dot{order:-2}
   .task-row .task-title{font-size:.82rem}
   .task-row .task-sub{font-size:.68rem;line-height:1.45}
-  .task-row .btn-xs{padding:6px 9px;font-size:.68rem}
-  .task-row .chip{font-size:.6rem;padding:3px 7px}
+  .task-row > .btn{flex:0 0 auto;min-width:0;white-space:nowrap;padding:6px 9px;font-size:.68rem}
+  .task-row > .chip{flex:0 0 auto;font-size:.6rem;padding:3px 7px}
   .vtabs{width:100%;display:grid;grid-template-columns:repeat(3,1fr)}
   .vtab{text-align:center;padding:8px 6px}
   .page-header > .flex-row{width:100%}
@@ -307,15 +309,6 @@ select.input-field{appearance:none;background-image:linear-gradient(45deg,transp
 .btn{will-change:transform}.btn:hover{transform:translateY(-1px)}.btn:active{transform:translateY(0) scale(.97)}
 .glass-panel{animation:panelIn .35s cubic-bezier(.22,1,.36,1)}
 @keyframes panelIn{from{opacity:.001;transform:translateY(8px)}to{opacity:1;transform:none}}
-
-@media(max-width:760px){
-  .task-row{display:grid;grid-template-columns:10px 1fr;align-items:flex-start}
-  .task-row .task-dot{grid-column:1;grid-row:1 / span 2;margin-top:7px}
-  .task-row > div[style*="flex: 1"]{grid-column:2;min-width:0}
-  .task-row > .chip,.task-row > .btn{grid-column:auto;min-height:34px}
-  .task-row > .chip{grid-column:2;justify-self:flex-start}
-  .task-row > .btn{margin-top:2px}
-}
 
 /* ============ COMMAND PALETTE ( K) ============ */
 .cmdk-overlay{position:fixed;inset:0;z-index:400;background:rgba(15,15,25,.5);backdrop-filter:blur(8px);display:flex;align-items:flex-start;justify-content:center;padding:14vh 16px 16px;animation:fadeIn .18s ease}
@@ -460,9 +453,11 @@ select.input-field{appearance:none;background-image:linear-gradient(45deg,transp
   letter-spacing: -1.5px;
 }
 .tracker-bar {
-  background: color-mix(in srgb, var(--surface) 90%, rgba(255, 255, 255, 0.7));
+  background: var(--surface-solid);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
   border: 1px solid var(--glass-border);
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
   border-left: 5px solid var(--accent);
 }
 .cmdk {
