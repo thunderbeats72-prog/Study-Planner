@@ -4,9 +4,8 @@ export type PlanTopic = {
   title: string;
   unit: string;
   estMinutes: number;
-  difficulty: "Easy" | "Medium" | "Hard" | string;
+  difficulty: string;
   mastery?: number;
-  position?: number;
 };
 
 export type PlanSubject = {
@@ -21,10 +20,10 @@ export type PlanSettings = {
   examDate: string;
   dailyHours: number;
   subjectsPerDay: number;
-  studyDays: string; // "all" | "6days" | "weekdays"
+  studyDays: string;
   bufferDays: number;
-  planMode: string; // "syllabus" | "revision" | "mock"
-  studyStyle: string; // "balanced" | "theory" | "practice"
+  planMode: string;
+  studyStyle: string;
   weakSubject: string;
   revisionWeeks: number;
 };
@@ -66,49 +65,15 @@ export function diffDays(a: string, b: string): number {
   return Math.round((parse(b).getTime() - parse(a).getTime()) / 86400000);
 }
 
-export function isStudyDay(dateStr: string, mode: string): boolean {
-  const dow = parse(dateStr).getDay(); // 0 = Sun, 1 = Mon, ..., 6 = Sat
+function isStudyDay(dateStr: string, mode: string): boolean {
+  const dow = parse(dateStr).getDay(); // 0 = Sun
   if (mode === "weekdays") return dow >= 1 && dow <= 5;
   if (mode === "6days") return dow !== 0;
   return true;
 }
 
-export function diffWeight(d: string): number {
-  return d === "Hard" ? 1.25 : d === "Easy" ? 0.85 : 1.0;
-}
-
-/**
- * Strict Mathematical Projected Date Calculator:
- * Total Days Required = ceil((Total Units Across All Subjects * Estimated Minutes Per Unit) / (Daily Study Hours * 60))
- * Then advances calendar days from startDate skipping non-study days according to studyDays setting.
- */
-export function calculateProjectedCompletionDate(
-  startDate: string,
-  totalUnits: number,
-  avgMinutesPerUnit: number,
-  dailyHours: number,
-  studyDays = "all"
-): { projectedDate: string; totalDaysRequired: number; totalMinutes: number } {
-  const totalMinutes = Math.max(1, totalUnits * Math.max(15, avgMinutesPerUnit));
-  const dailyMinutes = Math.max(15, Math.round(dailyHours * 60));
-  const totalDaysRequired = Math.max(1, Math.ceil(totalMinutes / dailyMinutes));
-
-  let cursor = startDate;
-  let studyDaysAccumulated = 0;
-  let guard = 0;
-
-  while (guard < 3650) {
-    if (isStudyDay(cursor, studyDays)) {
-      studyDaysAccumulated++;
-      if (studyDaysAccumulated >= totalDaysRequired) {
-        return { projectedDate: cursor, totalDaysRequired, totalMinutes };
-      }
-    }
-    cursor = addDays(cursor, 1);
-    guard++;
-  }
-
-  return { projectedDate: cursor, totalDaysRequired, totalMinutes };
+function diffWeight(d: string): number {
+  return d === "Hard" ? 1.3 : d === "Easy" ? 0.8 : 1;
 }
 
 export type PlanResult = {
@@ -128,360 +93,311 @@ export type PlanResult = {
   };
 };
 
-/**
- * Robust Mathematical Scheduling & Time-Division Engine
- */
 export function buildPlan(
   subjects: PlanSubject[],
   topics: PlanTopic[],
   st: PlanSettings
 ): PlanResult {
+  const dates: string[] = [];
+  const start = st.startDate;
+  const end = st.examDate;
+  let cursor = start;
+  let guard = 0;
+  while (diffDays(cursor, end) >= 0 && guard < 2000) {
+    if (isStudyDay(cursor, st.studyDays)) dates.push(cursor);
+    cursor = addDays(cursor, 1);
+    guard++;
+  }
+
   const empty: PlanResult = {
     tasks: [],
     stats: {
-      studyDays: 0,
-      learnDays: 0,
-      revisionDays: 0,
-      bufferDays: 0,
-      totalTopics: topics.length,
-      scheduledTopics: 0,
-      projectedFinish: null,
-      dailyMinutes: Math.round(st.dailyHours * 60),
-      requiredMinutes: 0,
-      feasible: false,
-      loadRatio: 0,
+      studyDays: 0, learnDays: 0, revisionDays: 0, bufferDays: 0,
+      totalTopics: topics.length, scheduledTopics: 0, projectedFinish: null,
+      dailyMinutes: st.dailyHours * 60, requiredMinutes: 0, feasible: false, loadRatio: 0,
     },
   };
+  if (!dates.length || !subjects.length) return empty;
 
-  if (!subjects.length) return empty;
+  const dailyCap = Math.max(20, Math.round(st.dailyHours * 60));
+  const bufferCount = Math.min(st.bufferDays, Math.floor(dates.length * 0.2));
+  const revisionCount =
+    st.planMode === "revision"
+      ? 0
+      : Math.min(st.revisionWeeks * 7, Math.floor((dates.length - bufferCount) * 0.3));
 
-  const dailyMinutes = Math.max(20, Math.round(st.dailyHours * 60));
-  const styleMul = st.studyStyle === "theory" ? 1.08 : st.studyStyle === "practice" ? 0.92 : 1.0;
+  const learnDates = dates.slice(0, Math.max(1, dates.length - bufferCount - revisionCount));
+  const revisionDates = dates.slice(learnDates.length, dates.length - bufferCount);
+  const bufferDates = dates.slice(dates.length - bufferCount);
 
-  // 1. Calculate exact required minutes for each topic
-  type TopicWork = PlanTopic & { remainingMinutes: number; targetMinutes: number };
-  const topicWorkList: TopicWork[] = topics.map((t) => {
-    const baseMins = Math.max(15, Number(t.estMinutes) || 45);
-    const masteryMul = t.mastery ? Math.max(0.4, 1 - t.mastery / 200) : 1.0;
-    const targetMinutes = Math.max(15, Math.round(baseMins * styleMul * masteryMul));
-    return {
-      ...t,
-      targetMinutes,
-      remainingMinutes: targetMinutes,
-    };
-  });
-
-  const totalRequiredMinutes = topicWorkList.reduce((acc, t) => acc + t.targetMinutes, 0);
-
-  // 2. Strict mathematical calculation of required study days
-  const studyDaysRequired = Math.max(1, Math.ceil(totalRequiredMinutes / dailyMinutes));
-
-  // 3. Compute the exact projected finish date by stepping study days
-  let projectedFinishDate = st.startDate;
-  let studyDaysCount = 0;
-  let pCursor = st.startDate;
-  let pGuard = 0;
-
-  while (pGuard < 3650) {
-    if (isStudyDay(pCursor, st.studyDays)) {
-      studyDaysCount++;
-      if (studyDaysCount >= studyDaysRequired) {
-        projectedFinishDate = pCursor;
-        break;
-      }
-    }
-    pCursor = addDays(pCursor, 1);
-    pGuard++;
-  }
-
-  // 4. Construct the full date timeline covering both syllabus completion and exam window
-  const endCalendarDate = diffDays(projectedFinishDate, st.examDate) > 0 ? st.examDate : projectedFinishDate;
-  const allDates: string[] = [];
-  let dCursor = st.startDate;
-  let dGuard = 0;
-
-  while (diffDays(dCursor, endCalendarDate) >= 0 && dGuard < 3650) {
-    if (isStudyDay(dCursor, st.studyDays)) {
-      allDates.push(dCursor);
-    }
-    dCursor = addDays(dCursor, 1);
-    dGuard++;
-  }
-
-  if (!allDates.length) return empty;
-
-  // 5. Build subject topic queues
   const weakId = st.weakSubject && st.weakSubject !== "none" ? Number(st.weakSubject) : -1;
   const subjWeight = new Map<number, number>();
   for (const s of subjects) {
-    subjWeight.set(s.id, diffWeight(s.difficulty) * (s.id === weakId ? 1.3 : 1.0));
+    subjWeight.set(s.id, diffWeight(s.difficulty) * (s.id === weakId ? 1.45 : 1));
   }
 
-  const queues = new Map<number, TopicWork[]>();
+  const queues = new Map<number, PlanTopic[]>();
   for (const s of subjects) queues.set(s.id, []);
-  for (const t of topicWorkList) {
+  for (const t of topics) {
     if (!queues.has(t.subjectId)) queues.set(t.subjectId, []);
     queues.get(t.subjectId)!.push(t);
   }
 
-  const subjById = new Map(subjects.map((s) => [s.id, s]));
-  const tasks: PlanTask[] = [];
-  const learnedTopics: TopicWork[] = [];
-  const scheduledTopicIds = new Set<number>();
-  let lastLearnDate: string | null = null;
-  let learnDaysUsed = 0;
+  const styleMul = st.studyStyle === "theory" ? 1.1 : st.studyStyle === "practice" ? 0.9 : 1;
+  const requiredMinutes = topics.reduce(
+    (a, t) => a + t.estMinutes * styleMul * (1 + (t.mastery ? -t.mastery / 200 : 0)),
+    0
+  );
+  const availableMinutes = learnDates.length * dailyCap * 0.78; // 22% goes to spaced review
+  const loadRatio = availableMinutes > 0 ? requiredMinutes / availableMinutes : 99;
+  // compression: if overloaded, shrink per-topic time (still keeps every lesson on the plan)
+  const compress = loadRatio > 1 ? Math.max(0.45, 1 / loadRatio) : 1;
 
-  // Spaced review map: studyDayIndex -> { topic: TopicWork; pass: number }[]
-  const reviewQueue = new Map<number, { topic: TopicWork; pass: number }[]>();
-  const pushReview = (dayIdx: number, topic: TopicWork, pass: number) => {
+  const tasks: PlanTask[] = [];
+  const reviewQueue = new Map<number, { topic: PlanTopic; pass: number }[]>();
+  const pushReview = (dayIdx: number, topic: PlanTopic, pass: number) => {
+    if (dayIdx >= learnDates.length) return;
     const arr = reviewQueue.get(dayIdx) || [];
     arr.push({ topic, pass });
     reviewQueue.set(dayIdx, arr);
   };
 
-  // 6. Schedule day by day
-  let dayIndex = 0;
+  const subjById = new Map(subjects.map((s) => [s.id, s]));
+  const learned: PlanTopic[] = [];
+  let cyclePtr = 0;
+  let scheduled = 0;
+  let lastLearnDate: string | null = null;
 
-  for (let d = 0; d < allDates.length; d++) {
-    const date = allDates[d];
-    dayIndex = d;
-    let dayRemaining = dailyMinutes;
-    let pos = 0;
+  // pace new lessons so the syllabus spreads across the whole learning window
+  // instead of finishing in a burst and leaving empty weeks behind.
+  const dailyLearnBudget = Math.max(
+    25,
+    Math.min(Math.round(dailyCap * 0.8), Math.ceil(requiredMinutes / Math.max(1, learnDates.length)) + 10)
+  );
 
-    // Check if there are active subjects with remaining pending units
-    const activeSubjects = subjects.filter((s) => (queues.get(s.id) || []).length > 0);
+  if (st.planMode !== "revision") {
+    for (let d = 0; d < learnDates.length; d++) {
+      const date = learnDates[d];
+      let remaining = dailyCap;
+      let pos = 0;
 
-    if (activeSubjects.length > 0 && st.planMode !== "revision") {
-      learnDaysUsed++;
-      lastLearnDate = date;
-
-      // A) Spaced Repetition (light review, max 20% of day)
-      const reviewsDue = (reviewQueue.get(d) || []).slice(0, 2);
-      for (const r of reviewsDue) {
-        const revTime = Math.min(15, Math.floor(dayRemaining * 0.15));
-        if (revTime < 10) break;
-        dayRemaining -= revTime;
+      // 1) spaced repetition reviews due today
+      const due = (reviewQueue.get(d) || []).slice(0, 3);
+      for (const r of due) {
+        const mins = r.pass === 1 ? 15 : 20;
+        if (remaining < mins + 20) break;
+        remaining -= mins;
         tasks.push({
           date,
           subjectId: r.topic.subjectId,
           topicId: r.topic.id,
           kind: "revise",
-          title: `Recall Checkpoint: ${r.topic.title}`,
+          title: `Recall: ${r.topic.title}`,
           detail:
             r.pass === 1
-              ? "24-48h Spaced Recall. Practice active recall without notes, then check knowledge gaps."
-              : "1-Week Spaced Mastery. Solve 3-5 mixed application questions on this concept.",
-          plannedMinutes: revTime,
+              ? "24–48h spaced recall. Close the book, write everything you remember, then check gaps."
+              : "1-week spaced recall. Do 5 mixed questions from this lesson without notes.",
+          plannedMinutes: mins,
           position: pos++,
         });
       }
 
-      // B) Weekly Checkpoint (every 7th study day)
-      const isWeeklyCheckDay = d > 0 && d % 7 === 6;
-      if (isWeeklyCheckDay && dayRemaining >= 40) {
-        const testMins = Math.min(45, Math.floor(dayRemaining * 0.35));
-        dayRemaining -= testMins;
+      // 2) weekly self-test / mock
+      const isTestDay = d > 3 && d % 7 === 6;
+      if (isTestDay && remaining > 45) {
+        const mins = st.planMode === "mock" ? 60 : 40;
+        remaining -= mins;
         tasks.push({
           date,
           subjectId: null,
           topicId: null,
           kind: "mock",
-          title: `Weekly Milestone Checkpoint #${Math.floor(d / 7) + 1}`,
-          detail: "Timed checkpoint on the lessons covered over the last 7 study days. Log any errors in your review notebook.",
-          plannedMinutes: testMins,
+          title: `Weekly Checkpoint Test #${Math.floor(d / 7)}`,
+          detail:
+            "Mixed test on everything covered in the last 7 study days. Time it strictly, then log every mistake in your error notebook.",
+          plannedMinutes: mins,
           position: pos++,
         });
       }
 
-      // C) Perfect Subject Time Division for New Lessons
-      const numSubjectsToday = Math.max(1, Math.min(st.subjectsPerDay, activeSubjects.length));
-      const sortedActive = [...activeSubjects].sort((a, b) => {
-        const qa = (queues.get(a.id)?.length || 0) * (subjWeight.get(a.id) || 1);
-        const qb = (queues.get(b.id)?.length || 0) * (subjWeight.get(b.id) || 1);
-        return qb - qa;
+      // 3) new lessons — choose subjects for the day
+      const live = subjects.filter((s) => (queues.get(s.id) || []).length > 0);
+      const rotated = [...(live.length ? live : subjects)].sort((a, b) => {
+        const ra = ((queues.get(a.id)!.length * (subjWeight.get(a.id) || 1)) % 1000);
+        const rb = ((queues.get(b.id)!.length * (subjWeight.get(b.id) || 1)) % 1000);
+        return rb - ra;
       });
+      const offset = d % rotated.length;
+      const ordered = [...rotated.slice(offset), ...rotated.slice(0, offset)];
+      const chosen = ordered.slice(0, Math.max(1, Math.min(st.subjectsPerDay, ordered.length)));
 
-      const offset = d % sortedActive.length;
-      const rotated = [...sortedActive.slice(offset), ...sortedActive.slice(0, offset)];
-      const chosenForToday = rotated.slice(0, numSubjectsToday);
-
-      // Divide remaining daily time equally and precisely among the chosen subjects
-      const baseSlot = Math.floor(dayRemaining / chosenForToday.length);
-      const remMinutes = dayRemaining % chosenForToday.length;
-
-      for (let i = 0; i < chosenForToday.length; i++) {
-        const s = chosenForToday[i];
-        let subjectSlotBudget = baseSlot + (i < remMinutes ? 1 : 0);
+      const learnBudget = Math.max(20, Math.min(remaining - 5, dailyLearnBudget));
+      const wsum = chosen.reduce((a, s) => a + (subjWeight.get(s.id) || 1), 0);
+      const touched: PlanSubject[] = [];
+      const todaysTopics: PlanTopic[] = [];
+      for (const s of chosen) {
+        let slot = Math.round((learnBudget * (subjWeight.get(s.id) || 1)) / wsum);
         const q = queues.get(s.id)!;
-
-        while (subjectSlotBudget > 0 && q.length > 0) {
-          const currentTopic = q[0];
-          const isSplit = currentTopic.remainingMinutes < currentTopic.targetMinutes;
-
-          if (currentTopic.remainingMinutes <= subjectSlotBudget) {
-            // Topic finishes in this slot
-            const allocatedMins = currentTopic.remainingMinutes;
-            subjectSlotBudget -= allocatedMins;
-            dayRemaining -= allocatedMins;
-            currentTopic.remainingMinutes = 0;
-            q.shift(); // Remove finished topic
-
-            scheduledTopicIds.add(currentTopic.id);
-            learnedTopics.push(currentTopic);
-            pushReview(d + 2, currentTopic, 1);
-            pushReview(d + 7, currentTopic, 2);
-
-            tasks.push({
-              date,
-              subjectId: s.id,
-              topicId: currentTopic.id,
-              kind: "learn",
-              title: isSplit
-                ? `${s.name}: ${currentTopic.title} (Part 2 — Completion)`
-                : `${s.name}: ${currentTopic.title}`,
-              detail: `${currentTopic.unit} • ${currentTopic.difficulty}. Core curriculum lesson. Review concept and complete practice problems.`,
-              plannedMinutes: allocatedMins,
-              position: pos++,
-            });
-          } else {
-            // Topic is larger than slot budget: bifurcate into a clean study block
-            const allocatedMins = subjectSlotBudget;
-            currentTopic.remainingMinutes -= allocatedMins;
-            dayRemaining -= allocatedMins;
-            subjectSlotBudget = 0;
-
-            tasks.push({
-              date,
-              subjectId: s.id,
-              topicId: currentTopic.id,
-              kind: "learn",
-              title: `${s.name}: ${currentTopic.title} (Part 1 — Concept & Foundations)`,
-              detail: `${currentTopic.unit} • ${currentTopic.difficulty}. Study block 1: Understand core principles and definitions.`,
-              plannedMinutes: allocatedMins,
-              position: pos++,
-            });
-          }
-        }
-
-        // If subject has no more topics but still has slot time, allocate subject practice
-        if (subjectSlotBudget >= 15) {
-          const pracMins = subjectSlotBudget;
-          dayRemaining -= pracMins;
-          subjectSlotBudget = 0;
+        let placed = 0;
+        while (q.length) {
+          const t = q[0];
+          const mins = Math.max(15, Math.round((t.estMinutes * styleMul * compress) / 5) * 5);
+          if (placed > 0 && mins > slot) break;
+          if (mins > remaining) break;
+          q.shift();
+          slot -= mins;
+          remaining -= mins;
+          placed++;
+          scheduled++;
+          lastLearnDate = date;
+          if (!touched.includes(s)) touched.push(s);
+          todaysTopics.push(t);
+          learned.push(t);
           tasks.push({
             date,
             subjectId: s.id,
-            topicId: null,
-            kind: "practice",
-            title: `Practice & Problem Drill: ${s.name}`,
-            detail: "Targeted problem set to reinforce mastery of completed units.",
-            plannedMinutes: pracMins,
-            position: pos++,
-          });
-        }
-      }
-
-      // D) Fill any tiny leftover minute drift with targeted review
-      if (dayRemaining >= 15 && learnedTopics.length > 0) {
-        const revTopic = learnedTopics[d % learnedTopics.length];
-        const sName = subjById.get(revTopic.subjectId)?.name || "Study";
-        tasks.push({
-          date,
-          subjectId: revTopic.subjectId,
-          topicId: revTopic.id,
-          kind: "practice",
-          title: `Reinforcement: ${sName} — ${revTopic.title}`,
-          detail: "Active application drill to solidify retention.",
-          plannedMinutes: dayRemaining,
-          position: pos++,
-        });
-        dayRemaining = 0;
-      }
-    } else {
-      // Post-Syllabus / Revision / Buffer Phase
-      const isBufferDay = d >= allDates.length - Math.max(1, st.bufferDays);
-      if (isBufferDay) {
-        const isFinalDay = d === allDates.length - 1;
-        tasks.push({
-          date,
-          subjectId: null,
-          topicId: null,
-          kind: "buffer",
-          title: isFinalDay ? "Final Pre-Exam Rest & High-Yield Formulae Review" : `Buffer Catch-up Day ${d - (allDates.length - st.bufferDays) + 1}`,
-          detail: isFinalDay
-            ? "No new lessons. Review one-page recall sheets, rest well, and organise exam materials."
-            : "Buffer slack day. Use this time to revisit any challenging concepts or resolve doubts.",
-          plannedMinutes: Math.round(dailyMinutes * (isFinalDay ? 0.4 : 0.7)),
-          position: pos++,
-        });
-      } else {
-        // High-Yield Revision / Mock Phase
-        const isMock = d % 3 === 0 || st.planMode === "mock";
-        if (isMock && dayRemaining >= 60) {
-          const mockMins = Math.min(90, Math.round(dailyMinutes * 0.6));
-          dayRemaining -= mockMins;
-          tasks.push({
-            date,
-            subjectId: null,
-            topicId: null,
-            kind: "mock",
-            title: `Full Syllabus Simulation Mock #${Math.floor(d / 3) + 1}`,
-            detail: "Full exam conditions. Time strictly and review every incorrect answer immediately after.",
-            plannedMinutes: mockMins,
-            position: pos++,
-          });
-        }
-
-        // Cycle through all topics by lowest mastery / highest difficulty
-        const sortedPool = [...topics].sort((a, b) => {
-          const w = diffWeight(b.difficulty) - diffWeight(a.difficulty);
-          if (w !== 0) return w;
-          return (a.mastery || 0) - (b.mastery || 0);
-        });
-
-        let poolIdx = d * 2;
-        while (dayRemaining >= 20 && sortedPool.length > 0) {
-          const t = sortedPool[poolIdx % sortedPool.length];
-          poolIdx++;
-          const s = subjById.get(t.subjectId);
-          const mins = Math.min(dayRemaining, Math.max(20, Math.round(t.estMinutes * 0.5)));
-          dayRemaining -= mins;
-          tasks.push({
-            date,
-            subjectId: t.subjectId,
             topicId: t.id,
-            kind: "revise",
-            title: `Deep Revision: ${s ? s.name + " — " : ""}${t.title}`,
-            detail: "Active recall and previous-year question practice. Focus on speed and precision.",
+            kind: "learn",
+            title: `${s.name}: ${t.title}`,
+            detail: `${t.unit} • ${t.difficulty}. Learn the concept, then attempt practice questions before marking done.`,
             plannedMinutes: mins,
             position: pos++,
           });
+          pushReview(d + 2, t, 1);
+          pushReview(d + 7, t, 2);
+          if (slot <= 10) break;
         }
+      }
+
+      // 4) fill spare capacity with topic-linked practice / mastery cycles,
+      //    so every study day is tied to specific lessons — never generic filler.
+      let guardFill = 0;
+      while (remaining >= 25 && guardFill < 5) {
+        let t: PlanTopic | undefined;
+        let label = "";
+        let detail = "";
+        if (todaysTopics[guardFill]) {
+          t = todaysTopics[guardFill];
+          label = "Apply";
+          detail =
+            "Immediate application of the lesson you just learned: 10–12 graded questions, easy → hard. Anything you hesitate on goes in the error log.";
+        } else if (learned.length) {
+          t = learned[cyclePtr % learned.length];
+          const cycle = 2 + Math.floor(cyclePtr / learned.length);
+          cyclePtr++;
+          label = `Mastery Cycle ${cycle}`;
+          detail =
+            "Second-pass mastery: previous-year and advanced variations of this lesson. Work for speed and accuracy, not re-reading.";
+        } else if (touched.length || chosen.length) {
+          const s = (touched.length ? touched : chosen)[guardFill % (touched.length || chosen.length)];
+          remaining -= Math.min(remaining, 45);
+          tasks.push({
+            date, subjectId: s.id, topicId: null, kind: "practice",
+            title: `${s.name} — Warm-up Problem Set`,
+            detail: "Mixed questions to build baseline familiarity before the syllabus lessons begin.",
+            plannedMinutes: 45, position: pos++,
+          });
+          guardFill++;
+          continue;
+        } else break;
+
+        const sName = subjById.get(t.subjectId)?.name || "Study";
+        const mins = Math.min(remaining, 45);
+        remaining -= mins;
+        tasks.push({
+          date,
+          subjectId: t.subjectId,
+          topicId: t.id,
+          kind: "practice",
+          title: `${label} — ${sName}: ${t.title}`,
+          detail,
+          plannedMinutes: mins,
+          position: pos++,
+        });
+        guardFill++;
       }
     }
   }
 
-  // 7. Calculate final statistical indicators
-  const totalStudyDays = allDates.length;
-  const scheduledCount = scheduledTopicIds.size || (topics.length ? topics.length : 0);
-  const finishDate = lastLearnDate || projectedFinishDate;
-  const availableMinutes = totalStudyDays * dailyMinutes;
-  const loadRatio = availableMinutes > 0 ? totalRequiredMinutes / availableMinutes : 1.0;
-  const feasible = diffDays(st.startDate, finishDate) <= diffDays(st.startDate, st.examDate);
+  // 4) revision block — hardest + least mastered first, cycled
+  const revisionPool = [...topics].sort((a, b) => {
+    const w = diffWeight(b.difficulty) - diffWeight(a.difficulty);
+    if (w !== 0) return w;
+    return (a.mastery || 0) - (b.mastery || 0);
+  });
+  const revDates = st.planMode === "revision" ? dates.slice(0, dates.length - bufferCount) : revisionDates;
+  if (revDates.length && revisionPool.length) {
+    const perDay = Math.max(1, Math.ceil(revisionPool.length / revDates.length));
+    let idx = 0;
+    for (let d = 0; d < revDates.length; d++) {
+      const date = revDates[d];
+      let remaining = dailyCap;
+      let pos = 0;
+      const isMockDay = st.planMode === "mock" ? d % 2 === 0 : d % 3 === 2;
+      if (isMockDay) {
+        const mins = Math.min(90, Math.round(dailyCap * 0.5));
+        remaining -= mins;
+        tasks.push({
+          date,
+          subjectId: null,
+          topicId: null,
+          kind: "mock",
+          title: `Full-Length Mock Test #${Math.floor(d / 3) + 1}`,
+          detail: "Exam-condition mock. Afterwards spend 20 minutes analysing every wrong answer.",
+          plannedMinutes: mins,
+          position: pos++,
+        });
+      }
+      for (let k = 0; k < perDay && remaining > 15; k++) {
+        const t = revisionPool[idx % revisionPool.length];
+        idx++;
+        const s = subjById.get(t.subjectId);
+        const mins = Math.max(15, Math.min(remaining, Math.round(t.estMinutes * 0.45 / 5) * 5));
+        remaining -= mins;
+        tasks.push({
+          date,
+          subjectId: t.subjectId,
+          topicId: t.id,
+          kind: "revise",
+          title: `Revise — ${s ? s.name + ": " : ""}${t.title}`,
+          detail: "Active recall + previous-year questions. Aim for speed and accuracy, not re-reading.",
+          plannedMinutes: mins,
+          position: pos++,
+        });
+      }
+    }
+  }
+
+  // 5) buffer / taper days
+  bufferDates.forEach((date, i) => {
+    const last = i === bufferDates.length - 1;
+    tasks.push({
+      date,
+      subjectId: null,
+      topicId: null,
+      kind: "buffer",
+      title: last ? "Light review & rest before exam" : `Buffer day ${i + 1} — catch-up & weak areas`,
+      detail: last
+        ? "No new material. Skim your recall sheets, sleep early, prepare documents."
+        : "Use this slack to finish anything you skipped, or drill your weakest topic list.",
+      plannedMinutes: Math.round(dailyCap * (last ? 0.4 : 0.7)),
+      position: 0,
+    });
+  });
 
   return {
     tasks,
     stats: {
-      studyDays: totalStudyDays,
-      learnDays: learnDaysUsed || studyDaysRequired,
-      revisionDays: Math.max(0, totalStudyDays - (learnDaysUsed || studyDaysRequired) - st.bufferDays),
-      bufferDays: st.bufferDays,
+      studyDays: dates.length,
+      learnDays: learnDates.length,
+      revisionDays: revDates.length,
+      bufferDays: bufferDates.length,
       totalTopics: topics.length,
-      scheduledTopics: scheduledCount,
-      projectedFinish: finishDate,
-      dailyMinutes,
-      requiredMinutes: Math.round(totalRequiredMinutes),
-      feasible,
+      scheduledTopics: scheduled,
+      projectedFinish: lastLearnDate,
+      dailyMinutes: dailyCap,
+      requiredMinutes: Math.round(requiredMinutes),
+      feasible: loadRatio <= 1.15,
       loadRatio: Math.round(loadRatio * 100) / 100,
     },
   };
