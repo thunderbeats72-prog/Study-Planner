@@ -109,64 +109,64 @@ export default function Dashboard({
 
       <div className="dash-grid-2">
         <div className="glass-panel tilt-card dash-card">
-          <h3 style={{ fontSize: ".88rem", fontWeight: 800, margin: "0 0 16px" }}>Weekly Study Volume</h3>
+          <h3 style={{ fontSize: ".92rem", fontWeight: 800, margin: "0 0 16px" }}>Weekly Study Volume</h3>
           <div style={{ display: "flex", alignItems: "flex-end", gap: 10, height: 150 }}>
             {week.map((w) => (
               <div key={w.date} style={{ flex: 1, textAlign: "center" }}>
-                <div style={{ fontSize: ".66rem", fontWeight: 700, color: "var(--text-muted)", marginBottom: 4 }}>
-                  {w.hours || ""}
+                <div style={{ fontSize: ".68rem", fontWeight: 700, color: "var(--text-muted)", marginBottom: 4 }}>
+                  {w.hours ? `${w.hours}h` : ""}
                 </div>
                 <div style={{
                   height: `${Math.max(4, (w.hours / maxH) * 110)}px`,
                   background: w.date === t ? "var(--accent-gradient)" : "var(--chart-bar)",
                   borderRadius: 8, transition: "height .5s ease",
                 }} />
-                <div style={{ fontSize: ".67rem", fontWeight: 750, marginTop: 6, color: "var(--text-muted)" }}>{w.label}</div>
+                <div style={{ fontSize: ".7rem", fontWeight: 750, marginTop: 6, color: "var(--text-muted)" }}>{w.label}</div>
               </div>
             ))}
           </div>
         </div>
-        <div className="glass-panel tilt-card dash-card" style={{ maxHeight: 260, overflowY: "auto" }}>
-          <h3 style={{ fontSize: ".88rem", fontWeight: 800, margin: "0 0 16px" }}>Subject Mastery</h3>
+        <div className="glass-panel tilt-card dash-card" style={{ maxHeight: 270, overflowY: "auto" }}>
+          <h3 style={{ fontSize: ".92rem", fontWeight: 800, margin: "0 0 16px" }}>Subject Mastery</h3>
           {ctx.subjects.map((s) => {
             const pct = s.total ? Math.round((s.done / s.total) * 100) : 0;
             const color = state.subjects.find((x) => x.id === s.id)?.color || "var(--accent)";
             return (
-              <div key={s.id} style={{ marginBottom: 12 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: ".76rem", fontWeight: 700, marginBottom: 5 }}>
+              <div key={s.id} style={{ marginBottom: 14 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: ".8rem", fontWeight: 700, marginBottom: 5 }}>
                   <span>{s.name}</span><span style={{ color: "var(--text-muted)" }}>{s.done}/{s.total}</span>
                 </div>
                 <div className="bar-track"><div className="bar-fill" style={{ width: `${pct}%`, background: color }} /></div>
               </div>
             );
           })}
-          {!ctx.subjects.length && <div style={{ fontSize: ".8rem", color: "var(--text-dim)" }}>No subjects yet.</div>}
+          {!ctx.subjects.length && <div style={{ fontSize: ".82rem", color: "var(--text-dim)" }}>No subjects yet.</div>}
         </div>
       </div>
 
-      <div style={{ marginBottom: 18 }}>
+      <div style={{ marginBottom: 20 }}>
         <Heatmap state={state} />
       </div>
 
-      <div className="glass-panel tilt-card" style={{ padding: 20, marginBottom: 18, borderLeft: "4px solid var(--accent)" }}>
-        <h3 style={{ fontSize: ".88rem", fontWeight: 800, margin: "0 0 10px", display: "flex", alignItems: "center", gap: 8 }}>
+      <div className="glass-panel tilt-card" style={{ padding: 22, marginBottom: 20, borderLeft: "4px solid var(--accent)" }}>
+        <h3 style={{ fontSize: ".92rem", fontWeight: 800, margin: "0 0 10px", display: "flex", alignItems: "center", gap: 8 }}>
           <IconSpark size={15} /> AETHER Coaching Insights
         </h3>
         {loadingIns ? (
-          <div style={{ fontSize: ".84rem", color: "var(--text-muted)" }}>Analysing your data…</div>
+          <div style={{ fontSize: ".85rem", color: "var(--text-muted)" }}>Analysing your study patterns…</div>
         ) : (
-          <div style={{ fontSize: ".85rem", lineHeight: 1.65, color: "var(--text-muted)", fontWeight: 550 }}
+          <div style={{ fontSize: ".86rem", lineHeight: 1.65, color: "var(--text-muted)", fontWeight: 550 }}
             dangerouslySetInnerHTML={{ __html: mdToHtml(insights) }} />
         )}
       </div>
 
-      <div className="glass-panel tilt-card" style={{ padding: 20 }}>
+      <div className="glass-panel tilt-card" style={{ padding: 22 }}>
         <div className="day-head">
-          <h3 style={{ fontSize: ".88rem", fontWeight: 800, margin: 0 }}>Today&apos;s Study Load</h3>
+          <h3 style={{ fontSize: ".95rem", fontWeight: 800, margin: 0 }}>Today&apos;s Study Load</h3>
           <span className="day-meta">{doneToday}/{todayTasks.length} done · {totalPlannedMin} min planned</span>
         </div>
         {!todayTasks.length && (
-          <div style={{ fontSize: ".84rem", color: "var(--text-dim)" }}>
+          <div style={{ fontSize: ".86rem", color: "var(--text-dim)", padding: "12px 0" }}>
             Nothing scheduled today — rest day or plan not generated yet.
           </div>
         )}
@@ -175,23 +175,27 @@ export default function Dashboard({
           const subj = state.subjects.find((s) => s.id === task.subjectId);
           return (
             <div key={task.id} className={`task-row${task.status === "done" ? " done" : ""}${activeTaskId === task.id ? " active-clock" : ""}`}>
-              <div className="task-dot" style={{ background: subj?.color || meta.color }} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div className="task-title">{task.title}</div>
-                <div className="task-sub">
-                  {meta.label} · {task.plannedMinutes} min{taskLogged(task.id) ? ` · ${fmtMin(taskLogged(task.id))} logged` : task.actualMinutes ? ` · ${task.actualMinutes}m logged` : ""}
-                  {activeTaskId === task.id && activeClockSeconds ? ` · live +${Math.floor(activeClockSeconds / 60)}m ${activeClockSeconds % 60}s` : ""}
+              <div className="task-info-top">
+                <div className="task-dot" style={{ background: subj?.color || meta.color, marginTop: 5 }} />
+                <div className="task-info">
+                  <div className="task-title">{task.title}</div>
+                  <div className="task-sub">
+                    {meta.label} · {task.plannedMinutes} min{taskLogged(task.id) ? ` · ${fmtMin(taskLogged(task.id))} logged` : task.actualMinutes ? ` · ${task.actualMinutes}m logged` : ""}
+                    {activeTaskId === task.id && activeClockSeconds ? ` · live +${Math.floor(activeClockSeconds / 60)}m ${activeClockSeconds % 60}s` : ""}
+                  </div>
                 </div>
               </div>
-              <button className="btn btn-xs btn-secondary" onClick={() => setEditingTaskId(task.id)}>Edit</button>
-              {subj && task.status !== "skipped" && (
-                <button className="btn btn-xs btn-secondary" onClick={() => onSkipSubject(subj.id, task.date)}>Skip subject</button>
-              )}
-              <button className="btn btn-xs btn-secondary" onClick={() => onFocusTask(task.id)}>Clock in</button>
-              <button className={`btn btn-xs ${task.status === "done" ? "btn-secondary" : "btn-primary"}`}
-                onClick={() => onTaskStatus(task.id, task.status === "done" ? "pending" : "done")}>
-                {task.status === "done" ? "Undo" : "Done"}
-              </button>
+              <div className="task-actions">
+                <button className="btn btn-xs btn-secondary" onClick={() => setEditingTaskId(task.id)}>Edit</button>
+                {subj && task.status !== "skipped" && (
+                  <button className="btn btn-xs btn-secondary" onClick={() => onSkipSubject(subj.id, task.date)}>Skip subject</button>
+                )}
+                <button className="btn btn-xs btn-secondary" onClick={() => onFocusTask(task.id)}>Clock in</button>
+                <button className={`btn btn-xs ${task.status === "done" ? "btn-secondary" : "btn-primary"}`}
+                  onClick={() => onTaskStatus(task.id, task.status === "done" ? "pending" : "done")}>
+                  {task.status === "done" ? "Undo" : "Done"}
+                </button>
+              </div>
             </div>
           );
         })}
