@@ -2,14 +2,32 @@ import { generateTopics, lookupTopicBank, synthesiseSubjects, type GeneratedTopi
 import { lookupKnowledge, teachFromKnowledge } from "./knowledge";
 
 /* ============================================================
-   LLM PROVIDER LAYER (CASCADING FALLBACK)
+   UNIVERSAL ENVIRONMENT VARIABLE FETCHER
 ============================================================ */
+function getSafeKey(keyName: string): string | null {
+  try {
+    // 1. Try Next.js / Create React App format
+    if (typeof process !== "undefined" && process.env && process.env[keyName]) {
+      return process.env[keyName] as string;
+    }
+    // 2. Try Vite format (fallback)
+    // @ts-ignore
+    if (typeof import.meta !== "undefined" && import.meta.env && import.meta.env[keyName]) {
+      // @ts-ignore
+      return import.meta.env[keyName] as string;
+    }
+  } catch (e) {
+    return null;
+  }
+  return null;
+}
+
 type ChatMsg = { role: "user" | "assistant"; content: string };
 
 export function activeProvider(): string | null {
-  if (process.env.NEXT_PUBLIC_GEMINI_API_KEY) return "AI Cloud";
-  if (process.env.NEXT_PUBLIC_GROQ_API_KEY) return "Groq";
-  if (process.env.NEXT_PUBLIC_OPENROUTER_API_KEY) return "OpenRouter";
+  if (getSafeKey("NEXT_PUBLIC_GEMINI_API_KEY") || getSafeKey("NEXT_PUBLIC_GOOGLE_API_KEY")) return "AI Cloud";
+  if (getSafeKey("NEXT_PUBLIC_GROQ_API_KEY")) return "Groq";
+  if (getSafeKey("NEXT_PUBLIC_OPENROUTER_API_KEY")) return "OpenRouter";
   return null;
 }
 
@@ -26,11 +44,14 @@ export async function callLLM(
       const timer = setTimeout(() => ctrl.abort(), 18000); 
       let text: string | null = null;
 
-      if (provider === "gemini" && process.env.NEXT_PUBLIC_GEMINI_API_KEY) {
-        const key = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-        const model = process.env.NEXT_PUBLIC_GEMINI_MODEL || "gemini-1.5-flash"; 
+      const geminiKey = getSafeKey("NEXT_PUBLIC_GEMINI_API_KEY") || getSafeKey("NEXT_PUBLIC_GOOGLE_API_KEY");
+      const groqKey = getSafeKey("NEXT_PUBLIC_GROQ_API_KEY");
+      const openrouterKey = getSafeKey("NEXT_PUBLIC_OPENROUTER_API_KEY");
+      const geminiModel = getSafeKey("NEXT_PUBLIC_GEMINI_MODEL") || "gemini-1.5-flash";
+
+      if (provider === "gemini" && geminiKey) {
         const r = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiKey}`,
           {
             method: "POST",
             signal: ctrl.signal,
@@ -50,12 +71,11 @@ export async function callLLM(
           text = j?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text || "").join("") ?? null;
         }
       } 
-      else if (provider === "groq" && process.env.NEXT_PUBLIC_GROQ_API_KEY) {
-        const key = process.env.NEXT_PUBLIC_GROQ_API_KEY;
+      else if (provider === "groq" && groqKey) {
         const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
           method: "POST",
           signal: ctrl.signal,
-          headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
+          headers: { "content-type": "application/json", authorization: `Bearer ${groqKey}` },
           body: JSON.stringify({
             model: "llama-3.3-70b-versatile",
             max_tokens: maxTokens,
@@ -67,14 +87,13 @@ export async function callLLM(
           text = j?.choices?.[0]?.message?.content ?? null;
         }
       } 
-      else if (provider === "openrouter" && process.env.NEXT_PUBLIC_OPENROUTER_API_KEY) {
-        const key = process.env.NEXT_PUBLIC_OPENROUTER_API_KEY;
+      else if (provider === "openrouter" && openrouterKey) {
         const r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
           method: "POST",
           signal: ctrl.signal,
           headers: { 
             "content-type": "application/json", 
-            "authorization": `Bearer ${key}`,
+            "authorization": `Bearer ${openrouterKey}`,
             "HTTP-Referer": "https://studyplanner.netlify.app", 
             "X-Title": "Study Planner Pro" 
           },
@@ -225,7 +244,6 @@ export function parseCommand(q: string): TutorReply["action"] | undefined {
   if (/\b(zen|focus mode|full ?screen|distraction ?free|deep work mode)\b/.test(n)) return { type: "zen" };
   if (/\b(re-?plan|rebuild|regenerate|reschedule|re-?balance|redo my (plan|schedule)|fix my (plan|schedule)|update my plan)\b/.test(n)) return { type: "replan" };
   
-  // FIXED THEME COMMANDS
   if (n.includes("theme") || /\b(midnight|dark|obsidian|nebula|emerald|sunset|mint|silver|lavender|samsung|light|black)\b/.test(n)) {
     if (/(midnight|dark|black)/.test(n)) return { type: "theme", payload: "theme-dark" };
     if (/(obsidian)/.test(n)) return { type: "theme", payload: "theme-obsidian" };
@@ -243,7 +261,6 @@ export async function localTutor(q: string, ctx: TutorContext): Promise<TutorRep
   const action = parseCommand(q);
   const n = q.toLowerCase();
 
-  // 1. Check for App Actions (Timers, Navigation, Themes)
   if (action?.type === "replan") {
     return { text: `No problem, falling behind is built into the design, that's what buffer days are for. I'm rebalancing your schedule now. Give me a second...`, action };
   }
@@ -259,19 +276,20 @@ export async function localTutor(q: string, ctx: TutorContext): Promise<TutorRep
     return { text: msgs[action.type] || "Done.", action };
   }
 
-  // 2. Check for instant status checks
   if (/(what|which).*(today|now)|today'?s (plan|task|study|load)|what should i (study|do)/.test(n)) {
     if (!ctx.today.length)
       return { text: `Nothing is scheduled for today   either it's a rest day or the plan hasn't been generated yet.` };
     const list = ctx.today.map((t, i) => `${i + 1}. **${t.title}**   ${t.minutes} min`).join("\n");
     return { text: `Here's today (${ctx.today.reduce((a, t) => a + t.minutes, 0)} min total):\n\n${list}\n\nStart with #1. Say *"start timer"* and I'll clock you in.` };
   }
+
   const pct = percentQ(q); if (pct) return { text: pct };
 
-  // =========================================================================
-  // 3. AI CLOUD CHAT INTEGRATION (THE MISSING LINK)
-  // This sends your conversation directly to Gemini/Groq!
-  // =========================================================================
+  if (/how (do|should) i (answer|approach|structure|write|solve|tackle|start)/i.test(n)) {
+    return { text: `### How to approach: this\n\n**1. Decode the command word.**\n**2. Plan for 60 seconds before writing.**\n**3. Open with a precise 1-line definition.**` };
+  }
+
+  // AI CLOUD CONVERSATION FORWARDING
   const aiResponse = await callLLM(
     tutorSystemPrompt(ctx),
     [{ role: "user", content: q }],
@@ -282,7 +300,6 @@ export async function localTutor(q: string, ctx: TutorContext): Promise<TutorRep
     return { text: aiResponse };
   }
 
-  // 4. Last Resort Offline Fallback (If internet dies)
   const subjectHint = ctx.subjects.find((s) => n.includes(s.name.toLowerCase().split(" ")[0]))?.name;
   const knowledge = await lookupKnowledge(q);
   if (knowledge) return { text: teachFromKnowledge(knowledge, q, ctx.level, subjectHint) };
