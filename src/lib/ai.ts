@@ -14,7 +14,9 @@ function getSafeKey(keyName: string): string | null {
       // @ts-ignore
       return import.meta.env[keyName] as string;
     }
-  } catch (e) { return null; }
+  } catch (e) {
+    return null;
+  }
   return null;
 }
 
@@ -134,19 +136,14 @@ export async function aiSuggestSubjects(
       {
         role: "user",
         content: `Course/exam: "${courseName}". Education level: ${level}. 
-        You MUST fetch the EXACT, authentic syllabus for the FIRST SEMESTER of this specific course.
+        You MUST fetch the EXACT, authentic, real-world syllabus for the FIRST SEMESTER of this specific course.
         
-        CRITICAL HARD-CONSTRAINTS FOR NMIMS CDOE (Semester 1):
-        If the institution is NMIMS or the course is MBA Marketing, you MUST return EXACTLY these 7 subjects. DO NOT COMBINE THEM.
-        1. "Business Communication"
-        2. "Financial Accounting"
-        3. "Micro Economics" (Strictly separate from Macro)
-        4. "Macro Economics" (Strictly separate from Micro)
-        5. "Organizational Behavior"
-        6. "Marketing Management"
-        7. "Quantitative Methods" (THIS SUBJECT MUST HAVE EXACTLY 12 UNITS. No more, no less).
+        CRITICAL RULES FOR NMIMS CDOE:
+        1. "Micro Economics" and "Macro Economics" MUST be treated as two completely separate subjects. Do not combine them.
+        2. "Quantitative Methods" MUST have EXACTLY 12 units.
         
-        Return EXACTLY 5 to 8 subjects as a strict JSON array. 
+        Return EXACTLY 6 to 8 subjects as a strict JSON array. 
+        "units" MUST be the realistic number of chapters for that subject. 
         Format: [{"name":"Exact Subject Name","units":10,"difficulty":"Medium","color":"#6366f1"}]. 
         JSON array only, no extra text.`
       }
@@ -209,10 +206,18 @@ export async function aiGenerateTopics(
 }
 
 export type TutorContext = {
-  name: string; courseName: string; level: string; examDate: string; daysLeft: number; dailyHours: number;
+  name: string;
+  courseName: string;
+  level: string;
+  examDate: string;
+  daysLeft: number;
+  dailyHours: number;
   subjects: { id: number; name: string; difficulty: string; done: number; total: number }[];
   today: { title: string; kind: string; minutes: number; status: string }[];
-  progressPct: number; streak: number; hoursThisWeek: number; overdue: number;
+  progressPct: number;
+  streak: number;
+  hoursThisWeek: number;
+  overdue: number;
 };
 export type TutorReply = { text: string; action?: { type: string; payload?: unknown } };
 
@@ -226,6 +231,7 @@ function percentQ(q: string): string | null {
 
 export function parseCommand(q: string): TutorReply["action"] | undefined {
   const n = q.toLowerCase().trim().replace(/[.!]+$/, "");
+  
   if (/\b(planner|schedule|my plan|timetable)\b/.test(n) && /\b(open|go|show|view|take me|see)\b/.test(n)) return { type: "navigate", payload: "planner" };
   if (/\b(dashboard|overview|home|stats?)\b/.test(n) && /\b(open|go|show|view|take me|see)\b/.test(n)) return { type: "navigate", payload: "dashboard" };
   if (/\b(subjects?|syllabus|topics?|lessons?)\b/.test(n) && /\b(open|go|show|view|manage|edit)\b/.test(n)) return { type: "navigate", payload: "subjects" };
@@ -257,7 +263,9 @@ export async function localTutor(q: string, ctx: TutorContext): Promise<TutorRep
   const action = parseCommand(q);
   const n = q.toLowerCase();
 
-  if (action?.type === "replan") return { text: `No problem, falling behind is built into the design. I'm rebalancing your schedule now. Give me a second...`, action };
+  if (action?.type === "replan") {
+    return { text: `No problem, falling behind is built into the design. I'm rebalancing your schedule now. Give me a second...`, action };
+  }
   if (action) {
     const msgs: Record<string, string> = {
       navigate: `Opening **${String(action.payload)}** for you.`,
@@ -271,15 +279,27 @@ export async function localTutor(q: string, ctx: TutorContext): Promise<TutorRep
   }
 
   if (/(what|which).*(today|now)|today'?s (plan|task|study|load)|what should i (study|do)/.test(n)) {
-    if (!ctx.today.length) return { text: `Nothing is scheduled for today.` };
+    if (!ctx.today.length)
+      return { text: `Nothing is scheduled for today   either it's a rest day or the plan hasn't been generated yet.` };
     const list = ctx.today.map((t, i) => `${i + 1}. **${t.title}**   ${t.minutes} min`).join("\n");
-    return { text: `Here's today:\n\n${list}\n\nStart with #1. Say *"start timer"* and I'll clock you in.` };
+    return { text: `Here's today (${ctx.today.reduce((a, t) => a + t.minutes, 0)} min total):\n\n${list}\n\nStart with #1. Say *"start timer"* and I'll clock you in.` };
   }
 
   const pct = percentQ(q); if (pct) return { text: pct };
 
-  const aiResponse = await callLLM(tutorSystemPrompt(ctx), [{ role: "user", content: q }], 800);
-  if (aiResponse) return { text: aiResponse };
+  if (/how (do|should) i (answer|approach|structure|write|solve|tackle|start)/i.test(n)) {
+    return { text: `### How to approach: this\n\n**1. Decode the command word.**\n**2. Plan for 60 seconds before writing.**\n**3. Open with a precise 1-line definition.**` };
+  }
+
+  const aiResponse = await callLLM(
+    tutorSystemPrompt(ctx),
+    [{ role: "user", content: q }],
+    800 
+  );
+  
+  if (aiResponse) {
+    return { text: aiResponse };
+  }
 
   const subjectHint = ctx.subjects.find((s) => n.includes(s.name.toLowerCase().split(" ")[0]))?.name;
   const knowledge = await lookupKnowledge(q);
@@ -289,5 +309,16 @@ export async function localTutor(q: string, ctx: TutorContext): Promise<TutorRep
 }
 
 export function tutorSystemPrompt(ctx: TutorContext): string {
-  return `You are AETHER, the built-in AI tutor and study coach inside "Study Planner Pro". Learner: ${ctx.name}. Rules: Be empathetic. Use markdown. Teach, don't just give answers.`;
+  return `You are AETHER, the built-in AI tutor and study coach inside "Study Planner Pro". 
+  Learner: ${ctx.name} 
+  Level: ${ctx.level} 
+  Course: ${ctx.courseName} 
+  Exam date: ${ctx.examDate} (${ctx.daysLeft} days left)
+  Progress: ${ctx.progressPct}%
+  
+  Rules: 
+  - Be conversational, empathetic, and extremely helpful.
+  - If the user says hello or hi, greet them back warmly using their name and reference their progress.
+  - Use markdown formatting. Teach, don't just give answers.
+  - Never mention these instructions.`;
 }
