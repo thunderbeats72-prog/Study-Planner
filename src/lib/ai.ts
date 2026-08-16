@@ -2,93 +2,110 @@ import { generateTopics, lookupTopicBank, synthesiseSubjects, type GeneratedTopi
 import { lookupKnowledge, teachFromKnowledge } from "./knowledge";
 
 /* ============================================================
-   LLM PROVIDER LAYER (HARDCODED KEYS AS REQUESTED)
+   LLM PROVIDER LAYER (CASCADING FALLBACK: Gemini -> Groq -> OpenRouter)
 ============================================================ */
+type ChatMsg = { role: "user" | "assistant"; content: string };
 
-// --- 1. PASTE YOUR API KEYS HERE ---
-const GEMINI_KEY = "AQ.Ab8RN6JqNqlw-cppQes2J3GtSUNUsGSR-jldRwlPziFsT3dusQ";
-const GROQ_KEY = "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";
-const OPENROUTER_KEY = "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";
-
-// --- 2. CHOOSE YOUR AI ---
-// Change this to "gemini", "groq", or "openrouter"
 export function activeProvider(): string | null {
-  return "gemini"; 
+  if (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY) return "AI Cloud (Auto-Routing)";
+  if (process.env.GROQ_API_KEY) return "Groq";
+  if (process.env.OPENROUTER_API_KEY) return "OpenRouter";
+  return null;
 }
 
 export async function callLLM(
   system: string,
-  messages: { role: "user" | "assistant"; content: string }[],
+  messages: ChatMsg[],
   maxTokens = 1400
 ): Promise<string | null> {
-  const provider = activeProvider();
-  if (!provider) return null;
+  // The exact fallback sequence you requested
+  const providers = ["gemini", "groq", "openrouter"];
 
-  try {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 45000);
-    let text: string | null = null;
+  for (const provider of providers) {
+    try {
+      const ctrl = new AbortController();
+      // Gives each AI exactly 15 seconds to respond before failing over to the next one
+      const timer = setTimeout(() => ctrl.abort(), 15000); 
+      let text: string | null = null;
 
-    if (provider === "gemini") {
-      const model = "gemini-1.5-flash"; // Highly stable and fast model
-      const r = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_KEY}`,
-        {
+      if (provider === "gemini" && (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY)) {
+        const key = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+        const model = process.env.GEMINI_MODEL || "gemini-1.5-flash"; 
+        const r = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
+          {
+            method: "POST",
+            signal: ctrl.signal,
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              systemInstruction: { parts: [{ text: system }] },
+              contents: messages.map((m) => ({
+                role: m.role === "assistant" ? "model" : "user",
+                parts: [{ text: m.content }],
+              })),
+              generationConfig: { maxOutputTokens: maxTokens },
+            }),
+          }
+        );
+        if (r.ok) {
+          const j = await r.json();
+          text = j?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text || "").join("") ?? null;
+        }
+      } 
+      else if (provider === "groq" && process.env.GROQ_API_KEY) {
+        const key = process.env.GROQ_API_KEY;
+        const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
           method: "POST",
           signal: ctrl.signal,
-          headers: { "content-type": "application/json" },
+          headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
           body: JSON.stringify({
-            systemInstruction: { parts: [{ text: system }] },
-            contents: messages.map((m) => ({
-              role: m.role === "assistant" ? "model" : "user",
-              parts: [{ text: m.content }],
-            })),
-            generationConfig: { maxOutputTokens: maxTokens },
+            model: "llama-3.3-70b-versatile",
+            max_tokens: maxTokens,
+            messages: [{ role: "system", content: system }, ...messages],
           }),
+        });
+        if (r.ok) {
+          const j = await r.json();
+          text = j?.choices?.[0]?.message?.content ?? null;
         }
-      );
-      const j = await r.json();
-      text = j?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text || "").join("") ?? null;
-      
-    } else {
-      let url = "";
-      let key = "";
-      let model = "";
-
-      if (provider === "groq") {
-        url = "https://api.groq.com/openai/v1/chat/completions";
-        key = GROQ_KEY;
-        model = "llama-3.3-70b-versatile"; 
-      } else if (provider === "openrouter") {
-        url = "https://openrouter.ai/api/v1/chat/completions";
-        key = OPENROUTER_KEY;
-        model = "openai/gpt-4o-mini"; 
+      } 
+      else if (provider === "openrouter" && process.env.OPENROUTER_API_KEY) {
+        const key = process.env.OPENROUTER_API_KEY;
+        const r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          signal: ctrl.signal,
+          headers: { 
+            "content-type": "application/json", 
+            "authorization": `Bearer ${key}`,
+            "HTTP-Referer": "https://studyplanner.netlify.app", 
+            "X-Title": "Study Planner Pro" 
+          },
+          body: JSON.stringify({
+            model: "openai/gpt-4o-mini",
+            max_tokens: maxTokens,
+            messages: [{ role: "system", content: system }, ...messages],
+          }),
+        });
+        if (r.ok) {
+          const j = await r.json();
+          text = j?.choices?.[0]?.message?.content ?? null;
+        }
       }
 
-      const r = await fetch(url, {
-        method: "POST",
-        signal: ctrl.signal,
-        headers: { 
-          "content-type": "application/json", 
-          authorization: `Bearer ${key}`,
-          "HTTP-Referer": "https://studyplanner.netlify.app", // Crucial for OpenRouter
-          "X-Title": "Study Planner Pro" 
-        },
-        body: JSON.stringify({
-          model: model,
-          max_tokens: maxTokens,
-          messages: [{ role: "system", content: system }, ...messages],
-        }),
-      });
-      const j = await r.json();
-      text = j?.choices?.[0]?.message?.content ?? null;
-    }
+      clearTimeout(timer);
 
-    clearTimeout(timer);
-    return text && text.trim() ? text.trim() : null;
-  } catch {
-    return null;
+      // If the current AI successfully generated a response, return it and break the loop
+      if (text && text.trim()) {
+        return text.trim();
+      }
+    } catch (error) {
+      // If the current AI hits a rate limit, crashes, or times out, safely continue to the next one
+      continue; 
+    }
   }
+
+  // If ALL THREE APIs fail, this triggers the local knowledge base fallback
+  return null;
 }
 
 function extractJson<T>(raw: string): T | null {
@@ -105,16 +122,13 @@ function extractJson<T>(raw: string): T | null {
 }
 
 /* ============================================================
-   CURRICULUM SYNTHESIS (Strict AI Prompting for Relevant Courses)
+   CURRICULUM SYNTHESIS (SMART COURSE DETECTION)
 ============================================================ */
 export async function aiSuggestSubjects(
   courseName: string,
   level: string
 ): Promise<{ subjects: SeedSubject[]; source: string }> {
   const fallback = synthesiseSubjects(courseName, level);
-  const provider = activeProvider();
-  
-  if (!provider || provider === "none") return { subjects: fallback, source: "aether-local" };
 
   const raw = await callLLM(
     "You are a curriculum designer. Reply with strict JSON only.",
@@ -140,7 +154,7 @@ export async function aiSuggestSubjects(
           difficulty: (["Easy", "Medium", "Hard"].includes(String(s.difficulty)) ? s.difficulty : "Medium") as SeedSubject["difficulty"],
           color: /^#[0-9a-f]{6}$/i.test(String(s.color)) ? s.color : palette[i % palette.length],
         })),
-        source: provider,
+        source: "AI Cloud",
       };
     }
   } catch { /* fall through */ }
@@ -182,7 +196,7 @@ export async function aiGenerateTopics(
 }
 
 /* ============================================================
-   LOCAL TUTOR ENGINE (Original Full Logic Restored)
+   LOCAL TUTOR ENGINE (In-App Commands & Final Fallback)
 ============================================================ */
 export type TutorContext = {
   name: string;
@@ -201,120 +215,6 @@ export type TutorContext = {
 
 export type TutorReply = { text: string; action?: { type: string; payload?: unknown } };
 
-function tokenize(expr: string): string[] | null {
-  const t = expr.match(/(\d+\.?\d*|[+\-*/^()%]|sqrt|sin|cos|tan|log|ln|pi|e)/g);
-  return t && t.join("").replace(/\s/g, "").length === expr.replace(/\s/g, "").length ? t : null;
-}
-
-export function evalMath(expr: string): number | null {
-  const cleaned = expr.replace(/\s+/g, "").replace(/ /g, "*").replace(/ /g, "/").replace(/\^/g, "**");
-  if (!/^[-+*/().%\d\s*]+$/.test(cleaned)) return null;
-  if (!/\d/.test(cleaned)) return null;
-  try {
-    const val = Function(`"use strict";return (${cleaned});`)() as number;
-    return Number.isFinite(val) ? val : null;
-  } catch {
-    return null;
-  }
-}
-
-function solveLinear(q: string): string | null {
-  const m = q.match(/(-?\d*\.?\d*)\s*x\s*([+-]\s*\d+\.?\d*)?\s*=\s*(-?\d+\.?\d*)/i);
-  if (!m) return null;
-  const a = m[1] === "" || m[1] === "+" ? 1 : m[1] === "-" ? -1 : parseFloat(m[1]);
-  const b = m[2] ? parseFloat(m[2].replace(/\s/g, "")) : 0;
-  const c = parseFloat(m[3]);
-  if (!a) return null;
-  const x = (c - b) / a;
-  return `**Solving ${m[0]}**\n\n1. Move the constant: ${a}x = ${c} ${b >= 0 ? "-" : "+"} ${Math.abs(b)} = ${c - b}\n2. Divide both sides by ${a}: x = ${c - b} / ${a}\n\n**x = ${round(x)}**`;
-}
-
-function solveQuadratic(q: string): string | null {
-  const m = q.replace(/\s/g, "").match(/(-?\d*)x\^?2([+-]\d*)x?([+-]\d+)?=0/i);
-  if (!m) return null;
-  const a = m[1] === "" || m[1] === "+" ? 1 : m[1] === "-" ? -1 : parseFloat(m[1]);
-  const b = m[2] ? (m[2] === "+" ? 1 : m[2] === "-" ? -1 : parseFloat(m[2])) : 0;
-  const c = m[3] ? parseFloat(m[3]) : 0;
-  const disc = b * b - 4 * a * c;
-  let roots: string;
-  if (disc > 0) {
-    roots = `x  = ${round((-b + Math.sqrt(disc)) / (2 * a))}, x  = ${round((-b - Math.sqrt(disc)) / (2 * a))}`;
-  } else if (disc === 0) {
-    roots = `x = ${round(-b / (2 * a))} (repeated root)`;
-  } else {
-    roots = `x = ${round(-b / (2 * a))}   ${round(Math.sqrt(-disc) / (2 * a))}i (complex roots)`;
-  }
-  return `**Quadratic:** ${a}x  ${b >= 0 ? "+" : "-"} ${Math.abs(b)}x ${c >= 0 ? "+" : "-"} ${Math.abs(c)} = 0\n\nDiscriminant D = **${round(disc)}**\n\n**${roots}**`;
-}
-
-function simultaneous(q: string): string | null {
-  const eqs = q.match(/-?\d*\.?\d*\s*x\s*[+-]\s*\d*\.?\d*\s*y\s*=\s*-?\d+\.?\d*/gi);
-  if (!eqs || eqs.length < 2) return null;
-  const parse2 = (e: string) => {
-    const m = e.replace(/\s/g, "").match(/(-?\d*\.?\d*)x([+-]\d*\.?\d*)y=(-?\d+\.?\d*)/i);
-    if (!m) return null;
-    const a = m[1] === "" || m[1] === "+" ? 1 : m[1] === "-" ? -1 : parseFloat(m[1]);
-    const b = m[2] === "+" ? 1 : m[2] === "-" ? -1 : parseFloat(m[2]);
-    return { a, b, c: parseFloat(m[3]) };
-  };
-  const e1 = parse2(eqs[0]); const e2 = parse2(eqs[1]);
-  if (!e1 || !e2) return null;
-  const det = e1.a * e2.b - e2.a * e1.b;
-  if (!det) return `These equations are **not independent**.`;
-  const x = (e1.c * e2.b - e2.c * e1.b) / det;
-  const y = (e1.a * e2.c - e2.a * e1.c) / det;
-  return `**Simultaneous equations**\nx = **${round(x)}**\ny = **${round(y)}**`;
-}
-
-function integral(q: string): string | null {
-  if (!/integrate|integral|antiderivative/i.test(q)) return null;
-  const terms = q.match(/(-?\d*\.?\d*)x\^?(\d*)/g);
-  if (!terms || !terms.length) return null;
-  const parts = terms.map((t) => {
-    const mm = t.match(/(-?\d*\.?\d*)x\^?(\d*)/)!;
-    const coef = mm[1] === "" || mm[1] === "+" ? 1 : mm[1] === "-" ? -1 : parseFloat(mm[1]);
-    const pow = mm[2] ? parseInt(mm[2]) : 1;
-    return `${round(coef / (pow + 1))}x^${pow + 1}`;
-  });
-  return `**Integral:**   **${parts.join(" + ").replace(/\+ -/g, "- ")} + C**`;
-}
-
-function numberTheory(q: string): string | null {
-  const nums = (q.match(/\d+/g) || []).map(Number);
-  if (/\bhcf\b|\bgcd\b/i.test(q) && nums.length >= 2) {
-    const g = (a: number, b: number): number => (b ? g(b, a % b) : a);
-    return `**HCF/GCD of ${nums.join(", ")} = ${nums.reduce((a, b) => g(a, b))}**`;
-  }
-  if (/\blcm\b/i.test(q) && nums.length >= 2) {
-    const g = (a: number, b: number): number => (b ? g(b, a % b) : a);
-    return `**LCM of ${nums.join(", ")} = ${nums.reduce((a, b) => (a * b) / g(a, b))}**`;
-  }
-  if (/\bprime\b/i.test(q) && nums.length === 1) {
-    const n = nums[0]; let p = n > 1;
-    for (let i = 2; i * i <= n; i++) if (n % i === 0) { p = false; break; }
-    return `**${n} is ${p ? "a prime" : "not a prime"} number.**`;
-  }
-  if (/average|mean/i.test(q) && nums.length >= 3) {
-    const sum = nums.reduce((a, b) => a + b, 0);
-    return `**Mean of ${nums.join(", ")} = ${round(sum / nums.length)}**`;
-  }
-  return null;
-}
-
-function derivative(q: string): string | null {
-  if (!/derivative|differentiate|d\/dx/i.test(q)) return null;
-  const terms = q.match(/(-?\d*\.?\d*)x\^?(\d*)/g);
-  if (!terms || !terms.length) return null;
-  const parts = terms.map((t) => {
-    const mm = t.match(/(-?\d*\.?\d*)x\^?(\d*)/)!;
-    const coef = mm[1] === "" || mm[1] === "+" ? 1 : mm[1] === "-" ? -1 : parseFloat(mm[1]);
-    const pow = mm[2] ? parseInt(mm[2]) : 1;
-    if (pow === 1) return `${coef}`;
-    return `${round(coef * pow)}x${pow - 1 === 1 ? "" : "^" + (pow - 1)}`;
-  });
-  return `**Derivative:** **${parts.join(" + ").replace(/\+ -/g, "- ")}**`;
-}
-
 function round(n: number): number { return Math.round(n * 10000) / 10000; }
 
 function percentQ(q: string): string | null {
@@ -322,42 +222,6 @@ function percentQ(q: string): string | null {
   if (!m) return null;
   const v = (parseFloat(m[1]) / 100) * parseFloat(m[2]);
   return `${m[1]}% of ${m[2]} = **${round(v)}**`;
-}
-
-const CONCEPTS: Record<string, string> = {
-  "spaced repetition": "**Spaced repetition** means reviewing material at increasing intervals...",
-  "active recall": "**Active recall** = closing the book and forcing your brain to retrieve the answer...",
-  "pomodoro": "**Pomodoro** = 25 minutes of single-task focus + 5 minutes break...",
-};
-
-function findConcept(q: string): string | null {
-  const n = q.toLowerCase();
-  let best: { key: string; len: number } | null = null;
-  for (const key of Object.keys(CONCEPTS)) {
-    const re = new RegExp(`\\b${key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i");
-    if (re.test(n) && (!best || key.length > best.len)) best = { key, len: key.length };
-  }
-  return best ? CONCEPTS[best.key] : null;
-}
-
-function answerStrategy(q: string, ctx: TutorContext): string {
-  const topic = q.replace(/.*how (do|should) i (answer|approach|structure|write|solve|tackle|start)\s*/i, "").replace(/[?.]/g, "").trim();
-  const deep = ctx.level === "phd" || ctx.level === "pg";
-  return `### How to approach: ${topic || "this"}\n\n**1. Decode the command word.**\n**2. Plan for 60 seconds.**\n**3. Open with a precise 1-line definition.**`;
-}
-
-function topicExplainer(q: string, ctx: TutorContext): string | null {
-  const n = q.toLowerCase();
-  const wantsOverview = /(syllabus|overview|plan for|chapters|units|roadmap|where to start|how to study)/i.test(n);
-  if (!wantsOverview) return null;
-  for (const s of ctx.subjects) {
-    if (n.includes(s.name.toLowerCase().split(" ")[0]) && s.name.length > 3) {
-      const bank = lookupTopicBank(s.name) || [];
-      const pct = s.total ? Math.round((s.done / s.total) * 100) : 0;
-      return `### ${s.name}   study roadmap\nYou're **${pct}%** through (${s.done}/${s.total} lessons).\n\n**Recommended order**\n${bank.slice(0, 10).map((t, i) => `${i + 1}. ${t}`).join("\n")}`;
-    }
-  }
-  return null;
 }
 
 export function parseCommand(q: string): TutorReply["action"] | undefined {
@@ -399,16 +263,16 @@ export async function localTutor(q: string, ctx: TutorContext): Promise<TutorRep
 
   if (action?.type === "replan") {
     return {
-      text: `No problem   falling behind is built into the design, that's what buffer days are for. I'm rebalancing your schedule now: unfinished lessons get pushed forward, the daily load is re-spread across the remaining ${ctx.daysLeft} days, and your weakest subject keeps priority. Give me a second       `,
+      text: `No problem, falling behind is built into the design, that's what buffer days are for. I'm rebalancing your schedule now. Give me a second...`,
       action,
     };
   }
   if (action) {
     const msgs: Record<string, string> = {
       navigate: `Opening **${String(action.payload)}** for you.`,
-      startTimer: `Clock started. Session logged against your current subject   I'll add the minutes to today's task automatically. Put the phone in another room.`,
+      startTimer: `Clock started. Session logged against your current subject. Put the phone in another room.`,
       stopTimer: `Session stopped and logged. Nice work.`,
-      break: `Break started. Stand up, look 6 metres away for 20 seconds, drink water. I'll ping you back in.`,
+      break: `Break started. Stand up, look 6 metres away for 20 seconds, drink water.`,
       zen: `Zen mode engaged. Nothing on screen but the timer.`,
       theme: `Theme changed instantly.`
     };
@@ -423,44 +287,19 @@ export async function localTutor(q: string, ctx: TutorContext): Promise<TutorRep
   }
 
   const pct = percentQ(q); if (pct) return { text: pct };
-  const sim = simultaneous(q); if (sim) return { text: sim };
-  const quad = solveQuadratic(q); if (quad) return { text: quad };
-  const lin = solveLinear(q); if (lin) return { text: lin };
-  const der = derivative(q); if (der) return { text: der };
-  const integ = integral(q); if (integ) return { text: integ };
-  const nt = numberTheory(q); if (nt) return { text: nt };
-
-  const mathExpr = q.replace(/^(what is|calculate|compute|solve|=)\s*/i, "").replace(/[?=]/g, "").trim();
-  if (/^[\d\s+\-*/().^% ]+$/.test(mathExpr) && /\d/.test(mathExpr) && /[+\-*/^]/.test(mathExpr)) {
-    const v = evalMath(mathExpr);
-    if (v !== null) return { text: `**${mathExpr} = ${round(v)}**` };
-  }
-
-  const concept = findConcept(q); if (concept) return { text: concept };
-  const topic = topicExplainer(q, ctx); if (topic) return { text: topic };
-
-  if (/^(hi|hello|hey|yo)\b/.test(n)) {
-    return { text: `Hey ${ctx.name}! ${ctx.daysLeft} days to go and you're ${ctx.progressPct}% through ${ctx.courseName}.\n\nAsk me to explain a topic, solve a problem, or say *"replan"* if you've slipped.` };
-  }
-
-  const cmp = q.match(/difference between (.+?) and ([^?.]+)/i) || q.match(/compare (.+?) (?:and|vs\.?|with) ([^?.]+)/i);
-  if (cmp) {
-    const [a, b] = [cmp[1].trim(), cmp[2].trim()];
-    const [ka, kb] = await Promise.all([lookupKnowledge(a), lookupKnowledge(b)]);
-    if (ka && kb) return { text: `**${ka.title} vs ${kb.title}**\n\n**1. ${ka.title}**\n${ka.extract.split(/(?<=[.!?])\s+/).slice(0, 2).join(" ")}\n\n**2. ${kb.title}**\n${kb.extract.split(/(?<=[.!?])\s+/).slice(0, 2).join(" ")}\n\n<sub>Sources: ${ka.url}   ${kb.url}</sub>` };
-  }
 
   if (/how (do|should) i (answer|approach|structure|write|solve|tackle|start)/i.test(n)) {
-    return { text: answerStrategy(q, ctx) };
+    return { text: `### How to approach: this\n\n**1. Decode the command word.**\n**2. Plan for 60 seconds before writing.**\n**3. Open with a precise 1-line definition.**` };
   }
 
+  // LAST RESORT FALLBACK: If Gemini, Groq, and OpenRouter ALL fail, it runs this local database search
   const subjectHint = ctx.subjects.find((s) => n.includes(s.name.toLowerCase().split(" ")[0]))?.name;
   const knowledge = await lookupKnowledge(q);
   if (knowledge) return { text: teachFromKnowledge(knowledge, q, ctx.level, subjectHint) };
 
-  return { text: `I couldn't reach the AI or find a reference for that one. Try asking me to explain a specific concept, change your theme, or ask *"what should I study today?"*` };
+  return { text: `I couldn't reach any AI servers and my local database doesn't have a specific answer for this. Try asking me to explain a specific concept, change your theme, or ask *"what should I study today?"*` };
 }
 
 export function tutorSystemPrompt(ctx: TutorContext): string {
-  return `You are AETHER, the built-in AI tutor and study coach inside "Study Planner Pro". Learner: ${ctx.name}   Level: ${ctx.level}   Course: ${ctx.courseName} Exam date: ${ctx.examDate} (${ctx.daysLeft} days left)   Daily target: ${ctx.dailyHours}h Overall syllabus progress: ${ctx.progressPct}%   Streak: ${ctx.streak} days   Hours this week: ${ctx.hoursThisWeek}   Overdue tasks: ${ctx.overdue} Subjects: ${ctx.subjects.map((s) => `${s.name} (${s.done}/${s.total} lessons, ${s.difficulty})`).join("; ")} Today's plan: ${ctx.today.length ? ctx.today.map((t) => `${t.title} [${t.minutes}m, ${t.status}]`).join("; ") : "nothing scheduled"} Rules: - Teach, don't just answer. Show the reasoning steps for any problem (maths, science, logic, essays). - Match the learner's level: for nursery/school keep language simple and warm; for PhD be rigorous and cite frameworks. - Be concise but complete. Use markdown: bold key terms, numbered steps, short lists. - Always relate advice back to their actual plan and remaining days when it's relevant. - If the learner is behind, be encouraging and practical   never shame them. - If they ask you to change the app (replan, start timer, open a page), confirm briefly; the app handles the action.`;
+  return `You are AETHER, the built-in AI tutor and study coach inside "Study Planner Pro". Learner: ${ctx.name}   Level: ${ctx.level}   Course: ${ctx.courseName} Exam date: ${ctx.examDate} (${ctx.daysLeft} days left)   Daily target: ${ctx.dailyHours}h Overall syllabus progress: ${ctx.progressPct}%. Rules: - Teach, don't just answer. Match the learner's level. Use markdown. Be concise.`;
 }
