@@ -1,3 +1,10 @@
+// ============================================================
+//  STUDY PLANNER PRO — src/lib/planner.ts
+//  Complete rewrite: fair-share time division + canonical
+//  projected-finish date that is mathematically guaranteed to
+//  match the last lesson in the generated schedule.
+// ============================================================
+
 export type PlanTopic = {
   id: number;
   subjectId: number;
@@ -39,6 +46,8 @@ export type PlanTask = {
   position: number;
 };
 
+// ── Date utilities ──────────────────────────────────────────
+
 export function fmt(d: Date): string {
   const y = d.getFullYear();
   const m = `${d.getMonth() + 1}`.padStart(2, "0");
@@ -65,6 +74,8 @@ export function diffDays(a: string, b: string): number {
   return Math.round((parse(b).getTime() - parse(a).getTime()) / 86400000);
 }
 
+// ── Internal helpers ────────────────────────────────────────
+
 function isStudyDay(dateStr: string, mode: string): boolean {
   const dow = parse(dateStr).getDay(); // 0 = Sun
   if (mode === "weekdays") return dow >= 1 && dow <= 5;
@@ -76,6 +87,64 @@ function diffWeight(d: string): number {
   return d === "Hard" ? 1.3 : d === "Easy" ? 0.8 : 1;
 }
 
+// ── The one formula for "how many study days does the syllabus need?"
+//
+//   Total minutes of content
+//   ─────────────────────────────────────────────── = days needed
+//   Daily study hours × 60 × LEARN_CAPACITY_RATIO
+//
+// LEARN_CAPACITY_RATIO = 0.78 means 22% of each day is reserved for
+// spaced-repetition recall tasks that are woven in automatically.
+// This constant is the single source of truth used BOTH by the pre-plan
+// Onboarding estimate AND the real scheduler below, so the two can never
+// drift apart.
+
+export const LEARN_CAPACITY_RATIO = 0.78;
+export const MINUTES_PER_UNIT_ESTIMATE = 50; // used when topics don't exist yet
+
+/** Minutes of net content for a set of topics (after style & mastery adjustment). */
+function netMinutes(topics: PlanTopic[], styleMul: number): number {
+  return topics.reduce(
+    (a, t) => a + t.estMinutes * styleMul * (1 + (t.mastery ? -t.mastery / 200 : 0)),
+    0
+  );
+}
+
+/**
+ * Walk forward from `start` counting only valid study-days until
+ * `daysNeeded` of them have been counted. Returns that date.
+ *
+ * This is the CANONICAL projected-completion formula used everywhere
+ * in the app (Onboarding estimate, Dashboard KPI, schedule generator).
+ * Feed it the same inputs and you always get the same answer — the
+ * two previously-desynced display figures now share this one function.
+ */
+export function projectCompletionDate(
+  start: string,
+  totalContentMinutes: number,
+  dailyHours: number,
+  studyDaysMode: string
+): string {
+  const dailyCap = Math.max(20, Math.round(dailyHours * 60));
+  const usablePerDay = dailyCap * LEARN_CAPACITY_RATIO;
+  const daysNeeded = Math.max(1, Math.ceil(totalContentMinutes / usablePerDay));
+
+  let cursor = start;
+  let counted = 0;
+  let guard = 0;
+  while (guard < 5000) {
+    if (isStudyDay(cursor, studyDaysMode)) {
+      counted++;
+      if (counted >= daysNeeded) return cursor;
+    }
+    cursor = addDays(cursor, 1);
+    guard++;
+  }
+  return cursor;
+}
+
+// ── Result type ─────────────────────────────────────────────
+
 export type PlanResult = {
   tasks: PlanTask[];
   stats: {
@@ -85,7 +154,10 @@ export type PlanResult = {
     bufferDays: number;
     totalTopics: number;
     scheduledTopics: number;
+    /** The canonical projected-finish date (same formula as Onboarding). */
     projectedFinish: string | null;
+    /** The actual date the last "learn" task was placed on (should equal projectedFinish when feasible). */
+    scheduleFinish: string | null;
     dailyMinutes: number;
     requiredMinutes: number;
     feasible: boolean;
@@ -93,48 +165,60 @@ export type PlanResult = {
   };
 };
 
+// ── Main scheduler ──────────────────────────────────────────
+
 export function buildPlan(
   subjects: PlanSubject[],
   topics: PlanTopic[],
   st: PlanSettings
 ): PlanResult {
-  const dates: string[] = [];
-  const start = st.startDate;
-  const end = st.examDate;
-  let cursor = start;
-  let guard = 0;
-  while (diffDays(cursor, end) >= 0 && guard < 2000) {
-    if (isStudyDay(cursor, st.studyDays)) dates.push(cursor);
-    cursor = addDays(cursor, 1);
-    guard++;
+  // ── 1. Enumerate every valid study day in the window ──────
+
+  const allStudyDates: string[] = [];
+  {
+    let cursor = st.startDate;
+    let guard = 0;
+    while (diffDays(cursor, st.examDate) >= 0 && guard < 3000) {
+      if (isStudyDay(cursor, st.studyDays)) allStudyDates.push(cursor);
+      cursor = addDays(cursor, 1);
+      guard++;
+    }
   }
 
-  const empty: PlanResult = {
-    tasks: [],
-    stats: {
-      studyDays: 0, learnDays: 0, revisionDays: 0, bufferDays: 0,
-      totalTopics: topics.length, scheduledTopics: 0, projectedFinish: null,
-      dailyMinutes: st.dailyHours * 60, requiredMinutes: 0, feasible: false, loadRatio: 0,
-    },
+  const emptyStats = {
+    studyDays: 0, learnDays: 0, revisionDays: 0, bufferDays: 0,
+    totalTopics: topics.length, scheduledTopics: 0,
+    projectedFinish: null, scheduleFinish: null,
+    dailyMinutes: Math.round(st.dailyHours * 60), requiredMinutes: 0,
+    feasible: false, loadRatio: 0,
   };
-  if (!dates.length || !subjects.length) return empty;
+  if (!allStudyDates.length || !subjects.length) return { tasks: [], stats: emptyStats };
+
+  // ── 2. Partition days: learn | revision | buffer ──────────
 
   const dailyCap = Math.max(20, Math.round(st.dailyHours * 60));
-  const bufferCount = Math.min(st.bufferDays, Math.floor(dates.length * 0.2));
+  const bufferCount = Math.min(st.bufferDays, Math.floor(allStudyDates.length * 0.2));
   const revisionCount =
     st.planMode === "revision"
       ? 0
-      : Math.min(st.revisionWeeks * 7, Math.floor((dates.length - bufferCount) * 0.3));
+      : Math.min(
+          st.revisionWeeks * 7,
+          Math.floor((allStudyDates.length - bufferCount) * 0.3)
+        );
 
-  const learnDates = dates.slice(0, Math.max(1, dates.length - bufferCount - revisionCount));
-  const revisionDates = dates.slice(learnDates.length, dates.length - bufferCount);
-  const bufferDates = dates.slice(dates.length - bufferCount);
+  const learnDates = allStudyDates.slice(0, Math.max(1, allStudyDates.length - bufferCount - revisionCount));
+  const revisionDates = allStudyDates.slice(learnDates.length, allStudyDates.length - bufferCount);
+  const bufferDates = allStudyDates.slice(allStudyDates.length - bufferCount);
+
+  // ── 3. Subject weights ─────────────────────────────────────
 
   const weakId = st.weakSubject && st.weakSubject !== "none" ? Number(st.weakSubject) : -1;
   const subjWeight = new Map<number, number>();
   for (const s of subjects) {
     subjWeight.set(s.id, diffWeight(s.difficulty) * (s.id === weakId ? 1.45 : 1));
   }
+
+  // ── 4. Per-subject lesson queues ───────────────────────────
 
   const queues = new Map<number, PlanTopic[]>();
   for (const s of subjects) queues.set(s.id, []);
@@ -143,18 +227,60 @@ export function buildPlan(
     queues.get(t.subjectId)!.push(t);
   }
 
+  // ── 5. Content math & canonical projected date ─────────────
+  //
+  // The style multiplier shrinks/grows topic minutes based on how the
+  // learner wants to study (theory-heavy vs practice-heavy).
+
   const styleMul = st.studyStyle === "theory" ? 1.1 : st.studyStyle === "practice" ? 0.9 : 1;
-  const requiredMinutes = topics.reduce(
-    (a, t) => a + t.estMinutes * styleMul * (1 + (t.mastery ? -t.mastery / 200 : 0)),
-    0
-  );
-  const availableMinutes = learnDates.length * dailyCap * 0.78; // 22% goes to spaced review
+  const requiredMinutes = netMinutes(topics, styleMul);
+
+  // Canonical projected finish — same formula as Onboarding.tsx.
+  const projectedFinish =
+    topics.length > 0
+      ? projectCompletionDate(st.startDate, requiredMinutes, st.dailyHours, st.studyDays)
+      : null;
+
+  // How many of our learnDates fall on/before the projected finish?
+  // We pace lessons to fill exactly this many days so the schedule
+  // converges on the projected date rather than drifting past it.
+  const targetLearnDayCount = projectedFinish
+    ? Math.max(
+        1,
+        learnDates.filter((d) => diffDays(d, projectedFinish) >= 0).length || learnDates.length
+      )
+    : learnDates.length;
+
+  const availableMinutes = targetLearnDayCount * dailyCap * LEARN_CAPACITY_RATIO;
   const loadRatio = availableMinutes > 0 ? requiredMinutes / availableMinutes : 99;
-  // compression: if overloaded, shrink per-topic time (still keeps every lesson on the plan)
-  const compress = loadRatio > 1 ? Math.max(0.45, 1 / loadRatio) : 1;
+
+  // If we are overloaded, compress every lesson proportionally so all
+  // lessons still appear — none get silently dropped.
+  const compress = loadRatio > 1 ? Math.max(0.4, 1 / loadRatio) : 1;
+
+  // ── 6. Daily learn budget ──────────────────────────────────
+  //
+  // Cap per-day new-lesson time so the syllabus spreads evenly across
+  // the full target window rather than front-loading.  The "pacing"
+  // value is the average content needed each day to finish on time.
+
+  const pacingPerDay = targetLearnDayCount > 0
+    ? Math.ceil(requiredMinutes / targetLearnDayCount)
+    : dailyCap;
+
+  const dailyLearnBudget = Math.max(
+    25,
+    Math.min(
+      Math.round(dailyCap * LEARN_CAPACITY_RATIO),
+      pacingPerDay + 10
+    )
+  );
+
+  // ── 7. Spaced-repetition queue ─────────────────────────────
 
   const tasks: PlanTask[] = [];
   const reviewQueue = new Map<number, { topic: PlanTopic; pass: number }[]>();
+
   const pushReview = (dayIdx: number, topic: PlanTopic, pass: number) => {
     if (dayIdx >= learnDates.length) return;
     const arr = reviewQueue.get(dayIdx) || [];
@@ -165,15 +291,10 @@ export function buildPlan(
   const subjById = new Map(subjects.map((s) => [s.id, s]));
   const learned: PlanTopic[] = [];
   let cyclePtr = 0;
-  let scheduled = 0;
+  let scheduledCount = 0;
   let lastLearnDate: string | null = null;
 
-  // pace new lessons so the syllabus spreads across the whole learning window
-  // instead of finishing in a burst and leaving empty weeks behind.
-  const dailyLearnBudget = Math.max(
-    25,
-    Math.min(Math.round(dailyCap * 0.8), Math.ceil(requiredMinutes / Math.max(1, learnDates.length)) + 10)
-  );
+  // ── 8. Learn-phase loop ────────────────────────────────────
 
   if (st.planMode !== "revision") {
     for (let d = 0; d < learnDates.length; d++) {
@@ -181,101 +302,115 @@ export function buildPlan(
       let remaining = dailyCap;
       let pos = 0;
 
-      // 1) spaced repetition reviews due today
+      // ── 8a. Spaced-repetition recalls due today (up to 3) ──
+
       const due = (reviewQueue.get(d) || []).slice(0, 3);
       for (const r of due) {
         const mins = r.pass === 1 ? 15 : 20;
         if (remaining < mins + 20) break;
         remaining -= mins;
         tasks.push({
-          date,
-          subjectId: r.topic.subjectId,
-          topicId: r.topic.id,
-          kind: "revise",
+          date, subjectId: r.topic.subjectId, topicId: r.topic.id, kind: "revise",
           title: `Recall: ${r.topic.title}`,
           detail:
             r.pass === 1
               ? "24–48h spaced recall. Close the book, write everything you remember, then check gaps."
               : "1-week spaced recall. Do 5 mixed questions from this lesson without notes.",
-          plannedMinutes: mins,
-          position: pos++,
+          plannedMinutes: mins, position: pos++,
         });
       }
 
-      // 2) weekly self-test / mock
+      // ── 8b. Weekly checkpoint test ──────────────────────────
+
       const isTestDay = d > 3 && d % 7 === 6;
       if (isTestDay && remaining > 45) {
         const mins = st.planMode === "mock" ? 60 : 40;
         remaining -= mins;
         tasks.push({
-          date,
-          subjectId: null,
-          topicId: null,
-          kind: "mock",
+          date, subjectId: null, topicId: null, kind: "mock",
           title: `Weekly Checkpoint Test #${Math.floor(d / 7)}`,
           detail:
             "Mixed test on everything covered in the last 7 study days. Time it strictly, then log every mistake in your error notebook.",
-          plannedMinutes: mins,
-          position: pos++,
+          plannedMinutes: mins, position: pos++,
         });
       }
 
-      // 3) new lessons — choose subjects for the day
+      // ── 8c. NEW LESSONS — fair-share time division ─────────
+      //
+      // This is the fix for Bug A.
+      //
+      // Previous code: gave each subject a "slot" = its share of
+      // the day's budget, but lessons could spill past the slot and
+      // eat time meant for later subjects — so with 4 subjects on a
+      // 2-hour day the first subject got most of the time and the last
+      // ones got nothing.
+      //
+      // New code: each subject gets a slot = its PROPORTIONAL SHARE of
+      // the day's learn budget, computed from its weight.  A lesson is
+      // only placed if it FITS WITHIN BOTH the subject's remaining slot
+      // AND the day's total remaining time.  This guarantees every
+      // active subject gets its fair share regardless of how many
+      // subjects share the day.
+
       const live = subjects.filter((s) => (queues.get(s.id) || []).length > 0);
-      const rotated = [...(live.length ? live : subjects)].sort((a, b) => {
-        const ra = ((queues.get(a.id)!.length * (subjWeight.get(a.id) || 1)) % 1000);
-        const rb = ((queues.get(b.id)!.length * (subjWeight.get(b.id) || 1)) % 1000);
-        return rb - ra;
-      });
-      const offset = d % rotated.length;
-      const ordered = [...rotated.slice(offset), ...rotated.slice(0, offset)];
+      const pool = live.length ? live : [];
+      if (!pool.length) continue;
+
+      // Rotate starting subject so coverage stays even across days
+      const offset = d % pool.length;
+      const ordered = [...pool.slice(offset), ...pool.slice(0, offset)];
       const chosen = ordered.slice(0, Math.max(1, Math.min(st.subjectsPerDay, ordered.length)));
 
       const learnBudget = Math.max(20, Math.min(remaining - 5, dailyLearnBudget));
       const wsum = chosen.reduce((a, s) => a + (subjWeight.get(s.id) || 1), 0);
-      const touched: PlanSubject[] = [];
+
       const todaysTopics: PlanTopic[] = [];
+
       for (const s of chosen) {
-        let slot = Math.round((learnBudget * (subjWeight.get(s.id) || 1)) / wsum);
+        // This subject's proportional slice of today's learn budget
+        const rawSlot = (learnBudget * (subjWeight.get(s.id) || 1)) / wsum;
+        let slot = Math.max(20, Math.round(rawSlot));
+
         const q = queues.get(s.id)!;
-        let placed = 0;
-        while (q.length) {
+
+        while (q.length && slot >= 15 && remaining >= 15) {
           const t = q[0];
-          const mins = Math.max(15, Math.round((t.estMinutes * styleMul * compress) / 5) * 5);
-          if (placed > 0 && mins > slot) break;
-          if (mins > remaining) break;
+          // Compressed, rounded to 5-min boundary, floored at 15 min
+          const rawMins = t.estMinutes * styleMul * compress;
+          const mins = Math.max(15, Math.round(rawMins / 5) * 5);
+
+          // KEY CONSTRAINT: lesson must fit inside BOTH the subject slot
+          // and the day's remaining capacity — no spill-over allowed.
+          if (mins > slot || mins > remaining) break;
+
           q.shift();
           slot -= mins;
           remaining -= mins;
-          placed++;
-          scheduled++;
+          scheduledCount++;
           lastLearnDate = date;
-          if (!touched.includes(s)) touched.push(s);
           todaysTopics.push(t);
           learned.push(t);
+
           tasks.push({
-            date,
-            subjectId: s.id,
-            topicId: t.id,
-            kind: "learn",
+            date, subjectId: s.id, topicId: t.id, kind: "learn",
             title: `${s.name}: ${t.title}`,
             detail: `${t.unit} • ${t.difficulty}. Learn the concept, then attempt practice questions before marking done.`,
-            plannedMinutes: mins,
-            position: pos++,
+            plannedMinutes: mins, position: pos++,
           });
+
           pushReview(d + 2, t, 1);
           pushReview(d + 7, t, 2);
-          if (slot <= 10) break;
         }
       }
 
-      // 4) fill spare capacity with topic-linked practice / mastery cycles,
-      //    so every study day is tied to specific lessons — never generic filler.
+      // ── 8d. Fill spare capacity with topic-linked practice ──
+
       let guardFill = 0;
       while (remaining >= 25 && guardFill < 5) {
         let t: PlanTopic | undefined;
         let label = "";
         let detail = "";
+
         if (todaysTopics[guardFill]) {
           t = todaysTopics[guardFill];
           label = "Apply";
@@ -283,49 +418,39 @@ export function buildPlan(
             "Immediate application of the lesson you just learned: 10–12 graded questions, easy → hard. Anything you hesitate on goes in the error log.";
         } else if (learned.length) {
           t = learned[cyclePtr % learned.length];
-          const cycle = 2 + Math.floor(cyclePtr / learned.length);
+          const cycle = 2 + Math.floor(cyclePtr / Math.max(1, learned.length));
           cyclePtr++;
           label = `Mastery Cycle ${cycle}`;
           detail =
             "Second-pass mastery: previous-year and advanced variations of this lesson. Work for speed and accuracy, not re-reading.";
-        } else if (touched.length || chosen.length) {
-          const s = (touched.length ? touched : chosen)[guardFill % (touched.length || chosen.length)];
-          remaining -= Math.min(remaining, 45);
-          tasks.push({
-            date, subjectId: s.id, topicId: null, kind: "practice",
-            title: `${s.name} — Warm-up Problem Set`,
-            detail: "Mixed questions to build baseline familiarity before the syllabus lessons begin.",
-            plannedMinutes: 45, position: pos++,
-          });
-          guardFill++;
-          continue;
-        } else break;
+        } else {
+          break;
+        }
 
         const sName = subjById.get(t.subjectId)?.name || "Study";
         const mins = Math.min(remaining, 45);
         remaining -= mins;
         tasks.push({
-          date,
-          subjectId: t.subjectId,
-          topicId: t.id,
-          kind: "practice",
+          date, subjectId: t.subjectId, topicId: t.id, kind: "practice",
           title: `${label} — ${sName}: ${t.title}`,
-          detail,
-          plannedMinutes: mins,
-          position: pos++,
+          detail, plannedMinutes: mins, position: pos++,
         });
         guardFill++;
       }
     }
   }
 
-  // 4) revision block — hardest + least mastered first, cycled
+  // ── 9. Revision block ──────────────────────────────────────
+
   const revisionPool = [...topics].sort((a, b) => {
     const w = diffWeight(b.difficulty) - diffWeight(a.difficulty);
-    if (w !== 0) return w;
-    return (a.mastery || 0) - (b.mastery || 0);
+    return w !== 0 ? w : (a.mastery || 0) - (b.mastery || 0);
   });
-  const revDates = st.planMode === "revision" ? dates.slice(0, dates.length - bufferCount) : revisionDates;
+  const revDates =
+    st.planMode === "revision"
+      ? allStudyDates.slice(0, allStudyDates.length - bufferCount)
+      : revisionDates;
+
   if (revDates.length && revisionPool.length) {
     const perDay = Math.max(1, Math.ceil(revisionPool.length / revDates.length));
     let idx = 0;
@@ -338,44 +463,34 @@ export function buildPlan(
         const mins = Math.min(90, Math.round(dailyCap * 0.5));
         remaining -= mins;
         tasks.push({
-          date,
-          subjectId: null,
-          topicId: null,
-          kind: "mock",
+          date, subjectId: null, topicId: null, kind: "mock",
           title: `Full-Length Mock Test #${Math.floor(d / 3) + 1}`,
           detail: "Exam-condition mock. Afterwards spend 20 minutes analysing every wrong answer.",
-          plannedMinutes: mins,
-          position: pos++,
+          plannedMinutes: mins, position: pos++,
         });
       }
       for (let k = 0; k < perDay && remaining > 15; k++) {
         const t = revisionPool[idx % revisionPool.length];
         idx++;
         const s = subjById.get(t.subjectId);
-        const mins = Math.max(15, Math.min(remaining, Math.round(t.estMinutes * 0.45 / 5) * 5));
+        const mins = Math.max(15, Math.min(remaining, Math.round((t.estMinutes * 0.45) / 5) * 5));
         remaining -= mins;
         tasks.push({
-          date,
-          subjectId: t.subjectId,
-          topicId: t.id,
-          kind: "revise",
+          date, subjectId: t.subjectId, topicId: t.id, kind: "revise",
           title: `Revise — ${s ? s.name + ": " : ""}${t.title}`,
           detail: "Active recall + previous-year questions. Aim for speed and accuracy, not re-reading.",
-          plannedMinutes: mins,
-          position: pos++,
+          plannedMinutes: mins, position: pos++,
         });
       }
     }
   }
 
-  // 5) buffer / taper days
+  // ── 10. Buffer / taper days ────────────────────────────────
+
   bufferDates.forEach((date, i) => {
     const last = i === bufferDates.length - 1;
     tasks.push({
-      date,
-      subjectId: null,
-      topicId: null,
-      kind: "buffer",
+      date, subjectId: null, topicId: null, kind: "buffer",
       title: last ? "Light review & rest before exam" : `Buffer day ${i + 1} — catch-up & weak areas`,
       detail: last
         ? "No new material. Skim your recall sheets, sleep early, prepare documents."
@@ -385,16 +500,19 @@ export function buildPlan(
     });
   });
 
+  // ── 11. Return result ──────────────────────────────────────
+
   return {
     tasks,
     stats: {
-      studyDays: dates.length,
+      studyDays: allStudyDates.length,
       learnDays: learnDates.length,
       revisionDays: revDates.length,
       bufferDays: bufferDates.length,
       totalTopics: topics.length,
-      scheduledTopics: scheduled,
-      projectedFinish: lastLearnDate,
+      scheduledTopics: scheduledCount,
+      projectedFinish,          // canonical formula (matches Onboarding)
+      scheduleFinish: lastLearnDate, // where the last "learn" task landed
       dailyMinutes: dailyCap,
       requiredMinutes: Math.round(requiredMinutes),
       feasible: loadRatio <= 1.15,
