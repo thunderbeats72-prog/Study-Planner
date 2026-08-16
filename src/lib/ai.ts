@@ -2,12 +2,12 @@ import { generateTopics, lookupTopicBank, synthesiseSubjects, type GeneratedTopi
 import { lookupKnowledge, teachFromKnowledge } from "./knowledge";
 
 /* ============================================================
-   LLM PROVIDER LAYER (CASCADING FALLBACK: Gemini -> Groq -> OpenRouter)
+   LLM PROVIDER LAYER (CASCADING FALLBACK)
 ============================================================ */
 type ChatMsg = { role: "user" | "assistant"; content: string };
 
 export function activeProvider(): string | null {
-  if (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY) return "AI Cloud (Auto-Routing)";
+  if (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY) return "AI Cloud";
   if (process.env.GROQ_API_KEY) return "Groq";
   if (process.env.OPENROUTER_API_KEY) return "OpenRouter";
   return null;
@@ -16,16 +16,14 @@ export function activeProvider(): string | null {
 export async function callLLM(
   system: string,
   messages: ChatMsg[],
-  maxTokens = 1400
+  maxTokens = 2500 // Increased tokens to allow for full comprehensive MBA syllabuses
 ): Promise<string | null> {
-  // The exact fallback sequence you requested
   const providers = ["gemini", "groq", "openrouter"];
 
   for (const provider of providers) {
     try {
       const ctrl = new AbortController();
-      // Gives each AI exactly 15 seconds to respond before failing over to the next one
-      const timer = setTimeout(() => ctrl.abort(), 15000); 
+      const timer = setTimeout(() => ctrl.abort(), 18000); 
       let text: string | null = null;
 
       if (provider === "gemini" && (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY)) {
@@ -93,18 +91,9 @@ export async function callLLM(
       }
 
       clearTimeout(timer);
-
-      // If the current AI successfully generated a response, return it and break the loop
-      if (text && text.trim()) {
-        return text.trim();
-      }
-    } catch (error) {
-      // If the current AI hits a rate limit, crashes, or times out, safely continue to the next one
-      continue; 
-    }
+      if (text && text.trim()) return text.trim();
+    } catch (error) { continue; }
   }
-
-  // If ALL THREE APIs fail, this triggers the local knowledge base fallback
   return null;
 }
 
@@ -114,15 +103,12 @@ function extractJson<T>(raw: string): T | null {
   const start = body.search(/[[{]/);
   if (start < 0) return null;
   const endBrace = Math.max(body.lastIndexOf("]"), body.lastIndexOf("}"));
-  try {
-    return JSON.parse(body.slice(start, endBrace + 1)) as T;
-  } catch {
-    return null;
-  }
+  try { return JSON.parse(body.slice(start, endBrace + 1)) as T; } 
+  catch { return null; }
 }
 
 /* ============================================================
-   CURRICULUM SYNTHESIS (SMART COURSE DETECTION)
+   CURRICULUM SYNTHESIS (STRICT ACCURACY FOR INSTITUTIONS)
 ============================================================ */
 export async function aiSuggestSubjects(
   courseName: string,
@@ -131,14 +117,20 @@ export async function aiSuggestSubjects(
   const fallback = synthesiseSubjects(courseName, level);
 
   const raw = await callLLM(
-    "You are a curriculum designer. Reply with strict JSON only.",
+    "You are an elite academic curriculum planner. Reply with strict JSON only.",
     [
       {
         role: "user",
-        content: `Course/exam: "${courseName}". Education level: ${level}. Analyse this specific course specialization and institution. List the 4-8 REAL core subjects/papers a student actually studies for this exact program, as a JSON array: [{"name":"...","units":8,"difficulty":"Easy|Medium|Hard","color":"#6366f1"}]. "units" MUST BE the total number of major chapters/lessons in that specific subject (choose between 4 to 15). For example, if it is an MBA in Marketing, ensure core subjects like 'Marketing Management', 'Consumer Behaviour', 'Quantitative Methods' are explicitly included. JSON array only, no other text.`
+        content: `Course/exam: "${courseName}". Education level: ${level}. 
+        You must act as the official syllabus generator for this exact institution and specialization. 
+        List ALL the actual core and specialization subjects (Minimum 8 subjects, maximum 16 subjects) as a strict JSON array. 
+        For example, if the course is "MBA Marketing NMIMS CDOE", you MUST explicitly output the real subjects such as 'Business Communication', 'Financial Accounting', 'Micro & Macro Economics', 'Organizational Behavior', 'Marketing Management', 'Operations Management', etc. 
+        "units" MUST be the realistic number of chapters or modules for that specific subject (strictly choose a number between 6 to 15). 
+        Format: [{"name":"Marketing Management","units":10,"difficulty":"Medium","color":"#6366f1"}]. 
+        JSON array only, no other text.`
       }
     ],
-    800
+    2000
   );
   
   if (!raw) return { subjects: fallback, source: "aether-local" };
@@ -148,13 +140,14 @@ export async function aiSuggestSubjects(
     if (Array.isArray(parsed) && parsed.length >= 2) {
       const palette = ["#6366f1", "#10b981", "#f59e0b", "#ef4444", "#06b6d4", "#ec4899", "#84cc16"];
       return {
-        subjects: parsed.slice(0, 10).map((s, i) => ({
+        // Allows up to 16 subjects to ensure complete MBA curriculums are loaded
+        subjects: parsed.slice(0, 16).map((s, i) => ({
           name: String(s.name).slice(0, 80),
           units: Math.min(30, Math.max(2, Number(s.units) || 8)),
           difficulty: (["Easy", "Medium", "Hard"].includes(String(s.difficulty)) ? s.difficulty : "Medium") as SeedSubject["difficulty"],
           color: /^#[0-9a-f]{6}$/i.test(String(s.color)) ? s.color : palette[i % palette.length],
         })),
-        source: "AI Cloud",
+        source: "AI Cloud Database",
       };
     }
   } catch { /* fall through */ }
@@ -171,7 +164,7 @@ export async function aiGenerateTopics(
 ): Promise<GeneratedTopic[]> {
   const fallback = generateTopics(subjectName, units, difficulty, level);
   const raw = await callLLM(
-    `You are a curriculum architect. Produce a lesson-by-lesson syllabus breakdown as strict JSON only.`,
+    `You are a strict curriculum architect. Produce a lesson-by-lesson syllabus breakdown as strict JSON only.`,
     [
       {
         role: "user",
@@ -216,7 +209,6 @@ export type TutorContext = {
 export type TutorReply = { text: string; action?: { type: string; payload?: unknown } };
 
 function round(n: number): number { return Math.round(n * 10000) / 10000; }
-
 function percentQ(q: string): string | null {
   const m = q.match(/what\s+is\s+(\d+\.?\d*)\s*%\s*of\s*(\d+\.?\d*)/i);
   if (!m) return null;
@@ -240,18 +232,17 @@ export function parseCommand(q: string): TutorReply["action"] | undefined {
   if (/\b(take a break|break time|pause (the )?(timer|clock|session)|need a break)\b/.test(n)) return { type: "break" };
   if (/\b(zen|focus mode|full ?screen|distraction ?free|deep work mode)\b/.test(n)) return { type: "zen" };
   if (/\b(re-?plan|rebuild|regenerate|reschedule|re-?balance|redo my (plan|schedule)|fix my (plan|schedule)|update my plan)\b/.test(n)) return { type: "replan" };
-  if (/\b(catch me up|i'?m behind|fell behind|too much pending|way behind|missed (days|class)|rebalance|reschedule)\b/.test(n)) return { type: "replan" };
-  if (/\b(behind|fallback)\b/.test(n) && /\b(study|studies|plan|schedule|syllabus|exam|prep|revision|backlog|pending|help)\b/.test(n)) return { type: "replan" };
-
-  if (/\btheme\b/.test(n) || /\b(midnight|dark|obsidian|nebula|emerald|sunset|mint|silver|lavender|samsung|light)\b/.test(n)) {
-    if (/\b(midnight|dark)\b/.test(n)) return { type: "theme", payload: "theme-dark" };
-    if (/\b(obsidian)\b/.test(n)) return { type: "theme", payload: "theme-obsidian" };
-    if (/\b(nebula)\b/.test(n)) return { type: "theme", payload: "theme-nebula" };
-    if (/\b(emerald|mint)\b/.test(n)) return { type: "theme", payload: "theme-mint" };
-    if (/\b(sunset|champagne)\b/.test(n)) return { type: "theme", payload: "theme-sunset" };
-    if (/\b(light|samsung|clean)\b/.test(n)) return { type: "theme", payload: "theme-sunset" };
-    if (/\b(silver|lavender)\b/.test(n)) return { type: "theme", payload: "theme-silver-lavender" };
-    if (/\btheme\b/.test(n)) return { type: "theme", payload: "theme-dark" };
+  
+  // FIX: Properly parses and triggers all theme variants (midnight, dark, obsidian, etc.)
+  if (/\btheme\b/i.test(n) || /\b(midnight|dark|obsidian|nebula|emerald|sunset|mint|silver|lavender|samsung|light|black)\b/i.test(n)) {
+    if (/\b(midnight|dark|black)\b/i.test(n)) return { type: "theme", payload: "theme-dark" };
+    if (/\b(obsidian)\b/i.test(n)) return { type: "theme", payload: "theme-obsidian" };
+    if (/\b(nebula)\b/i.test(n)) return { type: "theme", payload: "theme-nebula" };
+    if (/\b(emerald|mint)\b/i.test(n)) return { type: "theme", payload: "theme-mint" };
+    if (/\b(sunset|champagne)\b/i.test(n)) return { type: "theme", payload: "theme-sunset" };
+    if (/\b(light|samsung|clean)\b/i.test(n)) return { type: "theme", payload: "theme-sunset" };
+    if (/\b(silver|lavender)\b/i.test(n)) return { type: "theme", payload: "theme-silver-lavender" };
+    return { type: "theme", payload: "theme-dark" };
   }
 
   return undefined;
@@ -262,10 +253,7 @@ export async function localTutor(q: string, ctx: TutorContext): Promise<TutorRep
   const n = q.toLowerCase();
 
   if (action?.type === "replan") {
-    return {
-      text: `No problem, falling behind is built into the design, that's what buffer days are for. I'm rebalancing your schedule now. Give me a second...`,
-      action,
-    };
+    return { text: `No problem, falling behind is built into the design, that's what buffer days are for. I'm rebalancing your schedule now. Give me a second...`, action };
   }
   if (action) {
     const msgs: Record<string, string> = {
@@ -292,7 +280,6 @@ export async function localTutor(q: string, ctx: TutorContext): Promise<TutorRep
     return { text: `### How to approach: this\n\n**1. Decode the command word.**\n**2. Plan for 60 seconds before writing.**\n**3. Open with a precise 1-line definition.**` };
   }
 
-  // LAST RESORT FALLBACK: If Gemini, Groq, and OpenRouter ALL fail, it runs this local database search
   const subjectHint = ctx.subjects.find((s) => n.includes(s.name.toLowerCase().split(" ")[0]))?.name;
   const knowledge = await lookupKnowledge(q);
   if (knowledge) return { text: teachFromKnowledge(knowledge, q, ctx.level, subjectHint) };
@@ -301,5 +288,5 @@ export async function localTutor(q: string, ctx: TutorContext): Promise<TutorRep
 }
 
 export function tutorSystemPrompt(ctx: TutorContext): string {
-  return `You are AETHER, the built-in AI tutor and study coach inside "Study Planner Pro". Learner: ${ctx.name}   Level: ${ctx.level}   Course: ${ctx.courseName} Exam date: ${ctx.examDate} (${ctx.daysLeft} days left)   Daily target: ${ctx.dailyHours}h Overall syllabus progress: ${ctx.progressPct}%. Rules: - Teach, don't just answer. Match the learner's level. Use markdown. Be concise.`;
+  return `You are AETHER, the built-in AI tutor and study coach inside "Study Planner Pro". Learner: ${ctx.name}   Level: ${ctx.level}   Course: ${ctx.courseName} Exam date: ${ctx.examDate}. Rules: Teach, don't just answer. Use markdown. Be concise.`;
 }
