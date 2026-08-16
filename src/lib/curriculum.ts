@@ -763,8 +763,8 @@ const RULES: Rule[] = [
   { match: /nmims|cdoe|nga-sce|online.*mba.*marketing|distance.*mba.*marketing/i, subjects: [
     // NMIMS CDOE MBA Marketing-style program structure: core papers + marketing electives.
     sub("Business Communication", 8, "Medium"), sub("Financial Accounting", 7, "Medium"),
-    sub("Micro Economics & Macro Economics", 8, "Hard"), sub("Organizational Behavior", 8, "Medium"),
-    sub("Marketing Management", 10, "Hard"), sub("Quantitative Methods I", 8, "Hard"),
+    sub("Micro Economics", 8, "Hard"), sub("Macro Economics", 8, "Hard"), sub("Organizational Behavior", 8, "Medium"),
+    sub("Marketing Management", 10, "Hard"), sub("Quantitative Methods", 12, "Hard"),
     sub("Cost & Management Accounting", 8, "Hard"), sub("Human Resource Management", 7, "Medium"),
     sub("Strategic Management", 8, "Hard"), sub("Business Analytics", 8, "Hard"),
     sub("Legal Aspect of Business", 7, "Medium"), sub("Operations Management", 8, "Medium"),
@@ -943,9 +943,13 @@ export function synthesiseSubjects(courseName: string, level: string): SeedSubje
 
   // 1) SPECIFIC keyword rules FIRST so branded/exam courses beat the fuzzy
   //    catalogue match (e.g. "MBA Marketing from NMIMS" must not fall to plain MBA).
+  let matchedNmims = false;
   if (!picked && !isResearch) {
     const discipline = RULES.find((r) => r.match.test(q));
-    if (discipline) picked = discipline.subjects.map((x) => ({ ...x }));
+    if (discipline) {
+      picked = discipline.subjects.map((x) => ({ ...x }));
+      matchedNmims = /nmims|cdoe/i.test(discipline.match.source);
+    }
   }
 
   // 2) "class 8", "grade 10", "std 12"
@@ -1011,7 +1015,11 @@ export function synthesiseSubjects(courseName: string, level: string): SeedSubje
     // 3.5) specialisation / optional augmentation — add the named domain paper.
     let list: SeedSubject[] = applySpecialisation(q, picked);
     // 4) semester / year filter — if the learner named "sem 1" / "year 2" etc.
-    list = applySemesterFilter(q, list);
+    // NMIMS CDOE-style programs default to Semester 1 (the hard constraint for
+    // this course) even if the learner didn't type "semester 1" explicitly.
+    const hasExplicitSem = !!(detectSemester(q).sem || detectSemester(q).year);
+    const filterQuery = matchedNmims && !hasExplicitSem ? `${q} semester 1` : q;
+    list = applySemesterFilter(filterQuery, list);
     picked = list;
   }
 
@@ -1035,8 +1043,8 @@ export function synthesiseSubjects(courseName: string, level: string): SeedSubje
  * Sem 1-2 = core papers, Sem 3-4 = advanced core + specialisation electives.
  */
 const NMIMS_SEMESTER: Record<string, number> = {
-  "business communication": 1, "financial accounting": 1, "micro economics & macro economics": 1,
-  "organizational behavior": 1, "marketing management": 1, "quantitative methods i": 1,
+  "business communication": 1, "financial accounting": 1, "micro economics": 1, "macro economics": 1,
+  "organizational behavior": 1, "marketing management": 1, "quantitative methods": 1,
   "cost & management accounting": 2, "human resource management": 2, "strategic management": 2,
   "business analytics": 2, "legal aspect of business": 2, "operations management": 2,
   "corporate finance": 3, "research methodology": 3, "project part i": 3,
