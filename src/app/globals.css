@@ -48,12 +48,6 @@ body{
 .app-wrapper{display:flex;min-height:100vh;gap:22px;padding:22px}
 .sidebar{width:var(--sidebar-w);flex-shrink:0;display:flex;flex-direction:column;padding:22px 16px;position:sticky;top:22px;height:calc(100vh - 44px)}
 .main-workspace{flex:1;min-width:0;padding-bottom:60px}
-.glass-panel{
-  background:var(--surface);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);
-  border:1px solid var(--glass-border);border-radius:18px;box-shadow:var(--glass-shadow);
-  transition:box-shadow var(--anim-dur) ease,border-color var(--anim-dur) ease,transform var(--anim-dur) ease;
-}
-.tilt-card:hover{box-shadow:var(--glass-shadow-hover);border-color:var(--glass-border-hover);transform:translateY(-2px)}
 .brand-header{display:flex;align-items:center;gap:11px;padding:0 6px 18px;margin-bottom:6px;border-bottom:1px solid var(--glass-border)}
 .brand-logo-icon{width:36px;height:36px;border-radius:11px;background:var(--accent-gradient);color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 6px 16px var(--accent-glow)}
 .brand-title{font-size:.94rem;font-weight:800;letter-spacing:-.3px;line-height:1.1}
@@ -107,8 +101,23 @@ select.input-field{appearance:none;background-image:linear-gradient(45deg,transp
 .day-date{font-size:.95rem;font-weight:800;letter-spacing:-.3px}
 .day-meta{font-size:.74rem;color:var(--text-muted);font-weight:650}
 
-.task-row{display:flex;align-items:center;gap:12px;padding:11px 13px;border-radius:12px;background:var(--row-bg);border:1px solid transparent;margin-bottom:9px;transition:transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease, background 0.3s ease, border-color 0.3s ease;}
-.task-row:hover{background:var(--row-hover);border-color:var(--glass-border-hover);transform:translateY(-2px) scale(1.008);box-shadow:0 8px 24px rgba(0,0,0,0.04);}
+.task-row{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:11px 13px;
+  border-radius:12px;
+  background:var(--row-bg);
+  border:1px solid transparent;
+  margin-bottom:9px;
+  transition:transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease, background 0.3s ease, border-color 0.3s ease;
+}
+.task-row:hover{
+  background:var(--row-hover);
+  border-color:var(--glass-border-hover);
+  transform:translateY(-2px) scale(1.008);
+  box-shadow:0 8px 24px rgba(0,0,0,0.04);
+}
 .task-row.done{opacity:.55}
 .task-row.done .task-title{text-decoration:line-through}
 .task-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
@@ -214,10 +223,6 @@ select.input-field{appearance:none;background-image:linear-gradient(45deg,transp
 .typing-dot{width:6px;height:6px;border-radius:50%;background:var(--text-dim);display:inline-block;animation:blink 1.2s infinite}
 @keyframes blink{0%,80%,100%{opacity:.25}40%{opacity:1}}
 
-/* ============ ZEN ============ */
-.zen{position:fixed;inset:0;z-index:500;background:#05060a;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px}
-.zen .zen-digits{font-size:min(22vw,10rem);font-weight:800;letter-spacing:-6px;font-variant-numeric:tabular-nums}
-
 .slide-in{animation:slideIn .4s cubic-bezier(.22,1,.36,1)}
 @keyframes slideIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
 .fade-in{animation:fadeIn .3s ease}
@@ -264,20 +269,103 @@ select.input-field{appearance:none;background-image:linear-gradient(45deg,transp
 .heatmap-legend{display:flex;align-items:center;gap:5px;margin-top:10px;font-size:.66rem;font-weight:700;color:var(--text-dim)}
 .heatmap-legend .heat-cell{animation:none}
 
+
 /* =========================================================================
-   PREMIUM CUSTOM DESIGN OVERRIDES & MOBILE STACK FIXES
+   PREMIUM UI OVERRIDES, MOBILE LAYOUT, AND ZEN FIX
    ========================================================================= */
+
+/* 1. Unstoppable Zen Mode Fix */
+.zen {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 99999 !important; /* Forces it over absolutely everything */
+  background: #05060a !important;
+  color: #fff !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* 2. Premium Solid Tracker Bar */
+.tracker-bar {
+  background: rgba(255, 255, 255, 0.95) !important;
+  backdrop-filter: blur(24px) !important;
+  -webkit-backdrop-filter: blur(24px) !important;
+  z-index: 90 !important; /* Safely under Zen Mode */
+  box-shadow: 0 10px 30px rgba(0,0,0,0.08) !important;
+  border-bottom: 1px solid rgba(0,0,0,0.05) !important;
+  border-radius: 0 0 16px 16px !important;
+  top: 0 !important;
+  margin-top: -22px !important;
+  padding: 22px 20px 14px !important;
+  position: sticky;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+body.theme-dark .tracker-bar, 
+body.theme-obsidian .tracker-bar, 
+body.theme-nebula .tracker-bar {
+  background: rgba(18, 18, 22, 0.95) !important;
+  border-bottom: 1px solid rgba(255,255,255,0.05) !important;
+}
+
+/* 3. Smooth Glass Panels (No messy overlapping) */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.65) !important;
+  backdrop-filter: blur(28px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(180%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.8) !important;
+  box-shadow: 0 8px 32px rgba(30, 27, 75, 0.04), inset 0 1px 2px rgba(255, 255, 255, 0.9) !important;
+  border-radius: 20px !important;
+}
+body.theme-dark .glass-panel, 
+body.theme-obsidian .glass-panel {
+  background: rgba(20, 20, 24, 0.65) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), inset 0 1px 1px rgba(255, 255, 255, 0.05) !important;
+}
+
+/* 4. Perfect Mobile Button Stack (No squishing) & Mobile Layout */
+@media(max-width:1100px){
+  .dash-grid-2, .focus-grid-2, .kanban { grid-template-columns:1fr; }
+}
+@media(max-width:860px){
+  .app-wrapper{flex-direction:column;padding:0 12px 90px;gap:0}
+  .sidebar{position:fixed;bottom:0;left:0;right:0;top:auto;width:100%;height:auto;flex-direction:row;padding:8px;border-radius:18px 18px 0 0;z-index:1000;justify-content:space-around;gap:0}
+  .sidebar .brand-header,.sidebar .sidebar-foot{display:none}
+  .nav-list{flex-direction:row;margin-top:0;width:100%;justify-content:space-around;gap:0}
+  .nav-item{flex-direction:column;gap:3px;font-size:.62rem;padding:7px 6px;flex:1;justify-content:center;text-align:center}
+  .main-workspace{padding-top:64px; padding-bottom: 150px !important;}
+  .mobile-header{display:flex;position:fixed;top:0;left:0;right:0;height:54px;align-items:center;justify-content:space-between;padding:0 14px;z-index:100;background:var(--surface);backdrop-filter:blur(18px);border-bottom:1px solid var(--glass-border)}
+  .timer-ring-wrap{width:220px;height:220px}
+}
+@media(max-width: 760px) {
+  .task-row {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    padding: 16px !important;
+    gap: 12px !important;
+  }
+  .task-row > div:nth-child(2) {
+    width: 100% !important;
+  }
+  .task-row .btn, .task-row .chip {
+    width: 100% !important;
+    justify-content: center !important;
+    margin-left: 0 !important;
+    padding: 10px 14px !important;
+    font-size: 0.85rem !important;
+  }
+}
+
+/* Sidebar and Buttons Default Settings */
 :root {
   --sidebar-w: 270px;
   --anim-dur: 0.3s;
-}
-.glass-panel {
-  background: color-mix(in srgb, var(--surface) 80%, rgba(255, 255, 255, 0.45));
-  border: 1px solid var(--glass-border);
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.03), inset 0 1px 1px rgba(255, 255, 255, 0.5);
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
-  border-radius: 20px;
 }
 .sidebar {
   background: color-mix(in srgb, var(--surface) 95%, rgba(255, 255, 255, 0.6));
@@ -309,66 +397,3 @@ select.input-field{appearance:none;background-image:linear-gradient(45deg,transp
   border: 1px solid var(--glass-border);
 }
 .kpi-card { border-left: 3px solid var(--accent); }
-
-/* MOBILE AND DESKTOP RESPONSIVENESS */
-@media(max-width:1100px){
-  .dash-grid-2, .focus-grid-2, .kanban { grid-template-columns:1fr; }
-}
-@media(max-width:860px){
-  .app-wrapper{flex-direction:column;padding:0 12px 90px;gap:0}
-  .sidebar{position:fixed;bottom:0;left:0;right:0;top:auto;width:100%;height:auto;flex-direction:row;padding:8px;border-radius:18px 18px 0 0;z-index:1000;justify-content:space-around;gap:0}
-  .sidebar .brand-header,.sidebar .sidebar-foot{display:none}
-  .nav-list{flex-direction:row;margin-top:0;width:100%;justify-content:space-around;gap:0}
-  .nav-item{flex-direction:column;gap:3px;font-size:.62rem;padding:7px 6px;flex:1;justify-content:center;text-align:center}
-  .main-workspace{padding-top:64px; padding-bottom: 150px !important;}
-  .mobile-header{display:flex;position:fixed;top:0;left:0;right:0;height:54px;align-items:center;justify-content:space-between;padding:0 14px;z-index:100;background:var(--surface);backdrop-filter:blur(18px);border-bottom:1px solid var(--glass-border)}
-  .timer-ring-wrap{width:220px;height:220px}
-}
-
-/* UNSTOPPABLE MOBILE STACK OVERRIDES (Buttons will no longer squash) */
-@media(max-width: 760px) {
-  body .task-row {
-    display: flex !important;
-    flex-direction: column !important;
-    align-items: flex-start !important;
-    height: auto !important;
-    padding: 18px 16px !important;
-    gap: 12px !important;
-  }
-  body .task-row > div:nth-child(2) {
-    width: 100% !important;
-  }
-  body .task-row .btn, body .task-row .chip {
-    width: 100% !important;
-    justify-content: center !important;
-    margin-left: 0 !important;
-    padding: 10px 14px !important;
-    font-size: 0.85rem !important;
-  }
-}
-
-/* PREMIUM SOLID OVERRIDES (Fixing Glass Overlaps) */
-body .tracker-bar {
-  background: var(--surface-solid) !important;
-  z-index: 999 !important;
-  box-shadow: 0 15px 40px rgba(0,0,0,0.12) !important;
-  border-bottom: 1px solid var(--glass-border) !important;
-  border-radius: 0 0 16px 16px !important; 
-  top: 0 !important;
-  margin-top: -22px !important;
-  padding-top: 22px !important;
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:12px;
-  border-left:4px solid var(--accent);
-  position:sticky;
-  flex-wrap:wrap;
-}
-
-body.theme-dark .tracker-bar, 
-body.theme-obsidian .tracker-bar, 
-body.theme-nebula .tracker-bar {
-  background: #0f1014 !important; /* Forces solid black on dark themes */
-  box-shadow: 0 15px 40px rgba(0,0,0,0.6) !important;
-}
