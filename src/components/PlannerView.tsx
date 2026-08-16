@@ -1,507 +1,388 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
+import { api, prettyLong, today, type AppState, type MessageRow } from "@/lib/client";
+import { mmss, useFocusTimer, useStudyClock, type TimerMode } from "@/lib/useTimer";
+import Onboarding from "@/components/Onboarding";
+import Dashboard from "@/components/Dashboard";
+import PlannerView from "@/components/PlannerView";
+import FocusView from "@/components/FocusView";
+import SubjectsView from "@/components/SubjectsView";
+import SettingsView from "@/components/SettingsView";
+import ChatPanel from "@/components/ChatPanel";
+import CommandPalette, { type Command } from "@/components/CommandPalette";
+import type { TaskPatch } from "@/components/TaskEditor";
 import {
-  addDays, dayDiff, fmtDate, KIND_META, parseDate, prettyDate, prettyLong, today,
-  type AppState, type TaskRow,
-} from "@/lib/client";
-import { IconSpark, IconClose } from "./icons";
-import TaskEditor, { type TaskPatch } from "./TaskEditor";
+  IconBolt, IconBook, IconCalendar, IconClock, IconFlame, IconGear, IconHome, IconLogo,
+} from "@/components/icons";
 
-type View = "list" | "calendar" | "kanban";
+type Page = "dashboard" | "planner" | "focus" | "subjects" | "settings";
 
-export default function PlannerView({
-  state, onTaskStatus, onTaskUpdate, onSkipSubject, onFocusTask,
-  activeTaskId, activeClockSeconds, onAskTutor, replanning, onReplan,
-}: {
-  state: AppState;
-  onTaskStatus: (id: number, status: string) => void;
-  onTaskUpdate: (id: number, patch: TaskPatch) => void;
-  onSkipSubject: (subjectId: number, date: string) => void;
-  onFocusTask: (taskId: number) => void;
-  activeTaskId?: number | null;
-  activeClockSeconds?: number;
-  onAskTutor: (q: string) => void;
-  replanning: boolean;
-  onReplan: () => void;
-}) {
-  const [view, setView] = useState<View>("list");
-  const [filter, setFilter] = useState("all");
-  const [openDay, setOpenDay] = useState<string | null>(null);
-  const [expanded, setExpanded] = useState<number | null>(null);
-  const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
-  const [month, setMonth] = useState(() => {
-    const d = new Date();
-    return { y: d.getFullYear(), m: d.getMonth() };
-  });
+const NAV: { id: Page; label: string; icon: React.ReactNode }[] = [
+  { id: "dashboard", label: "Overview", icon: <IconHome /> },
+  { id: "planner", label: "Planner", icon: <IconCalendar /> },
+  { id: "focus", label: "Focus", icon: <IconClock /> },
+  { id: "subjects", label: "Subjects", icon: <IconBook /> },
+  { id: "settings", label: "Settings", icon: <IconGear /> },
+];
 
-  const t = today();
+export default function Home() {
+  const [state, setState] = useState<AppState | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState<Page>("dashboard");
+  const [busy, setBusy] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [thinking, setThinking] = useState(false);
+  const [zen, setZen] = useState(false);
+  const [toast, setToast] = useState("");
+  const [pendingMsgs, setPendingMsgs] = useState<MessageRow[]>([]);
+  const [forceWizard, setForceWizard] = useState(false);
 
-  const filtered = useMemo(() => {
-    let list = state.tasks;
-    if (filter !== "all") list = list.filter((x) => String(x.subjectId) === filter);
-    return list;
-  }, [state.tasks, filter]);
+  const notify = (m: string) => { setToast(m); setTimeout(() => setToast(""), 3200); };
 
-  const grouped = useMemo(() => {
-    const map = new Map<string, TaskRow[]>();
-    for (const task of filtered) {
-      if (!map.has(task.date)) map.set(task.date, []);
-      map.get(task.date)!.push(task);
-    }
-    // Sorted chronologically, NO slice — the full timeline is always rendered.
-    return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-  }, [filtered]);
+  useEffect(() => {
+    api<AppState>("/api/state")
+      .then(setState)
+      .catch(() => notify("Could not reach the server."))
+      .finally(() => setLoading(false));
+  }, []);
 
-  // "upcoming" = today and future days (dayDiff(date, today) <= 0 means date >= today)
-  const upcoming = grouped.filter(([d]) => dayDiff(d, t) <= 0);
-  const overdue = grouped
-    .filter(([d]) => dayDiff(d, t) > 0 && d !== t)
-    .flatMap(([, v]) => v)
-    .filter((x) => x.status === "pending");
+  useEffect(() => {
+    if (state?.settings.theme) document.body.className = `theme-${state.settings.theme}`;
+  }, [state?.settings.theme]);
 
-  const topicFor = (task: TaskRow) => state.topics.find((x) => x.id === task.topicId);
-  const subjFor  = (task: TaskRow) => state.subjects.find((s) => s.id === task.subjectId);
+  const logSession = useCallback(
+    (minutes: number, subjectId: number | null, taskId: number | null, mode: string) => {
+      api<AppState>("/api/sessions", {
+        method: "POST",
+        body: JSON.stringify({ minutes, subjectId, taskId, mode }),
+      }).then(setState).catch(() => {});
+    },
+    []
+  );
 
-  const taskLogged = (taskId: number) => {
-    const sum = state.sessions
-      .filter((x) => x.taskId === taskId)
-      .reduce((a, x) => a + x.minutes, 0);
-    return Math.round(sum * 100) / 100;
+  const clock = useStudyClock(logSession);
+
+  const onBlockComplete = useCallback((mode: TimerMode, minutes: number) => {
+    if (mode === "short" || mode === "long") { notify("Break over — back to it."); return; }
+    notify(`Focus block finished (${minutes} min).`);
+  }, []);
+
+  const timer = useFocusTimer(
+    {
+      pomodoro: state?.settings.pomodoro ?? 25,
+      shortBreak: state?.settings.shortBreak ?? 5,
+      longBreak: state?.settings.longBreak ?? 15,
+    },
+    onBlockComplete
+  );
+
+  const setTaskStatus = async (id: number, status: string) => {
+    try {
+      const s = await api<AppState>("/api/tasks", { method: "PATCH", body: JSON.stringify({ id, status }) });
+      setState(s);
+      if (status === "done") notify("Nice — logged and mastery updated.");
+    } catch { notify("Update failed."); }
   };
-  const fmtMin = (m: number) => (Number.isInteger(m) ? `${m}m` : `${m.toFixed(2)}m`);
 
-  // ── Task row ────────────────────────────────────────────────────────────────
-  // Uses semantic classes (task-body, task-actions) instead of inline
-  // `style={{ flex:1 }}` so the responsive CSS can target them reliably.
+  const updateTask = async (id: number, patch: TaskPatch) => {
+    try {
+      const s = await api<AppState>("/api/tasks", { method: "PATCH", body: JSON.stringify({ id, ...patch }) });
+      setState(s);
+      notify("Task updated.");
+    } catch { notify("Could not update task."); }
+  };
 
-  const renderTask = (task: TaskRow) => {
-    const meta  = KIND_META[task.kind] || KIND_META.learn;
-    const subj  = subjFor(task);
-    const topic = topicFor(task);
-    const open  = expanded === task.id;
-    const isActive = activeTaskId === task.id;
+  const skipSubjectForDay = async (subjectId: number, date: string) => {
+    try {
+      const s = await api<AppState>("/api/tasks", {
+        method: "PATCH",
+        body: JSON.stringify({ skipSubjectId: subjectId, skipDate: date }),
+      });
+      setState(s);
+      const name = s.subjects.find((x) => x.id === subjectId)?.name || "subject";
+      notify(`Skipped ${name} for that day.`);
+    } catch { notify("Could not skip subject."); }
+  };
 
+  const replan = async () => {
+    setBusy(true);
+    try {
+      const s = await api<AppState>("/api/replan", { method: "POST" });
+      setState(s);
+      notify("Schedule rebalanced from today onward.");
+    } catch { notify("Re-plan failed."); } finally { setBusy(false); }
+  };
+
+  const patchSettings = async (patch: Record<string, unknown>, replanIt = false) => {
+    setBusy(true);
+    try {
+      const s = await api<AppState>("/api/settings", {
+        method: "PATCH",
+        body: JSON.stringify({ ...patch, _replan: replanIt }),
+      });
+      setState(s);
+      notify(replanIt ? "Settings saved — plan regenerated." : "Saved.");
+    } catch { notify("Save failed."); } finally { setBusy(false); }
+  };
+
+  const addSubject = async (payload: { name: string; units: number; difficulty: string; color: string }) => {
+    setBusy(true);
+    try { setState(await api<AppState>("/api/subjects", { method: "POST", body: JSON.stringify(payload) })); notify("Subject added and lessons generated."); }
+    catch { notify("Could not add subject."); } finally { setBusy(false); }
+  };
+  const editSubject = async (payload: { id: number; name: string; units: number; difficulty: string; color: string }) => {
+    setBusy(true);
+    try { setState(await api<AppState>("/api/subjects", { method: "PATCH", body: JSON.stringify(payload) })); notify("Subject updated, plan rebalanced."); }
+    catch { notify("Could not update."); } finally { setBusy(false); }
+  };
+  const deleteSubject = async (id: number) => {
+    setBusy(true);
+    try { setState(await api<AppState>(`/api/subjects?id=${id}`, { method: "DELETE" })); notify("Subject removed."); }
+    catch { notify("Could not delete."); } finally { setBusy(false); }
+  };
+
+  const startSmartClock = () => {
+    const t = today();
+    const task = state?.tasks.find((x) => x.date === t && x.status === "pending") ||
+      state?.tasks.find((x) => x.date === t);
+    if (task) {
+      clock.clockIn({ taskId: task.id, subjectId: task.subjectId ?? null });
+      notify(`Clocked in to: ${task.title.slice(0, 48)}`);
+    } else {
+      const sub = state?.subjects[0];
+      clock.clockIn({ subjectId: sub?.id ?? null, taskId: null });
+      notify(sub ? `Clocked in to ${sub.name}.` : "Clocked in — free session.");
+    }
+  };
+
+  const focusTask = (taskId: number) => {
+    const task = state?.tasks.find((x) => x.id === taskId);
+    clock.clockIn({ taskId, subjectId: task?.subjectId ?? null });
+    notify(`Clocked in: ${task ? task.title.slice(0, 42) : "session"} — timer is recording.`);
+  };
+
+  const askTutor = useCallback(
+    async (q: string) => {
+      setChatOpen(true);
+      setThinking(true);
+      const optimistic: MessageRow = {
+        id: -Date.now(), userId: 0, role: "user", content: q, createdAt: new Date().toISOString(),
+      };
+      setPendingMsgs((p) => [...p, optimistic]);
+      try {
+        const r = await api<{ reply: string; action: { type: string; payload?: unknown } | null; state: AppState }>(
+          "/api/chat",
+          { method: "POST", body: JSON.stringify({ message: q }) }
+        );
+        setState(r.state);
+        setPendingMsgs([]);
+        const a = r.action;
+        if (a) {
+          if (a.type === "navigate") setPage(String(a.payload) as Page);
+          if (a.type === "startTimer") { if (!clock.running) startSmartClock(); }
+          if (a.type === "stopTimer") { if (clock.running) clock.clockOut(); }
+          if (a.type === "break") { if (clock.running) clock.takeBreak(); else notify("Start a session first, then take a break."); }
+          if (a.type === "zen") setZen(true);
+          if (a.type === "replan") { void replan(); }
+          if (a.type === "theme") { void patchSettings({ theme: String(a.payload) }); }
+        }
+      } catch {
+        notify("Tutor unavailable right now.");
+        setPendingMsgs((prev) => [
+          ...prev,
+          {
+            id: -Date.now() - 1, userId: 0, role: "assistant",
+            content:
+              "I couldn't reach the tutor service just now. Check your connection and send that again — your question wasn't lost.",
+            createdAt: new Date().toISOString(),
+          },
+        ]);
+      } finally { setThinking(false); }
+    },
+    [clock]
+  );
+
+  if (loading) {
     return (
-      <div key={task.id}>
-        <div
-          className={[
-            "task-row",
-            task.status === "done"  ? "done"         : "",
-            task.status === "skipped" ? "skipped"    : "",
-            isActive                ? "active-clock" : "",
-          ]
-            .filter(Boolean)
-            .join(" ")}
-        >
-          {/* Colour dot */}
-          <div className="task-dot" style={{ background: subj?.color || meta.color }} />
-
-          {/* Title + subtitle — expands on click if there is a topic brief */}
-          <div
-            className="task-body"
-            style={{ cursor: topic ? "pointer" : "default" }}
-            onClick={() => topic && setExpanded(open ? null : task.id)}
-          >
-            <div className="task-title">{task.title}</div>
-            <div className="task-sub">
-              <span className="chip chip-kind" style={{ marginRight: 6 }}>{meta.label}</span>
-              {task.plannedMinutes} min
-              {topic ? ` · ${topic.unit} · ${topic.difficulty}` : ""}
-              {taskLogged(task.id)
-                ? ` · ${fmtMin(taskLogged(task.id))} logged`
-                : task.actualMinutes
-                ? ` · ${task.actualMinutes}m logged`
-                : ""}
-              {isActive && activeClockSeconds
-                ? ` · live +${Math.floor(activeClockSeconds / 60)}m ${activeClockSeconds % 60}s`
-                : ""}
-            </div>
-          </div>
-
-          {/* Action buttons — grouped inside .task-actions so mobile CSS can
-              flex-wrap them as a second row underneath .task-body */}
-          <div className="task-actions">
-            <span className={`chip chip-${task.status}`}>{task.status}</span>
-            <button
-              className="btn btn-xs btn-secondary"
-              onClick={() => setEditingTaskId(task.id)}
-            >
-              Edit
-            </button>
-            {subj && task.status !== "skipped" && (
-              <button
-                className="btn btn-xs btn-secondary"
-                title="Skip all tasks for this subject today"
-                onClick={() => onSkipSubject(subj.id, task.date)}
-              >
-                Skip subj
-              </button>
-            )}
-            <button
-              className="btn btn-xs btn-secondary"
-              onClick={() => onFocusTask(task.id)}
-            >
-              Clock in
-            </button>
-            <button
-              className={`btn btn-xs ${task.status === "done" ? "btn-secondary" : "btn-primary"}`}
-              onClick={() =>
-                onTaskStatus(task.id, task.status === "done" ? "pending" : "done")
-              }
-            >
-              {task.status === "done" ? "Undo" : "Done"}
-            </button>
-            {task.status !== "skipped" && (
-              <button
-                className="btn btn-xs btn-secondary"
-                title="Skip this task"
-                onClick={() => onTaskStatus(task.id, "skipped")}
-              >
-                Skip
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Expandable lesson brief */}
-        {open && topic && (
-          <div
-            className="glass-panel slide-in"
-            style={{
-              padding: 16,
-              margin: "0 0 10px 22px",
-              borderLeft: `3px solid ${subj?.color || "var(--accent)"}`,
-            }}
-          >
-            <div
-              style={{
-                fontSize: ".74rem", fontWeight: 800, textTransform: "uppercase",
-                letterSpacing: ".7px", color: "var(--text-muted)", marginBottom: 6,
-              }}
-            >
-              Lesson brief · {topic.unit}
-            </div>
-            <div
-              style={{ fontSize: ".86rem", fontWeight: 650, marginBottom: 10, lineHeight: 1.55 }}
-            >
-              {topic.summary}
-            </div>
-            {!!topic.objectives?.length && (
-              <ul
-                style={{
-                  margin: "0 0 12px", paddingLeft: 18, fontSize: ".82rem",
-                  color: "var(--text-muted)", lineHeight: 1.7, fontWeight: 550,
-                }}
-              >
-                {topic.objectives.map((o, i) => <li key={i}>{o}</li>)}
-              </ul>
-            )}
-            <div className="flex-row gap-sm" style={{ flexWrap: "wrap" }}>
-              <div className="chip chip-kind">Mastery {topic.mastery}%</div>
-              <button
-                className="btn btn-xs btn-primary"
-                onClick={() =>
-                  onAskTutor(
-                    `Explain "${topic.title}" from ${subj?.name || "my course"} step by step with an example.`
-                  )
-                }
-              >
-                <IconSpark size={12} /> Teach me this
-              </button>
-              <button
-                className="btn btn-xs btn-secondary"
-                onClick={() =>
-                  onAskTutor(
-                    `Give me 5 practice questions on "${topic.title}" with answers.`
-                  )
-                }
-              >
-                Practice questions
-              </button>
-            </div>
-          </div>
-        )}
+      <div className="loader-screen">
+        <div className="loader-ring"><IconLogo size={28} /></div>
+        <div className="loader-title">Study Planner Pro</div>
+        <div className="loader-sub">Starting the AETHER engine…</div>
       </div>
     );
-  };
+  }
 
-  // ── Calendar grid ────────────────────────────────────────────────────────────
+  if (!state) {
+    return (
+      <div className="loader-screen">
+        <div className="loader-title">Connection problem</div>
+        <div className="loader-sub">Refresh the page to retry.</div>
+      </div>
+    );
+  }
 
-  const first = new Date(month.y, month.m, 1);
-  const startPad = first.getDay();
-  const daysInMonth = new Date(month.y, month.m + 1, 0).getDate();
-  const cells: (string | null)[] = [
-    ...Array(startPad).fill(null),
-    ...Array.from({ length: daysInMonth }, (_, i) =>
-      fmtDate(new Date(month.y, month.m, i + 1))
-    ),
+  if (!state.user.onboarded || forceWizard) {
+    return <Onboarding onDone={(s) => { setState(s); setForceWizard(false); setPage("dashboard"); }} />;
+  }
+
+  const ctx = state.context;
+  const t = today();
+  const todayDone = state.tasks.filter((x) => x.date === t && x.status === "done").length;
+  const todayTotal = state.tasks.filter((x) => x.date === t).length;
+  const allMsgs = [...state.messages, ...pendingMsgs];
+
+  const commands: Command[] = [
+    { id: "nav-dash", group: "Navigate", label: "Go to Overview", hint: "Dashboard", keywords: "home stats", run: () => setPage("dashboard") },
+    { id: "nav-plan", group: "Navigate", label: "Go to Planner", hint: "Schedule", keywords: "tasks lessons", run: () => setPage("planner") },
+    { id: "nav-focus", group: "Navigate", label: "Go to Focus", hint: "Pomodoro", keywords: "timer deep work", run: () => setPage("focus") },
+    { id: "nav-subj", group: "Navigate", label: "Go to Subjects", hint: "Syllabus", keywords: "units topics", run: () => setPage("subjects") },
+    { id: "nav-set", group: "Navigate", label: "Go to Settings", keywords: "theme preferences", run: () => setPage("settings") },
+    { id: "clock-in", group: "Study Clock", label: clock.running ? "Clock Out" : "Clock In", hint: clock.running ? "Stop & log" : "Start recording", keywords: "timer record attendance", run: () => (clock.running ? clock.clockOut() : startSmartClock()) },
+    { id: "clock-break", group: "Study Clock", label: clock.onBreak ? "Resume from break" : "Take a break", keywords: "pause rest", run: () => (clock.onBreak ? clock.endBreak() : clock.takeBreak()) },
+    { id: "zen", group: "Focus", label: "Enter Zen mode", hint: "Distraction-free", keywords: "fullscreen minimal", run: () => setZen(true) },
+    { id: "ai", group: "AI Tutor", label: "Ask the AI tutor", hint: "Open chat", keywords: "help question doubt", run: () => setChatOpen(true) },
+    { id: "ai-today", group: "AI Tutor", label: "What should I study today?", keywords: "plan today", run: () => askTutor("What should I study today and in what order?") },
+    { id: "replan", group: "Plan", label: "Re-plan with AI", hint: "Rebalance", keywords: "regenerate schedule", run: () => { setPage("planner"); replan(); } },
+    { id: "setup", group: "Plan", label: "Re-run setup wizard", keywords: "onboarding restart course", run: () => setForceWizard(true) },
   ];
-  const dayTasks = (d: string) => filtered.filter((x) => x.date === d);
-
-  // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
-    <div className="fade-in">
-      {/* Page header */}
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">Study Planner</h1>
-          <p className="page-subtitle">
-            Lesson-wise adaptive schedule · {state.tasks.length} tasks · {state.topics.length} lessons mapped
-          </p>
+    <>
+      <header className="mobile-header">
+        <div className="flex-row gap-sm">
+          <div className="brand-logo-icon" style={{ width: 28, height: 28 }}><IconLogo size={14} /></div>
+          <span style={{ fontSize: ".9rem", fontWeight: 800 }}>Study Planner Pro</span>
         </div>
-        <div className="flex-row gap-md" style={{ flexWrap: "wrap" }}>
-          <div className="vtabs">
-            {(["list", "calendar", "kanban"] as View[]).map((v) => (
-              <div
-                key={v}
-                className={`vtab${view === v ? " active" : ""}`}
-                onClick={() => setView(v)}
-              >
-                {v[0].toUpperCase() + v.slice(1)}
+        <span className="streak-badge"><IconFlame /> {state.user.streak}</span>
+      </header>
+
+      <div className="app-wrapper">
+        <aside className="sidebar glass-panel">
+          <div className="brand-header">
+            <div className="brand-logo-icon"><IconLogo /></div>
+            <div>
+              <div className="brand-title">Study Planner Pro</div>
+              <div className="brand-course">{state.user.courseName}</div>
+            </div>
+          </div>
+          <nav className="nav-list">
+            {NAV.map((n) => (
+              <div key={n.id} className={`nav-item${page === n.id ? " active" : ""}`} onClick={() => setPage(n.id)}>
+                {n.icon}<span>{n.label}</span>
               </div>
             ))}
+          </nav>
+          <div className="sidebar-foot" style={{ marginTop: "auto", paddingTop: 16 }}>
+            <div className="glass-panel tilt-card" style={{ padding: 18, textAlign: "center" }}>
+              <div className="streak-badge" style={{ marginBottom: 10 }}>
+                <IconFlame /> {state.user.streak} Day Streak
+              </div>
+              <h4 style={{ fontSize: ".88rem", fontWeight: 800, margin: "0 0 4px" }}>Stay consistent</h4>
+              <p style={{ fontSize: ".74rem", color: "var(--text-muted)", lineHeight: 1.45, margin: "0 0 12px" }}>
+                {ctx.daysLeft} days left · {ctx.progressPct}% of syllabus done.
+              </p>
+              <button className="btn btn-secondary w-full" style={{ fontSize: ".76rem", padding: 8 }} onClick={() => setForceWizard(true)}>
+                Re-run Setup
+              </button>
+            </div>
           </div>
-          <select
-            className="input-field"
-            style={{ width: "auto", height: 38 }}
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-          >
-            <option value="all">All subjects</option>
-            {state.subjects.map((s) => (
-              <option key={s.id} value={String(s.id)}>{s.name}</option>
-            ))}
-          </select>
-          <button className="btn btn-primary" onClick={onReplan} disabled={replanning}>
-            <IconSpark size={14} />
-            {replanning ? "Re-planning…" : "Re-plan"}
-          </button>
-        </div>
+        </aside>
+
+        <main className="main-workspace">
+          {/* THE NEW FLOATING PREMIUM TRACKER BAR */}
+          <div className="tracker-bar">
+            <div className="flex-row gap-md" style={{ flexWrap: "wrap" }}>
+              <div className={`pulse-dot${clock.running ? " live" : ""}`} style={{ width: 10, height: 10, borderRadius: "50%", background: clock.running ? "var(--success-accent)" : "var(--text-dim)" }} />
+              <div>
+                <div style={{ fontSize: ".8rem", fontWeight: 800 }}>
+                  {clock.running ? "Clocked in" : clock.onBreak ? "On break" : "Not clocked in"}
+                </div>
+                <div style={{ fontSize: ".72rem", color: "var(--text-muted)", fontWeight: 650 }}>
+                  {state.tasks.find((x) => x.id === clock.taskId)?.title.slice(0, 34) ||
+                    state.subjects.find((x) => x.id === clock.subjectId)?.name ||
+                    "Free session"}
+                </div>
+              </div>
+              <div className="mono" style={{ fontSize: "1.2rem", fontWeight: 800 }}>
+                {mmss(clock.elapsed)}
+              </div>
+            </div>
+            <div className="flex-row gap-sm" style={{ flexWrap: "wrap" }}>
+              <span className="chip chip-kind" style={{ background: "var(--accent-glow)", color: "var(--accent)" }}>{todayDone}/{todayTotal} today</span>
+              <span className="chip chip-pending" style={{ background: "var(--status-pending-bg)", color: "var(--status-pending-text)" }}>{ctx.daysLeft}d to {prettyLong(state.settings.examDate)}</span>
+              {!clock.running && !clock.onBreak && (
+                <button className="btn btn-xs btn-primary" onClick={startSmartClock}>Clock In</button>
+              )}
+              {clock.running && (
+                <>
+                  <button className="btn btn-xs btn-secondary" onClick={clock.pause}>Pause</button>
+                  <button className="btn btn-xs btn-secondary" onClick={clock.takeBreak}>Break</button>
+                  <button className="btn btn-xs btn-danger" style={{ background: "var(--status-skipped-bg)", color: "var(--status-skipped-text)" }} onClick={clock.clockOut}>Clock Out</button>
+                </>
+              )}
+              {clock.onBreak && (
+                <button className="btn btn-xs btn-primary" onClick={clock.endBreak}>Resume</button>
+              )}
+              <button className="btn btn-xs btn-secondary" onClick={() => setZen(true)}>⚡ Zen</button>
+            </div>
+          </div>
+
+          {page === "dashboard" && (
+            <Dashboard state={state} onTaskStatus={setTaskStatus} onTaskUpdate={updateTask}
+              onSkipSubject={skipSubjectForDay} onFocusTask={focusTask}
+              activeTaskId={clock.taskId} activeClockSeconds={clock.elapsed}
+              replanning={busy} onReplan={replan} />
+          )}
+          {page === "planner" && (
+            <PlannerView state={state} onTaskStatus={setTaskStatus} onTaskUpdate={updateTask}
+              onSkipSubject={skipSubjectForDay} onFocusTask={focusTask}
+              activeTaskId={clock.taskId} activeClockSeconds={clock.elapsed}
+              onAskTutor={askTutor} replanning={busy} onReplan={replan} />
+          )}
+          {page === "focus" && (
+            <FocusView state={state} timer={timer} clock={clock} onCompleteTask={(id) => setTaskStatus(id, "done")} onZen={() => setZen(true)} />
+          )}
+          {page === "subjects" && (
+            <SubjectsView state={state} onAdd={addSubject} onEdit={editSubject} onDelete={deleteSubject} busy={busy} onAskTutor={askTutor} />
+          )}
+          {page === "settings" && (
+            <SettingsView state={state} onPatch={patchSettings} onRestart={() => setForceWizard(true)} busy={busy} />
+          )}
+        </main>
       </div>
 
-      {/* Overdue warning */}
-      {overdue.length > 0 && (
-        <div
-          className="glass-panel"
-          style={{ padding: 16, marginBottom: 16, borderLeft: "4px solid var(--warning-accent)" }}
-        >
-          <div style={{ fontSize: ".85rem", fontWeight: 750 }}>
-            {overdue.length} task{overdue.length > 1 ? "s" : ""} from earlier days are still pending.
-          </div>
-          <div style={{ fontSize: ".78rem", color: "var(--text-muted)", marginTop: 4, marginBottom: 10 }}>
-            Don&apos;t cram them into today — let the engine redistribute them across your remaining days.
-          </div>
-          <button className="btn btn-sm btn-primary" onClick={onReplan} disabled={replanning}>
-            Rebalance my schedule
-          </button>
-        </div>
-      )}
+      <ChatPanel open={chatOpen} setOpen={setChatOpen} messages={allMsgs} onSend={askTutor}
+        thinking={thinking} provider={state.aiProvider} />
 
-      {/* ── LIST VIEW ─────────────────────────────────────────────────────────── */}
-      {view === "list" && (
-        <div>
-          {!upcoming.length && (
-            <div className="glass-panel" style={{ padding: 24, fontSize: ".86rem", color: "var(--text-muted)" }}>
-              No upcoming tasks. Hit <strong>Re-plan</strong> to generate the next stretch of your schedule.
-            </div>
-          )}
-          {/* NO .slice() here — renders the FULL chronological timeline */}
-          {upcoming.map(([date, list]) => {
-            const done = list.filter((x) => x.status === "done").length;
-            const mins = list.reduce((a, x) => a + x.plannedMinutes, 0);
-            return (
-              <div className="glass-panel tilt-card day-block" key={date}>
-                <div className="day-head">
-                  <div>
-                    <div className="day-date">
-                      {date === t
-                        ? "Today · "
-                        : dayDiff(date, t) === -1
-                        ? "Tomorrow · "
-                        : ""}
-                      {prettyDate(date)}
-                    </div>
-                    <div className="day-meta">
-                      {list.length} tasks · {mins} min · {done} done
-                    </div>
-                  </div>
-                  <div className="bar-track" style={{ width: 120 }}>
-                    <div
-                      className="bar-fill"
-                      style={{ width: `${list.length ? (done / list.length) * 100 : 0}%` }}
-                    />
-                  </div>
-                </div>
-                {list.map(renderTask)}
-              </div>
-            );
-          })}
-        </div>
-      )}
+      <CommandPalette commands={commands} />
+      <div className="cmdk-tip">Press ⌘K / Ctrl-K for commands</div>
 
-      {/* ── CALENDAR VIEW ─────────────────────────────────────────────────────── */}
-      {view === "calendar" && (
-        <div className="glass-panel" style={{ padding: 18 }}>
-          <div className="day-head">
-            <div className="day-date">
-              {first.toLocaleDateString(undefined, { month: "long", year: "numeric" })}
-            </div>
-            <div className="flex-row gap-sm">
-              <button
-                className="btn btn-xs btn-secondary"
-                onClick={() =>
-                  setMonth((mm) => (mm.m === 0 ? { y: mm.y - 1, m: 11 } : { ...mm, m: mm.m - 1 }))
-                }
-              >
-                ‹ Prev
-              </button>
-              <button
-                className="btn btn-xs btn-secondary"
-                onClick={() =>
-                  setMonth((mm) => (mm.m === 11 ? { y: mm.y + 1, m: 0 } : { ...mm, m: mm.m + 1 }))
-                }
-              >
-                Next ›
-              </button>
-            </div>
+      {zen && (
+        <div className="zen">
+          <div style={{ fontSize: ".72rem", letterSpacing: 3, textTransform: "uppercase", opacity: 0.6 }}>
+            {state.subjects.find((x) => x.id === clock.subjectId)?.name || "Deep Work"}
           </div>
-          <div className="cal-grid" style={{ marginBottom: 6 }}>
-            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
-              <div className="cal-dow" key={d}>{d}</div>
-            ))}
+          <div className="zen-digits mono">{mmss(timer.seconds)}</div>
+          <div style={{ fontSize: ".8rem", opacity: 0.55, fontWeight: 700 }}>
+            Study clock: {clock.running ? "recording" : clock.onBreak ? "on break" : "not clocked in"} · {mmss(clock.elapsed)}
           </div>
-          <div className="cal-grid">
-            {cells.map((d, i) => {
-              if (!d) return <div className="cal-cell empty" key={`e${i}`} />;
-              const list = dayTasks(d);
-              return (
-                <div
-                  key={d}
-                  className={`cal-cell${d === t ? " today" : ""}`}
-                  onClick={() => list.length && setOpenDay(d)}
-                >
-                  <div className="cal-num">{parseDate(d).getDate()}</div>
-                  {list.slice(0, 3).map((task) => {
-                    const c = subjFor(task)?.color || (KIND_META[task.kind] || KIND_META.learn).color;
-                    return (
-                      <div
-                        key={task.id}
-                        className="cal-pill"
-                        style={{ background: c, opacity: task.status === "done" ? 0.45 : 1 }}
-                      >
-                        {task.title}
-                      </div>
-                    );
-                  })}
-                  {list.length > 3 && (
-                    <div style={{ fontSize: ".6rem", fontWeight: 700, color: "var(--text-muted)" }}>
-                      +{list.length - 3} more
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+          <div className="flex-row gap-md" style={{ flexWrap: "wrap", justifyContent: "center" }}>
+            <button className="btn btn-primary" onClick={timer.toggle}>{timer.running ? "Pause Focus" : "Start Focus"}</button>
+            {!clock.running
+              ? <button className="btn btn-secondary" onClick={startSmartClock} style={{ color: "#000", background: "#fff" }}>Clock In</button>
+              : <button className="btn btn-secondary" onClick={clock.pause} style={{ color: "#000", background: "#fff" }}>Pause Clock</button>}
+            <button className="btn btn-secondary" onClick={() => setZen(false)} style={{ color: "#000", background: "#fff", border: "none" }}>Exit Zen</button>
           </div>
         </div>
       )}
 
-      {/* ── KANBAN VIEW ───────────────────────────────────────────────────────── */}
-      {view === "kanban" && (
-        <div className="kanban">
-          {(["pending", "done", "skipped"] as const).map((col) => {
-            // Show recent tasks (last 21 days) in kanban for performance,
-            // capped at 40 per column. Unlike the List view which renders
-            // the full future timeline, kanban is a status-board not a
-            // chronological view so a window makes sense here.
-            const list = filtered
-              .filter((x) => x.status === col && dayDiff(x.date, t) >= -21)
-              .slice(0, 40);
-            return (
-              <div className="glass-panel kan-col" key={col}>
-                <div className="kan-title">
-                  {col} · {list.length}
-                </div>
-                {list.map((task) => {
-                  const c =
-                    subjFor(task)?.color ||
-                    (KIND_META[task.kind] || KIND_META.learn).color;
-                  return (
-                    <div className="task-row" key={task.id} style={{ alignItems: "flex-start" }}>
-                      <div className="task-dot" style={{ background: c, marginTop: 5 }} />
-                      <div className="task-body">
-                        <div className="task-title">{task.title}</div>
-                        <div className="task-sub">
-                          {prettyDate(task.date)} · {task.plannedMinutes}m
-                        </div>
-                        <div className="flex-row gap-sm" style={{ marginTop: 6, flexWrap: "wrap" }}>
-                          <button
-                            className="btn btn-xs btn-secondary"
-                            onClick={() => setEditingTaskId(task.id)}
-                          >
-                            Edit
-                          </button>
-                          {col !== "done" && (
-                            <button
-                              className="btn btn-xs btn-primary"
-                              onClick={() => onTaskStatus(task.id, "done")}
-                            >
-                              Done
-                            </button>
-                          )}
-                          {col !== "pending" && (
-                            <button
-                              className="btn btn-xs btn-secondary"
-                              onClick={() => onTaskStatus(task.id, "pending")}
-                            >
-                              Reopen
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-                {!list.length && (
-                  <div style={{ fontSize: ".78rem", color: "var(--text-dim)" }}>
-                    Nothing here.
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+      {toast && (
+        <div className="glass-panel slide-in" style={{
+          position: "fixed", bottom: 96, left: "50%", transform: "translateX(-50%)", zIndex: 250,
+          padding: "11px 18px", fontSize: ".82rem", fontWeight: 700, background: "var(--surface-solid)"
+        }}>{toast}</div>
       )}
-
-      {/* ── Day-click modal (from calendar) ──────────────────────────────────── */}
-      {openDay && (
-        <div className="modal-overlay" onClick={() => setOpenDay(null)}>
-          <div className="glass-panel modal-box" onClick={(e) => e.stopPropagation()}>
-            <div className="day-head">
-              <div>
-                <div className="day-date">{prettyLong(openDay)}</div>
-                <div className="day-meta">{dayTasks(openDay).length} tasks scheduled</div>
-              </div>
-              <button className="btn btn-xs btn-secondary" onClick={() => setOpenDay(null)}>
-                <IconClose size={13} />
-              </button>
-            </div>
-            {dayTasks(openDay).map(renderTask)}
-            <button className="btn btn-secondary w-full mt-md" onClick={() => setOpenDay(null)}>
-              Close
-            </button>
-          </div>
-        </div>
-      )}
-
-      <TaskEditor
-        state={state}
-        task={state.tasks.find((x) => x.id === editingTaskId) || null}
-        onClose={() => setEditingTaskId(null)}
-        onSave={onTaskUpdate}
-        onSkipSubject={onSkipSubject}
-      />
-    </div>
+    </>
   );
 }
