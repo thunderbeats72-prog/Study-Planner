@@ -136,11 +136,14 @@ export async function aiSuggestSubjects(
       {
         role: "user",
         content: `Course/exam: "${courseName}". Education level: ${level}. 
-        You MUST fetch the EXACT, authentic, real-world syllabus for the FIRST SEMESTER (or current relevant term) of this specific course. 
-        Do NOT combine all semesters into one list. A student only studies 5 to 7 subjects per semester. 
-        If the institution is NMIMS CDOE, output exactly the Semester 1 subjects (Business Communication, Financial Accounting, Micro Economics & Macro Economics, Organizational Behavior, Marketing Management, Quantitative Methods).
-        Return EXACTLY 5 to 7 subjects as a strict JSON array. 
-        "units" MUST be the realistic number of chapters for that subject (strictly between 6 to 15). 
+        You MUST fetch the EXACT, authentic, real-world syllabus for the FIRST SEMESTER of this specific course.
+        
+        CRITICAL RULES FOR NMIMS CDOE:
+        1. "Micro Economics" and "Macro Economics" MUST be treated as two completely separate subjects. Do not combine them.
+        2. "Quantitative Methods" MUST have EXACTLY 12 units.
+        
+        Return EXACTLY 6 to 8 subjects as a strict JSON array. 
+        "units" MUST be the realistic number of chapters for that subject. 
         Format: [{"name":"Exact Subject Name","units":10,"difficulty":"Medium","color":"#6366f1"}]. 
         JSON array only, no extra text.`
       }
@@ -155,8 +158,7 @@ export async function aiSuggestSubjects(
     if (Array.isArray(parsed) && parsed.length >= 2) {
       const palette = ["#6366f1", "#10b981", "#f59e0b", "#ef4444", "#06b6d4", "#ec4899", "#84cc16"];
       return {
-        // Fixed: Sliced to 7 instead of 16 to ensure only one semester is loaded
-        subjects: parsed.slice(0, 7).map((s, i) => ({
+        subjects: parsed.slice(0, 8).map((s, i) => ({
           name: String(s.name).slice(0, 80),
           units: Math.min(30, Math.max(2, Number(s.units) || 8)),
           difficulty: (["Easy", "Medium", "Hard"].includes(String(s.difficulty)) ? s.difficulty : "Medium") as SeedSubject["difficulty"],
@@ -262,7 +264,7 @@ export async function localTutor(q: string, ctx: TutorContext): Promise<TutorRep
   const n = q.toLowerCase();
 
   if (action?.type === "replan") {
-    return { text: `No problem, falling behind is built into the design, that's what buffer days are for. I'm rebalancing your schedule now. Give me a second...`, action };
+    return { text: `No problem, falling behind is built into the design. I'm rebalancing your schedule now. Give me a second...`, action };
   }
   if (action) {
     const msgs: Record<string, string> = {
