@@ -49,6 +49,19 @@ const s = (
 ): SeedSubject => ({ name, units, difficulty, color });
 
 export const COURSE_DB: Record<string, Course> = {
+  nmims_mba_sem1: {
+    id: "nmims_mba_sem1",
+    name: "NMIMS CDOE — MBA (Semester 1)",
+    level: "pg",
+    subjects: [
+      s("Business Communication", 12, "Medium", "#6366f1"),
+      s("Financial Accounting", 12, "Hard", "#10b981"),
+      s("Micro Economics & Macro Economics", 12, "Hard", "#f59e0b"),
+      s("Organizational Behavior", 16, "Medium", "#ef4444"),
+      s("Marketing Management", 12, "Medium", "#06b6d4"),
+      s("Quantitative Methods - I", 12, "Hard", "#ec4899"),
+    ],
+  },
   nursery_foundation: {
     id: "nursery_foundation",
     name: "Nursery Foundation Program",
@@ -418,7 +431,7 @@ export const LEVEL_COURSES: Record<string, string[]> = {
   school: ["class_5", "class_8", "class_10", "class_12_pcm", "class_12_pcb", "class_12_commerce"],
   diploma: ["diploma_mech", "diploma_cs"],
   ug: ["btech_cse", "bsc_physics", "bcom", "ba_english", "bba", "mbbs"],
-  pg: ["mba", "msc_cs", "ma_economics"],
+  pg: ["nmims_mba_sem1", "mba", "msc_cs", "ma_economics"],
   phd: ["phd_research", "phd_coursework"],
   competitive: ["jee", "neet", "upsc", "gate_cse", "cat", "ssc_cgl"],
   professional: ["ca_inter", "cfa_l1", "pmp"],
@@ -434,7 +447,158 @@ for (const key of Object.keys(LEVEL_COURSES)) {
   );
 }
 
+/* ============================================================
+   TOPIC BANK — Lesson-level breakdown with authentic chapters
+============================================================ */
 export const TOPIC_BANK: Record<string, string[]> = {
+  "business communication": [
+    "Professional Communication in a Digital, Social, Mobile World",
+    "Writing Business Messages",
+    "Completing Business Messages",
+    "Digital Media",
+    "Social Media",
+    "Writing Routine and Positive Messages",
+    "Writing Negative Messages",
+    "Writing Persuasive Messages",
+    "Writing and Completing Reports and Proposals",
+    "Developing Presentations in a Social Media Environment",
+    "Building Careers and Writing Resumes",
+    "Applying and Interviewing for Employment"
+  ],
+  "financial accounting": [
+    "Introduction to Financial Accounting",
+    "Accounting Process & Rules",
+    "Financial Statements",
+    "Preparation of Financial Statements",
+    "Financial Reporting Standards I",
+    "Financial Reporting Standards II",
+    "Corporate Financial Statements",
+    "Statement of Cash Flows",
+    "Analysis of Financial Statement I",
+    "Analysis of Financial Statement II",
+    "Ethics in Accounting",
+    "Emerging Trends in Accounting"
+  ],
+  "micro economics & macro economics": [
+    "Introduction to Microeconomics",
+    "Demand and Supply Analysis",
+    "Elasticity of Demand and Supply",
+    "Consumer Demand Analysis and Demand Forecasting",
+    "Cost and Production Theory",
+    "Introduction to Perfect and Monopoly Market Structure - I",
+    "The Market Structure - II and Market Failure",
+    "Overview of Macroeconomics and Circular Flow of the Economy",
+    "Measuring a Nation's Income",
+    "Determination of National Income through Aggregate Demand and Aggregate Supply",
+    "Keynesian Theory of Income Determination",
+    "Monetary and Fiscal Policy"
+  ],
+  "micro economics": [
+    "Introduction to Microeconomics",
+    "Demand and Supply Analysis",
+    "Elasticity of Demand and Supply",
+    "Consumer Demand Analysis and Demand Forecasting",
+    "Cost and Production Theory",
+    "Introduction to Perfect and Monopoly Market Structure - I",
+    "The Market Structure - II and Market Failure",
+    "Overview of Macroeconomics and Circular Flow of the Economy",
+    "Measuring a Nation's Income",
+    "Determination of National Income through Aggregate Demand and Aggregate Supply",
+    "Keynesian Theory of Income Determination",
+    "Monetary and Fiscal Policy"
+  ],
+  "organizational behavior": [
+    "Introduction to Organizational Behavior",
+    "Evolution and Approaches to Organizational Behavior",
+    "Opportunities and Challenges to Organizational Behavior",
+    "Abilities, Values and Attitude",
+    "Personality and Emotions",
+    "Perception",
+    "Learning and Reinforcement",
+    "Motivation",
+    "Conflict Management",
+    "Stress Management",
+    "Power & Politics in Organizations",
+    "Group Dynamics and Teams",
+    "Leadership",
+    "Organizational Culture and Change",
+    "Organizational Development",
+    "International Context of Organizational Behavior"
+  ],
+  "organisational behaviour": [
+    "Introduction to Organizational Behavior",
+    "Evolution and Approaches to Organizational Behavior",
+    "Opportunities and Challenges to Organizational Behavior",
+    "Abilities, Values and Attitude",
+    "Personality and Emotions",
+    "Perception",
+    "Learning and Reinforcement",
+    "Motivation",
+    "Conflict Management",
+    "Stress Management",
+    "Power & Politics in Organizations",
+    "Group Dynamics and Teams",
+    "Leadership",
+    "Organizational Culture and Change",
+    "Organizational Development",
+    "International Context of Organizational Behavior"
+  ],
+  "marketing management": [
+    "Marketing: Creating Customer Value and Engagement",
+    "Analyzing the Marketing Environment",
+    "Consumer Markets and Buyer Behavior",
+    "Business Markets and Business Buyer",
+    "Customer Value-Driven Marketing",
+    "Products, Services, and Brands: Building Customer Value",
+    "Developing New Products and Managing the Product Life Cycle",
+    "Pricing: Understanding and Capturing Customer Value",
+    "Pricing Strategies: Additional Considerations",
+    "Marketing Channels: Delivering Customer Value",
+    "Communicating Customer Value: Integrated Marketing Communication Strategy",
+    "Direct, Online, Social Media, and Mobile Marketing"
+  ],
+  "quantitative methods - i": [
+    "Probability and Probability Concepts",
+    "Discrete Probability Distributions, Binomial and Poisson",
+    "Continuous Probability Distribution - Normal Distribution",
+    "Sampling and Sampling Distribution",
+    "Theory of Estimation",
+    "Testing of Hypothesis",
+    "Testing of Hypothesis - Proportion",
+    "Testing of Hypothesis-Variance, single sample",
+    "Testing of Hypothesis, Variance, Two samples using the F test",
+    "Testing of Hypothesis using ANOVA (Analysis of Variance)",
+    "Correlation and Regression - Single Independent Variable",
+    "Regression with more than one Independent Variables"
+  ],
+  "quantitative methods i": [
+    "Probability and Probability Concepts",
+    "Discrete Probability Distributions, Binomial and Poisson",
+    "Continuous Probability Distribution - Normal Distribution",
+    "Sampling and Sampling Distribution",
+    "Theory of Estimation",
+    "Testing of Hypothesis",
+    "Testing of Hypothesis - Proportion",
+    "Testing of Hypothesis-Variance, single sample",
+    "Testing of Hypothesis, Variance, Two samples using the F test",
+    "Testing of Hypothesis using ANOVA (Analysis of Variance)",
+    "Correlation and Regression - Single Independent Variable",
+    "Regression with more than one Independent Variables"
+  ],
+  "quantitative methods": [
+    "Probability and Probability Concepts",
+    "Discrete Probability Distributions, Binomial and Poisson",
+    "Continuous Probability Distribution - Normal Distribution",
+    "Sampling and Sampling Distribution",
+    "Theory of Estimation",
+    "Testing of Hypothesis",
+    "Testing of Hypothesis - Proportion",
+    "Testing of Hypothesis-Variance, single sample",
+    "Testing of Hypothesis, Variance, Two samples using the F test",
+    "Testing of Hypothesis using ANOVA (Analysis of Variance)",
+    "Correlation and Regression - Single Independent Variable",
+    "Regression with more than one Independent Variables"
+  ],
   "alphabet": ["Letters A–E: sounds & tracing", "Letters F–J: sounds & tracing", "Letters K–O: sounds & tracing", "Letters P–T: sounds & tracing", "Letters U–Z: sounds & tracing", "Blending CVC words", "Rhyming sound families", "Picture-to-letter matching"],
   "numbers & counting": ["Counting 1–10 with objects", "Writing numerals 1–10", "Counting 11–20", "Number ordering & comparison", "Simple addition with fingers", "Simple subtraction stories", "Shapes of numbers puzzle"],
   "shapes": ["Circle & oval hunt", "Square & rectangle", "Triangle & star", "Primary colours", "Secondary colours mixing", "Repeating patterns AB", "Sorting by size"],
@@ -522,7 +686,6 @@ export const TOPIC_BANK: Record<string, string[]> = {
   "thesis": ["Thesis structure & planning", "Chapter drafting workflow", "Data presentation & figures", "Discussion & argumentation", "Journal selection", "Manuscript writing", "Peer review response", "Viva preparation"],
   "strategic": ["Strategy fundamentals", "External environment analysis", "Internal capability analysis", "Business level strategy", "Corporate level strategy", "M&A and alliances", "Global strategy", "Strategy execution & BSC"],
   "operations": ["Operations strategy", "Process analysis & capacity", "Forecasting", "Inventory management", "MRP & scheduling", "Quality management & six sigma", "Lean & JIT", "Supply chain design", "Logistics & distribution"],
-  "organisational behaviour": ["Individual behaviour & personality", "Perception & attribution", "Motivation at work", "Group dynamics & teams", "Leadership", "Power & politics", "Conflict & negotiation", "Organisational culture & change"],
   "people domain": ["Team building & ground rules", "Conflict management", "Leading a team", "Supporting performance", "Removing blockers", "Negotiating agreements", "Mentoring & emotional intelligence"],
   "process domain": ["Integration management", "Scope management", "Schedule management", "Cost management", "Quality management", "Resource management", "Communications", "Risk management", "Procurement", "Stakeholder engagement"],
   "agile": ["Agile mindset & manifesto", "Scrum framework", "Kanban & flow", "Hybrid approaches", "Backlog & estimation", "Iteration planning & reviews", "Agile metrics"],
@@ -636,68 +799,6 @@ function buildObjectives(title: string, subject: string): string[] {
 
 export const KIND_LABEL = KIND_SUFFIX;
 
-Object.assign(TOPIC_BANK, EXTRA_TOPICS, {
-  "marketing management": [
-    "Marketing: Creating Customer Value and Engagement", "Analyzing the Marketing Environment", "Consumer Markets and Buyer Behavior", "Business Markets and Business Buyer", "Customer Value-Driven Marketing", "Products, Services, and Brands: Building Customer Value", "Developing New Products and Managing the Product Life Cycle", "Pricing: Understanding and Capturing Customer Value", "Pricing Strategies: Additional Considerations", "Marketing Channels: Delivering Customer Value", "Communicating Customer Value: Integrated Marketing Communication Strategy", "Direct, Online, Social Media, and Mobile Marketing"
-  ],
-  "consumer behaviour": [
-    "Consumer decision-making process", "Perception, learning and memory", "Motivation and personality",
-    "Attitudes and persuasion", "Reference groups and culture", "Family and household buying behaviour",
-    "Consumer research methods", "Online consumer behaviour", "Consumer behaviour case analysis"
-  ],
-  "brand management": [
-    "Brand identity and positioning", "Brand equity models", "Brand architecture and portfolios",
-    "Brand communication strategy", "Brand extension and revitalisation", "Measuring brand performance",
-    "Luxury, service and digital branding", "Brand audit and case study"
-  ],
-  "sales & distribution management": [
-    "Sales force roles and structure", "Sales forecasting and territory design", "Recruitment, training and motivation",
-    "Sales compensation and evaluation", "Distribution channel strategy", "Retail and wholesale management",
-    "Logistics and supply chain interface", "Channel conflict and control"
-  ],
-  "digital marketing": [
-    "Digital marketing funnel", "Search engine optimisation", "Search ads and performance marketing",
-    "Social media strategy", "Content marketing and storytelling", "Email and lifecycle marketing",
-    "Web analytics and attribution", "Marketing automation and AI tools", "Campaign optimisation project"
-  ],
-  "marketing research": [
-    "Research problem and design", "Sampling methods", "Questionnaire design", "Qualitative research methods",
-    "Survey and experimental research", "Data coding and cleaning", "Hypothesis testing for marketing",
-    "Conjoint, segmentation and perceptual maps", "Research report and presentation"
-  ],
-  "services marketing": [
-    "Characteristics of services", "Service quality and SERVQUAL", "Service blueprinting",
-    "Customer experience design", "Pricing and demand management in services", "People, process and physical evidence",
-    "Service recovery and complaint handling", "Services marketing cases"
-  ],
-  "business communication": [
-    "Professional Communication in a Digital, Social, Mobile World", "Writing Business Messages", "Completing Business Messages", "Digital Media", "Social Media", "Writing Routine and Positive Messages", "Writing Negative Messages", "Writing Persuasive Messages", "Writing and Completing Reports and Proposals", "Developing Presentations in a Social Media Environment", "Building Careers and Writing Resumes", "Applying and Interviewing for Employment"
-  ],
-  "financial accounting": [
-    "Introduction to Financial Accounting", "Accounting Process & Rules", "Financial Statements", "Preparation of Financial Statements", "Financial Reporting Standards I", "Financial Reporting Standards II", "Corporate Financial Statements", "Statement of Cash Flows", "Analysis of Financial Statement I", "Analysis of Financial Statement II", "Ethics in Accounting", "Emerging Trends in Accounting"
-  ],
-  "micro economics & macro economics": [
-    "Introduction to Microeconomics", "Demand and Supply Analysis", "Elasticity of Demand and Supply", "Consumer Demand Analysis and Demand Forecasting", "Cost and Production Theory", "Introduction to Perfect and Monopoly Market Structure - I", "The Market Structure - II and Market Failure", "Overview of Macroeconomics and Circular Flow of the Economy", "Measuring a Nation's Income", "Determination of National Income through Aggregate Demand and Aggregate Supply", "Keynesian Theory of Income Determination", "Monetary and Fiscal Policy"
-  ],
-  "organizational behavior": [
-    "Introduction to Organizational Behavior", "Evolution and Approaches to Organizational Behavior", "Opportunities and Challenges to Organizational Behavior", "Abilities, Values and Attitude", "Personality and Emotions", "Perception", "Learning and Reinforcement", "Motivation", "Conflict Management", "Stress Management", "Power & Politics in Organizations", "Group Dynamics and Teams", "Leadership", "Organizational Culture and Change", "Organizational Development", "International Context of Organizational Behavior"
-  ],
-  "quantitative methods - i": [
-    "Probability and Probability Concepts", "Discrete Probability Distributions, Binomial and Poisson", "Continuous Probability Distribution - Normal Distribution", "Sampling and Sampling Distribution", "Theory of Estimation", "Testing of Hypothesis", "Testing of Hypothesis - Proportion", "Testing of Hypothesis-Variance, single sample", "Testing of Hypothesis, Variance, Two samples using the F test", "Testing of Hypothesis using ANOVA (Analysis of Variance)", "Correlation and Regression - Single Independent Variable", "Regression with more than one Independent Variables"
-  ],
-  "cost & management accounting": ["Cost concepts and classification", "Material and labour cost", "Overhead allocation", "Marginal costing", "Budgetary control", "Standard costing", "Variance analysis", "Decision making with costs"],
-  "legal aspect of business": ["Indian Contract Act", "Sale of Goods Act", "Companies Act basics", "Consumer Protection Act", "Competition law", "Intellectual property basics", "Cyber law and data privacy"],
-  "business analytics": ["Analytics lifecycle", "Data cleaning and preparation", "Descriptive analytics", "Dashboard and visualisation", "Regression for business", "Forecasting basics", "Customer analytics", "Decision analytics project"],
-  "corporate finance": ["Time value of money", "Risk and return", "Capital budgeting", "Cost of capital", "Capital structure", "Dividend decisions", "Working capital management", "Corporate finance case analysis"],
-  "integrated marketing communications": ["IMC planning process", "Advertising strategy", "Media planning", "Sales promotion", "Public relations", "Direct and database marketing", "Digital and social communication", "Campaign evaluation"],
-  "sales management": ["Sales organisation and roles", "Sales forecasting", "Territory and quota design", "Recruitment and training", "Motivation and compensation", "Sales performance evaluation", "Key account management", "CRM in sales"],
-  "international marketing": ["Global marketing environment", "Market selection and entry modes", "Product adaptation vs standardisation", "International pricing", "Global distribution channels", "International promotion", "Export documentation", "Global marketing strategy cases"],
-  "indian ethos": ["Indian ethos in management", "Values and ethics", "Corporate governance", "Ethical dilemmas", "Spirituality and leadership", "CSR and responsible business"],
-  "corporate sustainability": ["Sustainability concepts", "ESG frameworks", "Climate risk for business", "Sustainable supply chains", "Sustainability reporting", "Circular economy", "Stakeholder capitalism"],
-  "project part i": ["Problem identification", "Research objectives", "Literature scan", "Research design", "Data collection plan", "Proposal writing"],
-  "project part ii": ["Data analysis", "Findings and interpretation", "Recommendations", "Report writing", "Presentation and viva preparation"],
-});
-
 const PALETTE = ["#6366f1", "#10b981", "#f59e0b", "#ef4444", "#06b6d4", "#ec4899", "#84cc16", "#8b5cf6"];
 
 const sub = (
@@ -753,19 +854,32 @@ const RULES: Rule[] = [
     sub("Data Structures", 10, "Hard"), sub("Operating System", 8, "Hard"),
     sub("Database", 8), sub("Computer Networks", 7), sub("Algorithms", 8, "Hard")] },
   { match: /nmims|cdoe|nga-sce|online.*mba.*marketing|distance.*mba.*marketing/i, subjects: [
-    sub("Business Communication", 12, "Medium"), sub("Financial Accounting", 12, "Hard"),
-    sub("Micro Economics & Macro Economics", 12, "Hard"), sub("Organizational Behavior", 16, "Medium"),
-    sub("Marketing Management", 12, "Medium"), sub("Quantitative Methods - I", 12, "Hard"),
-    sub("Cost & Management Accounting", 8, "Hard"), sub("Human Resource Management", 7, "Medium"),
-    sub("Strategic Management", 8, "Hard"), sub("Business Analytics", 8, "Hard"),
-    sub("Legal Aspect of Business", 7, "Medium"), sub("Operations Management", 8, "Medium"),
-    sub("Corporate Finance", 8, "Hard"), sub("Research Methodology", 8, "Hard"),
-    sub("Project Part I", 6, "Medium"), sub("Brand Management", 8, "Hard"),
-    sub("Consumer Behaviour", 9, "Hard"), sub("Integrated Marketing Communications", 8, "Hard"),
-    sub("Sales Management", 8, "Medium"), sub("Indian Ethos & Ethics", 6, "Easy"),
-    sub("Corporate Sustainability", 7, "Medium"), sub("International Business", 7, "Medium"),
-    sub("Project Part II", 5, "Hard"), sub("International Marketing", 8, "Hard"),
-    sub("Services Marketing", 8, "Medium"), sub("Digital Marketing", 9, "Hard")
+    sub("Business Communication", 12, "Medium"),
+    sub("Financial Accounting", 12, "Hard"),
+    sub("Micro Economics & Macro Economics", 12, "Hard"),
+    sub("Organizational Behavior", 16, "Medium"),
+    sub("Marketing Management", 12, "Medium"),
+    sub("Quantitative Methods - I", 12, "Hard"),
+    sub("Cost & Management Accounting", 8, "Hard"),
+    sub("Human Resource Management", 7, "Medium"),
+    sub("Strategic Management", 8, "Hard"),
+    sub("Business Analytics", 8, "Hard"),
+    sub("Legal Aspect of Business", 7, "Medium"),
+    sub("Operations Management", 8, "Medium"),
+    sub("Corporate Finance", 8, "Hard"),
+    sub("Research Methodology", 8, "Hard"),
+    sub("Project Part I", 6, "Medium"),
+    sub("Brand Management", 8, "Hard"),
+    sub("Consumer Behaviour", 9, "Hard"),
+    sub("Integrated Marketing Communications", 8, "Hard"),
+    sub("Sales Management", 8, "Medium"),
+    sub("Indian Ethos & Ethics", 6, "Easy"),
+    sub("Corporate Sustainability", 7, "Medium"),
+    sub("International Business", 7, "Medium"),
+    sub("Project Part II", 5, "Hard"),
+    sub("International Marketing", 8, "Hard"),
+    sub("Services Marketing", 8, "Medium"),
+    sub("Digital Marketing", 9, "Hard")
   ] },
   { match: /mba.*(finance|fintech|banking)|finance.*mba/i, subjects: [
     sub("Corporate Finance", 9, "Hard"), sub("Financial Management", 9, "Hard"),
@@ -1008,15 +1122,37 @@ export function synthesiseSubjects(courseName: string, level: string): SeedSubje
 }
 
 const NMIMS_SEMESTER: Record<string, number> = {
-  "business communication": 1, "financial accounting": 1, "micro economics & macro economics": 1,
-  "organizational behavior": 1, "marketing management": 1, "quantitative methods - i": 1,
-  "cost & management accounting": 2, "human resource management": 2, "strategic management": 2,
-  "business analytics": 2, "legal aspect of business": 2, "operations management": 2,
-  "corporate finance": 3, "research methodology": 3, "project part i": 3,
-  "brand management": 3, "consumer behaviour": 3, "integrated marketing communications": 3,
-  "sales management": 3, "indian ethos & ethics": 4, "corporate sustainability": 4,
-  "international business": 4, "project part ii": 4, "international marketing": 4,
-  "services marketing": 4, "digital marketing": 4,
+  "business communication": 1,
+  "financial accounting": 1,
+  "micro economics & macro economics": 1,
+  "micro economics": 1,
+  "macro economics": 1,
+  "organizational behavior": 1,
+  "organisational behaviour": 1,
+  "marketing management": 1,
+  "quantitative methods - i": 1,
+  "quantitative methods i": 1,
+  "quantitative methods": 1,
+  "cost & management accounting": 2,
+  "human resource management": 2,
+  "strategic management": 2,
+  "business analytics": 2,
+  "legal aspect of business": 2,
+  "operations management": 2,
+  "corporate finance": 3,
+  "research methodology": 3,
+  "project part i": 3,
+  "brand management": 3,
+  "consumer behaviour": 3,
+  "integrated marketing communications": 3,
+  "sales management": 3,
+  "indian ethos & ethics": 4,
+  "corporate sustainability": 4,
+  "international business": 4,
+  "project part ii": 4,
+  "international marketing": 4,
+  "services marketing": 4,
+  "digital marketing": 4,
 };
 
 export function detectSemester(q: string): { sem?: number; year?: number } {
