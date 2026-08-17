@@ -293,6 +293,8 @@ export function buildPlan(
   let cyclePtr = 0;
   let scheduledCount = 0;
   let lastLearnDate: string | null = null;
+  /** Learn-day index each subject last appeared on (for staleness scoring). */
+  const lastTouchedDay = new Map<number, number>();
 
   // ── 8. Learn-phase loop ────────────────────────────────────
 
@@ -356,10 +358,50 @@ export function buildPlan(
       const pool = live.length ? live : [];
       if (!pool.length) continue;
 
-      // Rotate starting subject so coverage stays even across days
-      const offset = d % pool.length;
-      const ordered = [...pool.slice(offset), ...pool.slice(0, offset)];
-      const chosen = ordered.slice(0, Math.max(1, Math.min(st.subjectsPerDay, ordered.length)));
+      // ── DIFFICULTY-AWARE SUBJECT SELECTION (spaced frequency) ──
+      //
+      // Instead of a blind round-robin rotation, each subject is scored
+      // every day and the top `subjectsPerDay` win the day's slots:
+      //
+      //   score = difficultyWeight            (Hard 1.3 > Medium 1 > Easy 0.8)
+      //         × staleness                   (days since last studied — nothing
+      //                                        is allowed to go cold)
+      //         × backlogRatio                (subjects with more unfinished
+      //                                        lessons get pulled forward)
+      //
+      // Effect: HARD subjects (e.g. Quantitative Methods, Financial
+      // Accounting) resurface on a visibly tighter cycle — roughly every
+      // 1–2 study days — while easier ones cycle every 2–3 days, yet the
+      // staleness term guarantees no subject is ever starved. The chosen
+      // subjects are then ordered hardest-first so the toughest material
+      // lands at the start of the session, when focus is highest.
+
+      const totalBySub = new Map<number, number>();
+      for (const t of topics) totalBySub.set(t.subjectId, (totalBySub.get(t.subjectId) || 0) + 1);
+
+      const scored = pool
+        .map((s) => {
+          const daysSince = d - (lastTouchedDay.get(s.id) ?? -1);
+          const total = totalBySub.get(s.id) || 1;
+          const remainingLessons = (queues.get(s.id) || []).length;
+          const backlogRatio = 0.6 + 0.8 * (remainingLessons / total);
+          // Staleness grows unbounded past day 5 (quadratically), so even a
+          // low-weight subject eventually outranks everything and can never
+          // be starved for weeks.
+          const base = Math.max(1, daysSince);
+          const staleness = base <= 5 ? base : 5 + (base - 5) * (base - 5) * 0.5;
+          return { s, score: (subjWeight.get(s.id) || 1) * staleness * backlogRatio };
+        })
+        .sort((a, b) => b.score - a.score);
+
+      const chosen = scored
+        .slice(0, Math.max(1, Math.min(st.subjectsPerDay, scored.length)))
+        .map((x) => x.s)
+        // Hardest first within the day: peak focus → toughest material
+        .sort((a, b) => (subjWeight.get(b.id) || 1) - (subjWeight.get(a.id) || 1));
+      // NOTE: lastTouchedDay is updated only when a lesson is actually
+      // placed (inside the loop below) — merely being "chosen" on a day
+      // too full to fit a lesson must not reset a subject's staleness.
 
       const learnBudget = Math.max(20, Math.min(remaining - 5, dailyLearnBudget));
       const wsum = chosen.reduce((a, s) => a + (subjWeight.get(s.id) || 1), 0);
@@ -394,6 +436,7 @@ export function buildPlan(
           slot -= mins;
           remaining -= mins;
           placedForSubject++;
+          lastTouchedDay.set(s.id, d);
           scheduledCount++;
           lastLearnDate = date;
           todaysTopics.push(t);
