@@ -300,14 +300,16 @@ export function parseCommand(q: string): TutorReply["action"] | undefined {
   if (/\b(re-?plan|rebuild|regenerate|reschedule|re-?balance|redo my (plan|schedule)|fix my (plan|schedule)|update my plan)\b/.test(n)) return { type: "replan" };
 
   if (n.includes("theme") || /\b(midnight|dark|obsidian|nebula|emerald|sunset|mint|silver|lavender|samsung|light|black)\b/.test(n)) {
-    if (/(midnight|dark|black)/.test(n)) return { type: "theme", payload: "theme-dark" };
-    if (/(obsidian)/.test(n)) return { type: "theme", payload: "theme-obsidian" };
-    if (/(nebula)/.test(n)) return { type: "theme", payload: "theme-nebula" };
-    if (/(emerald|mint)/.test(n)) return { type: "theme", payload: "theme-mint" };
-    if (/(sunset|champagne)/.test(n)) return { type: "theme", payload: "theme-sunset" };
-    if (/(light|samsung|clean)/.test(n)) return { type: "theme", payload: "theme-sunset" };
-    if (/(silver|lavender)/.test(n)) return { type: "theme", payload: "theme-silver-lavender" };
-    return { type: "theme", payload: "theme-dark" };
+    // Payloads are the raw THEME IDS stored in settings.theme — the UI
+    // applies them as `theme-${id}`, so never prefix "theme-" here.
+    if (/(midnight|dark|black)/.test(n)) return { type: "theme", payload: "dark" };
+    if (/(obsidian)/.test(n)) return { type: "theme", payload: "obsidian" };
+    if (/(nebula)/.test(n)) return { type: "theme", payload: "nebula" };
+    if (/(emerald|mint)/.test(n)) return { type: "theme", payload: "mint" };
+    if (/(sunset|champagne)/.test(n)) return { type: "theme", payload: "sunset" };
+    if (/(light|samsung|clean)/.test(n)) return { type: "theme", payload: "sunset" };
+    if (/(silver|lavender)/.test(n)) return { type: "theme", payload: "silver-lavender" };
+    return { type: "theme", payload: "dark" };
   }
   return undefined;
 }
