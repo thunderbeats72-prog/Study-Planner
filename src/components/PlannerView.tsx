@@ -1,375 +1,230 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { prettyLong, today, type AppState } from "@/lib/client";
-import type { TaskPatch } from "./TaskEditor";
+import {
+  addDays, dayDiff, fmtDate, KIND_META, parseDate, prettyDate, prettyLong, today, type AppState, type TaskRow,
+} from "@/lib/client";
+import { IconSpark, IconClose } from "./icons";
+import TaskEditor, { type TaskPatch } from "./TaskEditor";
 
-interface PlannerViewProps {
-  state: AppState;
-  onTaskStatus: (id: number, status: string) => Promise<void>;
-  onTaskUpdate: (id: number, patch: TaskPatch) => Promise<void>;
-  onSkipSubject: (subjectId: number, date: string) => Promise<void>;
-  onFocusTask: (taskId: number) => void;
-  activeTaskId: number | null;
-  activeClockSeconds: number;
-  onAskTutor: (q: string) => void;
-  replanning: boolean;
-  onReplan: () => Promise<void>;
-}
-
-type ViewMode = "list" | "calendar" | "kanban";
-
-function prettyDate(dateStr: string): string {
-  if (!dateStr) return "";
-  try {
-    const d = new Date(dateStr + "T00:00:00");
-    return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-  } catch {
-    return dateStr;
-  }
-}
-
-function addDaysToDate(dateStr: string, days: number): string {
-  const d = new Date(dateStr + "T00:00:00");
-  d.setDate(d.getDate() + days);
-  return d.toISOString().split("T")[0];
-}
-
-function getDaysBetween(startStr: string, endStr: string): number {
-  const start = new Date(startStr + "T00:00:00");
-  const end = new Date(endStr + "T00:00:00");
-  const diffTime = end.getTime() - start.getTime();
-  return Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
-}
+type View = "list" | "calendar" | "kanban";
 
 export default function PlannerView({
-  state,
-  onTaskStatus,
-  onTaskUpdate,
-  onSkipSubject,
-  onFocusTask,
-  activeTaskId,
-  activeClockSeconds,
-  onAskTutor,
-  replanning,
-  onReplan
-}: PlannerViewProps) {
-  const [viewMode, setViewMode] = useState<ViewMode>("list");
-  const [selectedSubjectId, setSelectedSubjectId] = useState<string>("all");
-  const [activeCalMonth, setActiveCalMonth] = useState<Date>(new Date());
-  const [selectedDayTasks, setSelectedDayTasks] = useState<{ date: string; tasks: typeof state.tasks } | null>(null);
-
+  state, onTaskStatus, onTaskUpdate, onSkipSubject, onFocusTask, activeTaskId, activeClockSeconds, onAskTutor, replanning, onReplan,
+}: {
+  state: AppState;
+  onTaskStatus: (id: number, status: string) => void;
+  onTaskUpdate: (id: number, patch: TaskPatch) => void;
+  onSkipSubject: (subjectId: number, date: string) => void;
+  onFocusTask: (taskId: number) => void;
+  activeTaskId?: number | null;
+  activeClockSeconds?: number;
+  onAskTutor: (q: string) => void;
+  replanning: boolean;
+  onReplan: () => void;
+}) {
+  const [view, setView] = useState<View>("list");
+  const [filter, setFilter] = useState("all");
+  const [openDay, setOpenDay] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<number | null>(null);
+  const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
+  const [month, setMonth] = useState(() => {
+    const d = new Date(); return { y: d.getFullYear(), m: d.getMonth() };
+  });
   const t = today();
 
-  // Pacing calculations
-  const pacing = useMemo(() => {
-    const totalUnits = state.subjects.reduce((sum, s) => sum + ((s as any).units || 10), 0);
-    const minutesPerUnit = 70;
-    const totalEstimatedMinutes = totalUnits * minutesPerUnit;
-    const dailyMinutesBudget = Math.max(30, Math.round((state.settings.dailyHours || 2) * 60));
-    const rawDaysRequired = Math.ceil(totalEstimatedMinutes / dailyMinutesBudget);
-    const bufferDays = Math.max(2, Math.round(rawDaysRequired * 0.1));
-    const daysRequired = rawDaysRequired + bufferDays;
-    const projectedDate = addDaysToDate(t, daysRequired);
-    const daysUntilExam = getDaysBetween(t, state.settings.examDate);
-    const isFeasible = daysRequired <= daysUntilExam;
+  const filtered = useMemo(() => {
+    let list = state.tasks;
+    if (filter !== "all") list = list.filter((x) => String(x.subjectId) === filter);
+    return list;
+  }, [state.tasks, filter]);
 
-    return {
-      daysRequired,
-      projectedDate,
-      bufferDays,
-      isFeasible
-    };
-  }, [state.subjects, state.settings.dailyHours, state.settings.examDate, t]);
-
-  const filteredTasks = useMemo(() => {
-    if (selectedSubjectId === "all") return state.tasks;
-    const subId = Number(selectedSubjectId);
-    return state.tasks.filter((task) => task.subjectId === subId);
-  }, [state.tasks, selectedSubjectId]);
-
-  const groupedTasksByDate = useMemo(() => {
-    const map = new Map<string, typeof state.tasks>();
-    for (const task of filteredTasks) {
-      const d = task.date;
-      if (!map.has(d)) map.set(d, []);
-      map.get(d)!.push(task);
+  const grouped = useMemo(() => {
+    const map = new Map<string, TaskRow[]>();
+    for (const task of filtered) {
+      if (!map.has(task.date)) map.set(task.date, []);
+      map.get(task.date)!.push(task);
     }
-    return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
-  }, [filteredTasks]);
+    return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  }, [filtered]);
 
-  const calendarDays = useMemo(() => {
-    const year = activeCalMonth.getFullYear();
-    const month = activeCalMonth.getMonth();
-    const firstDayIndex = new Date(year, month, 1).getDay();
-    const totalDaysInMonth = new Date(year, month + 1, 0).getDate();
+  const upcoming = grouped.filter(([d]) => dayDiff(d, t) <= 0);
+  const overdue = grouped.filter(([d]) => dayDiff(d, t) > 0 && d !== t).flatMap(([, v]) => v).filter((x) => x.status === "pending");
 
-    const days: { dateStr: string; dayNum: number; isCurrentMonth: boolean }[] = [];
-
-    for (let i = 0; i < firstDayIndex; i++) {
-      days.push({ dateStr: "", dayNum: 0, isCurrentMonth: false });
-    }
-
-    for (let d = 1; d <= totalDaysInMonth; d++) {
-      const monthStr = String(month + 1).padStart(2, "0");
-      const dayStr = String(d).padStart(2, "0");
-      days.push({
-        dateStr: `${year}-${monthStr}-${dayStr}`,
-        dayNum: d,
-        isCurrentMonth: true
-      });
-    }
-
-    return days;
-  }, [activeCalMonth]);
-
-  const monthName = activeCalMonth.toLocaleString("default", { month: "long", year: "numeric" });
-
-  const nextMonth = () => {
-    setActiveCalMonth(new Date(activeCalMonth.getFullYear(), activeCalMonth.getMonth() + 1, 1));
+  const topicFor = (task: TaskRow) => state.topics.find((x) => x.id === task.topicId);
+  const subjFor = (task: TaskRow) => state.subjects.find((s) => s.id === task.subjectId);
+  const taskLogged = (taskId: number) => {
+    const sum = state.sessions.filter((x) => x.taskId === taskId).reduce((a, x) => a + x.minutes, 0);
+    return Math.round(sum * 100) / 100;
   };
-  const prevMonth = () => {
-    setActiveCalMonth(new Date(activeCalMonth.getFullYear(), activeCalMonth.getMonth() - 1, 1));
+  const fmtMin = (m: number) => Number.isInteger(m) ? `${m}m` : `${m.toFixed(2)}m`;
+
+  const renderTask = (task: TaskRow) => {
+    const meta = KIND_META[task.kind] || KIND_META.learn;
+    const subj = subjFor(task);
+    const topic = topicFor(task);
+    const open = expanded === task.id;
+    return (
+      <div key={task.id}>
+        <div className={`task-row${task.status === "done" ? " done" : ""}${activeTaskId === task.id ? " active-clock" : ""}`}>
+          <div className="task-dot" style={{ background: subj?.color || meta.color }} />
+          <div style={{ flex: 1, minWidth: 0, cursor: topic ? "pointer" : "default" }}
+            onClick={() => topic && setExpanded(open ? null : task.id)}>
+            <div className="task-title">{task.title}</div>
+            <div className="task-sub">
+              <span className="chip chip-kind" style={{ marginRight: 6 }}>{meta.label}</span>
+              {task.plannedMinutes} min
+              {topic ? ` · ${topic.unit} · ${topic.difficulty}` : ""}
+              {taskLogged(task.id) ? ` · ${fmtMin(taskLogged(task.id))} logged` : task.actualMinutes ? ` · ${task.actualMinutes}m logged` : ""}
+              {activeTaskId === task.id && activeClockSeconds ? ` · live +${Math.floor(activeClockSeconds / 60)}m ${activeClockSeconds % 60}s` : ""}
+            </div>
+          </div>
+          <span className={`chip chip-${task.status}`}>{task.status}</span>
+          <button className="btn btn-xs btn-secondary" onClick={() => setEditingTaskId(task.id)}>Edit</button>
+          {subj && task.status !== "skipped" && (
+            <button className="btn btn-xs btn-secondary" title="Skip all tasks for this subject today"
+              onClick={() => onSkipSubject(subj.id, task.date)}>Skip subject</button>
+          )}
+          <button className="btn btn-xs btn-secondary" onClick={() => onFocusTask(task.id)}>Clock in</button>
+          <button className={`btn btn-xs ${task.status === "done" ? "btn-secondary" : "btn-primary"}`}
+            onClick={() => onTaskStatus(task.id, task.status === "done" ? "pending" : "done")}>
+            {task.status === "done" ? "Undo" : "Done"}
+          </button>
+          {task.status !== "skipped" && (
+            <button className="btn btn-xs btn-secondary" title="Skip"
+              onClick={() => onTaskStatus(task.id, "skipped")}>Skip</button>
+          )}
+        </div>
+        {open && topic && (
+          <div className="glass-panel slide-in" style={{ padding: 16, margin: "0 0 10px 22px", borderLeft: `3px solid ${subj?.color || "var(--accent)"}` }}>
+            <div style={{ fontSize: ".74rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: ".7px", color: "var(--text-muted)", marginBottom: 6 }}>
+              Lesson brief · {topic.unit}
+            </div>
+            <div style={{ fontSize: ".86rem", fontWeight: 650, marginBottom: 10, lineHeight: 1.55 }}>{topic.summary}</div>
+            {!!topic.objectives?.length && (
+              <ul style={{ margin: "0 0 12px", paddingLeft: 18, fontSize: ".82rem", color: "var(--text-muted)", lineHeight: 1.7, fontWeight: 550 }}>
+                {topic.objectives.map((o, i) => <li key={i}>{o}</li>)}
+              </ul>
+            )}
+            <div className="flex-row gap-sm" style={{ flexWrap: "wrap" }}>
+              <div className="chip chip-kind">Mastery {topic.mastery}%</div>
+              <button className="btn btn-xs btn-primary" onClick={() => onAskTutor(`Explain "${topic.title}" from ${subj?.name || "my course"} step by step with an example.`)}>
+                <IconSpark size={12} /> Teach me this
+              </button>
+              <button className="btn btn-xs btn-secondary" onClick={() => onAskTutor(`Give me 5 practice questions on "${topic.title}" with answers.`)}>
+                Practice questions
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
   };
+
+  // calendar grid
+  const first = new Date(month.y, month.m, 1);
+  const startPad = first.getDay();
+  const daysInMonth = new Date(month.y, month.m + 1, 0).getDate();
+  const cells: (string | null)[] = [
+    ...Array(startPad).fill(null),
+    ...Array.from({ length: daysInMonth }, (_, i) => fmtDate(new Date(month.y, month.m, i + 1))),
+  ];
+
+  const dayTasks = (d: string) => filtered.filter((x) => x.date === d);
 
   return (
-    <div className="planner-container" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      <div className="page-header" style={{ marginBottom: 4 }}>
+    <div className="fade-in">
+      <div className="page-header">
         <div>
           <h1 className="page-title">Study Planner</h1>
           <p className="page-subtitle">
-            Lesson-wise adaptive schedule · {state.tasks.length} total tasks · Projected completion:{" "}
-            <strong>{prettyDate(pacing.projectedDate)}</strong>
+            Lesson-wise adaptive schedule · {state.tasks.length} tasks · {state.topics.length} lessons mapped
           </p>
         </div>
-
-        <div className="flex-row gap-sm" style={{ flexWrap: "wrap" }}>
+        <div className="flex-row gap-md" style={{ flexWrap: "wrap" }}>
           <div className="vtabs">
-            <button className={`vtab${viewMode === "list" ? " active" : ""}`} onClick={() => setViewMode("list")}>
-              List
-            </button>
-            <button className={`vtab${viewMode === "calendar" ? " active" : ""}`} onClick={() => setViewMode("calendar")}>
-              Calendar
-            </button>
-            <button className={`vtab${viewMode === "kanban" ? " active" : ""}`} onClick={() => setViewMode("kanban")}>
-              Kanban
-            </button>
-          </div>
-
-          <select
-            className="input-field"
-            style={{ width: "auto", minWidth: 160, padding: "8px 12px" }}
-            value={selectedSubjectId}
-            onChange={(e) => setSelectedSubjectId(e.target.value)}
-          >
-            <option value="all">All subjects</option>
-            {state.subjects.map((sub) => (
-              <option key={sub.id} value={sub.id}>
-                {sub.name}
-              </option>
+            {(["list", "calendar", "kanban"] as View[]).map((v) => (
+              <div key={v} className={`vtab${view === v ? " active" : ""}`} onClick={() => setView(v)}>
+                {v[0].toUpperCase() + v.slice(1)}
+              </div>
             ))}
+          </div>
+          <select className="input-field" style={{ width: "auto", height: 38 }} value={filter} onChange={(e) => setFilter(e.target.value)}>
+            <option value="all">All subjects</option>
+            {state.subjects.map((s) => <option key={s.id} value={String(s.id)}>{s.name}</option>)}
           </select>
-
-          <button className="btn btn-primary btn-sm" onClick={onReplan} disabled={replanning}>
-            {replanning ? "Rebalancing..." : "⚡ Re-plan"}
+          <button className="btn btn-primary" onClick={onReplan} disabled={replanning}>
+            <IconSpark size={14} />{replanning ? "Re-planning…" : "Re-plan"}
           </button>
         </div>
       </div>
 
-      <div
-        className="glass-panel"
-        style={{
-          padding: "12px 20px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          flexWrap: "wrap",
-          gap: 12,
-          borderLeft: `4px solid ${pacing.isFeasible ? "var(--success-accent)" : "var(--warning-accent)"}`
-        }}
-      >
-        <div style={{ fontSize: ".82rem", fontWeight: 650 }}>
-          {pacing.isFeasible ? (
-            <span>
-              🎯 Target On Track: Syllabus completes by <strong>{prettyDate(pacing.projectedDate)}</strong> with{" "}
-              <strong>{pacing.bufferDays} buffer days</strong> before your exam on {prettyLong(state.settings.examDate)}.
-            </span>
-          ) : (
-            <span>
-              ⚠️ Intensive Load: Requires {pacing.daysRequired} days at current pacing. Increase daily study hours to finish
-              before {prettyDate(state.settings.examDate)}.
-            </span>
-          )}
-        </div>
-        <span className="chip chip-kind" style={{ background: "var(--accent-glow)", color: "var(--accent)" }}>
-          {state.settings.dailyHours || 2}h Daily Target
-        </span>
-      </div>
-
-      {viewMode === "list" && (
-        <div className="task-list-wrap" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          {groupedTasksByDate.length === 0 ? (
-            <div className="glass-panel" style={{ padding: 40, textAlign: "center", color: "var(--text-muted)" }}>
-              No tasks found for the selected subject filter.
-            </div>
-          ) : (
-            groupedTasksByDate.map(([dateStr, tasks]) => {
-              const isToday = dateStr === t;
-              const totalMins = tasks.reduce((sum, task) => sum + ((task as any).duration ?? (task as any).minutes ?? 45), 0);
-              const doneCount = tasks.filter((task) => task.status === "done").length;
-
-              return (
-                <div
-                  key={dateStr}
-                  className="day-block glass-panel"
-                  style={{
-                    border: isToday ? "1.5px solid var(--accent)" : "1px solid var(--glass-border)",
-                    boxShadow: isToday ? "0 8px 28px var(--accent-glow)" : undefined
-                  }}
-                >
-                  <div className="day-head">
-                    <div className="flex-row gap-sm">
-                      <span className="day-date" style={{ color: isToday ? "var(--accent)" : "inherit" }}>
-                        {isToday ? "Today, " : ""}
-                        {prettyDate(dateStr)}
-                      </span>
-                      {isToday && (
-                        <span className="chip chip-kind" style={{ fontSize: ".65rem" }}>
-                          Active
-                        </span>
-                      )}
-                    </div>
-                    <span className="day-meta">
-                      {tasks.length} tasks · {totalMins} min · {doneCount}/{tasks.length} done
-                    </span>
-                  </div>
-
-                  <div className="task-items-list" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    {tasks.map((task) => {
-                      const isClockedIn = activeTaskId === task.id;
-                      const sub = state.subjects.find((s) => s.id === task.subjectId);
-                      const subColor = sub?.color || "var(--accent)";
-                      const durationVal = (task as any).duration ?? (task as any).minutes ?? 45;
-
-                      return (
-                        <div
-                          key={task.id}
-                          className={`task-row ${task.status}${isClockedIn ? " active-clock" : ""}`}
-                          style={{ borderLeft: `4px solid ${subColor}` }}
-                        >
-                          <div className="task-dot" style={{ background: subColor }} />
-
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div className="task-title">{task.title}</div>
-                            <span className="task-sub">
-                              {(task.kind || "lesson").toUpperCase()} · {durationVal} min · {(task as any).difficulty || "Medium"}
-                            </span>
-                          </div>
-
-                          <div className="task-actions">
-                            <span className={`chip chip-${task.status}`}>{task.status}</span>
-
-                            {task.status === "pending" && (
-                              <>
-                                <button
-                                  className={`btn btn-xs ${isClockedIn ? "btn-primary" : "btn-secondary"}`}
-                                  onClick={() => onFocusTask(task.id)}
-                                >
-                                  {isClockedIn ? "Clocked In" : "Clock In"}
-                                </button>
-                                <button
-                                  className="btn btn-xs btn-secondary"
-                                  onClick={() => onTaskStatus(task.id, "done")}
-                                >
-                                  Done
-                                </button>
-                                <button
-                                  className="btn btn-xs btn-danger"
-                                  onClick={() => onTaskStatus(task.id, "skipped")}
-                                >
-                                  Skip
-                                </button>
-                              </>
-                            )}
-
-                            {task.status === "done" && (
-                              <button
-                                className="btn btn-xs btn-secondary"
-                                onClick={() => onTaskStatus(task.id, "pending")}
-                              >
-                                Undo
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })
-          )}
+      {overdue.length > 0 && (
+        <div className="glass-panel" style={{ padding: 16, marginBottom: 16, borderLeft: "4px solid var(--warning-accent)" }}>
+          <div style={{ fontSize: ".85rem", fontWeight: 750 }}>
+            {overdue.length} task{overdue.length > 1 ? "s" : ""} from earlier days are still pending.
+          </div>
+          <div style={{ fontSize: ".78rem", color: "var(--text-muted)", marginTop: 4, marginBottom: 10 }}>
+            Don&apos;t cram them into today — let the engine redistribute them across your remaining days.
+          </div>
+          <button className="btn btn-sm btn-primary" onClick={onReplan} disabled={replanning}>Rebalance my schedule</button>
         </div>
       )}
 
-      {viewMode === "calendar" && (
-        <div className="glass-panel" style={{ padding: 24 }}>
-          <div className="flex-row" style={{ justifyContent: "space-between", marginBottom: 18 }}>
-            <h3 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 800 }}>{monthName}</h3>
+      {view === "list" && (
+        <div>
+          {!upcoming.length && (
+            <div className="glass-panel" style={{ padding: 24, fontSize: ".86rem", color: "var(--text-muted)" }}>
+              No upcoming tasks. Hit <strong>Re-plan</strong> to generate the next stretch of your schedule.
+            </div>
+          )}
+          {upcoming.map(([date, list]) => {
+            const done = list.filter((x) => x.status === "done").length;
+            const mins = list.reduce((a, x) => a + x.plannedMinutes, 0);
+            return (
+              <div className="glass-panel tilt-card day-block" key={date}>
+                <div className="day-head">
+                  <div>
+                    <div className="day-date">
+                      {date === t ? "Today · " : dayDiff(date, t) === -1 ? "Tomorrow · " : ""}{prettyDate(date)}
+                    </div>
+                    <div className="day-meta">{list.length} tasks · {mins} min · {done} done</div>
+                  </div>
+                  <div className="bar-track" style={{ width: 120 }}>
+                    <div className="bar-fill" style={{ width: `${list.length ? (done / list.length) * 100 : 0}%` }} />
+                  </div>
+                </div>
+                {list.map(renderTask)}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {view === "calendar" && (
+        <div className="glass-panel" style={{ padding: 18 }}>
+          <div className="day-head">
+            <div className="day-date">{first.toLocaleDateString(undefined, { month: "long", year: "numeric" })}</div>
             <div className="flex-row gap-sm">
-              <button className="btn btn-secondary btn-xs" onClick={prevMonth}>
-                ‹ Prev
-              </button>
-              <button className="btn btn-secondary btn-xs" onClick={nextMonth}>
-                Next ›
-              </button>
+              <button className="btn btn-xs btn-secondary" onClick={() => setMonth((mm) => (mm.m === 0 ? { y: mm.y - 1, m: 11 } : { ...mm, m: mm.m - 1 }))}>‹ Prev</button>
+              <button className="btn btn-xs btn-secondary" onClick={() => setMonth((mm) => (mm.m === 11 ? { y: mm.y + 1, m: 0 } : { ...mm, m: mm.m + 1 }))}>Next ›</button>
             </div>
           </div>
-
+          <div className="cal-grid" style={{ marginBottom: 6 }}>
+            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => <div className="cal-dow" key={d}>{d}</div>)}
+          </div>
           <div className="cal-grid">
-            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((dow) => (
-              <div key={dow} className="cal-dow">
-                {dow}
-              </div>
-            ))}
-
-            {calendarDays.map((cell, idx) => {
-              if (!cell.isCurrentMonth) {
-                return <div key={`empty-${idx}`} className="cal-cell empty" />;
-              }
-
-              const dayTasks = state.tasks.filter((task) => task.date === cell.dateStr);
-              const isToday = cell.dateStr === t;
-
+            {cells.map((d, i) => {
+              if (!d) return <div className="cal-cell empty" key={`e${i}`} />;
+              const list = dayTasks(d);
               return (
-                <div
-                  key={cell.dateStr}
-                  className={`cal-cell${isToday ? " today" : ""}`}
-                  onClick={() => setSelectedDayTasks({ date: cell.dateStr, tasks: dayTasks })}
-                >
-                  <div className="cal-num" style={{ color: isToday ? "var(--accent)" : "inherit" }}>
-                    {cell.dayNum}
-                  </div>
-                  {dayTasks.slice(0, 3).map((task) => {
-                    const sub = state.subjects.find((s) => s.id === task.subjectId);
-                    return (
-                      <div
-                        key={task.id}
-                        className="cal-pill"
-                        style={{
-                          background: sub?.color || "var(--accent)",
-                          opacity: task.status === "done" ? 0.5 : 1
-                        }}
-                      >
-                        {task.title}
-                      </div>
-                    );
+                <div key={d} className={`cal-cell${d === t ? " today" : ""}`} onClick={() => list.length && setOpenDay(d)}>
+                  <div className="cal-num">{parseDate(d).getDate()}</div>
+                  {list.slice(0, 3).map((task) => {
+                    const c = subjFor(task)?.color || (KIND_META[task.kind] || KIND_META.learn).color;
+                    return <div key={task.id} className="cal-pill" style={{ background: c, opacity: task.status === "done" ? 0.45 : 1 }}>{task.title}</div>;
                   })}
-                  {dayTasks.length > 3 && (
-                    <div style={{ fontSize: ".62rem", color: "var(--text-muted)", fontWeight: 700 }}>
-                      +{dayTasks.length - 3} more
-                    </div>
-                  )}
+                  {list.length > 3 && <div style={{ fontSize: ".6rem", fontWeight: 700, color: "var(--text-muted)" }}>+{list.length - 3} more</div>}
                 </div>
               );
             })}
@@ -377,111 +232,60 @@ export default function PlannerView({
         </div>
       )}
 
-      {viewMode === "kanban" && (
+      {view === "kanban" && (
         <div className="kanban">
-          {(["pending", "done", "skipped"] as const).map((colStatus) => {
-            const tasksInCol = filteredTasks.filter((task) => task.status === colStatus);
-
+          {(["pending", "done", "skipped"] as const).map((col) => {
+            const list = filtered.filter((x) => x.status === col && dayDiff(x.date, t) >= -21).slice(0, 40);
             return (
-              <div key={colStatus} className="kan-col glass-panel">
-                <div className="kan-title">
-                  {colStatus.toUpperCase()} ({tasksInCol.length})
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {tasksInCol.map((task) => {
-                    const sub = state.subjects.find((s) => s.id === task.subjectId);
-                    const durationVal = (task as any).duration ?? (task as any).minutes ?? 45;
-
-                    return (
-                      <div
-                        key={task.id}
-                        className="task-row"
-                        style={{ borderLeft: `3px solid ${sub?.color || "var(--accent)"}` }}
-                      >
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div className="task-title" style={{ fontSize: ".82rem" }}>
-                            {task.title}
-                          </div>
-                          <span className="task-sub">
-                            {prettyDate(task.date)} · {durationVal} min
-                          </span>
-                        </div>
-                        <div className="task-actions">
-                          {colStatus !== "done" && (
-                            <button
-                              className="btn btn-xs btn-secondary"
-                              onClick={() => onTaskStatus(task.id, "done")}
-                            >
-                              Done
-                            </button>
-                          )}
-                          {colStatus !== "pending" && (
-                            <button
-                              className="btn btn-xs btn-secondary"
-                              onClick={() => onTaskStatus(task.id, "pending")}
-                            >
-                              Reset
-                            </button>
-                          )}
+              <div className="glass-panel kan-col" key={col}>
+                <div className="kan-title">{col} · {list.length}</div>
+                {list.map((task) => {
+                  const c = subjFor(task)?.color || (KIND_META[task.kind] || KIND_META.learn).color;
+                  return (
+                    <div className="task-row" key={task.id} style={{ alignItems: "flex-start" }}>
+                      <div className="task-dot" style={{ background: c, marginTop: 5 }} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div className="task-title">{task.title}</div>
+                        <div className="task-sub">{prettyDate(task.date)} · {task.plannedMinutes}m</div>
+                        <div className="flex-row gap-sm" style={{ marginTop: 6 }}>
+                          <button className="btn btn-xs btn-secondary" onClick={() => setEditingTaskId(task.id)}>Edit</button>
+                          {col !== "done" && <button className="btn btn-xs btn-primary" onClick={() => onTaskStatus(task.id, "done")}>Done</button>}
+                          {col !== "pending" && <button className="btn btn-xs btn-secondary" onClick={() => onTaskStatus(task.id, "pending")}>Reopen</button>}
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
+                    </div>
+                  );
+                })}
+                {!list.length && <div style={{ fontSize: ".78rem", color: "var(--text-dim)" }}>Nothing here.</div>}
               </div>
             );
           })}
         </div>
       )}
 
-      {selectedDayTasks && (
-        <div className="modal-overlay" onClick={() => setSelectedDayTasks(null)}>
-          <div className="modal-box glass-panel" onClick={(e) => e.stopPropagation()}>
-            <div className="flex-row" style={{ justifyContent: "space-between", marginBottom: 16 }}>
-              <h3 style={{ margin: 0, fontSize: "1.1rem" }}>{prettyLong(selectedDayTasks.date)}</h3>
-              <button className="btn btn-secondary btn-xs" onClick={() => setSelectedDayTasks(null)}>
-                ✕ Close
-              </button>
+      {openDay && (
+        <div className="modal-overlay" onClick={() => setOpenDay(null)}>
+          <div className="glass-panel modal-box" onClick={(e) => e.stopPropagation()}>
+            <div className="day-head">
+              <div>
+                <div className="day-date">{prettyLong(openDay)}</div>
+                <div className="day-meta">{dayTasks(openDay).length} tasks scheduled</div>
+              </div>
+              <button className="btn btn-xs btn-secondary" onClick={() => setOpenDay(null)}><IconClose size={13} /></button>
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {selectedDayTasks.tasks.length === 0 ? (
-                <p style={{ color: "var(--text-muted)" }}>No tasks scheduled for this date.</p>
-              ) : (
-                selectedDayTasks.tasks.map((task) => {
-                  const durationVal = (task as any).duration ?? (task as any).minutes ?? 45;
-                  return (
-                    <div key={task.id} className="task-row">
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div className="task-title">{task.title}</div>
-                        <span className="task-sub">
-                          {durationVal} min · {(task.kind || "lesson").toUpperCase()}
-                        </span>
-                      </div>
-                      <div className="task-actions">
-                        <button
-                          className="btn btn-xs btn-primary"
-                          onClick={() => {
-                            onFocusTask(task.id);
-                            setSelectedDayTasks(null);
-                          }}
-                        >
-                          Clock In
-                        </button>
-                        <button
-                          className="btn btn-xs btn-secondary"
-                          onClick={() => onTaskStatus(task.id, "done")}
-                        >
-                          Done
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
+            {dayTasks(openDay).map(renderTask)}
+            <button className="btn btn-secondary w-full mt-md" onClick={() => setOpenDay(null)}>Close</button>
           </div>
         </div>
       )}
+
+      <TaskEditor
+        state={state}
+        task={state.tasks.find((x) => x.id === editingTaskId) || null}
+        onClose={() => setEditingTaskId(null)}
+        onSave={onTaskUpdate}
+        onSkipSubject={onSkipSubject}
+      />
     </div>
   );
 }
