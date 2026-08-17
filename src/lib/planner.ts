@@ -372,20 +372,28 @@ export function buildPlan(
         let slot = Math.max(20, Math.round(rawSlot));
 
         const q = queues.get(s.id)!;
+        let placedForSubject = 0;
 
-        while (q.length && slot >= 15 && remaining >= 15) {
+        while (q.length && remaining >= 15) {
           const t = q[0];
           // Compressed, rounded to 5-min boundary, floored at 15 min
           const rawMins = t.estMinutes * styleMul * compress;
           const mins = Math.max(15, Math.round(rawMins / 5) * 5);
 
-          // KEY CONSTRAINT: lesson must fit inside BOTH the subject slot
-          // and the day's remaining capacity — no spill-over allowed.
-          if (mins > slot || mins > remaining) break;
+          // KEY CONSTRAINT: lessons must fit inside the subject's slot AND
+          // the day's remaining capacity. HOWEVER, every chosen subject is
+          // guaranteed its FIRST lesson of the day whenever the day itself
+          // has room. Without this guarantee, a proportional slot that is
+          // slightly smaller than one lesson (e.g. slot 41 min vs a 45-min
+          // lesson) would place nothing — producing entirely empty days at
+          // the start of the plan.
+          if (mins > remaining) break;
+          if (placedForSubject > 0 && mins > slot) break;
 
           q.shift();
           slot -= mins;
           remaining -= mins;
+          placedForSubject++;
           scheduledCount++;
           lastLearnDate = date;
           todaysTopics.push(t);
