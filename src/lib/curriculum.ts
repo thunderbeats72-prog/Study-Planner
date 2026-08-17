@@ -415,7 +415,6 @@ export const LEVEL_COURSES: Record<string, string[]> = {
   professional: ["ca_inter", "cfa_l1", "pmp"],
 };
 
-// merge the extended catalogue into the per-level lists, keeping a sensible order
 for (const c of EXTRA_COURSES) {
   if (!LEVEL_COURSES[c.level]) LEVEL_COURSES[c.level] = [];
   if (!LEVEL_COURSES[c.level].includes(c.id)) LEVEL_COURSES[c.level].push(c.id);
@@ -428,7 +427,6 @@ for (const key of Object.keys(LEVEL_COURSES)) {
 
 /* ============================================================
    TOPIC BANK — lesson-level breakdown for common subjects.
-   Keys are matched by keyword against the subject name.
 ============================================================ */
 export const TOPIC_BANK: Record<string, string[]> = {
   "alphabet": ["Letters A–E: sounds & tracing", "Letters F–J: sounds & tracing", "Letters K–O: sounds & tracing", "Letters P–T: sounds & tracing", "Letters U–Z: sounds & tracing", "Blending CVC words", "Rhyming sound families", "Picture-to-letter matching"],
@@ -574,15 +572,6 @@ const GENERIC_TEMPLATES = [
   "Previous-year question drill — {S}",
 ];
 
-export type GeneratedTopic = {
-  unit: string;
-  title: string;
-  summary: string;
-  objectives: string[];
-  difficulty: "Easy" | "Medium" | "Hard";
-  estMinutes: number;
-};
-
 /** Deterministic curriculum synthesis: subject -> ordered lesson list. */
 export function generateTopics(
   subjectName: string,
@@ -593,8 +582,6 @@ export function generateTopics(
   const bank = lookupTopicBank(subjectName);
   const titles: string[] = [];
   if (bank) {
-    // Use each bank chapter once. If the learner asked for more units than the
-    // bank has, extend with meaningful applied lessons (not "(part 2)" dupes).
     const extend = [
       `Applied case study — ${subjectName}`,
       `Problem set & numericals — ${subjectName}`,
@@ -646,11 +633,10 @@ function buildObjectives(title: string, subject: string): string[] {
 
 export const KIND_LABEL = KIND_SUFFIX;
 
+// === NMIMS EXACT TEXTBOOK DATA INJECTED HERE SAFELY ===
 Object.assign(TOPIC_BANK, EXTRA_TOPICS, {
   "marketing management": [
-    "Marketing orientation and value creation", "Marketing environment analysis", "STP: segmentation, targeting, positioning",
-    "Product strategy and lifecycle", "Pricing strategies and decisions", "Channel design and distribution",
-    "Integrated marketing communication", "Marketing metrics and ROI", "Customer relationship management", "Marketing plan development"
+    "Marketing: Creating Customer Value and Engagement", "Analyzing the Marketing Environment", "Consumer Markets and Buyer Behavior", "Business Markets and Business Buyer", "Customer Value-Driven Marketing", "Products, Services, and Brands: Building Customer Value", "Developing New Products and Managing the Product Life Cycle", "Pricing: Understanding and Capturing Customer Value", "Pricing Strategies: Additional Considerations", "Marketing Channels: Delivering Customer Value", "Communicating Customer Value: Integrated Marketing Communication Strategy", "Direct, Online, Social Media, and Mobile Marketing"
   ],
   "consumer behaviour": [
     "Consumer decision-making process", "Perception, learning and memory", "Motivation and personality",
@@ -682,11 +668,21 @@ Object.assign(TOPIC_BANK, EXTRA_TOPICS, {
     "Customer experience design", "Pricing and demand management in services", "People, process and physical evidence",
     "Service recovery and complaint handling", "Services marketing cases"
   ],
-  "business communication": ["Communication process and barriers", "Business writing essentials", "Email and memo writing", "Report writing", "Presentation skills", "Negotiation communication", "Meeting etiquette and minutes", "Cross-cultural communication"],
-  "financial accounting": ["Accounting concepts and principles", "Journal, ledger and trial balance", "Final accounts", "Depreciation accounting", "Ratio analysis", "Cash flow statement", "Financial statement interpretation"],
-  "micro economics": ["Demand and supply analysis", "Elasticity of demand", "Consumer behaviour theory", "Production and cost", "Market structures", "National income", "Inflation and business cycles", "Fiscal and monetary policy"],
-  "organizational behavior": ["Individual behaviour and personality", "Perception and attribution", "Learning and motivation", "Group dynamics", "Leadership theories", "Power and politics", "Conflict and negotiation", "Organisational culture and change"],
-  "quantitative methods i": ["Data types and presentation", "Measures of central tendency", "Dispersion and skewness", "Probability basics", "Probability distributions", "Sampling and estimation", "Hypothesis testing", "Correlation and regression"],
+  "business communication": [
+    "Professional Communication in a Digital, Social, Mobile World", "Writing Business Messages", "Completing Business Messages", "Digital Media", "Social Media", "Writing Routine and Positive Messages", "Writing Negative Messages", "Writing Persuasive Messages", "Writing and Completing Reports and Proposals", "Developing Presentations in a Social Media Environment", "Building Careers and Writing Resumes", "Applying and Interviewing for Employment"
+  ],
+  "financial accounting": [
+    "Introduction to Financial Accounting", "Accounting Process & Rules", "Financial Statements", "Preparation of Financial Statements", "Financial Reporting Standards I", "Financial Reporting Standards II", "Corporate Financial Statements", "Statement of Cash Flows", "Analysis of Financial Statement I", "Analysis of Financial Statement II", "Ethics in Accounting", "Emerging Trends in Accounting"
+  ],
+  "micro economics & macro economics": [
+    "Introduction to Microeconomics", "Demand and Supply Analysis", "Elasticity of Demand and Supply", "Consumer Demand Analysis and Demand Forecasting", "Cost and Production Theory", "Introduction to Perfect and Monopoly Market Structure - I", "The Market Structure - II and Market Failure", "Overview of Macroeconomics and Circular Flow of the Economy", "Measuring a Nation's Income", "Determination of National Income through Aggregate Demand and Aggregate Supply", "Keynesian Theory of Income Determination", "Monetary and Fiscal Policy"
+  ],
+  "organizational behavior": [
+    "Introduction to Organizational Behavior", "Evolution and Approaches to Organizational Behavior", "Opportunities and Challenges to Organizational Behavior", "Abilities, Values and Attitude", "Personality and Emotions", "Perception", "Learning and Reinforcement", "Motivation", "Conflict Management", "Stress Management", "Power & Politics in Organizations", "Group Dynamics and Teams", "Leadership", "Organizational Culture and Change", "Organizational Development", "International Context of Organizational Behavior"
+  ],
+  "quantitative methods - i": [
+    "Probability and Probability Concepts", "Discrete Probability Distributions, Binomial and Poisson", "Continuous Probability Distribution - Normal Distribution", "Sampling and Sampling Distribution", "Theory of Estimation", "Testing of Hypothesis", "Testing of Hypothesis - Proportion", "Testing of Hypothesis-Variance, single sample", "Testing of Hypothesis, Variance, Two samples using the F test", "Testing of Hypothesis using ANOVA (Analysis of Variance)", "Correlation and Regression - Single Independent Variable", "Regression with more than one Independent Variables"
+  ],
   "cost & management accounting": ["Cost concepts and classification", "Material and labour cost", "Overhead allocation", "Marginal costing", "Budgetary control", "Standard costing", "Variance analysis", "Decision making with costs"],
   "legal aspect of business": ["Indian Contract Act", "Sale of Goods Act", "Companies Act basics", "Consumer Protection Act", "Competition law", "Intellectual property basics", "Cyber law and data privacy"],
   "business analytics": ["Analytics lifecycle", "Data cleaning and preparation", "Descriptive analytics", "Dashboard and visualisation", "Regression for business", "Forecasting basics", "Customer analytics", "Decision analytics project"],
@@ -702,8 +698,6 @@ Object.assign(TOPIC_BANK, EXTRA_TOPICS, {
 
 /* ============================================================
    FREE-TEXT COURSE → SUBJECT SYNTHESIS
-   Lets a learner type ANY course/exam name and still get a
-   relevant subject list without an LLM key.
 ============================================================ */
 
 const PALETTE = ["#6366f1", "#10b981", "#f59e0b", "#ef4444", "#06b6d4", "#ec4899", "#84cc16", "#8b5cf6"];
@@ -760,11 +754,11 @@ const RULES: Rule[] = [
   { match: /computer|software|\bit\b|informatics|\bcse\b|\bbca\b|\bmca\b|programming|coding/i, subjects: [
     sub("Data Structures", 10, "Hard"), sub("Operating System", 8, "Hard"),
     sub("Database", 8), sub("Computer Networks", 7), sub("Algorithms", 8, "Hard")] },
+  // === NMIMS EXACT RAG REPLACEMENT RULE HERE ===
   { match: /nmims|cdoe|nga-sce|online.*mba.*marketing|distance.*mba.*marketing/i, subjects: [
-    // NMIMS CDOE MBA Marketing-style program structure: core papers + marketing electives.
-    sub("Business Communication", 8, "Medium"), sub("Financial Accounting", 7, "Medium"),
-    sub("Micro Economics", 8, "Hard"), sub("Macro Economics", 8, "Hard"), sub("Organizational Behavior", 8, "Medium"),
-    sub("Marketing Management", 10, "Hard"), sub("Quantitative Methods", 12, "Hard"),
+    sub("Business Communication", 12, "Medium"), sub("Financial Accounting", 12, "Hard"),
+    sub("Micro Economics & Macro Economics", 12, "Hard"), sub("Organizational Behavior", 16, "Medium"),
+    sub("Marketing Management", 12, "Medium"), sub("Quantitative Methods - I", 12, "Hard"),
     sub("Cost & Management Accounting", 8, "Hard"), sub("Human Resource Management", 7, "Medium"),
     sub("Strategic Management", 8, "Hard"), sub("Business Analytics", 8, "Hard"),
     sub("Legal Aspect of Business", 7, "Medium"), sub("Operations Management", 8, "Medium"),
@@ -908,7 +902,6 @@ const CLASS_SETS: Record<string, SeedSubject[]> = {
     sub("Social Science", 12), sub("English", 10), sub("Computer", 6, "Easy")],
 };
 
-/** Last-resort: derive a sensible module list from the course title itself. */
 function nameDerived(courseName: string): SeedSubject[] {
   const clean = (courseName || "Your Course")
     .replace(/\b(diploma|certificate|course|program(me)?|training|in|of|the|for|\d+(st|nd|rd|th)?\s*year|semester)\b/gi, " ")
@@ -924,25 +917,12 @@ function nameDerived(courseName: string): SeedSubject[] {
   ];
 }
 
-/**
- * Build a relevant subject list for ANY free-text course/exam name.
- * Deterministic, keyless, and always returns something usable.
- *
- * Precedence (most specific first):
- *   1. Specific keyword RULES (NMIMS, JEE, NEET, UPSC, ...)
- *   2. "class N" school detection
- *   3. Exact/near-exact COURSE_DB catalogue name match
- *   4. Level default / name-derived scaffold
- * Then a semester/year filter is applied if the user named one.
- */
 export function synthesiseSubjects(courseName: string, level: string): SeedSubject[] {
   const q = (courseName || "").trim();
   let picked: SeedSubject[] | null = null;
 
   const isResearch = /\bphd\b|doctoral|m\.?phil|research schol/i.test(q);
 
-  // 1) SPECIFIC keyword rules FIRST so branded/exam courses beat the fuzzy
-  //    catalogue match (e.g. "MBA Marketing from NMIMS" must not fall to plain MBA).
   let matchedNmims = false;
   if (!picked && !isResearch) {
     const discipline = RULES.find((r) => r.match.test(q));
@@ -952,7 +932,6 @@ export function synthesiseSubjects(courseName: string, level: string): SeedSubje
     }
   }
 
-  // 2) "class 8", "grade 10", "std 12"
   if (!picked) {
     const m = q.match(/(?:class|grade|std|standard)\s*(\d{1,2})/i);
     if (m) {
@@ -969,7 +948,6 @@ export function synthesiseSubjects(courseName: string, level: string): SeedSubje
     }
   }
 
-  // 3) exact / partial match against the catalogue
   if (!picked) {
     const nq = normalise(q);
     if (nq.length > 2) {
@@ -980,7 +958,6 @@ export function synthesiseSubjects(courseName: string, level: string): SeedSubje
     }
   }
 
-  // research degree keeps its discipline but gains a thesis track
   if (!picked && isResearch) {
     const discipline = RULES.find((r) => r.match.test(q) && !/phd|doctoral/.test(r.match.source));
     const base = discipline ? discipline.subjects.slice(0, 3).map((x) => ({ ...x })) : [];
@@ -993,7 +970,6 @@ export function synthesiseSubjects(courseName: string, level: string): SeedSubje
     ];
   }
 
-  // level default
   if (!picked) {
     const fallbackByLevel: Record<string, SeedSubject[]> = {
       nursery: RULES[0].subjects,
@@ -1012,11 +988,7 @@ export function synthesiseSubjects(courseName: string, level: string): SeedSubje
   }
 
   if (picked) {
-    // 3.5) specialisation / optional augmentation — add the named domain paper.
     let list: SeedSubject[] = applySpecialisation(q, picked);
-    // 4) semester / year filter — if the learner named "sem 1" / "year 2" etc.
-    // NMIMS CDOE-style programs default to Semester 1 (the hard constraint for
-    // this course) even if the learner didn't type "semester 1" explicitly.
     const hasExplicitSem = !!(detectSemester(q).sem || detectSemester(q).year);
     const filterQuery = matchedNmims && !hasExplicitSem ? `${q} semester 1` : q;
     list = applySemesterFilter(filterQuery, list);
@@ -1038,13 +1010,9 @@ export function synthesiseSubjects(courseName: string, level: string): SeedSubje
     }));
 }
 
-/**
- * Semester map for the NMIMS-style MBA structure (by normalised subject name).
- * Sem 1-2 = core papers, Sem 3-4 = advanced core + specialisation electives.
- */
 const NMIMS_SEMESTER: Record<string, number> = {
-  "business communication": 1, "financial accounting": 1, "micro economics": 1, "macro economics": 1,
-  "organizational behavior": 1, "marketing management": 1, "quantitative methods": 1,
+  "business communication": 1, "financial accounting": 1, "micro economics & macro economics": 1,
+  "organizational behavior": 1, "marketing management": 1, "quantitative methods - i": 1,
   "cost & management accounting": 2, "human resource management": 2, "strategic management": 2,
   "business analytics": 2, "legal aspect of business": 2, "operations management": 2,
   "corporate finance": 3, "research methodology": 3, "project part i": 3,
@@ -1054,7 +1022,6 @@ const NMIMS_SEMESTER: Record<string, number> = {
   "services marketing": 4, "digital marketing": 4,
 };
 
-/** Detect a semester (1-8) or year (1-4) request in the course text. */
 export function detectSemester(q: string): { sem?: number; year?: number } {
   const semMatch = q.match(/\b(?:sem(?:ester)?)\s*[-:]?\s*(\d)\b/i) || q.match(/\b(\d)(?:st|nd|rd|th)?\s*sem(?:ester)?\b/i);
   const yearMatch = q.match(/\b(?:year)\s*[-:]?\s*(\d)\b/i) || q.match(/\b(\d)(?:st|nd|rd|th)?\s*year\b/i);
@@ -1063,7 +1030,6 @@ export function detectSemester(q: string): { sem?: number; year?: number } {
   return { sem: sem && sem >= 1 && sem <= 8 ? sem : undefined, year: year && year >= 1 && year <= 4 ? year : undefined };
 }
 
-/** UPSC optionals & GATE branches → the actual domain papers to add. */
 const SPECIALISATION_PAPERS: Array<{ re: RegExp; subjects: SeedSubject[] }> = [
   { re: /\bpsir\b|political science.*international/i, subjects: [
     sub("PSIR Paper I: Political Theory", 9, "Hard"), sub("PSIR Paper II: International Relations", 9, "Hard")] },
@@ -1072,7 +1038,6 @@ const SPECIALISATION_PAPERS: Array<{ re: RegExp; subjects: SeedSubject[] }> = [
   { re: /\bhistor/i, subjects: [sub("History Optional Paper I", 9, "Hard"), sub("History Optional Paper II", 9, "Hard")] },
   { re: /\bpub(lic)? ?ad/i, subjects: [sub("Public Administration Paper I", 9, "Hard"), sub("Public Administration Paper II", 9, "Hard")] },
   { re: /\banthropolog/i, subjects: [sub("Anthropology Paper I", 9, "Hard"), sub("Anthropology Paper II", 9, "Hard")] },
-  // GATE branches
   { re: /gate.*\bcse?\b|cse?.*gate|computer science.*gate/i, subjects: [
     sub("Data Structures & Algorithms", 10, "Hard"), sub("Operating Systems", 8, "Hard"),
     sub("DBMS", 8, "Hard"), sub("Computer Networks", 8, "Hard"), sub("Theory of Computation", 8, "Hard"),
@@ -1086,11 +1051,9 @@ const SPECIALISATION_PAPERS: Array<{ re: RegExp; subjects: SeedSubject[] }> = [
 ];
 
 function applySpecialisation(q: string, subjectsList: SeedSubject[]): SeedSubject[] {
-  // Only relevant when the text mentions an optional/specialisation for exams.
   if (!/optional|specialis|paper|gate/i.test(q)) return subjectsList;
   for (const { re, subjects } of SPECIALISATION_PAPERS) {
     if (re.test(q)) {
-      // Put domain papers first, keep the general-studies papers after.
       const names = new Set(subjects.map((s) => normalise(s.name)));
       return [...subjects.map((s) => ({ ...s })), ...subjectsList.filter((s) => !names.has(normalise(s.name)))];
     }
@@ -1101,12 +1064,8 @@ function applySpecialisation(q: string, subjectsList: SeedSubject[]): SeedSubjec
 function applySemesterFilter(q: string, subjectsList: SeedSubject[]): SeedSubject[] {
   const { sem, year } = detectSemester(q);
   if (!sem && !year) return subjectsList;
-
-  // Which semesters to keep. A "year" maps to two semesters.
   const wanted = sem ? [sem] : year ? [year * 2 - 1, year * 2] : [];
   if (!wanted.length) return subjectsList;
-
   const tagged = subjectsList.filter((s) => wanted.includes(NMIMS_SEMESTER[normalise(s.name)]));
-  // Only narrow if the mapping actually recognised these subjects; otherwise keep all.
   return tagged.length >= 3 ? tagged : subjectsList;
 }
