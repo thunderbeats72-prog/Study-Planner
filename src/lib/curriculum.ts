@@ -5,6 +5,15 @@ export type SeedSubject = {
   color: string;
 };
 
+export type GeneratedTopic = {
+  unit: string;
+  title: string;
+  summary: string;
+  objectives: string[];
+  difficulty: "Easy" | "Medium" | "Hard";
+  estMinutes: number;
+};
+
 export type Course = {
   id: string;
   name: string;
@@ -425,9 +434,6 @@ for (const key of Object.keys(LEVEL_COURSES)) {
   );
 }
 
-/* ============================================================
-   TOPIC BANK — lesson-level breakdown for common subjects.
-============================================================ */
 export const TOPIC_BANK: Record<string, string[]> = {
   "alphabet": ["Letters A–E: sounds & tracing", "Letters F–J: sounds & tracing", "Letters K–O: sounds & tracing", "Letters P–T: sounds & tracing", "Letters U–Z: sounds & tracing", "Blending CVC words", "Rhyming sound families", "Picture-to-letter matching"],
   "numbers & counting": ["Counting 1–10 with objects", "Writing numerals 1–10", "Counting 11–20", "Number ordering & comparison", "Simple addition with fingers", "Simple subtraction stories", "Shapes of numbers puzzle"],
@@ -535,7 +541,6 @@ export function normalise(str: string): string {
   return str.toLowerCase().replace(/[^a-z\s&]/g, " ").replace(/\s+/g, " ").trim();
 }
 
-/** Find the best topic bank entry for a subject name. */
 export function lookupTopicBank(subjectName: string): string[] | null {
   const n = normalise(subjectName);
   let best: { key: string; score: number } | null = null;
@@ -546,7 +551,6 @@ export function lookupTopicBank(subjectName: string): string[] | null {
     }
   }
   if (best) return TOPIC_BANK[best.key];
-  // token overlap fallback
   const tokens = n.split(" ").filter((t) => t.length > 3);
   for (const key of Object.keys(TOPIC_BANK)) {
     const kt = key.split(" ");
@@ -572,7 +576,6 @@ const GENERIC_TEMPLATES = [
   "Previous-year question drill — {S}",
 ];
 
-/** Deterministic curriculum synthesis: subject -> ordered lesson list. */
 export function generateTopics(
   subjectName: string,
   unitCount: number,
@@ -633,7 +636,6 @@ function buildObjectives(title: string, subject: string): string[] {
 
 export const KIND_LABEL = KIND_SUFFIX;
 
-// === NMIMS EXACT TEXTBOOK DATA INJECTED HERE SAFELY ===
 Object.assign(TOPIC_BANK, EXTRA_TOPICS, {
   "marketing management": [
     "Marketing: Creating Customer Value and Engagement", "Analyzing the Marketing Environment", "Consumer Markets and Buyer Behavior", "Business Markets and Business Buyer", "Customer Value-Driven Marketing", "Products, Services, and Brands: Building Customer Value", "Developing New Products and Managing the Product Life Cycle", "Pricing: Understanding and Capturing Customer Value", "Pricing Strategies: Additional Considerations", "Marketing Channels: Delivering Customer Value", "Communicating Customer Value: Integrated Marketing Communication Strategy", "Direct, Online, Social Media, and Mobile Marketing"
@@ -696,10 +698,6 @@ Object.assign(TOPIC_BANK, EXTRA_TOPICS, {
   "project part ii": ["Data analysis", "Findings and interpretation", "Recommendations", "Report writing", "Presentation and viva preparation"],
 });
 
-/* ============================================================
-   FREE-TEXT COURSE → SUBJECT SYNTHESIS
-============================================================ */
-
 const PALETTE = ["#6366f1", "#10b981", "#f59e0b", "#ef4444", "#06b6d4", "#ec4899", "#84cc16", "#8b5cf6"];
 
 const sub = (
@@ -754,7 +752,6 @@ const RULES: Rule[] = [
   { match: /computer|software|\bit\b|informatics|\bcse\b|\bbca\b|\bmca\b|programming|coding/i, subjects: [
     sub("Data Structures", 10, "Hard"), sub("Operating System", 8, "Hard"),
     sub("Database", 8), sub("Computer Networks", 7), sub("Algorithms", 8, "Hard")] },
-  // === NMIMS EXACT RAG REPLACEMENT RULE HERE ===
   { match: /nmims|cdoe|nga-sce|online.*mba.*marketing|distance.*mba.*marketing/i, subjects: [
     sub("Business Communication", 12, "Medium"), sub("Financial Accounting", 12, "Hard"),
     sub("Micro Economics & Macro Economics", 12, "Hard"), sub("Organizational Behavior", 16, "Medium"),
