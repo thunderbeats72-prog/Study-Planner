@@ -1,18 +1,16 @@
 import {
   generateTopics,
   synthesiseSubjects,
-  type SeedSubject
+  nmimsSem1Subjects,
+  isNmimsQuery,
+  getNmimsChapters,
+  type SeedSubject,
+  type GeneratedTopic,
 } from "./curriculum";
 import { lookupKnowledge, teachFromKnowledge } from "./knowledge";
 
-export type GeneratedTopic = {
-  unit: string;
-  title: string;
-  summary: string;
-  objectives: string[];
-  difficulty: "Easy" | "Medium" | "Hard";
-  estMinutes: number;
-};
+// Re-export the canonical topic shape so existing imports from "./ai" keep working.
+export type { GeneratedTopic } from "./curriculum";
 
 /* ============================================================
    UNIVERSAL ENVIRONMENT VARIABLE FETCHER
@@ -152,9 +150,27 @@ export async function aiSuggestSubjects(
 ): Promise<{ subjects: SeedSubject[]; source: string }> {
   const fallback = synthesiseSubjects(courseName, level);
   const query = courseName.toLowerCase();
-  
-  if (query.includes("nmims") || query.includes("cdoe")) {
-    return { subjects: fallback, source: "Verified NMIMS Database" };
+
+  // ── GROUND-TRUTH INTERCEPTION (LLM BYPASS) ──────────────────────
+  // NMIMS / CDOE / MBA / Marketing queries never touch the LLM: the
+  // verified Semester 1 catalog (6 subjects, 76 units) is returned
+  // directly so unit counts can never be hallucinated.
+  if (
+    isNmimsQuery(courseName) ||
+    query.includes("nmims") ||
+    query.includes("cdoe") ||
+    query.includes("marketing") ||
+    query.includes("mba")
+  ) {
+    // synthesiseSubjects already resolves NMIMS ground truth (and handles
+    // explicit semester filters); if it returned the locked Sem-1 set use
+    // it as-is, otherwise fall back to the canonical catalog directly.
+    const nmims = isNmimsQuery(courseName);
+    const verified = fallback.length >= 3 ? fallback : nmimsSem1Subjects();
+    return {
+      subjects: verified,
+      source: nmims ? "Verified NMIMS Database" : "Verified Catalog",
+    };
   }
 
   const raw = await callLLM(
@@ -199,8 +215,15 @@ export async function aiGenerateTopics(
   level: string,
   courseName: string
 ): Promise<GeneratedTopic[]> {
-  const query = courseName.toLowerCase() + " " + subjectName.toLowerCase();
-  if (query.includes("nmims") || query.includes("cdoe")) {
+  // ── GROUND-TRUTH INTERCEPTION (LLM BYPASS) ──────────────────────
+  // If this subject belongs to the verified NMIMS catalog, load the exact
+  // textbook chapter titles from the ground-truth bank — never the LLM.
+  // generateTopics() internally locks the unit count to the chapter list.
+  const nmimsChapters = getNmimsChapters(subjectName);
+  if (nmimsChapters) {
+    return generateTopics(subjectName, nmimsChapters.length, difficulty, level);
+  }
+  if (isNmimsQuery(courseName) || isNmimsQuery(subjectName)) {
     return generateTopics(subjectName, units, difficulty, level);
   }
 
