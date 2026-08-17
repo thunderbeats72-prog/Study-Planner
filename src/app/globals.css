@@ -69,6 +69,20 @@ body{
   background:linear-gradient(100deg,var(--text-main) 55%,var(--accent) 130%);
   -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
 }
+/* Emoji inside gradient-clipped titles must opt back into normal color
+   rendering, otherwise background-clip:text turns them into flat
+   gradient silhouettes. */
+.page-title .wave-emoji{
+  -webkit-text-fill-color:initial;background:none;-webkit-background-clip:initial;background-clip:initial;
+  display:inline-block;margin-left:10px;
+  animation:waveHand 2.2s ease-in-out 0.6s 1;transform-origin:70% 75%;
+}
+@keyframes waveHand{
+  0%,100%{transform:rotate(0)}
+  10%{transform:rotate(16deg)}20%{transform:rotate(-8deg)}
+  30%{transform:rotate(14deg)}40%{transform:rotate(-6deg)}
+  50%{transform:rotate(10deg)}60%{transform:rotate(0)}
+}
 .page-subtitle{font-size:.85rem;color:var(--text-muted);font-weight:550;margin:4px 0 0}
 
 /* ============ CONTROLS ============ */
@@ -227,13 +241,17 @@ select.input-field{appearance:none;background-image:linear-gradient(45deg,transp
 .tracker-bar{
   margin-bottom:24px;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;gap:14px;
   position:sticky;top:12px;z-index:60;flex-wrap:wrap;
-  background:linear-gradient(120deg,var(--surface) 0%,var(--surface-hover) 100%);
-  backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);
+  /* Near-opaque: sticky bars sit OVER scrolling content, so a translucent
+     surface makes underlying text bleed through and fight the bar's own
+     labels. Solid surface + heavy blur keeps the premium glass look while
+     guaranteeing legibility in every theme. */
+  background:color-mix(in srgb, var(--surface-solid) 92%, transparent);
+  backdrop-filter:blur(28px) saturate(180%);-webkit-backdrop-filter:blur(28px) saturate(180%);
   border:1px solid var(--glass-border);border-radius:999px;
-  box-shadow:0 8px 32px rgba(30,27,75,.08),inset 0 1px 0 rgba(255,255,255,.35);
+  box-shadow:0 10px 36px rgba(30,27,75,.12),inset 0 1px 0 rgba(255,255,255,.35);
   transition:box-shadow .4s ease,transform .4s ease;
 }
-.tracker-bar:hover{box-shadow:0 14px 44px rgba(30,27,75,.13),inset 0 1px 0 rgba(255,255,255,.45)}
+.tracker-bar:hover{box-shadow:0 14px 44px rgba(30,27,75,.16),inset 0 1px 0 rgba(255,255,255,.45)}
 .tracker-bar::before{
   content:"";position:absolute;inset:0;border-radius:inherit;padding:1px;pointer-events:none;
   background:linear-gradient(120deg,var(--accent-glow),transparent 40%,transparent 60%,var(--accent-glow));
@@ -474,19 +492,38 @@ select.input-field{appearance:none;background-image:linear-gradient(45deg,transp
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
 }
 .kpi-card {
-  border-left: 3px solid var(--accent);
+  position: relative;
+  border-left: none;
+  overflow: hidden;
+  transition: transform .3s cubic-bezier(.22,1,.36,1), box-shadow .3s ease;
+}
+.kpi-card::before {
+  content: "";
+  position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  background: var(--accent-gradient);
+  opacity: .85;
+}
+.kpi-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--glass-shadow-hover);
 }
 .kpi-value {
-  font-family: 'Inter', sans-serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   letter-spacing: -1.5px;
+  font-variant-numeric: tabular-nums;
 }
+/* Smooth cross-fade when switching themes */
+body { transition: background-color .5s ease, color .3s ease; }
+::selection { background: var(--accent-glow); color: var(--text-main); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
 
 .cmdk {
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.5);
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(28px);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--surface-solid) 96%, transparent);
+  backdrop-filter: blur(28px) saturate(170%);
+  -webkit-backdrop-filter: blur(28px) saturate(170%);
 }
 .cmdk-item:hover, .cmdk-item.active {
   background: var(--accent-gradient);
@@ -497,8 +534,8 @@ select.input-field{appearance:none;background-image:linear-gradient(45deg,transp
 }
 .task-row.active-clock {
   border-color: var(--success-accent);
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.06), rgba(255, 255, 255, 0.9));
-  box-shadow: 0 8px 24px rgba(34, 197, 94, 0.08);
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), var(--row-hover));
+  box-shadow: 0 8px 24px rgba(34, 197, 94, 0.1);
 }
 ::-webkit-scrollbar {
   width: 6px;
