@@ -61,9 +61,9 @@ export default function PlannerView({
 
   const t = today();
 
-  // Mathematical pacing calculation
+  // Pacing calculations
   const pacing = useMemo(() => {
-    const totalUnits = state.subjects.reduce((sum, s) => sum + (s.units || 10), 0);
+    const totalUnits = state.subjects.reduce((sum, s) => sum + ((s as any).units || 10), 0);
     const minutesPerUnit = 70;
     const totalEstimatedMinutes = totalUnits * minutesPerUnit;
     const dailyMinutesBudget = Math.max(30, Math.round((state.settings.dailyHours || 2) * 60));
@@ -215,7 +215,7 @@ export default function PlannerView({
           ) : (
             groupedTasksByDate.map(([dateStr, tasks]) => {
               const isToday = dateStr === t;
-              const totalMins = tasks.reduce((sum, task) => sum + task.minutes, 0);
+              const totalMins = tasks.reduce((sum, task) => sum + ((task as any).duration ?? (task as any).minutes ?? 45), 0);
               const doneCount = tasks.filter((task) => task.status === "done").length;
 
               return (
@@ -249,6 +249,7 @@ export default function PlannerView({
                       const isClockedIn = activeTaskId === task.id;
                       const sub = state.subjects.find((s) => s.id === task.subjectId);
                       const subColor = sub?.color || "var(--accent)";
+                      const durationVal = (task as any).duration ?? (task as any).minutes ?? 45;
 
                       return (
                         <div
@@ -261,7 +262,7 @@ export default function PlannerView({
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div className="task-title">{task.title}</div>
                             <span className="task-sub">
-                              {task.kind.toUpperCase()} · {task.minutes} min · {task.difficulty || "Medium"}
+                              {(task.kind || "lesson").toUpperCase()} · {durationVal} min · {(task as any).difficulty || "Medium"}
                             </span>
                           </div>
 
@@ -389,6 +390,8 @@ export default function PlannerView({
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {tasksInCol.map((task) => {
                     const sub = state.subjects.find((s) => s.id === task.subjectId);
+                    const durationVal = (task as any).duration ?? (task as any).minutes ?? 45;
+
                     return (
                       <div
                         key={task.id}
@@ -400,7 +403,7 @@ export default function PlannerView({
                             {task.title}
                           </div>
                           <span className="task-sub">
-                            {prettyDate(task.date)} · {task.minutes} min
+                            {prettyDate(task.date)} · {durationVal} min
                           </span>
                         </div>
                         <div className="task-actions">
@@ -444,33 +447,36 @@ export default function PlannerView({
               {selectedDayTasks.tasks.length === 0 ? (
                 <p style={{ color: "var(--text-muted)" }}>No tasks scheduled for this date.</p>
               ) : (
-                selectedDayTasks.tasks.map((task) => (
-                  <div key={task.id} className="task-row">
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div className="task-title">{task.title}</div>
-                      <span className="task-sub">
-                        {task.minutes} min · {task.kind.toUpperCase()}
-                      </span>
+                selectedDayTasks.tasks.map((task) => {
+                  const durationVal = (task as any).duration ?? (task as any).minutes ?? 45;
+                  return (
+                    <div key={task.id} className="task-row">
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div className="task-title">{task.title}</div>
+                        <span className="task-sub">
+                          {durationVal} min · {(task.kind || "lesson").toUpperCase()}
+                        </span>
+                      </div>
+                      <div className="task-actions">
+                        <button
+                          className="btn btn-xs btn-primary"
+                          onClick={() => {
+                            onFocusTask(task.id);
+                            setSelectedDayTasks(null);
+                          }}
+                        >
+                          Clock In
+                        </button>
+                        <button
+                          className="btn btn-xs btn-secondary"
+                          onClick={() => onTaskStatus(task.id, "done")}
+                        >
+                          Done
+                        </button>
+                      </div>
                     </div>
-                    <div className="task-actions">
-                      <button
-                        className="btn btn-xs btn-primary"
-                        onClick={() => {
-                          onFocusTask(task.id);
-                          setSelectedDayTasks(null);
-                        }}
-                      >
-                        Clock In
-                      </button>
-                      <button
-                        className="btn btn-xs btn-secondary"
-                        onClick={() => onTaskStatus(task.id, "done")}
-                      >
-                        Done
-                      </button>
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>
