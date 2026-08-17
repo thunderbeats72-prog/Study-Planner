@@ -3,6 +3,7 @@ import { subjects, topics, tasks } from "@/db/schema";
 import { and, eq, inArray } from "drizzle-orm";
 import { aiGenerateTopics } from "./ai";
 import { buildPlan, todayStr, diffDays, type PlanSettings, type PlanTopic } from "./planner";
+import { learnPace, learnWeekdays, paceFor, weekdayLoadFactor, decayedMastery } from "./ml";
 
 export async function synthesiseTopicsForSubject(
   userId: number,
@@ -58,6 +59,36 @@ export async function regeneratePlan(userId: number, settingsRow: {
   const start =
     opts.fromToday || diffDays(settingsRow.startDate, today) > 0 ? today : settingsRow.startDate;
 
+  // ── ML: learn from this user's complete task history ────────
+  // 1. PACE — how long they ACTUALLY take vs planned, per subject.
+  // 2. WEEKDAYS — which days of the week they historically complete.
+  // 3. DECAY — mastery fades for topics untouched for a long time,
+  //    so old "done" work resurfaces in revision with priority.
+  const allHistory = await db.select().from(tasks).where(eq(tasks.userId, userId));
+  const historyRows = allHistory.map((t) => ({
+    subjectId: t.subjectId,
+    date: t.date,
+    kind: t.kind,
+    status: t.status,
+    plannedMinutes: t.plannedMinutes,
+    actualMinutes: t.actualMinutes,
+  }));
+  const pace = learnPace(historyRows);
+  const weekdays = learnWeekdays(historyRows);
+
+  // Last date each topic was actually worked on (for mastery decay)
+  const lastTouch = new Map<number, string>();
+  for (const t of allHistory) {
+    if (t.topicId && t.status === "done") {
+      const prev = lastTouch.get(t.topicId);
+      if (!prev || t.date > prev) lastTouch.set(t.topicId, t.date);
+    }
+  }
+  const daysSince = (topicId: number): number => {
+    const d = lastTouch.get(topicId);
+    return d ? Math.max(0, diffDays(d, today)) : 0;
+  };
+
   const pending: PlanTopic[] = tps
     .filter((t) => !doneTopicIds.has(t.id) && t.status !== "done")
     .sort((a, b) => a.position - b.position)
@@ -66,16 +97,21 @@ export async function regeneratePlan(userId: number, settingsRow: {
       subjectId: t.subjectId,
       title: t.title,
       unit: t.unit,
-      estMinutes: t.estMinutes,
+      // ML pace adjustment: schedule the time THIS user actually needs.
+      // Neutral (×1.0) until ~5 completed tasks exist for the subject.
+      estMinutes: Math.round((t.estMinutes * paceFor(pace, t.subjectId)) / 5) * 5,
       difficulty: t.difficulty,
-      mastery: t.mastery,
+      // ML decay: long-untouched topics report lower effective mastery,
+      // which pushes them up the revision priority queue.
+      mastery: decayedMastery(t.mastery, daysSince(t.id)),
     }));
 
   const ps: PlanSettings = { ...settingsRow, startDate: start };
   const result = buildPlan(
     subs.map((s) => ({ id: s.id, name: s.name, difficulty: s.difficulty, color: s.color })),
     pending,
-    ps
+    ps,
+    { dayFactor: (date) => weekdayLoadFactor(weekdays, date) }
   );
 
   // wipe only future/pending tasks, keep history
