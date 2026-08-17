@@ -167,11 +167,21 @@ export type PlanResult = {
 
 // ── Main scheduler ──────────────────────────────────────────
 
+export type MlHooks = {
+  /**
+   * Per-date capacity multiplier learned from the user's weekday
+   * completion history (e.g. 0.8 on days they historically under-deliver).
+   */
+  dayFactor?: (date: string) => number;
+};
+
 export function buildPlan(
   subjects: PlanSubject[],
   topics: PlanTopic[],
-  st: PlanSettings
+  st: PlanSettings,
+  ml: MlHooks = {}
 ): PlanResult {
+  const dayFactor = ml.dayFactor ?? (() => 1);
   // ── 1. Enumerate every valid study day in the window ──────
 
   const allStudyDates: string[] = [];
@@ -251,7 +261,15 @@ export function buildPlan(
       )
     : learnDates.length;
 
-  const availableMinutes = targetLearnDayCount * dailyCap * LEARN_CAPACITY_RATIO;
+  // Average ML day-factor across the learn window, so reduced-capacity
+  // days (weekday propensity model) are priced into the load math and
+  // lessons compress accordingly instead of falling off the schedule.
+  const avgDayFactor =
+    learnDates.length > 0
+      ? learnDates.reduce((a, dt) => a + dayFactor(dt), 0) / learnDates.length
+      : 1;
+
+  const availableMinutes = targetLearnDayCount * dailyCap * LEARN_CAPACITY_RATIO * avgDayFactor;
   const loadRatio = availableMinutes > 0 ? requiredMinutes / availableMinutes : 99;
 
   // If we are overloaded, compress every lesson proportionally so all
@@ -301,7 +319,9 @@ export function buildPlan(
   if (st.planMode !== "revision") {
     for (let d = 0; d < learnDates.length; d++) {
       const date = learnDates[d];
-      let remaining = dailyCap;
+      // ML: shrink/grow the day's capacity based on the user's historical
+      // completion propensity for this weekday (1.0 until enough history).
+      let remaining = Math.round(dailyCap * dayFactor(date));
       let pos = 0;
 
       // ── 8a. Spaced-repetition recalls due today (up to 3) ──
@@ -487,6 +507,53 @@ export function buildPlan(
           detail, plannedMinutes: mins, position: pos++,
         });
         guardFill++;
+      }
+    }
+
+    // ── 8e. GUARANTEED SWEEP — no lesson is ever silently dropped ──
+    //
+    // Slot mechanics, spaced-review overhead and ML day-factors can leave
+    // a handful of lessons unplaced at the end of the main loop. Rather
+    // than dropping them (the old failure mode), spread each leftover
+    // onto the currently least-loaded learn day. A mildly fuller day is
+    // always better than a hole in the syllabus.
+
+    const leftovers: { s: PlanSubject; t: PlanTopic }[] = [];
+    for (const s of subjects) {
+      const q = queues.get(s.id) || [];
+      while (q.length) leftovers.push({ s, t: q.shift()! });
+    }
+    if (leftovers.length) {
+      const usedByDate = new Map<string, number>();
+      const posByDate = new Map<string, number>();
+      for (const dt of learnDates) usedByDate.set(dt, 0);
+      for (const tk of tasks) {
+        if (usedByDate.has(tk.date)) {
+          usedByDate.set(tk.date, (usedByDate.get(tk.date) || 0) + tk.plannedMinutes);
+          posByDate.set(tk.date, Math.max(posByDate.get(tk.date) || 0, tk.position + 1));
+        }
+      }
+      for (const { s, t } of leftovers) {
+        let bestDate = learnDates[learnDates.length - 1];
+        let bestUsed = Infinity;
+        for (const dt of learnDates) {
+          const u = usedByDate.get(dt) || 0;
+          if (u < bestUsed) { bestUsed = u; bestDate = dt; }
+        }
+        const rawMins = t.estMinutes * styleMul * compress;
+        const mins = Math.max(15, Math.round(rawMins / 5) * 5);
+        const p = posByDate.get(bestDate) || 0;
+        tasks.push({
+          date: bestDate, subjectId: s.id, topicId: t.id, kind: "learn",
+          title: `${s.name}: ${t.title}`,
+          detail: `${t.unit} • ${t.difficulty}. Learn the concept, then attempt practice questions before marking done.`,
+          plannedMinutes: mins, position: p,
+        });
+        posByDate.set(bestDate, p + 1);
+        usedByDate.set(bestDate, bestUsed + mins);
+        scheduledCount++;
+        learned.push(t);
+        if (!lastLearnDate || bestDate > lastLearnDate) lastLearnDate = bestDate;
       }
     }
   }
