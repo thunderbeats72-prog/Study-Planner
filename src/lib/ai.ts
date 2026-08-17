@@ -273,18 +273,29 @@ function percentQ(q: string): string | null {
 }
 
 export function parseCommand(q: string): TutorReply["action"] | undefined {
-  const n = q.toLowerCase().trim().replace(/[.!]+$/, "");
+  const n = q.toLowerCase().trim().replace(/[.!?]+$/, "");
+
+  // ── Break / timer state transitions (checked BEFORE navigation so
+  //    "resume", "end break", "pause" never get mis-routed) ──
+  if (/\b(resume|end (my |the )?break|back from (my |the )?break|break('?s)? over|continue (the )?(session|timer|studying))\b/.test(n)) return { type: "resume" };
+  if (/\b(pause (the )?(timer|clock|session)|pause\b|hold (the )?timer)\b/.test(n) && !/\bbreak\b/.test(n)) return { type: "pause" };
+  if (/\b(take a break|break time|need a break|short break|give me a break)\b/.test(n)) return { type: "break" };
+
+  // ── Navigation ──
   if (/\b(planner|schedule|my plan|timetable)\b/.test(n) && /\b(open|go|show|view|take me|see)\b/.test(n)) return { type: "navigate", payload: "planner" };
   if (/\b(dashboard|overview|home|stats?)\b/.test(n) && /\b(open|go|show|view|take me|see)\b/.test(n)) return { type: "navigate", payload: "dashboard" };
   if (/\b(subjects?|syllabus|topics?|lessons?)\b/.test(n) && /\b(open|go|show|view|manage|edit)\b/.test(n)) return { type: "navigate", payload: "subjects" };
   if (/\b(settings?|preferences?|options?|profile)\b/.test(n) && /\b(open|go|show|change|edit)\b/.test(n)) return { type: "navigate", payload: "settings" };
+  if (/\b(focus( page| view| tab)?|pomodoro)\b/.test(n) && /\b(open|go|show|view|take me|see)\b/.test(n)) return { type: "navigate", payload: "focus" };
   if (/^\/?(planner|schedule)$/.test(n)) return { type: "navigate", payload: "planner" };
   if (/^\/?(dashboard|overview)$/.test(n)) return { type: "navigate", payload: "dashboard" };
   if (/^\/?(subjects|syllabus)$/.test(n)) return { type: "navigate", payload: "subjects" };
   if (/^\/?(settings)$/.test(n)) return { type: "navigate", payload: "settings" };
+  if (/^\/?(focus|pomodoro)$/.test(n)) return { type: "navigate", payload: "focus" };
+
+  // ── Clock ──
   if (/\b(clock ?in|start (the )?(timer|clock|focus|session|studying|study)|begin (studying|session|focus)|let'?s study|i'?m ready to study)\b/.test(n)) return { type: "startTimer" };
   if (/\b(clock ?out|stop (the )?(timer|clock|session)|end (the )?(session|study)|i'?m done|finished studying)\b/.test(n)) return { type: "stopTimer" };
-  if (/\b(take a break|break time|pause (the )?(timer|clock|session)|need a break)\b/.test(n)) return { type: "break" };
   if (/\b(zen|focus mode|full ?screen|distraction ?free|deep work mode)\b/.test(n)) return { type: "zen" };
   if (/\b(re-?plan|rebuild|regenerate|reschedule|re-?balance|redo my (plan|schedule)|fix my (plan|schedule)|update my plan)\b/.test(n)) return { type: "replan" };
 
@@ -314,6 +325,8 @@ export async function localTutor(q: string, ctx: TutorContext): Promise<TutorRep
       startTimer: `Clock started. Session logged against your current subject.`,
       stopTimer: `Session logged. Well done.`,
       break: `Break started. Hydrate and relax for a few minutes.`,
+      pause: `Timer paused. Say "resume" when ready.`,
+      resume: `Resumed — back on the clock.`,
       zen: `Zen mode active.`,
       theme: `Theme updated.`,
     };
