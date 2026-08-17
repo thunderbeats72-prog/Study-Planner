@@ -72,7 +72,7 @@ export default function Dashboard({
     <div className="fade-in">
       <div className="page-header">
         <div>
-          <h1 className="page-title">Hey {state.user.name} 👋</h1>
+          <h1 className="page-title">Hey {state.user.name}<span className="wave-emoji">👋</span></h1>
           <p className="page-subtitle">
             {ctx.daysLeft} days to {prettyLong(state.settings.examDate)} · {state.user.courseName}
           </p>
