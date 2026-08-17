@@ -192,6 +192,8 @@ export default function Home() {
           if (a.type === "navigate") setPage(String(a.payload) as Page);
           if (a.type === "startTimer") { if (!clock.running) startSmartClock(); }
           if (a.type === "stopTimer") { if (clock.running) clock.clockOut(); }
+          if (a.type === "pause") { if (clock.running) clock.pause(); else notify("No session running to pause."); }
+          if (a.type === "resume") { if (clock.onBreak) clock.endBreak(); else if (!clock.running) startSmartClock(); }
           if (a.type === "break") { if (clock.running) clock.takeBreak(); else notify("Start a session first, then take a break."); }
           if (a.type === "zen") setZen(true);
           if (a.type === "replan") { void replan(); }
