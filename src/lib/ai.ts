@@ -1,5 +1,18 @@
-import { generateTopics, lookupTopicBank, synthesiseSubjects, type GeneratedTopic, type SeedSubject } from "./curriculum";
+import {
+  generateTopics,
+  synthesiseSubjects,
+  type SeedSubject
+} from "./curriculum";
 import { lookupKnowledge, teachFromKnowledge } from "./knowledge";
+
+export type GeneratedTopic = {
+  unit: string;
+  title: string;
+  summary: string;
+  objectives: string[];
+  difficulty: "Easy" | "Medium" | "Hard";
+  estMinutes: number;
+};
 
 /* ============================================================
    UNIVERSAL ENVIRONMENT VARIABLE FETCHER
@@ -30,7 +43,7 @@ export function activeProvider(): string | null {
 }
 
 /* ============================================================
-   LLM CALLER — Gemini → Groq → OpenRouter fallback chain
+   LLM CALLER — Gemini → Groq → OpenRouter Fallback Chain
 ============================================================ */
 export async function callLLM(
   system: string,
@@ -117,9 +130,6 @@ export async function callLLM(
   return null;
 }
 
-/* ============================================================
-   JSON EXTRACTION
-============================================================ */
 function extractJson<T>(raw: string): T | null {
   const fence = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
   const body = fence ? fence[1] : raw;
@@ -134,64 +144,26 @@ function extractJson<T>(raw: string): T | null {
 }
 
 /* ============================================================
-   BROCHURE-ACCURATE HARD CONSTRAINTS
+   AI SUBJECT MATCHER
 ============================================================ */
-function enforceBrochureConstraints(parsedSubjects: SeedSubject[]): SeedSubject[] {
-  // This physically forces the exact NMIMS CDOE Semester 1 structure
-  const requiredSyllabus = [
-    { name: "Business Communication", units: 0 },
-    { name: "Financial Accounting", units: 0 },
-    { name: "Micro Economics & Macro Economics", units: 0 }, // Forces them combined
-    { name: "Organizational Behavior", units: 16 }, // Forces exactly 16 units
-    { name: "Marketing Management", units: 0 },
-    { name: "Quantitative Methods - I", units: 12 } // Forces exactly 12 units
-  ];
-
-  const palette = ["#6366f1", "#10b981", "#f59e0b", "#ef4444", "#06b6d4", "#ec4899", "#84cc16"];
-  const out: SeedSubject[] = [];
-
-  for (let i = 0; i < requiredSyllabus.length; i++) {
-    const req = requiredSyllabus[i];
-    // Find the closest match from AI to retain its generated difficulty
-    const match = parsedSubjects.find(s => 
-      s.name.toLowerCase().includes(req.name.toLowerCase().split(" ")[0]) || 
-      s.name.toLowerCase().includes("quant") || s.name.toLowerCase().includes("micro")
-    );
-
-    let finalUnits = req.units > 0 ? req.units : (match?.units || 10);
-    finalUnits = Math.min(40, Math.max(2, finalUnits)); // Ensure valid numbers
-
-    out.push({
-      name: req.name,
-      units: finalUnits,
-      difficulty: match?.difficulty || "Medium",
-      color: palette[i % palette.length]
-    });
-  }
-  return out;
-}
-
 export async function aiSuggestSubjects(
   courseName: string,
   level: string
 ): Promise<{ subjects: SeedSubject[]; source: string }> {
   const fallback = synthesiseSubjects(courseName, level);
+  const query = courseName.toLowerCase();
+  
+  if (query.includes("nmims") || query.includes("cdoe")) {
+    return { subjects: fallback, source: "Verified NMIMS Database" };
+  }
 
   const raw = await callLLM(
-    "You are an elite academic curriculum planner. Return a strict JSON array ONLY. DO NOT output conversational text, explanations, or markdown fences outside the JSON.",
+    "You are an academic curriculum planner. Return a strict JSON array ONLY.",
     [
       {
         role: "user",
         content: `Course/exam: "${courseName}". Education level: ${level}.
-        Based on the official NMIMS CDOE Semester 1 curriculum, you MUST return exactly these 6 core subjects:
-        1. "Business Communication"
-        2. "Financial Accounting"
-        3. "Micro Economics & Macro Economics" (THIS IS A SINGLE COMBINED SUBJECT)
-        4. "Organizational Behavior" (Must be exactly 16 units)
-        5. "Marketing Management"
-        6. "Quantitative Methods - I" (MUST BE EXACTLY 12 UNITS).
-
-        Output format MUST be EXACTLY:
+        Generate the core subjects for Semester 1 as a JSON array:
         [{"name":"Exact Subject Name","units":12,"difficulty":"Medium","color":"#6366f1"}]`
       }
     ],
@@ -203,7 +175,13 @@ export async function aiSuggestSubjects(
   try {
     const parsed = extractJson<SeedSubject[]>(raw);
     if (Array.isArray(parsed) && parsed.length > 0) {
-      const validated = enforceBrochureConstraints(parsed);
+      const palette = ["#6366f1", "#10b981", "#f59e0b", "#ef4444", "#06b6d4", "#ec4899", "#84cc16"];
+      const validated = parsed.slice(0, 8).map((s, i) => ({
+        name: String(s.name).slice(0, 80),
+        units: Math.min(40, Math.max(2, Number(s.units) || 8)),
+        difficulty: (["Easy", "Medium", "Hard"].includes(String(s.difficulty)) ? s.difficulty : "Medium") as SeedSubject["difficulty"],
+        color: palette[i % palette.length],
+      }));
       return { subjects: validated, source: "AI Cloud Database" };
     }
   } catch { /* fall through */ }
@@ -211,6 +189,9 @@ export async function aiSuggestSubjects(
   return { subjects: fallback, source: "aether-local" };
 }
 
+/* ============================================================
+   TOPIC RESOLUTION
+============================================================ */
 export async function aiGenerateTopics(
   subjectName: string,
   units: number,
@@ -218,17 +199,20 @@ export async function aiGenerateTopics(
   level: string,
   courseName: string
 ): Promise<GeneratedTopic[]> {
-  const fallback = generateTopics(subjectName, units, difficulty, level);
+  const query = courseName.toLowerCase() + " " + subjectName.toLowerCase();
+  if (query.includes("nmims") || query.includes("cdoe")) {
+    return generateTopics(subjectName, units, difficulty, level);
+  }
 
+  const fallback = generateTopics(subjectName, units, difficulty, level);
   const raw = await callLLM(
-    `You are a strict curriculum architect. Return a strict JSON array ONLY. Do NOT output conversational text, pleasantries, or markdown fences outside the JSON.`,
+    `You are a strict curriculum architect. Return a strict JSON array ONLY.`,
     [
       {
         role: "user",
-        content: `Course: ${courseName} (level: ${level}). Subject: "${subjectName}". Canonical unit count: ${units}. Difficulty: ${difficulty}.
-        Generate exactly ${units} sequential lessons.
-        Format: [{"unit":"Unit 1","title":"...","summary":"2-sentence instruction","objectives":["..."],"difficulty":"Medium","estMinutes":45}]
-        JSON ARRAY ONLY.`,
+        content: `Subject: "${subjectName}". Canonical unit count: ${units}. Difficulty: ${difficulty}.
+        Generate exactly ${units} lessons.
+        Format: [{"unit":"Unit 1","title":"...","summary":"...","objectives":["..."],"difficulty":"Medium","estMinutes":45}]`,
       },
     ],
     Math.min(4000, 800 + units * 120)
@@ -239,15 +223,12 @@ export async function aiGenerateTopics(
   const parsed = extractJson<GeneratedTopic[]>(raw);
   if (!parsed || !Array.isArray(parsed) || parsed.length < 2) return fallback;
 
-  const maxLessons = units * 2;
-  return parsed.slice(0, maxLessons).map((t, i) => ({
+  return parsed.slice(0, units).map((t, i) => ({
     unit: t.unit || `Unit ${i + 1}`,
     title: String(t.title || fallback[i]?.title || `Lesson ${i + 1}`).slice(0, 160),
     summary: String(t.summary || fallback[i]?.summary || ""),
     objectives: Array.isArray(t.objectives) ? t.objectives.slice(0, 4).map(String) : [],
-    difficulty: (["Easy", "Medium", "Hard"].includes(String(t.difficulty))
-      ? t.difficulty
-      : "Medium") as "Easy" | "Medium" | "Hard",
+    difficulty: (["Easy", "Medium", "Hard"].includes(String(t.difficulty)) ? t.difficulty : "Medium") as "Easy" | "Medium" | "Hard",
     estMinutes: Math.min(180, Math.max(15, Number(t.estMinutes) || 45)),
   }));
 }
@@ -302,27 +283,28 @@ export async function localTutor(q: string, ctx: TutorContext): Promise<TutorRep
   const n = q.toLowerCase();
 
   if (action?.type === "replan") {
-    return { text: `No problem. I'm rebalancing your schedule now. Give me a second...`, action };
+    return { text: `Schedule rebalanced against your remaining syllabus.`, action };
   }
   if (action) {
     const msgs: Record<string, string> = {
       navigate: `Opening **${String(action.payload)}** for you.`,
-      startTimer: `Clock started. Session logged against your current subject. Put the phone in another room.`,
-      stopTimer: `Session stopped and logged. Nice work.`,
-      break: `Break started. Stand up, look 6 metres away for 20 seconds, drink water.`,
-      zen: `Zen mode engaged. Nothing on screen but the timer.`,
-      theme: `Theme changed instantly.`,
+      startTimer: `Clock started. Session logged against your current subject.`,
+      stopTimer: `Session logged. Well done.`,
+      break: `Break started. Hydrate and relax for a few minutes.`,
+      zen: `Zen mode active.`,
+      theme: `Theme updated.`,
     };
     return { text: msgs[action.type] || "Done.", action };
   }
 
   if (/(what|which).*(today|now)|today'?s (plan|task|study|load)|what should i (study|do)/.test(n)) {
-    if (!ctx.today.length) return { text: `Nothing is scheduled for today.` };
-    const list = ctx.today.map((t, i) => `${i + 1}. **${t.title}**   ${t.minutes} min`).join("\n");
-    return { text: `Here's today:\n\n${list}\n\nStart with #1. Say *"start timer"* and I'll clock you in.` };
+    if (!ctx.today.length) return { text: `Nothing scheduled for today.` };
+    const list = ctx.today.map((t, i) => `${i + 1}. **${t.title}** (${t.minutes} min)`).join("\n");
+    return { text: `Here is today's schedule:\n\n${list}\n\nSay *"start timer"* to begin.` };
   }
 
-  const pct = percentQ(q); if (pct) return { text: pct };
+  const pct = percentQ(q);
+  if (pct) return { text: pct };
 
   const aiResponse = await callLLM(tutorSystemPrompt(ctx), [{ role: "user", content: q }], 800);
   if (aiResponse) return { text: aiResponse };
@@ -331,9 +313,11 @@ export async function localTutor(q: string, ctx: TutorContext): Promise<TutorRep
   const knowledge = await lookupKnowledge(q);
   if (knowledge) return { text: teachFromKnowledge(knowledge, q, ctx.level, subjectHint) };
 
-  return { text: `I couldn't reach any AI servers. Try asking me to explain a specific concept.` };
+  return { text: `Ask me to explain any concept from your subjects or say *"what should I study today?"*` };
 }
 
 export function tutorSystemPrompt(ctx: TutorContext): string {
-  return `You are AETHER, the built-in AI tutor and study coach. Learner: ${ctx.name}. Rules: Be conversational. Use markdown. Teach, don't just give answers.`;
+  return `You are AETHER, the built-in study coach for Study Planner Pro.
+Learner: ${ctx.name}. Course: ${ctx.courseName}. Days Left: ${ctx.daysLeft}. Progress: ${ctx.progressPct}%.
+Teach step-by-step using clear markdown formatting.`;
 }
