@@ -654,13 +654,162 @@ body.theme-dark .input-field {
   }
 }
 .btn-secondary {
-  background: rgba(255, 255, 255, 0.95) !important;
-  border: 1px solid rgba(0, 0, 0, 0.25) !important;
-  color: #000 !important;
+  background: color-mix(in srgb, var(--surface-solid) 96%, transparent) !important;
+  border: 1px solid var(--glass-border-hover) !important;
+  color: var(--text-main) !important;
   font-weight: 800 !important;
 }
-body.theme-dark .btn-secondary {
-  background: rgba(40, 40, 45, 0.98) !important;
-  border: 1px solid rgba(255, 255, 255, 0.4) !important;
-  color: #fff !important;
+
+/* ==================================================
+   LIQUID GLASS LAYER — Apple-style glass morphism
+   Rim light + specular highlight + saturated refraction
+   blur + iOS spring physics. Fully theme-aware.
+================================================== */
+:root{
+  /* iOS spring curves */
+  --spring: cubic-bezier(.34,1.56,.64,1);       /* gentle overshoot */
+  --spring-soft: cubic-bezier(.22,1,.36,1);      /* settle, no bounce */
+  --lg-rim: rgba(255,255,255,.65);
+  --lg-rim-faint: rgba(255,255,255,.25);
+  --lg-shine: linear-gradient(115deg,rgba(255,255,255,.5) 0%,rgba(255,255,255,.12) 28%,transparent 45%);
+}
+body.theme-dark,body.theme-obsidian,body.theme-nebula{
+  --lg-rim: rgba(255,255,255,.28);
+  --lg-rim-faint: rgba(255,255,255,.1);
+  --lg-shine: linear-gradient(115deg,rgba(255,255,255,.16) 0%,rgba(255,255,255,.05) 28%,transparent 45%);
+}
+
+/* ── Core liquid-glass surface: refraction blur + top rim light ── */
+.glass-panel,.tracker-bar,.ai-panel,.cmdk,.modal-box{
+  backdrop-filter: blur(28px) saturate(190%) brightness(1.04);
+  -webkit-backdrop-filter: blur(28px) saturate(190%) brightness(1.04);
+  box-shadow:
+    0 12px 40px rgba(30,27,75,.1),
+    inset 0 1px 0 var(--lg-rim),               /* top specular rim */
+    inset 0 -1px 0 rgba(0,0,0,.04),            /* bottom grounding */
+    inset 1px 0 0 var(--lg-rim-faint),         /* left edge catch */
+    inset -1px 0 0 var(--lg-rim-faint);        /* right edge catch */
+}
+
+/* ── Specular sheen sweeping the top of primary surfaces ── */
+.tracker-bar::after{
+  content:"";position:absolute;inset:0 0 55% 0;border-radius:inherit;pointer-events:none;
+  background:var(--lg-shine);
+  opacity:.8;
+}
+
+
+/* ── Buttons: liquid pill glass with press-in physics ── */
+.btn{transition:transform .3s var(--spring),box-shadow .25s ease,background .2s ease,border-color .2s ease,color .2s ease,filter .2s ease}
+.btn:hover{transform:translateY(-1.5px) scale(1.015)}
+.btn:active{transform:translateY(0) scale(.94);transition-duration:.08s}
+.btn-primary{
+  position:relative;overflow:hidden;
+  box-shadow:0 6px 18px var(--accent-glow),inset 0 1.5px 0 rgba(255,255,255,.45),inset 0 -1px 0 rgba(0,0,0,.12);
+}
+.btn-primary::before{
+  content:"";position:absolute;inset:0 0 50% 0;
+  background:linear-gradient(180deg,rgba(255,255,255,.28),transparent);
+  pointer-events:none;
+}
+.btn-secondary{
+  backdrop-filter:blur(16px) saturate(160%);-webkit-backdrop-filter:blur(16px) saturate(160%);
+  box-shadow:inset 0 1px 0 var(--lg-rim-faint) !important;
+}
+
+/* ── Chips → liquid glass capsules ── */
+.chip{
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.3);
+  transition:transform .3s var(--spring);
+}
+.chip:hover{transform:translateY(-1px) scale(1.04)}
+
+/* ── Nav items: springy select with liquid pill ── */
+.nav-item{transition:background .25s ease,color .25s ease,transform .3s var(--spring),box-shadow .3s ease}
+.nav-item:active{transform:scale(.95)}
+.nav-item.active{box-shadow:0 8px 20px var(--accent-glow),inset 0 1px 0 rgba(255,255,255,.35)}
+
+/* ── FAB: floating liquid orb with idle breathing ── */
+.ai-fab{
+  box-shadow:0 12px 30px var(--accent-glow),inset 0 2px 0 rgba(255,255,255,.4),inset 0 -2px 4px rgba(0,0,0,.15);
+  transition:transform .35s var(--spring),box-shadow .3s ease;
+  animation:fabBreathe 4s ease-in-out infinite;
+}
+.ai-fab:hover{transform:scale(1.08) rotate(-4deg);animation-play-state:paused}
+.ai-fab:active{transform:scale(.9)}
+@keyframes fabBreathe{0%,100%{box-shadow:0 12px 30px var(--accent-glow),inset 0 2px 0 rgba(255,255,255,.4)}50%{box-shadow:0 16px 44px var(--accent-glow),inset 0 2px 0 rgba(255,255,255,.5)}}
+
+/* ── Task rows: glass lift on hover, spring settle ── */
+.task-row{transition:background .2s ease,border-color .2s ease,transform .35s var(--spring),box-shadow .3s ease}
+.task-row:hover{box-shadow:0 6px 18px rgba(30,27,75,.08),inset 0 1px 0 var(--lg-rim-faint)}
+.task-row:active{transform:scale(.995)}
+
+/* ── KPI cards: iOS widget feel ── */
+.kpi-card{transition:transform .4s var(--spring),box-shadow .35s ease}
+.kpi-card:hover{transform:translateY(-4px) scale(1.015)}
+.kpi-card:active{transform:scale(.98)}
+
+/* ── Modal + palette: iOS sheet spring-up ── */
+.modal-box{animation:sheetUp .5s var(--spring)}
+@keyframes sheetUp{from{opacity:0;transform:translateY(28px) scale(.96)}to{opacity:1;transform:none}}
+.cmdk{animation:cmdkPop .38s var(--spring)}
+@keyframes cmdkPop{from{opacity:0;transform:translateY(-14px) scale(.97)}to{opacity:1;transform:none}}
+.ai-panel.slide-in{animation:panelSpring .5s var(--spring)}
+@keyframes panelSpring{from{opacity:0;transform:translateY(24px) scale(.96)}to{opacity:1;transform:none}}
+
+/* ── Inputs: focus glow like iOS search fields ── */
+.input-field,.ob-name-input,.ob-course-search,.ob-add-sub-input{
+  transition:border-color .25s ease,box-shadow .3s ease,background .2s ease;
+}
+.input-field:focus,.ob-name-input:focus,.ob-course-search:focus,.ob-add-sub-input:focus{
+  border-color:var(--accent);
+  box-shadow:0 0 0 4px var(--accent-glow),inset 0 1px 0 var(--lg-rim-faint);
+}
+
+/* ── Mobile bottom nav → iOS dock: floating glass capsule ── */
+@media(max-width:860px){
+  .sidebar{
+    left:10px;right:10px;bottom:10px;width:auto;
+    border-radius:26px;
+    background:color-mix(in srgb, var(--surface-solid) 88%, transparent) !important;
+    backdrop-filter:blur(30px) saturate(190%);-webkit-backdrop-filter:blur(30px) saturate(190%);
+    border:1px solid var(--glass-border) !important;
+    box-shadow:0 -6px 30px rgba(0,0,0,.14),inset 0 1px 0 var(--lg-rim-faint) !important;
+    padding-bottom:max(8px, env(safe-area-inset-bottom)) !important;
+  }
+  .nav-item.active{background:var(--accent-gradient);border-radius:16px}
+  .mobile-header{
+    background:color-mix(in srgb, var(--surface-solid) 90%, transparent);
+    backdrop-filter:blur(26px) saturate(180%);-webkit-backdrop-filter:blur(26px) saturate(180%);
+  }
+  .main-workspace{padding-bottom:120px !important}
+}
+
+/* ── Tablet band (861–1100px): tighter sidebar, denser grid ── */
+@media(min-width:861px) and (max-width:1100px){
+  :root{--sidebar-w:212px}
+  .app-wrapper{gap:14px;padding:14px}
+  .kpi-grid{grid-template-columns:repeat(2,1fr)}
+}
+
+/* ── Ultra-small phones ── */
+@media(max-width:360px){
+  .page-title{font-size:1.18rem}
+  .kpi-value{font-size:1.55rem}
+  .nav-item{font-size:.58rem;padding:6px 3px}
+  .btn{padding:8px 12px;font-size:.78rem}
+}
+
+/* ── Landscape phones: dock shrinks, workspace breathes ── */
+@media(max-width:900px) and (max-height:500px) and (orientation:landscape){
+  .sidebar{padding:4px !important}
+  .nav-item{flex-direction:row;gap:6px;font-size:.68rem}
+  .main-workspace{padding-top:8px;padding-bottom:76px !important}
+  .mobile-header{display:none}
+}
+
+/* ── Accessibility: honour reduced-motion everywhere ── */
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important;scroll-behavior:auto !important}
 }
