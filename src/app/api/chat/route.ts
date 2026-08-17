@@ -3,7 +3,7 @@ import { db } from "@/db";
 import { messages } from "@/db/schema";
 import { asc, eq } from "drizzle-orm";
 import { buildContext, fullState, getOrCreateUser, getSettings, keyFrom } from "@/lib/state";
-import { callLLM, localTutor, parseCommand, tutorSystemPrompt, activeProvider } from "@/lib/ai";
+import { callLLM, localTutor, parseCommand, tutorSystemPrompt, activeProvider, extractLlmAction } from "@/lib/ai";
 import { regeneratePlan } from "@/lib/generate";
 
 export const dynamic = "force-dynamic";
@@ -18,7 +18,7 @@ export async function POST(req: Request) {
 
   const state = await fullState(key);
   const ctx = buildContext(state);
-  const action = parseCommand(text);
+  let action = parseCommand(text);
 
   await db.insert(messages).values({ userId: user.id, role: "user", content: text });
 
@@ -55,8 +55,25 @@ export async function POST(req: Request) {
       }));
       reply = await callLLM(tutorSystemPrompt(ctx), [...history, { role: "user", content: text }], 1600);
     }
-    const local = await localTutor(text, ctx);
-    finalText = reply || local.text;
+    if (reply) {
+      // The LLM may have emitted an [[action:...]] tag for requests the
+      // regex parser didn't recognise (unusual phrasing, other languages).
+      // Strip the tag from the visible reply and execute the action.
+      const extracted = extractLlmAction(reply);
+      finalText = extracted.text || "Done. ✅";
+      if (extracted.action) {
+        action = extracted.action;
+        if (action.type === "replan") {
+          const st = await getSettings(user.id);
+          await regeneratePlan(user.id, st, { fromToday: true });
+          replanned = true;
+        }
+      }
+    } else {
+      const local = await localTutor(text, ctx);
+      finalText = local.text;
+      if (local.action) action = local.action;
+    }
   }
 
   await db.insert(messages).values({ userId: user.id, role: "assistant", content: finalText });
