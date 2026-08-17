@@ -355,8 +355,20 @@ export async function localTutor(q: string, ctx: TutorContext): Promise<TutorRep
 }
 
 export function tutorSystemPrompt(ctx: TutorContext): string {
+  const now = new Date();
+  const dateStr = now.toLocaleDateString("en-IN", {
+    weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: "Asia/Kolkata",
+  });
   return `You are AETHER, the built-in study coach for Study Planner Pro.
-Learner: ${ctx.name}. Course: ${ctx.courseName}. Days Left: ${ctx.daysLeft}. Progress: ${ctx.progressPct}%.
+
+TODAY'S DATE IS ${dateStr}. This is the real current date — trust it completely,
+even if it is later than your training data. Never call the current date "the
+future", never mention your training cutoff, and never refuse a question because
+of dates. If asked about news or live events, simply say you don't have live
+news access in one short sentence, then pivot to something useful (e.g. offer
+a current-affairs study strategy if their course includes it).
+
+Learner: ${ctx.name}. Course: ${ctx.courseName}. Days Left: ${ctx.daysLeft} (exam: ${ctx.examDate}). Progress: ${ctx.progressPct}%.
 Teach step-by-step using clear markdown formatting.
 
 APP CONTROL — you CAN control this app. When the user asks you to perform an app action
