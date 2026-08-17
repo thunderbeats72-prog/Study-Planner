@@ -1,940 +1,414 @@
-@import "tailwindcss";
+import {
+  generateTopics,
+  synthesiseSubjects,
+  nmimsSem1Subjects,
+  isNmimsQuery,
+  getNmimsChapters,
+  type SeedSubject,
+  type GeneratedTopic,
+} from "./curriculum";
+import { lookupKnowledge, teachFromKnowledge } from "./knowledge";
 
-/* ==================================================
-   DESIGN TOKENS & THEMES
-================================================== */
-:root {
-  --app-bg:#e6eaf5;
-  --bg-gradient:linear-gradient(135deg,#f5f0fd 0%,#ebf0ff 30%,#e1e9fb 60%,#ebe2fa 100%);
-  --surface:rgba(255,255,255,0.45); --surface-solid:rgba(255,255,255,0.92); --surface-hover:rgba(255,255,255,0.85);
-  --glass-border:rgba(255,255,255,0.6); --glass-border-hover:rgba(99,102,241,0.4);
-  --glass-shadow:0 10px 40px rgba(30,27,75,0.05),0 2px 6px rgba(30,27,75,0.03);
-  --glass-shadow-hover:0 25px 60px rgba(30,27,75,0.1),0 0 0 1px rgba(99,102,241,0.2);
-  --text-main:#1e1b4b; --text-muted:#4b5563; --text-dim:#9ca3af;
-  --accent:#6366f1; --accent-light:#818cf8; --accent-glow:rgba(99,102,241,0.2);
-  --accent-gradient:linear-gradient(135deg,#818cf8,#6366f1);
-  --nav-active-bg:linear-gradient(135deg,rgba(238,242,255,0.9),rgba(224,231,255,0.7));
-  --nav-active-text:#4f46e5; --nav-active-border:rgba(199,210,254,0.8);
-  --row-bg:rgba(255,255,255,0.3); --row-hover:rgba(255,255,255,0.6);
-  --status-pending-bg:#fef3c7; --status-pending-text:#d97706;
-  --status-done-bg:#dcfce7; --status-done-text:#16a34a;
-  --status-skipped-bg:#fee2e2; --status-skipped-text:#dc2626;
-  --success-accent:#16a34a; --warning-accent:#d97706; --danger-accent:#dc2626;
-  --chart-bar:rgba(99,102,241,0.7);
-  --input-bg:rgba(255,255,255,0.4);
-  --anim-dur:0.35s; --sidebar-w:260px;
-}
+// Re-export the canonical topic shape so existing imports from "./ai" keep working.
+export type { GeneratedTopic } from "./curriculum";
 
-body.theme-dark{--app-bg:#000;--bg-gradient:radial-gradient(circle at 50% 0%,#1a1a1e 0%,#000 70%);--surface:rgba(20,20,24,0.75);--surface-solid:#121214;--surface-hover:rgba(35,35,40,0.9);--glass-border:rgba(255,255,255,0.18);--glass-border-hover:rgba(255,255,255,0.4);--glass-shadow:0 10px 40px rgba(0,0,0,.8);--glass-shadow-hover:0 25px 60px rgba(0,0,0,.9);--text-main:#fff;--text-muted:#d1d5db;--text-dim:#9ca3af;--accent:#3b82f6;--accent-light:#60a5fa;--accent-glow:rgba(59,130,246,0.3);--accent-gradient:linear-gradient(135deg,#60a5fa,#2563eb);--nav-active-bg:rgba(59,130,246,0.15);--nav-active-text:#60a5fa;--nav-active-border:rgba(59,130,246,0.4);--row-bg:rgba(30,30,35,0.6);--row-hover:rgba(45,45,50,0.8);--status-pending-bg:rgba(245,158,11,.2);--status-pending-text:#fbbf24;--status-done-bg:rgba(34,197,94,.2);--status-done-text:#4ade80;--status-skipped-bg:rgba(239,68,68,.2);--status-skipped-text:#f87171;--chart-bar:rgba(59,130,246,.85);--input-bg:rgba(40,40,45,0.8)}
-body.theme-obsidian{--app-bg:#090d16;--bg-gradient:radial-gradient(ellipse at 20% 0%,#1e293b 0%,#090d16 80%);--surface:rgba(30,41,59,0.4);--surface-solid:rgba(15,23,42,0.95);--surface-hover:rgba(51,65,85,0.5);--glass-border:rgba(255,255,255,0.08);--glass-border-hover:rgba(148,163,184,0.3);--glass-shadow:0 10px 40px rgba(0,0,0,.4);--glass-shadow-hover:0 25px 60px rgba(0,0,0,.5);--text-main:#f3f4f6;--text-muted:#9ca3af;--text-dim:#4b5563;--accent:#38bdf8;--accent-light:#7dd3fc;--accent-glow:rgba(56,189,248,.2);--accent-gradient:linear-gradient(135deg,#7dd3fc,#0284c7);--nav-active-bg:rgba(56,189,248,.12);--nav-active-text:#7dd3fc;--nav-active-border:rgba(56,189,248,.3);--row-bg:rgba(30,41,59,.25);--row-hover:rgba(51,65,85,.4);--status-pending-bg:rgba(245,158,11,.15);--status-pending-text:#fbbf24;--status-done-bg:rgba(34,197,94,.15);--status-done-text:#4ade80;--status-skipped-bg:rgba(239,68,68,.15);--status-skipped-text:#f87171;--chart-bar:rgba(56,189,248,.7);--input-bg:rgba(0,0,0,.25)}
-body.theme-nebula{--app-bg:#0b071a;--bg-gradient:radial-gradient(ellipse at 30% -10%,#3b0764 0%,#0b071a 80%);--surface:rgba(126,34,206,0.08);--surface-solid:rgba(23,15,46,0.95);--surface-hover:rgba(126,34,206,0.16);--glass-border:rgba(192,132,252,0.16);--glass-border-hover:rgba(192,132,252,0.45);--glass-shadow:0 10px 40px rgba(0,0,0,.5);--glass-shadow-hover:0 25px 60px rgba(88,28,135,.35);--text-main:#f9fafb;--text-muted:#c4b5fd;--text-dim:#8b5cf6;--accent:#a855f7;--accent-light:#d8b4fe;--accent-glow:rgba(168,85,247,.25);--accent-gradient:linear-gradient(135deg,#d8b4fe,#9333ea);--nav-active-bg:rgba(168,85,247,.14);--nav-active-text:#e9d5ff;--nav-active-border:rgba(168,85,247,.35);--row-bg:rgba(88,28,135,.1);--row-hover:rgba(126,34,206,.18);--status-pending-bg:rgba(245,158,11,.15);--status-pending-text:#fbbf24;--status-done-bg:rgba(34,197,94,.15);--status-done-text:#4ade80;--status-skipped-bg:rgba(239,68,68,.15);--status-skipped-text:#f87171;--chart-bar:rgba(168,85,247,.7);--input-bg:rgba(0,0,0,.25)}
-body.theme-mint{--app-bg:#eefbf4;--bg-gradient:linear-gradient(135deg,#f0fdf7 0%,#e6f9f0 40%,#ddf5ff 100%);--accent:#10b981;--accent-light:#34d399;--accent-glow:rgba(16,185,129,.2);--accent-gradient:linear-gradient(135deg,#6ee7b7,#059669);--nav-active-bg:linear-gradient(135deg,rgba(209,250,229,.9),rgba(167,243,208,.6));--nav-active-text:#047857;--nav-active-border:rgba(167,243,208,.9);--text-main:#064e3b;--chart-bar:rgba(16,185,129,.7)}
-body.theme-sunset{--app-bg:#fff1e9;--bg-gradient:linear-gradient(135deg,#fff7ed 0%,#ffe9e2 45%,#fee2f0 100%);--accent:#f97316;--accent-light:#fb923c;--accent-glow:rgba(249,115,22,.2);--accent-gradient:linear-gradient(135deg,#fdba74,#ea580c);--nav-active-bg:linear-gradient(135deg,rgba(255,237,213,.95),rgba(254,215,170,.6));--nav-active-text:#c2410c;--nav-active-border:rgba(254,215,170,.9);--text-main:#431407;--chart-bar:rgba(249,115,22,.7)}
-
-*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{padding:0;margin:0}
-body{
-  font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-  background:var(--app-bg);background-image:var(--bg-gradient);background-attachment:fixed;
-  color:var(--text-main);min-height:100vh;overflow-x:hidden;
-  transition:background-color .4s ease,color .4s ease;
-}
-.mono{font-family:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
-::-webkit-scrollbar{width:8px;height:8px}
-::-webkit-scrollbar-thumb{background:var(--glass-border-hover);border-radius:99px}
-::-webkit-scrollbar-track{background:transparent}
-
-/* ============ LAYOUT ============ */
-.app-wrapper{display:flex;min-height:100vh;gap:22px;padding:22px}
-.sidebar{width:var(--sidebar-w);flex-shrink:0;display:flex;flex-direction:column;padding:22px 16px;position:sticky;top:22px;height:calc(100vh - 44px)}
-.main-workspace{flex:1;min-width:0;padding-bottom:60px}
-.glass-panel{
-  background:var(--surface);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);
-  border:1px solid var(--glass-border);border-radius:18px;box-shadow:var(--glass-shadow);
-  transition:box-shadow var(--anim-dur) ease,border-color var(--anim-dur) ease,transform var(--anim-dur) ease;
-}
-.tilt-card:hover{box-shadow:var(--glass-shadow-hover);border-color:var(--glass-border-hover);transform:translateY(-2px)}
-.brand-header{display:flex;align-items:center;gap:11px;padding:0 6px 18px;margin-bottom:6px;border-bottom:1px solid var(--glass-border)}
-.brand-logo-icon{width:36px;height:36px;border-radius:11px;background:var(--accent-gradient);color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 6px 16px var(--accent-glow)}
-.brand-title{font-size:.94rem;font-weight:800;letter-spacing:-.3px;line-height:1.1}
-.brand-course{font-size:.7rem;color:var(--text-muted);font-weight:600;margin-top:2px}
-.nav-list{display:flex;flex-direction:column;gap:4px;margin-top:14px}
-.nav-item{display:flex;align-items:center;gap:11px;padding:10px 13px;border-radius:11px;font-size:.86rem;font-weight:650;color:var(--text-muted);cursor:pointer;border:1px solid transparent;transition:all .2s ease;user-select:none}
-.nav-item:hover{background:var(--row-hover);color:var(--text-main)}
-.nav-item.active{background:var(--nav-active-bg);color:var(--nav-active-text);border-color:var(--nav-active-border);font-weight:750}
-.streak-badge{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:99px;background:var(--accent-glow);color:var(--accent);font-size:.72rem;font-weight:800}
-.page-header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:22px;flex-wrap:wrap}
-.page-title{
-  font-family:"Plus Jakarta Sans",Inter,sans-serif;font-size:1.8rem;font-weight:800;letter-spacing:-.9px;margin:0;
-  background:linear-gradient(100deg,var(--text-main) 55%,var(--accent) 130%);
-  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
-}
-/* Emoji inside gradient-clipped titles must opt back into normal color
-   rendering, otherwise background-clip:text turns them into flat
-   gradient silhouettes. */
-.page-title .wave-emoji{
-  -webkit-text-fill-color:initial;background:none;-webkit-background-clip:initial;background-clip:initial;
-  display:inline-block;margin-left:10px;
-  animation:waveHand 2.2s ease-in-out 0.6s 1;transform-origin:70% 75%;
-}
-@keyframes waveHand{
-  0%,100%{transform:rotate(0)}
-  10%{transform:rotate(16deg)}20%{transform:rotate(-8deg)}
-  30%{transform:rotate(14deg)}40%{transform:rotate(-6deg)}
-  50%{transform:rotate(10deg)}60%{transform:rotate(0)}
-}
-.page-subtitle{font-size:.85rem;color:var(--text-muted);font-weight:550;margin:4px 0 0}
-
-/* ============ CONTROLS ============ */
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:9px 16px;border-radius:12px;font-size:.84rem;font-weight:700;cursor:pointer;border:1px solid transparent;transition:transform .18s cubic-bezier(.22,1,.36,1),box-shadow .25s ease,background .2s ease,border-color .2s ease,color .2s ease;font-family:inherit;white-space:nowrap}
-.btn:hover{transform:translateY(-1px)}
-.btn:active{transform:translateY(0) scale(.97);transition-duration:.06s}
-.btn:active{transform:scale(.97)}
-.btn-primary{background:var(--accent-gradient);color:#fff;box-shadow:0 6px 18px var(--accent-glow),inset 0 1px 0 rgba(255,255,255,.25)}
-.btn-primary:hover{box-shadow:0 10px 26px var(--accent-glow),inset 0 1px 0 rgba(255,255,255,.3);filter:brightness(1.05)}
-.btn-primary:hover{filter:brightness(1.07);box-shadow:0 10px 26px var(--accent-glow)}
-.btn-secondary{background:var(--surface-hover);color:var(--text-main);border-color:var(--glass-border)}
-.btn-secondary:hover{background:var(--row-hover);border-color:var(--glass-border-hover)}
-.btn-danger{background:var(--status-skipped-bg);color:var(--status-skipped-text);border-color:transparent}
-.btn-sm{padding:6px 12px;font-size:.76rem;border-radius:8px}
-.btn-xs{padding:5px 11px;font-size:.7rem;border-radius:999px}
-.w-full{width:100%}
-.btn:disabled{opacity:.5;cursor:not-allowed}
-.lbl{display:block;font-size:.72rem;font-weight:750;text-transform:uppercase;letter-spacing:.6px;color:var(--text-muted);margin-bottom:6px}
-.input-field{width:100%;padding:10px 13px;border-radius:10px;border:1px solid var(--glass-border);background:var(--input-bg);color:var(--text-main);font-size:.86rem;font-weight:600;font-family:inherit;outline:none;transition:all .2s ease}
-.input-field:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow)}
-select.input-field{appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--text-muted) 50%),linear-gradient(135deg,var(--text-muted) 50%,transparent 50%);background-position:calc(100% - 16px) 19px,calc(100% - 11px) 19px;background-size:5px 5px,5px 5px;background-repeat:no-repeat;padding-right:32px}
-
-.flex-row{display:flex;align-items:center}
-.flex-col{display:flex;flex-direction:column}
-.gap-sm{gap:8px}.gap-md{gap:14px}
-.mb-md{margin-bottom:14px}.mt-md{margin-top:14px}
-
-/* ============ KPI / DASHBOARD ============ */
-.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:16px;margin-bottom:18px}
-.kpi-card{padding:20px}
-.kpi-label{font-size:.7rem;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted)}
-.kpi-value{font-size:2rem;font-weight:800;letter-spacing:-1.2px;margin-top:6px;line-height:1}
-.kpi-sub{font-size:.76rem;color:var(--text-muted);font-weight:600;margin-top:5px}
-
-.dash-grid-2{display:grid;grid-template-columns:1.4fr 1fr;gap:16px;margin-bottom:18px}
-.dash-card{padding:20px}
-.bar-track{height:8px;border-radius:99px;background:var(--row-bg);overflow:hidden}
-.bar-fill{height:100%;border-radius:99px;background:var(--accent-gradient);transition:width .6s cubic-bezier(.22,1,.36,1)}
-
-/* ============ TASK ROWS ============ */
-.day-block{margin-bottom:14px;padding:16px 18px}
-.day-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
-.day-date{font-size:.95rem;font-weight:800;letter-spacing:-.3px}
-.day-meta{font-size:.74rem;color:var(--text-muted);font-weight:650}
-
-.task-row{display:flex;align-items:center;gap:12px;padding:12px 15px;border-radius:14px;background:var(--row-bg);border:1px solid transparent;margin-bottom:8px;transition:background .2s ease,border-color .2s ease,transform .2s cubic-bezier(.22,1,.36,1),box-shadow .25s ease}
-.task-row:hover{background:var(--row-hover);border-color:var(--glass-border);transform:translateX(3px);box-shadow:0 4px 14px rgba(30,27,75,.06)}
-.task-row.done{opacity:.55}
-.task-row.done .task-title{text-decoration:line-through}
-.task-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
-.task-title{font-size:.85rem;font-weight:700;line-height:1.35}
-.task-sub{font-size:.72rem;color:var(--text-muted);font-weight:600;margin-top:3px}
-
-.chip{display:inline-flex;align-items:center;gap:5px;padding:4px 11px;border-radius:99px;font-size:.66rem;font-weight:800;text-transform:uppercase;letter-spacing:.5px;border:1px solid transparent;transition:transform .18s ease}
-.chip:hover{transform:translateY(-1px)}
-.chip-pending{background:var(--status-pending-bg);color:var(--status-pending-text)}
-.chip-done{background:var(--status-done-bg);color:var(--status-done-text)}
-.chip-skipped{background:var(--status-skipped-bg);color:var(--status-skipped-text)}
-.chip-kind{background:var(--accent-glow);color:var(--accent)}
-
-.vtabs{display:inline-flex;padding:4px;gap:3px;border-radius:11px;background:var(--row-bg);border:1px solid var(--glass-border)}
-.vtab{padding:7px 15px;border-radius:8px;font-size:.79rem;font-weight:700;color:var(--text-muted);cursor:pointer;transition:all .2s ease}
-.vtab.active{background:var(--surface-solid);color:var(--accent);box-shadow:0 2px 8px rgba(0,0,0,.06)}
-
-/* calendar */
-.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}
-.cal-dow{font-size:.68rem;font-weight:800;text-transform:uppercase;color:var(--text-muted);text-align:center;padding:4px 0}
-.cal-cell{min-height:88px;border-radius:12px;background:var(--row-bg);border:1px solid transparent;padding:8px;cursor:pointer;transition:all .2s ease}
-.cal-cell:hover{border-color:var(--accent);background:var(--row-hover)}
-.cal-cell.empty{background:transparent;cursor:default}
-.cal-cell.today{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-glow)}
-.cal-num{font-size:.74rem;font-weight:800;margin-bottom:5px}
-.cal-pill{font-size:.62rem;font-weight:700;padding:2px 5px;border-radius:5px;margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#fff}
-
-/* kanban */
-.kanban{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
-.kan-col{padding:14px;min-height:260px}
-.kan-title{font-size:.8rem;font-weight:800;text-transform:uppercase;letter-spacing:.7px;margin-bottom:12px;color:var(--text-muted)}
-
-/* ============ TIMER ============ */
-.focus-grid-2{display:grid;grid-template-columns:1.3fr 1fr;gap:16px}
-.timer-ring-wrap{position:relative;width:260px;height:260px;margin:18px 0}
-.timer-ring-wrap svg{transform:rotate(-90deg);width:100%;height:100%}
-#t-digits{font-size:2.9rem;font-weight:800;letter-spacing:-2px;font-variant-numeric:tabular-nums}
-#t-label{font-size:.7rem;font-weight:800;text-transform:uppercase;letter-spacing:2px;color:var(--text-muted);margin-top:4px}
-
-/* ============ ONBOARDING ============ */
-.ob-overlay{position:fixed;inset:0;z-index:400;background:var(--app-bg);background-image:var(--bg-gradient);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;overflow-y:auto}
-.ob-progress{display:flex;gap:7px;margin-bottom:22px}
-.ob-dot{width:26px;height:5px;border-radius:99px;background:var(--row-bg);transition:all .3s ease}
-.ob-dot.active{background:var(--accent);width:38px}
-.ob-dot.done{background:var(--accent-light)}
-.ob-card{width:100%;max-width:600px;background:var(--surface);backdrop-filter:blur(22px);border:1px solid var(--glass-border);border-radius:22px;box-shadow:var(--glass-shadow);padding:34px}
-.ob-card h1{font-size:1.7rem;font-weight:800;letter-spacing:-.9px;margin:0 0 8px}
-.ob-card p{font-size:.88rem;color:var(--text-muted);font-weight:550;margin:0 0 20px;line-height:1.5}
-.ob-name-input,.ob-course-search{width:100%;padding:13px 16px;border-radius:12px;border:1px solid var(--glass-border);background:var(--input-bg);color:var(--text-main);font-size:.95rem;font-weight:650;outline:none;font-family:inherit;margin-bottom:14px}
-.ob-name-input:focus,.ob-course-search:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow)}
-.ob-hint{font-size:.76rem;color:var(--text-dim);font-weight:600;margin-bottom:18px}
-.ob-level-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-bottom:20px}
-.ob-level-btn{padding:15px;border-radius:13px;border:1.5px solid var(--glass-border);background:var(--row-bg);color:var(--text-main);font-size:.88rem;font-weight:750;cursor:pointer;text-align:left;transition:all .2s ease;font-family:inherit}
-.ob-level-btn:hover{border-color:var(--accent);background:var(--row-hover)}
-.ob-level-btn.selected{border-color:var(--accent);background:var(--accent-glow);box-shadow:0 0 0 3px var(--accent-glow)}
-.ob-course-list{max-height:270px;overflow-y:auto;display:flex;flex-direction:column;gap:7px;margin-bottom:16px}
-.ob-course-item{display:flex;align-items:center;gap:11px;padding:12px 14px;border-radius:11px;border:1.5px solid transparent;background:var(--row-bg);font-size:.86rem;font-weight:650;cursor:pointer;transition:all .2s ease}
-.ob-course-item:hover{background:var(--row-hover)}
-.ob-course-item.selected{border-color:var(--accent);background:var(--accent-glow)}
-.ob-course-check{width:19px;height:19px;border-radius:6px;border:1.5px solid var(--glass-border-hover);display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.ob-course-item.selected .ob-course-check{background:var(--accent);border-color:var(--accent)}
-.ob-subs-grid{display:flex;flex-direction:column;gap:8px;max-height:250px;overflow-y:auto;margin-bottom:12px}
-.ob-sub-row{display:flex;align-items:center;gap:9px;padding:9px 12px;border-radius:11px;background:var(--row-bg)}
-.ob-sub-row input[type=text]{flex:1;background:transparent;border:none;outline:none;color:var(--text-main);font-size:.85rem;font-weight:700;font-family:inherit;min-width:0}
-.ob-sub-row input[type=number]{width:54px;background:var(--input-bg);border:1px solid var(--glass-border);border-radius:7px;padding:4px 6px;color:var(--text-main);font-size:.76rem;font-weight:700;outline:none;font-family:inherit}
-.ob-sub-row select{background:var(--input-bg);border:1px solid var(--glass-border);border-radius:7px;padding:4px 6px;color:var(--text-main);font-size:.72rem;font-weight:700;outline:none;font-family:inherit}
-.ob-add-sub-row{display:flex;gap:9px;margin-bottom:6px}
-.ob-add-sub-input{flex:1;padding:11px 14px;border-radius:11px;border:1px solid var(--glass-border);background:var(--input-bg);color:var(--text-main);font-size:.85rem;font-weight:650;outline:none;font-family:inherit}
-
-.ob-schedule-grid{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-bottom:18px}
-.ob-field label{display:block;font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:var(--text-muted);margin-bottom:6px}
-.ob-field input,.ob-field select{width:100%;padding:11px 13px;border-radius:11px;border:1px solid var(--glass-border);background:var(--input-bg);color:var(--text-main);font-size:.86rem;font-weight:650;outline:none;font-family:inherit}
-.ob-btn-row{display:flex;gap:11px;justify-content:flex-end}
-.ob-btn{padding:12px 26px;border-radius:12px;font-size:.9rem;font-weight:750;cursor:pointer;border:1px solid transparent;font-family:inherit;transition:all .2s ease}
-.ob-btn-primary{background:var(--accent-gradient);color:#fff;box-shadow:0 8px 22px var(--accent-glow)}
-.ob-btn-secondary{background:var(--surface-hover);color:var(--text-main);border-color:var(--glass-border)}
-.ob-btn:disabled{opacity:.55;cursor:not-allowed}
-
-.ob-summary-row{display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px dashed var(--glass-border);font-size:.84rem}
-.ob-summary-row span:first-child{color:var(--text-muted);font-weight:650}
-.ob-summary-row span:last-child{font-weight:800}
-
-/* ============ MODALS ============ */
-.modal-overlay{position:fixed;inset:0;z-index:300;background:rgba(15,15,25,.45);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;padding:20px;overflow-y:auto}
-.modal-box{width:100%;max-width:560px;padding:28px;background:var(--surface-solid);max-height:90vh;overflow-y:auto}
-
-/* ============ AI CHAT ============ */
-.ai-fab{position:fixed;right:22px;bottom:22px;width:56px;height:56px;border-radius:50%;background:var(--accent-gradient);color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 12px 30px var(--accent-glow);cursor:pointer;z-index:200;border:none;transition:transform .25s ease}
-.ai-fab:hover{transform:scale(1.08)}
-.ai-panel{position:fixed;right:22px;bottom:88px;width:min(430px,calc(100vw - 32px));height:min(620px,calc(100vh - 130px));z-index:201;display:flex;flex-direction:column;overflow:hidden;background:var(--surface-solid);backdrop-filter:blur(24px)}
-.ai-head{padding:15px 18px;border-bottom:1px solid var(--glass-border);display:flex;align-items:center;gap:11px}
-.ai-status{font-size:.66rem;font-weight:800;text-transform:uppercase;letter-spacing:.7px;color:var(--success-accent)}
-.ai-msgs{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px}
-.ai-msg{max-width:88%;padding:11px 14px;border-radius:14px;font-size:.84rem;line-height:1.55;font-weight:520;white-space:pre-wrap;word-break:break-word}
-.ai-msg.user{align-self:flex-end;background:var(--accent-gradient);color:#fff;border-bottom-right-radius:4px}
-.ai-msg.bot{align-self:flex-start;background:var(--row-bg);border:1px solid var(--glass-border);border-bottom-left-radius:4px}
-.ai-msg strong{font-weight:800}
-.ai-msg code{background:var(--accent-glow);padding:1px 5px;border-radius:5px;font-family:"JetBrains Mono",monospace;font-size:.78rem}
-.ai-input-row{padding:12px;border-top:1px solid var(--glass-border);display:flex;gap:9px}
-.ai-quick{display:flex;gap:6px;padding:0 12px 10px;flex-wrap:wrap}
-.ai-quick button{font-size:.68rem;font-weight:700;padding:5px 10px;border-radius:99px;background:var(--row-bg);border:1px solid var(--glass-border);color:var(--text-muted);cursor:pointer;font-family:inherit}
-.ai-quick button:hover{border-color:var(--accent);color:var(--accent)}
-
-.typing-dot{width:6px;height:6px;border-radius:50%;background:var(--text-dim);display:inline-block;animation:blink 1.2s infinite}
-@keyframes blink{0%,80%,100%{opacity:.25}40%{opacity:1}}
-
-/* ============ TRACKER BAR ============ */
-/* ── Tracker bar: soft floating pill (no hard boxy edges) ── */
-.tracker-bar{
-  margin-bottom:24px;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;gap:14px;
-  position:sticky;top:12px;z-index:60;flex-wrap:wrap;
-  /* Near-opaque: sticky bars sit OVER scrolling content, so a translucent
-     surface makes underlying text bleed through and fight the bar's own
-     labels. Solid surface + heavy blur keeps the premium glass look while
-     guaranteeing legibility in every theme. */
-  background:color-mix(in srgb, var(--surface-solid) 92%, transparent);
-  backdrop-filter:blur(28px) saturate(180%);-webkit-backdrop-filter:blur(28px) saturate(180%);
-  border:1px solid var(--glass-border);border-radius:999px;
-  box-shadow:0 10px 36px rgba(30,27,75,.12),inset 0 1px 0 rgba(255,255,255,.35);
-  transition:box-shadow .4s ease,transform .4s ease;
-}
-.tracker-bar:hover{box-shadow:0 14px 44px rgba(30,27,75,.16),inset 0 1px 0 rgba(255,255,255,.45)}
-.tracker-bar::before{
-  content:"";position:absolute;inset:0;border-radius:inherit;padding:1px;pointer-events:none;
-  background:linear-gradient(120deg,var(--accent-glow),transparent 40%,transparent 60%,var(--accent-glow));
-  -webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);
-  -webkit-mask-composite:xor;mask-composite:exclude;opacity:.7;
-}
-.pulse-dot{width:11px;height:11px;border-radius:50%;background:var(--text-dim);transition:background .3s ease;flex-shrink:0}
-.pulse-dot.live{background:var(--success-accent);animation:pulse 1.5s infinite}
-@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(34,197,94,.55)}70%{box-shadow:0 0 0 9px rgba(34,197,94,0)}100%{box-shadow:0 0 0 0 rgba(34,197,94,0)}}
-
-/* ============ ZEN ============ */
-.zen{position:fixed;inset:0;z-index:999999;background:#05060a;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px}
-.zen .zen-digits{font-size:min(22vw,10rem);font-weight:800;letter-spacing:-6px;font-variant-numeric:tabular-nums}
-
-.slide-in{animation:slideIn .4s cubic-bezier(.22,1,.36,1)}
-@keyframes slideIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
-.fade-in{animation:fadeIn .3s ease}
-@keyframes fadeIn{from{opacity:0}to{opacity:1}}
-
-.loader-screen{position:fixed;inset:0;z-index:600;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:var(--app-bg);background-image:var(--bg-gradient)}
-.loader-ring{width:56px;height:56px;border-radius:18px;background:var(--accent-gradient);color:#fff;display:flex;align-items:center;justify-content:center;animation:float 2s ease-in-out infinite}
-@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
-.loader-title{font-size:1.05rem;font-weight:800}
-.loader-sub{font-size:.8rem;color:var(--text-muted);font-weight:600}
-
-.mobile-header{display:none}
-
-/* ============ RESPONSIVE ============ */
-@media(max-width:1100px){
-  .subs-wrap{grid-template-columns:1fr !important}
-  .dash-grid-2{grid-template-columns:1fr}
-  .focus-grid-2{grid-template-columns:1fr}
-  .kanban{grid-template-columns:1fr}
-}
-@media(max-width:860px){
-  .app-wrapper{flex-direction:column;padding:0 12px 90px;gap:0}
-  .sidebar{position:fixed;bottom:0;left:0;right:0;top:auto;width:100%;height:auto;flex-direction:row;padding:8px;border-radius:18px 18px 0 0;z-index:100;justify-content:space-around;gap:0}
-  .sidebar .brand-header,.sidebar .sidebar-foot{display:none}
-  .nav-list{flex-direction:row;margin-top:0;width:100%;justify-content:space-around;gap:0}
-  .nav-item{flex-direction:column;gap:3px;font-size:.62rem;padding:7px 6px;flex:1;justify-content:center;text-align:center}
-  .main-workspace{padding-top:64px}
-  .mobile-header{display:flex;position:fixed;top:0;left:0;right:0;height:54px;align-items:center;justify-content:space-between;padding:0 14px;z-index:100;background:var(--surface);backdrop-filter:blur(18px);border-bottom:1px solid var(--glass-border)}
-  .page-title{font-size:1.35rem}
-  .ob-level-grid,.ob-schedule-grid{grid-template-columns:1fr}
-  .ob-card{padding:24px 20px}
-  .ai-panel{right:8px;left:8px;width:auto;bottom:78px;height:min(70vh,540px)}
-  .ai-fab{bottom:76px;right:14px;width:50px;height:50px}
-  .cal-cell{min-height:62px;padding:5px}
-  .timer-ring-wrap{width:220px;height:220px}
-  .task-row{flex-wrap:wrap;align-items:center}
-  .task-row > .btn,.task-row > .chip{flex-shrink:0;flex-grow:0}
-  textarea.input-field{resize:vertical;min-height:86px}
-}
-@media(max-width:640px){
-  .tracker-bar{position:relative;top:auto;padding:14px;align-items:stretch;flex-direction:column;border-radius:22px}
-  .tracker-bar > .flex-row{width:100%;justify-content:space-between}
-  .tracker-bar > .flex-row:last-child{flex-wrap:wrap;gap:8px}
-  .tracker-bar .btn-xs{flex:1;min-width:88px;justify-content:center}
-  .heat-cell{width:11px;height:11px}
-  .task-row{align-items:center;gap:8px;padding:10px}
-  .task-row > div[style*="flex: 1"]{flex-basis:100%;order:-1;margin-bottom:2px}
-  .task-row .task-dot{order:-2}
-  .task-row .task-title{font-size:.82rem}
-  .task-row .task-sub{font-size:.68rem;line-height:1.45}
-  .task-row > .btn{flex:0 0 auto;min-width:0;white-space:nowrap;padding:6px 9px;font-size:.68rem}
-  .task-row > .chip{flex:0 0 auto;font-size:.6rem;padding:3px 7px}
-  .vtabs{width:100%;display:grid;grid-template-columns:repeat(3,1fr)}
-  .vtab{text-align:center;padding:8px 6px}
-  .page-header > .flex-row{width:100%}
-  .page-header select.input-field{width:100%!important}
-  .cal-grid{gap:4px}
-  .cal-cell{min-height:54px;border-radius:9px;padding:4px}
-  .cal-pill{display:none}
-  .modal-overlay{padding:10px;align-items:flex-end}
-  .modal-box{max-height:92vh;border-radius:18px 18px 0 0;padding:20px}
-  .task-edit-grid{grid-template-columns:1fr!important}
-  .ob-add-sub-row{flex-direction:column}
-  .ob-btn-row{flex-direction:column-reverse}
-  .ob-btn{width:100%}
-  .ob-sub-row{display:grid;grid-template-columns:12px 1fr 58px;gap:8px}
-  .ob-sub-row select{grid-column:2 / 3}
-  .ob-sub-row .btn{grid-column:3 / 4;grid-row:2 / 3}
-}
-@media(max-width:420px){
-  .app-wrapper{padding-left:8px;padding-right:8px}
-  .kpi-grid{grid-template-columns:1fr}
-  .day-block{padding:13px 12px}
-  .ai-fab{bottom:72px}
-  .timer-ring-wrap{width:190px;height:190px}
-  #t-digits{font-size:2.25rem}
-  .zen .zen-digits{letter-spacing:-2px}
+/* ============================================================
+   UNIVERSAL ENVIRONMENT VARIABLE FETCHER
+============================================================ */
+function getSafeKey(keyName: string): string | null {
+  try {
+    if (typeof process !== "undefined" && process.env && process.env[keyName]) {
+      return process.env[keyName] as string;
+    }
+    // @ts-ignore
+    if (typeof import.meta !== "undefined" && import.meta.env && import.meta.env[keyName]) {
+      // @ts-ignore
+      return import.meta.env[keyName] as string;
+    }
+  } catch (_) {
+    return null;
+  }
+  return null;
 }
 
-.task-row.active-clock{position:relative;border-color:rgba(34,197,94,.45);background:linear-gradient(135deg,var(--row-hover),rgba(34,197,94,.08));box-shadow:0 10px 28px rgba(34,197,94,.10)}
-.task-row.active-clock::before{content:"";position:absolute;inset:-1px;border-radius:13px;padding:1px;background:linear-gradient(90deg,transparent,var(--success-accent),transparent);-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;animation:flowBorder 2.2s linear infinite;pointer-events:none}
-@keyframes flowBorder{0%{filter:hue-rotate(0deg);opacity:.35}50%{opacity:.9}100%{filter:hue-rotate(80deg);opacity:.35}}
-.btn{will-change:transform}.btn:hover{transform:translateY(-1px)}.btn:active{transform:translateY(0) scale(.97)}
-.glass-panel{animation:panelIn .45s cubic-bezier(.22,1,.36,1) backwards}
-@keyframes panelIn{from{opacity:.001;transform:translateY(10px) scale(.995)}to{opacity:1;transform:none}}
-/* Gentle stagger so stacked panels cascade in rather than popping at once */
-.main-workspace .glass-panel:nth-child(2){animation-delay:.04s}
-.main-workspace .glass-panel:nth-child(3){animation-delay:.08s}
-.main-workspace .glass-panel:nth-child(4){animation-delay:.12s}
-.main-workspace .glass-panel:nth-child(5){animation-delay:.16s}
+type ChatMsg = { role: "user" | "assistant"; content: string };
 
-/* ============ COMMAND PALETTE ( K) ============ */
-.cmdk-overlay{position:fixed;inset:0;z-index:400;background:rgba(15,15,25,.5);backdrop-filter:blur(8px);display:flex;align-items:flex-start;justify-content:center;padding:14vh 16px 16px;animation:fadeIn .18s ease}
-.cmdk{width:100%;max-width:600px;overflow:hidden;background:var(--surface-solid);animation:cmdkIn .28s cubic-bezier(.22,1,.36,1)}
-@keyframes cmdkIn{from{opacity:0;transform:translateY(-14px) scale(.97)}to{opacity:1;transform:none}}
-.cmdk-input-row{display:flex;align-items:center;gap:10px;padding:15px 16px;border-bottom:1px solid var(--glass-border);color:var(--text-muted)}
-.cmdk-input{flex:1;border:none;outline:none;background:transparent;color:var(--text-main);font-size:1rem;font-weight:600;font-family:inherit}
-.cmdk-kbd{font-size:.6rem;font-weight:800;padding:3px 7px;border-radius:6px;background:var(--row-bg);border:1px solid var(--glass-border);color:var(--text-dim)}
-.cmdk-list{max-height:56vh;overflow-y:auto;padding:8px}
-.cmdk-group{font-size:.62rem;font-weight:800;text-transform:uppercase;letter-spacing:.7px;color:var(--text-dim);padding:10px 10px 5px}
-.cmdk-item{width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border:none;border-radius:10px;background:transparent;cursor:pointer;font-family:inherit;text-align:left;transition:background .12s ease}
-.cmdk-item.active{background:var(--nav-active-bg)}
-.cmdk-label{font-size:.86rem;font-weight:650;color:var(--text-main)}
-.cmdk-hint{font-size:.72rem;font-weight:600;color:var(--text-dim)}
-.cmdk-empty{padding:24px;text-align:center;font-size:.85rem;color:var(--text-dim)}
-
-/* ============ HEATMAP ============ */
-.heatmap-scroll{overflow-x:auto;padding-bottom:4px}
-.heatmap{min-width:max-content}
-.heatmap-months{display:flex;gap:3px;font-size:.6rem;font-weight:700;color:var(--text-dim);margin-bottom:5px}
-.heatmap-months span{display:inline-block;text-align:left;overflow:hidden}
-.heatmap-grid{display:flex;gap:3px}
-.heatmap-col{display:flex;flex-direction:column;gap:3px}
-.heat-cell{width:13px;height:13px;border-radius:3px;background:var(--row-bg);animation:heatPop .4s ease both}
-@keyframes heatPop{from{opacity:0;transform:scale(.4)}to{opacity:1;transform:none}}
-.heat-cell.l0{background:var(--row-bg)}
-.heat-cell.l1{background:color-mix(in srgb,var(--accent) 28%,transparent)}
-.heat-cell.l2{background:color-mix(in srgb,var(--accent) 50%,transparent)}
-.heat-cell.l3{background:color-mix(in srgb,var(--accent) 74%,transparent)}
-.heat-cell.l4{background:var(--accent)}
-.heat-cell.future{opacity:.35}
-.heatmap-legend{display:flex;align-items:center;gap:5px;margin-top:10px;font-size:.66rem;font-weight:700;color:var(--text-dim)}
-.heatmap-legend .heat-cell{animation:none}
-
-/* ============ MICRO-ANIMATIONS / EFFICIENCY POLISH ============ */
-@media (prefers-reduced-motion: no-preference){
-  .kpi-value{animation:countPop .5s cubic-bezier(.22,1,.36,1)}
-  @keyframes countPop{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
-  .nav-item{transition:background .2s ease,color .2s ease,transform .15s ease}
-  .nav-item:active{transform:scale(.96)}
-  .chip{transition:transform .15s ease}
-  .task-row:hover .task-title{color:var(--accent)}
-}
-.cmdk-tip{position:fixed;bottom:14px;left:14px;z-index:120;font-size:.66rem;font-weight:700;color:var(--text-dim);background:var(--surface);border:1px solid var(--glass-border);border-radius:8px;padding:5px 9px;pointer-events:none;opacity:.85}
-@media(max-width:860px){.cmdk-tip{display:none}}
-
-/* =========================================================================
-   PREMIUM CUSTOM DESIGN OVERRIDES (BESPOKE LOOK & FEEL)
-   ========================================================================= */
-:root {
-  --sidebar-w: 270px;
-  --anim-dur: 0.3s;
-}
-.glass-panel {
-  background: color-mix(in srgb, var(--surface) 80%, rgba(255, 255, 255, 0.45));
-  border: 1px solid var(--glass-border);
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.03), inset 0 1px 1px rgba(255, 255, 255, 0.5);
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
-  border-radius: 20px;
-}
-.sidebar {
-  background: color-mix(in srgb, var(--surface) 95%, rgba(255, 255, 255, 0.6));
-  border: 1px solid var(--glass-border);
-}
-.brand-title {
-  font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, sans-serif;
-  font-weight: 800;
-  letter-spacing: -0.5px;
-}
-.nav-item {
-  position: relative;
-  font-weight: 600;
-  letter-spacing: -0.1px;
-}
-.nav-item.active {
-  background: var(--accent-gradient);
-  color: #ffffff !important;
-  box-shadow: 0 8px 20px var(--accent-glow);
-  border-color: transparent;
-}
-.nav-item:not(.active):hover {
-  background: rgba(0, 0, 0, 0.03);
-  transform: translateX(4px);
-}
-.btn {
-  font-family: inherit;
-  font-weight: 700;
-  letter-spacing: -0.1px;
-  border-radius: 12px;
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-}
-.btn-primary {
-  background: var(--accent-gradient);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 4px 14px var(--accent-glow), inset 0 1px 0 rgba(255, 255, 255, 0.2);
-}
-.btn-primary:hover {
-  transform: translateY(-1.5px);
-  box-shadow: 0 8px 24px var(--accent-glow);
-  filter: brightness(1.05);
-}
-.btn-secondary {
-  background: rgba(255, 255, 255, 0.6);
-  border: 1px solid var(--glass-border);
-}
-.btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.9);
-  transform: translateY(-1.5px);
-  border-color: var(--glass-border-hover);
-}
-.task-row {
-  border: 1px solid rgba(0, 0, 0, 0.02);
-  background: rgba(255, 255, 255, 0.4);
-  margin-bottom: 9px;
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-  border-radius: 14px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.01);
-}
-.task-row:hover {
-  background: rgba(255, 255, 255, 0.85);
-  transform: translateX(3px) scale(1.005);
-  border-color: var(--accent-light);
-  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.03);
-}
-.task-row.done {
-  opacity: 0.45;
-  background: rgba(255, 255, 255, 0.15);
-  border-color: transparent;
-}
-.task-dot {
-  width: 10px;
-  height: 10px;
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-}
-.kpi-card {
-  position: relative;
-  border-left: none;
-  overflow: hidden;
-  transition: transform .3s cubic-bezier(.22,1,.36,1), box-shadow .3s ease;
-}
-.kpi-card::before {
-  content: "";
-  position: absolute; top: 0; left: 0; right: 0; height: 3px;
-  background: var(--accent-gradient);
-  opacity: .85;
-}
-.kpi-card:hover {
-  transform: translateY(-3px);
-  box-shadow: var(--glass-shadow-hover);
-}
-.kpi-value {
-  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
-  letter-spacing: -1.5px;
-  font-variant-numeric: tabular-nums;
-}
-/* Smooth cross-fade when switching themes */
-body { transition: background-color .5s ease, color .3s ease; }
-::selection { background: var(--accent-glow); color: var(--text-main); }
-:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
-
-.cmdk {
-  border: 1px solid var(--glass-border);
-  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.25);
-  border-radius: 18px;
-  background: color-mix(in srgb, var(--surface-solid) 96%, transparent);
-  backdrop-filter: blur(28px) saturate(170%);
-  -webkit-backdrop-filter: blur(28px) saturate(170%);
-}
-.cmdk-item:hover, .cmdk-item.active {
-  background: var(--accent-gradient);
-  color: #fff !important;
-}
-.cmdk-item:hover .cmdk-label, .cmdk-item.active .cmdk-label, .cmdk-item:hover .cmdk-hint, .cmdk-item.active .cmdk-hint {
-  color: #fff !important;
-}
-.task-row.active-clock {
-  border-color: var(--success-accent);
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), var(--row-hover));
-  box-shadow: 0 8px 24px rgba(34, 197, 94, 0.1);
-}
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-thumb {
-  background: rgba(99, 102, 241, 0.25);
-  border-radius: 10px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(99, 102, 241, 0.5);
-}
-.heat-cell {
-  border-radius: 4px;
-  transition: all 0.2s ease;
-}
-.heat-cell:hover {
-  transform: scale(1.2);
-  box-shadow: 0 0 8px var(--accent);
-}
-.ai-panel {
-  border-radius: 20px;
-  border: 1px solid var(--glass-border);
-  box-shadow: 0 20px 50px rgba(30, 27, 75, 0.12);
-  overflow: hidden;
-  background: rgba(255, 255, 255, 0.96);
-}
-.ai-head {
-  background: rgba(255, 255, 255, 0.4);
-  border-bottom: 1px solid var(--glass-border);
-}
-.ai-msg {
-  border-radius: 16px;
-  padding: 12px 16px;
-  font-size: 0.88rem;
-}
-.ai-msg.user {
-  background: var(--accent-gradient);
-  color: #fff;
-  box-shadow: 0 4px 12px var(--accent-glow);
-}
-.ai-msg.bot {
-  background: rgba(255, 255, 255, 0.8);
-  border: 1px solid rgba(0, 0, 0, 0.05);
-}
-.ai-quick button {
-  background: rgba(255, 255, 255, 0.6);
-  border: 1px solid var(--glass-border);
-  border-radius: 12px;
-  padding: 6px 12px;
-  font-weight: 700;
-  transition: all 0.2s ease;
-}
-.ai-quick button:hover {
-  background: var(--accent-gradient);
-  color: #fff !important;
-  border-color: transparent;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 10px var(--accent-glow);
-}
-body.theme-dark .glass-panel {
-  background: rgba(18, 18, 20, 0.8);
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
-  border-color: rgba(255, 255, 255, 0.1);
-}
-body.theme-dark .sidebar {
-  background: rgba(14, 14, 16, 0.9);
-}
-body.theme-dark .task-row {
-  background: rgba(255, 255, 255, 0.04);
-  border-color: rgba(255, 255, 255, 0.03);
-}
-body.theme-dark .task-row:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: var(--accent);
-}
-body.theme-dark .btn-secondary {
-  background: rgba(255, 255, 255, 0.05);
-  color: #fff;
-  border-color: rgba(255, 255, 255, 0.1);
-}
-body.theme-dark .btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.1);
-}
-body.theme-dark .cmdk {
-  background: rgba(18, 18, 20, 0.95);
-  border-color: rgba(255, 255, 255, 0.1);
-}
-body.theme-dark .ai-panel {
-  background: rgba(18, 18, 20, 0.98);
-  border-color: rgba(255, 255, 255, 0.1);
-}
-body.theme-dark .ai-msg.bot {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.05);
-  color: #e2e8f0;
-}
-body.theme-dark .ai-quick button {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.1);
-  color: #94a3b8;
-}
-body.theme-dark .input-field {
-  background: rgba(255, 255, 255, 0.03);
-  border-color: rgba(255, 255, 255, 0.08);
+export function activeProvider(): string | null {
+  if (getSafeKey("NEXT_PUBLIC_GEMINI_API_KEY") || getSafeKey("NEXT_PUBLIC_GOOGLE_API_KEY")) return "AI Cloud";
+  if (getSafeKey("NEXT_PUBLIC_GROQ_API_KEY")) return "Groq";
+  if (getSafeKey("NEXT_PUBLIC_OPENROUTER_API_KEY")) return "OpenRouter";
+  return null;
 }
 
-/* --- FIXES FOR MOBILE OVERLAP & BUTTON VISIBILITY --- */
-@media(max-width:860px) {
-  .main-workspace { padding-bottom: 150px !important; }
-  .sidebar {
-    background: var(--surface-solid) !important;
-    border-top: 1px solid var(--glass-border) !important;
-    box-shadow: 0 -10px 40px rgba(0,0,0,0.2) !important;
-    padding-bottom: 24px !important;
+/* ============================================================
+   LLM CALLER — Gemini → Groq → OpenRouter Fallback Chain
+============================================================ */
+export async function callLLM(
+  system: string,
+  messages: ChatMsg[],
+  maxTokens = 2500
+): Promise<string | null> {
+  const providers = ["gemini", "groq", "openrouter"];
+
+  for (const provider of providers) {
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 18000);
+      let text: string | null = null;
+
+      const geminiKey = getSafeKey("NEXT_PUBLIC_GEMINI_API_KEY") || getSafeKey("NEXT_PUBLIC_GOOGLE_API_KEY");
+      const groqKey = getSafeKey("NEXT_PUBLIC_GROQ_API_KEY");
+      const openrouterKey = getSafeKey("NEXT_PUBLIC_OPENROUTER_API_KEY");
+      const geminiModel = getSafeKey("NEXT_PUBLIC_GEMINI_MODEL") || "gemini-1.5-flash";
+
+      if (provider === "gemini" && geminiKey) {
+        const r = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiKey}`,
+          {
+            method: "POST",
+            signal: ctrl.signal,
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              systemInstruction: { parts: [{ text: system }] },
+              contents: messages.map((m) => ({
+                role: m.role === "assistant" ? "model" : "user",
+                parts: [{ text: m.content }],
+              })),
+              generationConfig: { maxOutputTokens: maxTokens },
+            }),
+          }
+        );
+        if (r.ok) {
+          const j = await r.json();
+          text = j?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text || "").join("") ?? null;
+        }
+      } else if (provider === "groq" && groqKey) {
+        const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+          method: "POST",
+          signal: ctrl.signal,
+          headers: { "content-type": "application/json", authorization: `Bearer ${groqKey}` },
+          body: JSON.stringify({
+            model: "llama-3.3-70b-versatile",
+            max_tokens: maxTokens,
+            messages: [{ role: "system", content: system }, ...messages],
+          }),
+        });
+        if (r.ok) {
+          const j = await r.json();
+          text = j?.choices?.[0]?.message?.content ?? null;
+        }
+      } else if (provider === "openrouter" && openrouterKey) {
+        const r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          signal: ctrl.signal,
+          headers: {
+            "content-type": "application/json",
+            authorization: `Bearer ${openrouterKey}`,
+            "HTTP-Referer": "https://studyplanner.netlify.app",
+            "X-Title": "Study Planner Pro",
+          },
+          body: JSON.stringify({
+            model: "openai/gpt-4o-mini",
+            max_tokens: maxTokens,
+            messages: [{ role: "system", content: system }, ...messages],
+          }),
+        });
+        if (r.ok) {
+          const j = await r.json();
+          text = j?.choices?.[0]?.message?.content ?? null;
+        }
+      }
+
+      clearTimeout(timer);
+      if (text && text.trim()) return text.trim();
+    } catch (_) {
+      continue;
+    }
+  }
+  return null;
+}
+
+function extractJson<T>(raw: string): T | null {
+  const fence = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
+  const body = fence ? fence[1] : raw;
+  const start = body.search(/[[{]/);
+  if (start < 0) return null;
+  const endBrace = Math.max(body.lastIndexOf("]"), body.lastIndexOf("}"));
+  try {
+    return JSON.parse(body.slice(start, endBrace + 1)) as T;
+  } catch {
+    return null;
   }
 }
-.btn-secondary {
-  background: color-mix(in srgb, var(--surface-solid) 96%, transparent) !important;
-  border: 1px solid var(--glass-border-hover) !important;
-  color: var(--text-main) !important;
-  font-weight: 800 !important;
-}
 
-/* ==================================================
-   LIQUID GLASS LAYER — Apple-style glass morphism
-   Rim light + specular highlight + saturated refraction
-   blur + iOS spring physics. Fully theme-aware.
-================================================== */
-:root{
-  /* iOS spring curves */
-  --spring: cubic-bezier(.34,1.56,.64,1);       /* gentle overshoot */
-  --spring-soft: cubic-bezier(.22,1,.36,1);      /* settle, no bounce */
-  --lg-rim: rgba(255,255,255,.65);
-  --lg-rim-faint: rgba(255,255,255,.25);
-  --lg-shine: linear-gradient(115deg,rgba(255,255,255,.5) 0%,rgba(255,255,255,.12) 28%,transparent 45%);
-}
-body.theme-dark,body.theme-obsidian,body.theme-nebula{
-  --lg-rim: rgba(255,255,255,.28);
-  --lg-rim-faint: rgba(255,255,255,.1);
-  --lg-shine: linear-gradient(115deg,rgba(255,255,255,.16) 0%,rgba(255,255,255,.05) 28%,transparent 45%);
-}
+/* ============================================================
+   AI SUBJECT MATCHER
+============================================================ */
+export async function aiSuggestSubjects(
+  courseName: string,
+  level: string
+): Promise<{ subjects: SeedSubject[]; source: string }> {
+  const fallback = synthesiseSubjects(courseName, level);
+  const query = courseName.toLowerCase();
 
-/* ── Core liquid-glass surface: refraction blur + top rim light ── */
-.glass-panel,.tracker-bar,.ai-panel,.cmdk,.modal-box{
-  backdrop-filter: blur(28px) saturate(190%) brightness(1.04);
-  -webkit-backdrop-filter: blur(28px) saturate(190%) brightness(1.04);
-  box-shadow:
-    0 12px 40px rgba(30,27,75,.1),
-    inset 0 1px 0 var(--lg-rim),               /* top specular rim */
-    inset 0 -1px 0 rgba(0,0,0,.04),            /* bottom grounding */
-    inset 1px 0 0 var(--lg-rim-faint),         /* left edge catch */
-    inset -1px 0 0 var(--lg-rim-faint);        /* right edge catch */
-}
-
-/* ── Specular sheen sweeping the top of primary surfaces ── */
-.tracker-bar::after{
-  content:"";position:absolute;inset:0 0 55% 0;border-radius:inherit;pointer-events:none;
-  background:var(--lg-shine);
-  opacity:.8;
-}
-
-
-/* ── Buttons: liquid pill glass with press-in physics ── */
-.btn{transition:transform .3s var(--spring),box-shadow .25s ease,background .2s ease,border-color .2s ease,color .2s ease,filter .2s ease}
-.btn:hover{transform:translateY(-1.5px) scale(1.015)}
-.btn:active{transform:translateY(0) scale(.94);transition-duration:.08s}
-.btn-primary{
-  position:relative;overflow:hidden;
-  box-shadow:0 6px 18px var(--accent-glow),inset 0 1.5px 0 rgba(255,255,255,.45),inset 0 -1px 0 rgba(0,0,0,.12);
-}
-.btn-primary::before{
-  content:"";position:absolute;inset:0 0 50% 0;
-  background:linear-gradient(180deg,rgba(255,255,255,.28),transparent);
-  pointer-events:none;
-}
-.btn-secondary{
-  backdrop-filter:blur(16px) saturate(160%);-webkit-backdrop-filter:blur(16px) saturate(160%);
-  box-shadow:inset 0 1px 0 var(--lg-rim-faint) !important;
-}
-
-/* ── Chips → liquid glass capsules ── */
-.chip{
-  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.3);
-  transition:transform .3s var(--spring);
-}
-.chip:hover{transform:translateY(-1px) scale(1.04)}
-
-/* ── Nav items: springy select with liquid pill ── */
-.nav-item{transition:background .25s ease,color .25s ease,transform .3s var(--spring),box-shadow .3s ease}
-.nav-item:active{transform:scale(.95)}
-.nav-item.active{box-shadow:0 8px 20px var(--accent-glow),inset 0 1px 0 rgba(255,255,255,.35)}
-
-/* ── FAB: floating liquid orb with idle breathing ── */
-.ai-fab{
-  box-shadow:0 12px 30px var(--accent-glow),inset 0 2px 0 rgba(255,255,255,.4),inset 0 -2px 4px rgba(0,0,0,.15);
-  transition:transform .35s var(--spring),box-shadow .3s ease;
-  animation:fabBreathe 4s ease-in-out infinite;
-}
-.ai-fab:hover{transform:scale(1.08) rotate(-4deg);animation-play-state:paused}
-.ai-fab:active{transform:scale(.9)}
-@keyframes fabBreathe{0%,100%{box-shadow:0 12px 30px var(--accent-glow),inset 0 2px 0 rgba(255,255,255,.4)}50%{box-shadow:0 16px 44px var(--accent-glow),inset 0 2px 0 rgba(255,255,255,.5)}}
-
-/* ── Task rows: glass lift on hover, spring settle ── */
-.task-row{transition:background .2s ease,border-color .2s ease,transform .35s var(--spring),box-shadow .3s ease}
-.task-row:hover{box-shadow:0 6px 18px rgba(30,27,75,.08),inset 0 1px 0 var(--lg-rim-faint)}
-.task-row:active{transform:scale(.995)}
-
-/* ── KPI cards: iOS widget feel ── */
-.kpi-card{transition:transform .4s var(--spring),box-shadow .35s ease}
-.kpi-card:hover{transform:translateY(-4px) scale(1.015)}
-.kpi-card:active{transform:scale(.98)}
-
-/* ── Modal + palette: iOS sheet spring-up ── */
-.modal-box{animation:sheetUp .5s var(--spring)}
-@keyframes sheetUp{from{opacity:0;transform:translateY(28px) scale(.96)}to{opacity:1;transform:none}}
-.cmdk{animation:cmdkPop .38s var(--spring)}
-@keyframes cmdkPop{from{opacity:0;transform:translateY(-14px) scale(.97)}to{opacity:1;transform:none}}
-.ai-panel.slide-in{animation:panelSpring .5s var(--spring)}
-@keyframes panelSpring{from{opacity:0;transform:translateY(24px) scale(.96)}to{opacity:1;transform:none}}
-
-/* ── Inputs: focus glow like iOS search fields ── */
-.input-field,.ob-name-input,.ob-course-search,.ob-add-sub-input{
-  transition:border-color .25s ease,box-shadow .3s ease,background .2s ease;
-}
-.input-field:focus,.ob-name-input:focus,.ob-course-search:focus,.ob-add-sub-input:focus{
-  border-color:var(--accent);
-  box-shadow:0 0 0 4px var(--accent-glow),inset 0 1px 0 var(--lg-rim-faint);
-}
-
-/* ── Mobile bottom nav → iOS dock: floating glass capsule ── */
-@media(max-width:860px){
-  .sidebar{
-    left:10px;right:10px;bottom:10px;width:auto;
-    border-radius:26px;
-    background:color-mix(in srgb, var(--surface-solid) 88%, transparent) !important;
-    backdrop-filter:blur(30px) saturate(190%);-webkit-backdrop-filter:blur(30px) saturate(190%);
-    border:1px solid var(--glass-border) !important;
-    box-shadow:0 -6px 30px rgba(0,0,0,.14),inset 0 1px 0 var(--lg-rim-faint) !important;
-    padding-bottom:max(8px, env(safe-area-inset-bottom)) !important;
+  // ── GROUND-TRUTH INTERCEPTION (LLM BYPASS) ──────────────────────
+  // NMIMS / CDOE / MBA / Marketing queries never touch the LLM: the
+  // verified Semester 1 catalog (6 subjects, 76 units) is returned
+  // directly so unit counts can never be hallucinated.
+  if (
+    isNmimsQuery(courseName) ||
+    query.includes("nmims") ||
+    query.includes("cdoe") ||
+    query.includes("marketing") ||
+    query.includes("mba")
+  ) {
+    // synthesiseSubjects already resolves NMIMS ground truth (and handles
+    // explicit semester filters); if it returned the locked Sem-1 set use
+    // it as-is, otherwise fall back to the canonical catalog directly.
+    const nmims = isNmimsQuery(courseName);
+    const verified = fallback.length >= 3 ? fallback : nmimsSem1Subjects();
+    return {
+      subjects: verified,
+      source: nmims ? "Verified NMIMS Database" : "Verified Catalog",
+    };
   }
-  .nav-item.active{background:var(--accent-gradient);border-radius:16px}
-  .mobile-header{
-    background:color-mix(in srgb, var(--surface-solid) 90%, transparent);
-    backdrop-filter:blur(26px) saturate(180%);-webkit-backdrop-filter:blur(26px) saturate(180%);
+
+  const raw = await callLLM(
+    "You are an academic curriculum planner. Return a strict JSON array ONLY.",
+    [
+      {
+        role: "user",
+        content: `Course/exam: "${courseName}". Education level: ${level}.
+        Generate the core subjects for Semester 1 as a JSON array:
+        [{"name":"Exact Subject Name","units":12,"difficulty":"Medium","color":"#6366f1"}]`
+      }
+    ],
+    2500
+  );
+
+  if (!raw) return { subjects: fallback, source: "aether-local" };
+
+  try {
+    const parsed = extractJson<SeedSubject[]>(raw);
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      const palette = ["#6366f1", "#10b981", "#f59e0b", "#ef4444", "#06b6d4", "#ec4899", "#84cc16"];
+      const validated = parsed.slice(0, 8).map((s, i) => ({
+        name: String(s.name).slice(0, 80),
+        units: Math.min(40, Math.max(2, Number(s.units) || 8)),
+        difficulty: (["Easy", "Medium", "Hard"].includes(String(s.difficulty)) ? s.difficulty : "Medium") as SeedSubject["difficulty"],
+        color: palette[i % palette.length],
+      }));
+      return { subjects: validated, source: "AI Cloud Database" };
+    }
+  } catch { /* fall through */ }
+
+  return { subjects: fallback, source: "aether-local" };
+}
+
+/* ============================================================
+   TOPIC RESOLUTION
+============================================================ */
+export async function aiGenerateTopics(
+  subjectName: string,
+  units: number,
+  difficulty: string,
+  level: string,
+  courseName: string
+): Promise<GeneratedTopic[]> {
+  // ── GROUND-TRUTH INTERCEPTION (LLM BYPASS) ──────────────────────
+  // If this subject belongs to the verified NMIMS catalog, load the exact
+  // textbook chapter titles from the ground-truth bank — never the LLM.
+  // generateTopics() internally locks the unit count to the chapter list.
+  const nmimsChapters = getNmimsChapters(subjectName);
+  if (nmimsChapters) {
+    return generateTopics(subjectName, nmimsChapters.length, difficulty, level);
   }
-  .main-workspace{padding-bottom:120px !important}
+  if (isNmimsQuery(courseName) || isNmimsQuery(subjectName)) {
+    return generateTopics(subjectName, units, difficulty, level);
+  }
+
+  const fallback = generateTopics(subjectName, units, difficulty, level);
+  const raw = await callLLM(
+    `You are a strict curriculum architect. Return a strict JSON array ONLY.`,
+    [
+      {
+        role: "user",
+        content: `Subject: "${subjectName}". Canonical unit count: ${units}. Difficulty: ${difficulty}.
+        Generate exactly ${units} lessons.
+        Format: [{"unit":"Unit 1","title":"...","summary":"...","objectives":["..."],"difficulty":"Medium","estMinutes":45}]`,
+      },
+    ],
+    Math.min(4000, 800 + units * 120)
+  );
+
+  if (!raw) return fallback;
+
+  const parsed = extractJson<GeneratedTopic[]>(raw);
+  if (!parsed || !Array.isArray(parsed) || parsed.length < 2) return fallback;
+
+  return parsed.slice(0, units).map((t, i) => ({
+    unit: t.unit || `Unit ${i + 1}`,
+    title: String(t.title || fallback[i]?.title || `Lesson ${i + 1}`).slice(0, 160),
+    summary: String(t.summary || fallback[i]?.summary || ""),
+    objectives: Array.isArray(t.objectives) ? t.objectives.slice(0, 4).map(String) : [],
+    difficulty: (["Easy", "Medium", "Hard"].includes(String(t.difficulty)) ? t.difficulty : "Medium") as "Easy" | "Medium" | "Hard",
+    estMinutes: Math.min(180, Math.max(15, Number(t.estMinutes) || 45)),
+  }));
 }
 
-/* ── Tablet band (861–1100px): tighter sidebar, denser grid ── */
-@media(min-width:861px) and (max-width:1100px){
-  :root{--sidebar-w:212px}
-  .app-wrapper{gap:14px;padding:14px}
-  .kpi-grid{grid-template-columns:repeat(2,1fr)}
+export type TutorContext = {
+  name: string; courseName: string; level: string; examDate: string; daysLeft: number; dailyHours: number;
+  subjects: { id: number; name: string; difficulty: string; done: number; total: number }[];
+  today: { title: string; kind: string; minutes: number; status: string }[];
+  progressPct: number; streak: number; hoursThisWeek: number; overdue: number;
+};
+export type TutorReply = { text: string; action?: { type: string; payload?: unknown } };
+
+function round(n: number): number { return Math.round(n * 10000) / 10000; }
+function percentQ(q: string): string | null {
+  const m = q.match(/what\s+is\s+(\d+\.?\d*)\s*%\s*of\s*(\d+\.?\d*)/i);
+  if (!m) return null;
+  const v = (parseFloat(m[1]) / 100) * parseFloat(m[2]);
+  return `${m[1]}% of ${m[2]} = **${round(v)}**`;
 }
 
-/* ── Ultra-small phones ── */
-@media(max-width:360px){
-  .page-title{font-size:1.18rem}
-  .kpi-value{font-size:1.55rem}
-  .nav-item{font-size:.58rem;padding:6px 3px}
-  .btn{padding:8px 12px;font-size:.78rem}
+export function parseCommand(q: string): TutorReply["action"] | undefined {
+  const n = q.toLowerCase().trim().replace(/[.!?]+$/, "");
+
+  // ── Break / timer state transitions (checked BEFORE navigation so
+  //    "resume", "end break", "pause" never get mis-routed) ──
+  if (/\b(resume|end (my |the )?break|back from (my |the )?break|break('?s)? over|continue (the )?(session|timer|studying))\b/.test(n)) return { type: "resume" };
+  if (/\b(pause (the )?(timer|clock|session)|pause\b|hold (the )?timer)\b/.test(n) && !/\bbreak\b/.test(n)) return { type: "pause" };
+  if (/\b(take a break|break time|need a break|short break|give me a break)\b/.test(n)) return { type: "break" };
+
+  // ── Navigation ──
+  if (/\b(planner|schedule|my plan|timetable)\b/.test(n) && /\b(open|go|show|view|take me|see)\b/.test(n)) return { type: "navigate", payload: "planner" };
+  if (/\b(dashboard|overview|home|stats?)\b/.test(n) && /\b(open|go|show|view|take me|see)\b/.test(n)) return { type: "navigate", payload: "dashboard" };
+  if (/\b(subjects?|syllabus|topics?|lessons?)\b/.test(n) && /\b(open|go|show|view|manage|edit)\b/.test(n)) return { type: "navigate", payload: "subjects" };
+  if (/\b(settings?|preferences?|options?|profile)\b/.test(n) && /\b(open|go|show|change|edit)\b/.test(n)) return { type: "navigate", payload: "settings" };
+  if (/\b(focus( page| view| tab)?|pomodoro)\b/.test(n) && /\b(open|go|show|view|take me|see)\b/.test(n)) return { type: "navigate", payload: "focus" };
+  if (/^\/?(planner|schedule)$/.test(n)) return { type: "navigate", payload: "planner" };
+  if (/^\/?(dashboard|overview)$/.test(n)) return { type: "navigate", payload: "dashboard" };
+  if (/^\/?(subjects|syllabus)$/.test(n)) return { type: "navigate", payload: "subjects" };
+  if (/^\/?(settings)$/.test(n)) return { type: "navigate", payload: "settings" };
+  if (/^\/?(focus|pomodoro)$/.test(n)) return { type: "navigate", payload: "focus" };
+
+  // ── Clock ──
+  if (/\b(clock ?in|start (the )?(timer|clock|focus|session|studying|study)|begin (studying|session|focus)|let'?s study|i'?m ready to study)\b/.test(n)) return { type: "startTimer" };
+  if (/\b(clock ?out|stop (the )?(timer|clock|session)|end (the )?(session|study)|i'?m done|finished studying)\b/.test(n)) return { type: "stopTimer" };
+  if (/\b(zen|focus mode|full ?screen|distraction ?free|deep work mode)\b/.test(n)) return { type: "zen" };
+  if (/\b(re-?plan|rebuild|regenerate|reschedule|re-?balance|redo my (plan|schedule)|fix my (plan|schedule)|update my plan)\b/.test(n)) return { type: "replan" };
+
+  if (n.includes("theme") || /\b(midnight|dark|obsidian|nebula|emerald|sunset|mint|silver|lavender|samsung|light|black)\b/.test(n)) {
+    // Payloads are the raw THEME IDS stored in settings.theme — the UI
+    // applies them as `theme-${id}`, so never prefix "theme-" here.
+    if (/(midnight|dark|black)/.test(n)) return { type: "theme", payload: "dark" };
+    if (/(obsidian)/.test(n)) return { type: "theme", payload: "obsidian" };
+    if (/(nebula)/.test(n)) return { type: "theme", payload: "nebula" };
+    if (/(emerald|mint)/.test(n)) return { type: "theme", payload: "mint" };
+    if (/(sunset|champagne)/.test(n)) return { type: "theme", payload: "sunset" };
+    if (/(light|samsung|clean)/.test(n)) return { type: "theme", payload: "sunset" };
+    if (/(silver|lavender)/.test(n)) return { type: "theme", payload: "silver-lavender" };
+    return { type: "theme", payload: "dark" };
+  }
+  return undefined;
 }
 
-/* ── Landscape phones: dock shrinks, workspace breathes ── */
-@media(max-width:900px) and (max-height:500px) and (orientation:landscape){
-  .sidebar{padding:4px !important}
-  .nav-item{flex-direction:row;gap:6px;font-size:.68rem}
-  .main-workspace{padding-top:8px;padding-bottom:76px !important}
-  .mobile-header{display:none}
+export async function localTutor(q: string, ctx: TutorContext): Promise<TutorReply> {
+  const action = parseCommand(q);
+  const n = q.toLowerCase();
+
+  if (action?.type === "replan") {
+    return { text: `Schedule rebalanced against your remaining syllabus.`, action };
+  }
+  if (action) {
+    const msgs: Record<string, string> = {
+      navigate: `Opening **${String(action.payload)}** for you.`,
+      startTimer: `Clock started. Session logged against your current subject.`,
+      stopTimer: `Session logged. Well done.`,
+      break: `Break started. Hydrate and relax for a few minutes.`,
+      pause: `Timer paused. Say "resume" when ready.`,
+      resume: `Resumed — back on the clock.`,
+      zen: `Zen mode active.`,
+      theme: `Theme updated.`,
+    };
+    return { text: msgs[action.type] || "Done.", action };
+  }
+
+  if (/(what|which).*(today|now)|today'?s (plan|task|study|load)|what should i (study|do)/.test(n)) {
+    if (!ctx.today.length) return { text: `Nothing scheduled for today.` };
+    const list = ctx.today.map((t, i) => `${i + 1}. **${t.title}** (${t.minutes} min)`).join("\n");
+    return { text: `Here is today's schedule:\n\n${list}\n\nSay *"start timer"* to begin.` };
+  }
+
+  const pct = percentQ(q);
+  if (pct) return { text: pct };
+
+  const aiResponse = await callLLM(tutorSystemPrompt(ctx), [{ role: "user", content: q }], 800);
+  if (aiResponse) return { text: aiResponse };
+
+  const subjectHint = ctx.subjects.find((s) => n.includes(s.name.toLowerCase().split(" ")[0]))?.name;
+  const knowledge = await lookupKnowledge(q);
+  if (knowledge) return { text: teachFromKnowledge(knowledge, q, ctx.level, subjectHint) };
+
+  return { text: `Ask me to explain any concept from your subjects or say *"what should I study today?"*` };
 }
 
-/* ==================================================
-   LIQUID GLASS — EXTENDED COVERAGE
-   Every remaining button-like element, with touch-first
-   physics (press states work even where hover doesn't).
-================================================== */
+export function tutorSystemPrompt(ctx: TutorContext): string {
+  const now = new Date();
+  const dateStr = now.toLocaleDateString("en-IN", {
+    weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: "Asia/Kolkata",
+  });
+  return `You are AETHER, the built-in study coach for Study Planner Pro.
 
-/* ── View tabs (List/Calendar/Kanban): iOS segmented control ── */
-.vtabs{
-  border-radius:999px;padding:4px;gap:3px;
-  background:color-mix(in srgb, var(--row-bg) 80%, transparent);
-  backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);
-  box-shadow:inset 0 1px 2px rgba(0,0,0,.05),inset 0 -1px 0 var(--lg-rim-faint);
-}
-.vtab{
-  border-radius:999px;
-  transition:background .3s var(--spring-soft),color .25s ease,transform .3s var(--spring),box-shadow .3s ease;
-}
-.vtab:active{transform:scale(.94)}
-.vtab.active{
-  background:var(--surface-solid);
-  box-shadow:0 3px 10px rgba(0,0,0,.1),inset 0 1px 0 var(--lg-rim);
-}
+TODAY'S DATE IS ${dateStr}. This is the real current date — trust it completely,
+even if it is later than your training data. Never call the current date "the
+future", never mention your training cutoff, and never refuse a question because
+of dates. If asked about news or live events, simply say you don't have live
+news access in one short sentence, then pivot to something useful (e.g. offer
+a current-affairs study strategy if their course includes it).
 
-/* ── Danger button: glass treatment consistent with the rest ── */
-.btn-danger{
-  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.25);
-}
-.btn-danger:hover{box-shadow:0 6px 16px rgba(220,38,38,.18),inset 0 1px 0 rgba(255,255,255,.3)}
+Learner: ${ctx.name}. Course: ${ctx.courseName}. Days Left: ${ctx.daysLeft} (exam: ${ctx.examDate}). Progress: ${ctx.progressPct}%.
+Teach step-by-step using clear markdown formatting.
 
-/* ── Streak badge: breathing glass capsule ── */
-.streak-badge{
-  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.35);
-  transition:transform .3s var(--spring);
-}
-.streak-badge:hover{transform:scale(1.05)}
-
-/* ── AI quick-suggestion pills: liquid chips with spring pop ── */
-.ai-quick button{
-  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
-  box-shadow:inset 0 1px 0 var(--lg-rim-faint);
-  transition:transform .3s var(--spring),border-color .2s ease,color .2s ease,background .2s ease,box-shadow .25s ease;
-}
-.ai-quick button:hover{
-  transform:translateY(-1.5px) scale(1.04);
-  background:var(--accent-glow);
-  box-shadow:0 4px 12px var(--accent-glow),inset 0 1px 0 rgba(255,255,255,.3);
-}
-.ai-quick button:active{transform:scale(.93)}
-
-/* ── Onboarding level/course buttons: glass selection cards ── */
-.ob-level-btn{
-  backdrop-filter:blur(14px) saturate(150%);-webkit-backdrop-filter:blur(14px) saturate(150%);
-  box-shadow:inset 0 1px 0 var(--lg-rim-faint);
-  transition:transform .35s var(--spring),border-color .25s ease,background .25s ease,box-shadow .3s ease;
-}
-.ob-level-btn:hover{transform:translateY(-2px) scale(1.01);box-shadow:0 8px 22px rgba(30,27,75,.08),inset 0 1px 0 var(--lg-rim)}
-.ob-level-btn:active{transform:scale(.97)}
-.ob-btn{
-  transition:transform .3s var(--spring),box-shadow .25s ease,background .2s ease,filter .2s ease;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.3);
-}
-.ob-btn:hover{transform:translateY(-1.5px)}
-.ob-btn:active{transform:scale(.95)}
-
-/* ── Calendar cells: glass tiles with lift ── */
-.cal-cell{
-  transition:transform .35s var(--spring),background .2s ease,border-color .2s ease,box-shadow .3s ease;
-}
-.cal-cell:hover{
-  transform:translateY(-2px);
-  border-color:var(--glass-border-hover);
-  box-shadow:0 8px 20px rgba(30,27,75,.08),inset 0 1px 0 var(--lg-rim-faint);
-}
-.cal-cell:active{transform:scale(.97)}
-
-/* ── Select dropdowns: match glass inputs ── */
-select.input-field{
-  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
-  box-shadow:inset 0 1px 0 var(--lg-rim-faint);
-  cursor:pointer;
+APP CONTROL — you CAN control this app. When the user asks you to perform an app action
+(in ANY language or phrasing), append ONE action tag on its own final line, then it will
+be executed automatically. Available tags:
+[[action:navigate:planner]]  [[action:navigate:dashboard]]  [[action:navigate:subjects]]
+[[action:navigate:settings]]  [[action:navigate:focus]]
+[[action:theme:dark]]  [[action:theme:obsidian]]  [[action:theme:nebula]]
+[[action:theme:mint]]  [[action:theme:sunset]]  [[action:theme:silver-lavender]]
+[[action:startTimer]]  [[action:stopTimer]]  [[action:pause]]  [[action:resume]]
+[[action:break]]  [[action:zen]]  [[action:replan]]
+Theme names: midnight/dark/black → dark; lavender/silver/light → silver-lavender;
+emerald → mint; champagne → sunset. "Previous/default theme" → silver-lavender.
+Rules: emit at most ONE tag, only when the user clearly requests that action.
+Never claim you cannot control themes, timers, navigation or replanning — you can.
+For pure study questions, do not emit any tag.`;
 }
 
-/* ── Day blocks: subtle glass grouping ── */
-.day-block{
-  transition:box-shadow .35s ease;
-}
-.day-block:hover{box-shadow:var(--glass-shadow-hover)}
+/**
+ * Extract a trailing [[action:...]] tag emitted by the LLM and convert it
+ * to the same action shape parseCommand produces. Returns the cleaned
+ * reply text (tag stripped) plus the action, if any.
+ */
+export function extractLlmAction(reply: string): {
+  text: string;
+  action?: TutorReply["action"];
+} {
+  const m = reply.match(/\[\[action:([a-zA-Z]+)(?::([a-z0-9-]+))?\]\]/);
+  if (!m) return { text: reply };
 
-/* ── cmdk items: springy hover like Spotlight ── */
-.cmdk-item{transition:background .18s ease,color .18s ease,transform .25s var(--spring)}
-.cmdk-item:active{transform:scale(.98)}
+  const type = m[1];
+  const payload = m[2];
+  const text = reply.replace(/\s*\[\[action:[^\]]*\]\]\s*/g, "\n").trim();
 
-/* ── Modal close / icon-only buttons get the squish too ── */
-button{-webkit-tap-highlight-color:transparent}
+  const NAV = new Set(["planner", "dashboard", "subjects", "settings", "focus"]);
+  const THEMES_SET = new Set(["dark", "obsidian", "nebula", "mint", "sunset", "silver-lavender"]);
+  const BARE = new Set(["startTimer", "stopTimer", "pause", "resume", "break", "zen", "replan"]);
 
-/* ==================================================
-   TOUCH DEVICES — hover doesn't exist; press is king.
-   Slightly larger tap targets, stronger active states.
-================================================== */
-@media (hover: none) and (pointer: coarse){
-  /* Disable hover-lift illusions that would "stick" after tap */
-  .btn:hover,.chip:hover,.task-row:hover,.kpi-card:hover,.cal-cell:hover,
-  .ob-level-btn:hover,.ai-quick button:hover,.streak-badge:hover,.vtab:hover{transform:none}
-  /* Stronger, faster press feedback instead */
-  .btn:active{transform:scale(.93);transition-duration:.06s}
-  .vtab:active,.chip:active,.ai-quick button:active{transform:scale(.9)}
-  .task-row:active{transform:scale(.985);background:var(--row-hover)}
-  .cal-cell:active,.ob-level-btn:active{transform:scale(.96)}
-  .kpi-card:active{transform:scale(.975)}
-  /* Comfortable 44px-equivalent tap targets (Apple HIG) */
-  .btn-xs{padding:7px 13px;min-height:32px}
-  .vtab{padding:9px 15px}
-  .ai-quick button{padding:8px 13px}
-  .nav-item{min-height:44px}
-  .cmdk-item{padding-top:12px;padding-bottom:12px}
-}
-
-/* Larger screens: a touch more air inside glass surfaces */
-@media(min-width:1400px){
-  .app-wrapper{max-width:1560px;margin:0 auto}
-  .kpi-card{padding:24px}
-}
-
-/* ── Accessibility: honour reduced-motion everywhere ── */
-@media (prefers-reduced-motion: reduce){
-  *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important;scroll-behavior:auto !important}
+  if (type === "navigate" && payload && NAV.has(payload)) return { text, action: { type, payload } };
+  if (type === "theme" && payload && THEMES_SET.has(payload)) return { text, action: { type, payload } };
+  if (BARE.has(type)) return { text, action: { type } };
+  return { text };
 }
