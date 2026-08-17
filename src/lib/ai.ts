@@ -357,5 +357,46 @@ export async function localTutor(q: string, ctx: TutorContext): Promise<TutorRep
 export function tutorSystemPrompt(ctx: TutorContext): string {
   return `You are AETHER, the built-in study coach for Study Planner Pro.
 Learner: ${ctx.name}. Course: ${ctx.courseName}. Days Left: ${ctx.daysLeft}. Progress: ${ctx.progressPct}%.
-Teach step-by-step using clear markdown formatting.`;
+Teach step-by-step using clear markdown formatting.
+
+APP CONTROL — you CAN control this app. When the user asks you to perform an app action
+(in ANY language or phrasing), append ONE action tag on its own final line, then it will
+be executed automatically. Available tags:
+[[action:navigate:planner]]  [[action:navigate:dashboard]]  [[action:navigate:subjects]]
+[[action:navigate:settings]]  [[action:navigate:focus]]
+[[action:theme:dark]]  [[action:theme:obsidian]]  [[action:theme:nebula]]
+[[action:theme:mint]]  [[action:theme:sunset]]  [[action:theme:silver-lavender]]
+[[action:startTimer]]  [[action:stopTimer]]  [[action:pause]]  [[action:resume]]
+[[action:break]]  [[action:zen]]  [[action:replan]]
+Theme names: midnight/dark/black → dark; lavender/silver/light → silver-lavender;
+emerald → mint; champagne → sunset. "Previous/default theme" → silver-lavender.
+Rules: emit at most ONE tag, only when the user clearly requests that action.
+Never claim you cannot control themes, timers, navigation or replanning — you can.
+For pure study questions, do not emit any tag.`;
+}
+
+/**
+ * Extract a trailing [[action:...]] tag emitted by the LLM and convert it
+ * to the same action shape parseCommand produces. Returns the cleaned
+ * reply text (tag stripped) plus the action, if any.
+ */
+export function extractLlmAction(reply: string): {
+  text: string;
+  action?: TutorReply["action"];
+} {
+  const m = reply.match(/\[\[action:([a-zA-Z]+)(?::([a-z0-9-]+))?\]\]/);
+  if (!m) return { text: reply };
+
+  const type = m[1];
+  const payload = m[2];
+  const text = reply.replace(/\s*\[\[action:[^\]]*\]\]\s*/g, "\n").trim();
+
+  const NAV = new Set(["planner", "dashboard", "subjects", "settings", "focus"]);
+  const THEMES_SET = new Set(["dark", "obsidian", "nebula", "mint", "sunset", "silver-lavender"]);
+  const BARE = new Set(["startTimer", "stopTimer", "pause", "resume", "break", "zen", "replan"]);
+
+  if (type === "navigate" && payload && NAV.has(payload)) return { text, action: { type, payload } };
+  if (type === "theme" && payload && THEMES_SET.has(payload)) return { text, action: { type, payload } };
+  if (BARE.has(type)) return { text, action: { type } };
+  return { text };
 }
