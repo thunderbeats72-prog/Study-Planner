@@ -6,7 +6,7 @@
 :root {
   /* ═══ Study Planner Pro — Master Brand Tokens (guideline §47) ═══ */
   --color-primary:#5B5CE2; --color-primary-hover:#4647C8; --color-primary-soft:#EEF0FF;
-  --color-ai:#8B5CF6; --color-ai-soft:#F3EEFF;
+  --color-ai:#8B5CF6; --color-ai-soft:#F3EEFF; --ai-rgb:139,92,246; --color-ai-bright:#9B6DF8;
   --radius-sm:6px; --radius-md:10px; --radius-lg:14px; --radius-xl:18px;
   --shadow-sm:0 1px 3px rgba(15,23,42,0.05);
   --shadow-md:0 4px 16px rgba(15,23,42,0.07);
@@ -37,11 +37,11 @@
   --font-display:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
 }
 
-body.theme-dark{--app-bg:#0B0E1A;--bg-gradient:radial-gradient(1100px 480px at 50% -12%,rgba(129,140,248,.13),transparent 65%);--surface:#141829;--surface-solid:#141829;--surface-elevated:#1B2035;--surface-hover:#1C2138;--glass-border:#262D45;--glass-border-hover:#39415F;--glass-shadow:0 1px 3px rgba(0,0,0,.45);--glass-shadow-hover:0 8px 28px rgba(0,0,0,.5);--text-main:#F4F6FF;--text-muted:#A9B1CC;--text-dim:#606A8A;--accent:#818CF8;--accent-hover:#93A0FB;--accent-light:#A5B0FA;--accent-glow:rgba(129,140,248,.22);--accent-gradient:linear-gradient(135deg,#8B96F9,#6366F1);--nav-active-bg:rgba(129,140,248,.14);--nav-active-text:#B0B9FB;--nav-active-border:rgba(129,140,248,.32);--row-bg:rgba(255,255,255,.035);--row-hover:rgba(255,255,255,.07);--status-pending-bg:rgba(245,176,65,.16);--status-pending-text:#F0BE6E;--status-done-bg:rgba(52,211,153,.15);--status-done-text:#5EE0A8;--status-skipped-bg:rgba(248,113,113,.15);--status-skipped-text:#F49E9E;--chart-bar:rgba(129,140,248,.75);--input-bg:#1B2035}
-body.theme-obsidian{--surface-elevated:#1A2338;--app-bg:#0B0F1A;--bg-gradient:radial-gradient(1000px 420px at 50% -12%,rgba(56,189,248,.05),transparent 70%);--surface:#131A2A;--surface-solid:#131A2A;--surface-hover:#1A2338;--glass-border:#263349;--glass-border-hover:#354765;--glass-shadow:0 1px 3px rgba(0,0,0,.35);--glass-shadow-hover:0 6px 20px rgba(0,0,0,.45);--text-main:#F1F5F9;--text-muted:#94A3B8;--text-dim:#556179;--accent:#38BDF8;--accent-hover:#5BC9F9;--accent-light:#7DD3FC;--accent-glow:rgba(56,189,248,.14);--accent-gradient:linear-gradient(180deg,#4CC5F9,#22A8E6);--nav-active-bg:rgba(56,189,248,.11);--nav-active-text:#7DD3FC;--nav-active-border:rgba(56,189,248,.26);--row-bg:rgba(255,255,255,.03);--row-hover:rgba(255,255,255,.06);--status-pending-bg:rgba(229,154,36,.14);--status-pending-text:#E0B35C;--status-done-bg:rgba(22,163,122,.14);--status-done-text:#4BC59E;--status-skipped-bg:rgba(224,82,82,.14);--status-skipped-text:#E58080;--chart-bar:rgba(56,189,248,.6);--input-bg:#1A2338}
-body.theme-nebula{--surface-elevated:#221940;--app-bg:#100B20;--bg-gradient:radial-gradient(1000px 420px at 50% -12%,rgba(168,85,247,.07),transparent 70%);--surface:#191230;--surface-solid:#191230;--surface-hover:#221940;--glass-border:#32264F;--glass-border-hover:#453567;--glass-shadow:0 1px 3px rgba(0,0,0,.4);--glass-shadow-hover:0 6px 20px rgba(0,0,0,.5);--text-main:#F5F3FA;--text-muted:#B3A6D4;--text-dim:#6A5C90;--accent:#A855F7;--accent-hover:#B672F9;--accent-light:#C495FA;--accent-glow:rgba(168,85,247,.15);--accent-gradient:linear-gradient(180deg,#B168F8,#9333EA);--nav-active-bg:rgba(168,85,247,.12);--nav-active-text:#D8B4FE;--nav-active-border:rgba(168,85,247,.28);--row-bg:rgba(255,255,255,.03);--row-hover:rgba(255,255,255,.06);--status-pending-bg:rgba(229,154,36,.14);--status-pending-text:#E0B35C;--status-done-bg:rgba(22,163,122,.14);--status-done-text:#4BC59E;--status-skipped-bg:rgba(224,82,82,.14);--status-skipped-text:#E58080;--chart-bar:rgba(168,85,247,.6);--input-bg:#221940}
-body.theme-mint{--app-bg:#F4FAF7;--bg-gradient:radial-gradient(1100px 460px at 50% -12%,rgba(16,163,127,.06),transparent 70%);--surface:#FFFFFF;--surface-solid:#FFFFFF;--surface-hover:#F8FCFA;--glass-border:#E2EDE7;--glass-border-hover:#CFE2D8;--glass-shadow:0 1px 3px rgba(6,78,59,.05);--glass-shadow-hover:0 4px 16px rgba(6,78,59,.08);--text-main:#0E2A20;--text-muted:#5B7268;--text-dim:#93A8A0;--accent:#0FA37F;--accent-hover:#0C8A6B;--accent-light:#34D399;--accent-glow:rgba(15,163,127,.13);--accent-gradient:linear-gradient(180deg,#16B08A,#0FA37F);--nav-active-bg:#E5F5EF;--nav-active-text:#0C7A60;--nav-active-border:rgba(15,163,127,.22);--row-bg:#F4FAF7;--row-hover:#EAF5F0;--chart-bar:rgba(15,163,127,.55);--input-bg:#FFFFFF}
-body.theme-sunset{--app-bg:#FBF6F1;--bg-gradient:radial-gradient(1100px 460px at 50% -12%,rgba(234,88,12,.05),transparent 70%);--surface:#FFFFFF;--surface-solid:#FFFFFF;--surface-hover:#FDF9F5;--glass-border:#F0E5DC;--glass-border-hover:#E4D2C4;--glass-shadow:0 1px 3px rgba(67,20,7,.05);--glass-shadow-hover:0 4px 16px rgba(67,20,7,.08);--text-main:#2D1A10;--text-muted:#77604F;--text-dim:#AE9C8D;--accent:#E1620F;--accent-hover:#C4540C;--accent-light:#FB923C;--accent-glow:rgba(225,98,15,.13);--accent-gradient:linear-gradient(180deg,#EE6F1B,#DC5E0C);--nav-active-bg:#FBEDE0;--nav-active-text:#B34E0A;--nav-active-border:rgba(225,98,15,.22);--row-bg:#FBF6F1;--row-hover:#F6EDE3;--chart-bar:rgba(225,98,15,.55);--input-bg:#FFFFFF}
+body.theme-dark{--color-ai:#A78BFA;--color-ai-soft:rgba(167,139,250,.12);--ai-rgb:167,139,250;--color-ai-bright:#B79EFB;--app-bg:#0B0E1A;--bg-gradient:radial-gradient(1100px 480px at 50% -12%,rgba(129,140,248,.13),transparent 65%);--surface:#141829;--surface-solid:#141829;--surface-elevated:#1B2035;--surface-hover:#1C2138;--glass-border:#262D45;--glass-border-hover:#39415F;--glass-shadow:0 1px 3px rgba(0,0,0,.45);--glass-shadow-hover:0 8px 28px rgba(0,0,0,.5);--text-main:#F4F6FF;--text-muted:#A9B1CC;--text-dim:#606A8A;--accent:#818CF8;--accent-hover:#93A0FB;--accent-light:#A5B0FA;--accent-glow:rgba(129,140,248,.22);--accent-gradient:linear-gradient(135deg,#8B96F9,#6366F1);--nav-active-bg:rgba(129,140,248,.14);--nav-active-text:#B0B9FB;--nav-active-border:rgba(129,140,248,.32);--row-bg:rgba(255,255,255,.035);--row-hover:rgba(255,255,255,.07);--status-pending-bg:rgba(245,176,65,.16);--status-pending-text:#F0BE6E;--status-done-bg:rgba(52,211,153,.15);--status-done-text:#5EE0A8;--status-skipped-bg:rgba(248,113,113,.15);--status-skipped-text:#F49E9E;--chart-bar:rgba(129,140,248,.75);--input-bg:#1B2035}
+body.theme-obsidian{--color-ai:#5BC9F9;--color-ai-soft:rgba(91,201,249,.12);--ai-rgb:91,201,249;--color-ai-bright:#7DD3FC;--surface-elevated:#1A2338;--app-bg:#0B0F1A;--bg-gradient:radial-gradient(1000px 420px at 50% -12%,rgba(56,189,248,.05),transparent 70%);--surface:#131A2A;--surface-solid:#131A2A;--surface-hover:#1A2338;--glass-border:#263349;--glass-border-hover:#354765;--glass-shadow:0 1px 3px rgba(0,0,0,.35);--glass-shadow-hover:0 6px 20px rgba(0,0,0,.45);--text-main:#F1F5F9;--text-muted:#94A3B8;--text-dim:#556179;--accent:#38BDF8;--accent-hover:#5BC9F9;--accent-light:#7DD3FC;--accent-glow:rgba(56,189,248,.14);--accent-gradient:linear-gradient(180deg,#4CC5F9,#22A8E6);--nav-active-bg:rgba(56,189,248,.11);--nav-active-text:#7DD3FC;--nav-active-border:rgba(56,189,248,.26);--row-bg:rgba(255,255,255,.03);--row-hover:rgba(255,255,255,.06);--status-pending-bg:rgba(229,154,36,.14);--status-pending-text:#E0B35C;--status-done-bg:rgba(22,163,122,.14);--status-done-text:#4BC59E;--status-skipped-bg:rgba(224,82,82,.14);--status-skipped-text:#E58080;--chart-bar:rgba(56,189,248,.6);--input-bg:#1A2338}
+body.theme-nebula{--color-ai:#C084FC;--color-ai-soft:rgba(192,132,252,.13);--ai-rgb:192,132,252;--color-ai-bright:#D8B4FE;--surface-elevated:#221940;--app-bg:#100B20;--bg-gradient:radial-gradient(1000px 420px at 50% -12%,rgba(168,85,247,.07),transparent 70%);--surface:#191230;--surface-solid:#191230;--surface-hover:#221940;--glass-border:#32264F;--glass-border-hover:#453567;--glass-shadow:0 1px 3px rgba(0,0,0,.4);--glass-shadow-hover:0 6px 20px rgba(0,0,0,.5);--text-main:#F5F3FA;--text-muted:#B3A6D4;--text-dim:#6A5C90;--accent:#A855F7;--accent-hover:#B672F9;--accent-light:#C495FA;--accent-glow:rgba(168,85,247,.15);--accent-gradient:linear-gradient(180deg,#B168F8,#9333EA);--nav-active-bg:rgba(168,85,247,.12);--nav-active-text:#D8B4FE;--nav-active-border:rgba(168,85,247,.28);--row-bg:rgba(255,255,255,.03);--row-hover:rgba(255,255,255,.06);--status-pending-bg:rgba(229,154,36,.14);--status-pending-text:#E0B35C;--status-done-bg:rgba(22,163,122,.14);--status-done-text:#4BC59E;--status-skipped-bg:rgba(224,82,82,.14);--status-skipped-text:#E58080;--chart-bar:rgba(168,85,247,.6);--input-bg:#221940}
+body.theme-mint{--color-ai:#0D9488;--color-ai-soft:#E5F5F2;--ai-rgb:13,148,136;--color-ai-bright:#14B8A6;--app-bg:#F4FAF7;--bg-gradient:radial-gradient(1100px 460px at 50% -12%,rgba(16,163,127,.06),transparent 70%);--surface:#FFFFFF;--surface-solid:#FFFFFF;--surface-hover:#F8FCFA;--glass-border:#E2EDE7;--glass-border-hover:#CFE2D8;--glass-shadow:0 1px 3px rgba(6,78,59,.05);--glass-shadow-hover:0 4px 16px rgba(6,78,59,.08);--text-main:#0E2A20;--text-muted:#5B7268;--text-dim:#93A8A0;--accent:#0FA37F;--accent-hover:#0C8A6B;--accent-light:#34D399;--accent-glow:rgba(15,163,127,.13);--accent-gradient:linear-gradient(180deg,#16B08A,#0FA37F);--nav-active-bg:#E5F5EF;--nav-active-text:#0C7A60;--nav-active-border:rgba(15,163,127,.22);--row-bg:#F4FAF7;--row-hover:#EAF5F0;--chart-bar:rgba(15,163,127,.55);--input-bg:#FFFFFF}
+body.theme-sunset{--color-ai:#D9530B;--color-ai-soft:#FBEDE3;--ai-rgb:217,83,11;--color-ai-bright:#F97316;--app-bg:#FBF6F1;--bg-gradient:radial-gradient(1100px 460px at 50% -12%,rgba(234,88,12,.05),transparent 70%);--surface:#FFFFFF;--surface-solid:#FFFFFF;--surface-hover:#FDF9F5;--glass-border:#F0E5DC;--glass-border-hover:#E4D2C4;--glass-shadow:0 1px 3px rgba(67,20,7,.05);--glass-shadow-hover:0 4px 16px rgba(67,20,7,.08);--text-main:#2D1A10;--text-muted:#77604F;--text-dim:#AE9C8D;--accent:#E1620F;--accent-hover:#C4540C;--accent-light:#FB923C;--accent-glow:rgba(225,98,15,.13);--accent-gradient:linear-gradient(180deg,#EE6F1B,#DC5E0C);--nav-active-bg:#FBEDE0;--nav-active-text:#B34E0A;--nav-active-border:rgba(225,98,15,.22);--row-bg:#FBF6F1;--row-hover:#F6EDE3;--chart-bar:rgba(225,98,15,.55);--input-bg:#FFFFFF}
 
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{padding:0;margin:0}
@@ -232,13 +232,13 @@ select.input-field{appearance:none;background-image:linear-gradient(45deg,transp
 body.theme-dark .ai-panel,body.theme-obsidian .ai-panel,body.theme-nebula .ai-panel{box-shadow:0 8px 28px rgba(0,0,0,.55),0 32px 90px rgba(0,0,0,.45)}
 /* Header: violet AI identity strip with soft luminous wash */
 .ai-head{padding:15px 18px;display:flex;align-items:center;gap:11px;position:relative;
-  background:linear-gradient(135deg,rgba(139,92,246,.12),rgba(139,92,246,0) 65%),var(--surface-elevated);
+  background:linear-gradient(135deg,rgba(var(--ai-rgb),.12),rgba(var(--ai-rgb),0) 65%),var(--surface-elevated);
   border-bottom:1px solid var(--glass-border);color:var(--text-main)}
 .ai-head::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:1px;
-  background:linear-gradient(90deg,rgba(139,92,246,.5),transparent 60%)}
+  background:linear-gradient(90deg,rgba(var(--ai-rgb),.5),transparent 60%)}
 .ai-status{font-size:.64rem;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--color-ai);display:inline-flex;align-items:center;gap:5px}
 .ai-status::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--color-ai);animation:aiPulse 2.4s ease-in-out infinite}
-@keyframes aiPulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(139,92,246,.4)}50%{opacity:.6;box-shadow:0 0 0 4px rgba(139,92,246,0)}}
+@keyframes aiPulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(var(--ai-rgb),.4)}50%{opacity:.6;box-shadow:0 0 0 4px rgba(var(--ai-rgb),0)}}
 .ai-msgs{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px}
 /* Messages: user = indigo gradient; bot = clean elevated card with violet spine */
 .ai-msg{max-width:88%;padding:11px 15px;border-radius:var(--radius-lg);font-size:.85rem;line-height:1.6;font-weight:450;white-space:pre-wrap;word-break:break-word;animation:msgIn .3s var(--spring-soft) backwards}
@@ -247,7 +247,7 @@ body.theme-dark .ai-panel,body.theme-obsidian .ai-panel,body.theme-nebula .ai-pa
 .ai-msg.bot{align-self:flex-start;background:var(--surface);border:1px solid var(--glass-border);border-left:2.5px solid var(--color-ai);border-bottom-left-radius:5px;color:var(--text-main)}
 body.theme-dark .ai-msg.bot,body.theme-obsidian .ai-msg.bot,body.theme-nebula .ai-msg.bot{background:var(--surface-hover)}
 .ai-msg strong{font-weight:700;color:inherit}
-.ai-msg code{background:rgba(139,92,246,.12);color:var(--color-ai);padding:1px 6px;border-radius:var(--radius-sm);font-family:"JetBrains Mono",monospace;font-size:.78rem}
+.ai-msg code{background:rgba(var(--ai-rgb),.12);color:var(--color-ai);padding:1px 6px;border-radius:var(--radius-sm);font-family:"JetBrains Mono",monospace;font-size:.78rem}
 .ai-msg.user code{background:rgba(255,255,255,.2);color:#fff}
 /* Thinking indicator dots */
 .ai-msg.bot:has(.thinking-dots){padding:14px 16px}
@@ -258,8 +258,8 @@ body.theme-dark .ai-msg.bot,body.theme-obsidian .ai-msg.bot,body.theme-nebula .a
 .ai-input-row{padding:12px 14px calc(12px + env(safe-area-inset-bottom));border-top:1px solid var(--glass-border);display:flex;gap:9px;background:var(--surface)}
 .ai-quick{display:flex;gap:6px;padding:4px 14px 12px;flex-wrap:wrap;background:var(--surface)}
 .ai-quick button{font-size:.7rem;font-weight:600;padding:6px 12px;border-radius:99px;background:transparent;border:1px solid var(--glass-border);color:var(--text-muted);cursor:pointer;font-family:inherit;transition:background .15s ease,color .15s ease,border-color .15s ease}
-.ai-quick button:hover{background:var(--color-ai-soft);color:var(--color-ai);border-color:rgba(139,92,246,.35)}
-body.theme-dark .ai-quick button:hover,body.theme-obsidian .ai-quick button:hover,body.theme-nebula .ai-quick button:hover{background:rgba(139,92,246,.14)}
+.ai-quick button:hover{background:var(--color-ai-soft);color:var(--color-ai);border-color:rgba(var(--ai-rgb),.35)}
+body.theme-dark .ai-quick button:hover,body.theme-obsidian .ai-quick button:hover,body.theme-nebula .ai-quick button:hover{background:rgba(var(--ai-rgb),.14)}
 
 .typing-dot{width:6px;height:6px;border-radius:50%;background:var(--text-dim);display:inline-block;animation:blink 1.2s infinite}
 @keyframes blink{0%,80%,100%{opacity:.25}40%{opacity:1}}
@@ -838,8 +838,8 @@ button{-webkit-tap-highlight-color:transparent}
 
 
 /* ═══ AI IDENTITY (guideline §6, §25) — violet, scoped to AI only ═══ */
-.ai-fab{background:linear-gradient(180deg,#9B6DF8,var(--color-ai))}
-.ai-panel .brand-logo-icon{background:linear-gradient(180deg,#9B6DF8,var(--color-ai));box-shadow:none}
+.ai-fab{background:linear-gradient(180deg,var(--color-ai-bright),var(--color-ai));transition:background .4s ease}
+.ai-panel .brand-logo-icon{background:linear-gradient(180deg,var(--color-ai-bright),var(--color-ai));box-shadow:none;transition:background .4s ease}
 
 
 /* ═══ AGE-ADAPTIVE PRESENTATION ═════════════════════════════════
@@ -933,7 +933,7 @@ body.mode-young .day-complete{font-size:.95rem;padding:15px 18px}
 .tracker-bar .pulse-dot.live ~ * .mono{animation:digitBreath 2s ease-in-out infinite}
 
 /* FAB: attention ring exactly once on load, then still */
-.ai-fab::after{content:"";position:absolute;inset:-3px;border-radius:50%;border:2px solid rgba(139,92,246,.5);opacity:0;animation:fabRing 1.6s ease .8s 1}
+.ai-fab::after{content:"";position:absolute;inset:-3px;border-radius:50%;border:2px solid rgba(var(--ai-rgb),.5);opacity:0;animation:fabRing 1.6s ease .8s 1}
 @keyframes fabRing{0%{opacity:.8;transform:scale(.9)}100%{opacity:0;transform:scale(1.35)}}
 .ai-fab{position:fixed}
 
@@ -1155,3 +1155,94 @@ body.mode-focused .brand-logo-icon::before,body.mode-focused .cal-cell.today::af
 body.mode-focused .kpi-value{animation:none}
 
 /* reduced motion: everything above respects the global kill switch */
+
+
+/* ═══════════════════════════════════════════════════════════════
+   ENHANCEMENT LAYER v3 — deeper animation + device coverage
+═══════════════════════════════════════════════════════════════ */
+
+/* ── A. View transitions: each page arrives with soft depth ── */
+.main-workspace > :not(.tracker-bar){animation:pageIn .32s var(--spring-soft) backwards}
+@keyframes pageIn{from{opacity:0;transform:translateY(8px) scale(.998)}to{opacity:1;transform:none}}
+
+/* ── B. Day blocks cascade on the Planner ── */
+.day-block{animation:pageIn .34s var(--spring-soft) backwards}
+.day-block:nth-of-type(2){animation-delay:.05s}
+.day-block:nth-of-type(3){animation-delay:.1s}
+.day-block:nth-of-type(4){animation-delay:.15s}
+.day-block:nth-of-type(5){animation-delay:.2s}
+
+/* ── C. Interactive depth: cards tilt toward the cursor's side ── */
+@media(hover:hover) and (pointer:fine){
+  .kpi-card{transform-style:preserve-3d;transition:transform .3s var(--spring-soft),border-color .15s ease,box-shadow .2s ease}
+  .kpi-card:hover{transform:translateY(-2px)}
+}
+
+/* ── D. AETHER entrance: panel + FAB morph feel ── */
+.ai-fab svg{transition:transform .35s var(--spring)}
+.ai-fab:hover svg{transform:rotate(90deg)}
+.ai-quick button{animation:rowIn .3s var(--spring-soft) backwards}
+.ai-quick button:nth-child(2){animation-delay:.04s}
+.ai-quick button:nth-child(3){animation-delay:.08s}
+.ai-quick button:nth-child(4){animation-delay:.12s}
+.ai-quick button:nth-child(5){animation-delay:.16s}
+.ai-quick button:nth-child(6){animation-delay:.2s}
+
+/* ── E. Input send button: lifts when there's text to send ── */
+.ai-input-row .btn-primary:not(:disabled){animation:sendReady .3s var(--spring)}
+@keyframes sendReady{from{transform:scale(.9)}to{transform:scale(1)}}
+
+/* ── F. Heatmap cells ripple in ── */
+.heat-cell{animation:heatIn .5s ease backwards}
+@keyframes heatIn{from{opacity:0;transform:scale(.6)}to{opacity:1;transform:none}}
+
+/* ── G. Kanban columns arrive left-to-right ── */
+.kanban > *:nth-child(1){animation:pageIn .3s var(--spring-soft) backwards}
+.kanban > *:nth-child(2){animation:pageIn .3s var(--spring-soft) .06s backwards}
+.kanban > *:nth-child(3){animation:pageIn .3s var(--spring-soft) .12s backwards}
+
+/* ── H. Settings sections stagger ── */
+.grid-fit-300 > *:nth-child(1){animation:pageIn .3s var(--spring-soft) .03s backwards}
+.grid-fit-300 > *:nth-child(2){animation:pageIn .3s var(--spring-soft) .08s backwards}
+.grid-fit-300 > *:nth-child(3){animation:pageIn .3s var(--spring-soft) .13s backwards}
+.grid-fit-300 > *:nth-child(4){animation:pageIn .3s var(--spring-soft) .18s backwards}
+
+/* ── I. Theme switch: full-surface cross-fade ── */
+body,.glass-panel,.tracker-bar,.sidebar,.task-row,.btn-secondary,.input-field,.ai-panel,.chip,.nav-item{
+  transition-property:background-color,background,border-color,color,box-shadow;
+  transition-duration:.35s;transition-timing-function:ease;
+}
+
+/* ── J. Zen mode: digits breathe with the second ── */
+.zen .zen-digits{animation:zenGlow 4s ease-in-out infinite}
+@keyframes zenGlow{0%,100%{text-shadow:0 0 40px rgba(255,255,255,.08)}50%{text-shadow:0 0 80px rgba(255,255,255,.18)}}
+
+/* ── K. Responsive depth: hover states only where hover exists ── */
+@media(hover:none){
+  .day-block,.glass-panel{transition:none}
+}
+
+/* ── L. Larger tablets landscape (1024-1280): comfortable 3-col KPIs ── */
+@media(min-width:1024px) and (max-width:1280px){
+  .kpi-grid{grid-template-columns:repeat(2,1fr)}
+  .dash-grid-2{grid-template-columns:1fr 1fr}
+}
+
+/* ── M. Print: clean study plan printouts ── */
+@media print{
+  .sidebar,.tracker-bar,.ai-fab,.ai-panel,.cmdk-tip,.mobile-header{display:none !important}
+  .app-wrapper{padding:0}
+  .glass-panel{box-shadow:none;border:1px solid #ddd;break-inside:avoid}
+  body{background:#fff}
+}
+
+/* ── N. Battery-friendly: pause ambient loops when tab is hidden ── */
+/* (browsers auto-pause CSS animations offscreen; loops are opt-in only) */
+
+/* ── O. mode-focused & reduced-motion guards for the new layer ── */
+body.mode-focused .day-block,body.mode-focused .heat-cell,
+body.mode-focused .kanban > *,body.mode-focused .grid-fit-300 > *,
+body.mode-focused .main-workspace > :not(.tracker-bar){animation:none}
+@media (prefers-reduced-motion: reduce){
+  .day-block,.heat-cell,.kanban > *,.grid-fit-300 > *,.ai-quick button{animation:none !important}
+}
