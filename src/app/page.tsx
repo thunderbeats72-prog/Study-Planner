@@ -79,11 +79,19 @@ export default function Home() {
     onBlockComplete
   );
 
-  const setTaskStatus = async (id: number, status: string) => {
+  const setTaskStatus = async (id: number, status: string, rating?: number) => {
     try {
-      const s = await api<AppState>("/api/tasks", { method: "PATCH", body: JSON.stringify({ id, status }) });
+      const s = await api<AppState>("/api/tasks", { method: "PATCH", body: JSON.stringify({ id, status, rating }) });
       setState(s);
-      if (status === "done") notify("Lesson marked done — mastery updated.");
+      if (status === "done") {
+        notify(
+          rating
+            ? rating === 1
+              ? "Logged — this topic will come back sooner for another pass."
+              : "Logged — the memory model scheduled your next review."
+            : "Lesson marked done — mastery updated."
+        );
+      }
     } catch { notify("Update failed."); }
   };
 
