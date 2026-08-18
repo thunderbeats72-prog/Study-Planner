@@ -1,0 +1,33 @@
+DIRECT UPLOAD PACKAGE — Study Planner Pro (2026-08-18)
+=======================================================
+This zip mirrors your repository root. Everything here goes to the
+SAME location in the repo.
+
+STEP 1 — UPLOAD (GitHub web):
+  - Open your repo -> "Add file" -> "Upload files"
+  - Drag in: tsconfig.json AND the src folder (both from this zip)
+  - GitHub merges them into place, replacing existing files
+  - Commit directly to main
+
+STEP 2 — DELETE the stray folder (required once; upload can't delete):
+  - In the repo, open the deploy-package folder
+  - Use the "..." menu -> Delete directory -> commit
+  - Also delete README.txt at the repo ROOT if present
+  (Even if you skip this, the new tsconfig.json excludes
+   deploy-package from the build, so the build still passes.)
+
+STEP 3 — Vercel auto-deploys. When green, hard-refresh the site
+  (Ctrl+Shift+R on desktop; clear/close the tab on your phone).
+
+CONTENTS
+  tsconfig.json                     excludes deploy-package (build-proof)
+  src/app/globals.css               all styling and fixes
+  src/app/page.tsx                  loader, toast, age modes, back-close
+  src/app/layout.tsx                viewport/safe-area config
+  src/app/api/chat/route.ts         brand-voice confirmations
+  src/lib/ai.ts                     AI voice rules + action bridge
+  src/lib/useBackClose.ts           Android back closes overlays
+  src/components/*.tsx (7 files)    all component fixes
+
+VERIFIED: TypeScript clean; production build passes EVEN IF the
+deploy-package folder is still in the repo (reproduced and tested).
