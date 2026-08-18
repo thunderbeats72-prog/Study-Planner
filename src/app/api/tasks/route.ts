@@ -4,6 +4,7 @@ import { tasks, topics } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
 import { buildContext, fullState, getOrCreateUser, keyFrom } from "@/lib/state";
 import { todayStr } from "@/lib/planner";
+import { fsrsInit, fsrsReview, masteryDelta, type ReviewRating } from "@/lib/ml";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,8 @@ export async function PATCH(req: Request) {
     subjectId?: number | null;
     skipSubjectId?: number;
     skipDate?: string;
+    /** FSRS review rating: 1 Again · 2 Hard · 3 Good · 4 Easy */
+    rating?: number;
   };
 
   // Bulk skip: skip all pending tasks from one subject on one day.
@@ -66,13 +69,34 @@ export async function PATCH(req: Request) {
       const t = (await db.select().from(topics).where(eq(topics.id, row.topicId)).limit(1))[0];
       if (t) {
         const gain = row.kind === "learn" ? 55 : 20;
-        await db
-          .update(topics)
-          .set({
-            mastery: Math.min(100, t.mastery + gain),
-            status: row.kind === "learn" ? "done" : t.status,
-          })
-          .where(eq(topics.id, row.topicId));
+        const patch: Record<string, unknown> = {
+          mastery: Math.min(100, t.mastery + gain),
+          status: row.kind === "learn" ? "done" : t.status,
+        };
+
+        // ── FSRS-lite update from the review rating ────────────
+        // A rating trains the memory model: stability grows on
+        // Good/Easy, shrinks on Again, and the topic's next review
+        // lands when recall is predicted to hit ~90%.
+        const rating = (b.rating && b.rating >= 1 && b.rating <= 4 ? b.rating : 0) as ReviewRating | 0;
+        if (rating) {
+          const today = todayStr();
+          const elapsed = t.lastReview
+            ? Math.max(0, Math.round((Date.parse(today) - Date.parse(t.lastReview)) / 86400000))
+            : 0;
+          const next =
+            t.stability > 0
+              ? fsrsReview(t.stability, t.difficulty, elapsed, rating)
+              : { stability: fsrsInit(rating, t.difficulty), intervalDays: 0 };
+          patch.stability = next.stability;
+          patch.lastReview = today;
+          patch.mastery = Math.max(0, Math.min(100, t.mastery + gain + masteryDelta(rating)));
+          // "Again" reopens a learn topic — it clearly is not mastered.
+          if (rating === 1 && row.kind !== "learn") patch.status = t.status;
+          if (rating === 1) patch.mastery = Math.max(0, Math.min(100, t.mastery + masteryDelta(rating)));
+        }
+
+        await db.update(topics).set(patch).where(eq(topics.id, row.topicId));
       }
     } else if (b.status === "pending" && row.kind === "learn") {
       await db.update(topics).set({ status: "pending" }).where(eq(topics.id, row.topicId));
