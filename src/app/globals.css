@@ -934,6 +934,35 @@ button{-webkit-tap-highlight-color:transparent}
   .kpi-card{padding:24px}
 }
 
+/* ── FSRS review rating strip: iOS glass segmented buttons ── */
+.rating-strip{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
+  padding:10px 14px;margin:2px 0 10px 22px;border-radius:16px;
+}
+.rating-q{font-size:.76rem;font-weight:750;color:var(--text-muted)}
+.rating-btns{display:flex;gap:6px;flex-wrap:wrap}
+.rate-btn{
+  padding:7px 14px;border-radius:999px;font-size:.74rem;font-weight:800;cursor:pointer;
+  border:1px solid var(--glass-border);font-family:inherit;color:var(--text-main);
+  background:var(--row-bg);
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  box-shadow:inset 0 1px 0 var(--lg-rim-faint);
+  transition:transform .3s var(--spring),background .2s ease,color .2s ease,box-shadow .25s ease;
+}
+.rate-btn:hover{transform:translateY(-1.5px) scale(1.05)}
+.rate-btn:active{transform:scale(.9)}
+.rate-again:hover{background:var(--status-skipped-bg);color:var(--status-skipped-text)}
+.rate-hard:hover{background:var(--status-pending-bg);color:var(--status-pending-text)}
+.rate-good:hover{background:var(--status-done-bg);color:var(--status-done-text)}
+.rate-easy:hover{background:var(--accent-glow);color:var(--accent)}
+@media (hover: none) and (pointer: coarse){
+  .rate-btn{padding:9px 16px;min-height:36px}
+  .rate-btn:hover{transform:none}
+  .rating-strip{margin-left:0}
+  .rating-btns{width:100%}
+  .rate-btn{flex:1;text-align:center}
+}
+
 /* ── Accessibility: honour reduced-motion everywhere ── */
 @media (prefers-reduced-motion: reduce){
   *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important;scroll-behavior:auto !important}
