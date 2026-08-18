@@ -193,7 +193,7 @@ export default function Dashboard({
           return (
             <div key={task.id} className={`task-row${task.status === "done" ? " done" : ""}${activeTaskId === task.id ? " active-clock" : ""}`}>
               <div className="task-dot" style={{ background: subj?.color || meta.color }} />
-              <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="task-main">
                 <div className="task-title">{task.title}</div>
                 <div className="task-sub">
                   {meta.label} · {task.plannedMinutes} min{taskLogged(task.id) ? ` · ${fmtMin(taskLogged(task.id))} logged` : task.actualMinutes ? ` · ${task.actualMinutes}m logged` : ""}

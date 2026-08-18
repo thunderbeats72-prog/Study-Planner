@@ -71,7 +71,7 @@ export default function PlannerView({
       <div key={task.id}>
         <div className={`task-row${task.status === "done" ? " done" : ""}${activeTaskId === task.id ? " active-clock" : ""}`}>
           <div className="task-dot" style={{ background: subj?.color || meta.color }} />
-          <div style={{ flex: 1, minWidth: 0, cursor: topic ? "pointer" : "default" }}
+          <div className="task-main" style={{ cursor: topic ? "pointer" : "default" }}
             onClick={() => topic && setExpanded(open ? null : task.id)}>
             <div className="task-title">{task.title}</div>
             <div className="task-sub">
@@ -275,7 +275,7 @@ export default function PlannerView({
                   return (
                     <div className="task-row" key={task.id} style={{ alignItems: "flex-start" }}>
                       <div className="task-dot" style={{ background: c, marginTop: 5 }} />
-                      <div style={{ flex: 1, minWidth: 0 }}>
+                      <div className="task-main">
                         <div className="task-title">{task.title}</div>
                         <div className="task-sub">{prettyDate(task.date)} · {task.plannedMinutes}m</div>
                         <div className="flex-row gap-sm" style={{ marginTop: 6 }}>
