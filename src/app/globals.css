@@ -1513,3 +1513,24 @@ body.mode-focused .pulse-dot.live::after{animation:none;transition:none}
 @media(max-width:400px){
   .task-title{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 }
+
+
+/* ═══ POSITIONING HARDENING — desktop anchors are explicit ═══════
+   The AI panel and FAB are anchored bottom-RIGHT on desktop with a
+   min-width guard, so no mobile sheet rule (left:0/width:100%) can
+   ever leak upward regardless of cascade order. */
+@media(min-width:641px){
+  .ai-panel{
+    left:auto !important;right:22px;bottom:88px;
+    width:min(430px,calc(100vw - 44px));
+    height:min(620px,calc(100vh - 130px));
+    border-radius:var(--radius-xl);
+  }
+  .ai-panel::before{display:none}   /* grab handle is mobile-only */
+  .ai-fab{left:auto;right:22px;bottom:22px}
+}
+/* Belt-and-braces: overlays always above app chrome, below zen */
+.ai-panel{z-index:201}
+.ai-fab{z-index:200}
+.modal-overlay{z-index:300}
+.cmdk-overlay{z-index:400}
