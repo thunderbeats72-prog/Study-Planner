@@ -1067,3 +1067,91 @@ img,svg,video,canvas{max-width:100%;height:auto}
   .app-wrapper{max-width:1680px}
   html{font-size:17px}
 }
+
+
+/* ═══════════════════════════════════════════════════════════════
+   SIGNATURE POLISH LAYER — the details that make it feel expensive
+═══════════════════════════════════════════════════════════════ */
+
+/* 1. Progress bars: shimmering highlight rides the fill */
+.bar-fill,.prog-fill{position:relative;overflow:hidden}
+.bar-fill::after,.prog-fill::after{
+  content:"";position:absolute;inset:0;
+  background:linear-gradient(105deg,transparent 30%,rgba(255,255,255,.35) 50%,transparent 70%);
+  transform:translateX(-100%);animation:progShine 2.6s ease-in-out 1s infinite;
+}
+@keyframes progShine{0%{transform:translateX(-100%)}55%,100%{transform:translateX(100%)}}
+
+/* 2. Brand mark: soft conic halo rotating behind the logo */
+.brand-logo-icon{position:relative}
+.brand-logo-icon::before{
+  content:"";position:absolute;inset:-2.5px;border-radius:inherit;z-index:-1;
+  background:conic-gradient(from 0deg,transparent 0%,var(--accent-glow) 25%,transparent 50%,var(--accent-glow) 75%,transparent 100%);
+  animation:haloSpin 7s linear infinite;opacity:.8;
+}
+@keyframes haloSpin{to{transform:rotate(360deg)}}
+
+/* 3. Number tickers: KPI values slide up like an odometer */
+.kpi-value{display:inline-block;animation:tickUp .55s var(--spring-soft) backwards}
+@keyframes tickUp{from{opacity:0;transform:translateY(55%)}to{opacity:1;transform:none}}
+.kpi-grid .kpi-card:nth-child(2) .kpi-value{animation-delay:.06s}
+.kpi-grid .kpi-card:nth-child(3) .kpi-value{animation-delay:.12s}
+.kpi-grid .kpi-card:nth-child(4) .kpi-value{animation-delay:.18s}
+
+/* 4. Buttons: liquid press ripple (pure CSS, from center) */
+.btn{position:relative;overflow:hidden}
+.btn::after{
+  content:"";position:absolute;inset:0;border-radius:inherit;opacity:0;
+  background:radial-gradient(120px circle at var(--px,50%) var(--py,50%),rgba(255,255,255,.35),transparent 65%);
+  transition:opacity .5s ease;pointer-events:none;
+}
+.btn:active::after{opacity:1;transition:opacity .06s ease}
+
+/* 5. Task completion: row exhales — brief lift then settle */
+.task-row.done{animation:taskSettle .5s var(--spring-soft)}
+@keyframes taskSettle{0%{transform:scale(1)}30%{transform:scale(1.008)}100%{transform:scale(1)}}
+
+/* 6. Sidebar nav: icons nudge on hover, spring on select */
+.nav-item svg{transition:transform .25s var(--spring)}
+.nav-item:hover svg{transform:translateX(1.5px) scale(1.06)}
+.nav-item.active svg{animation:iconPop .35s var(--spring)}
+@keyframes iconPop{0%{transform:scale(.85)}60%{transform:scale(1.12)}100%{transform:scale(1)}}
+
+/* 7. Tracker pill: live session gets an ambient breathing ring */
+.tracker-bar:has(.pulse-dot.live){border-color:rgba(52,211,153,.28)}
+.tracker-bar:has(.pulse-dot.live)::after{opacity:.75}
+
+/* 8. Chips: status changes cross-fade */
+.chip{transition:background .3s ease,color .3s ease,transform .2s var(--spring)}
+
+/* 9. Calendar: today's cell carries a quiet living pulse */
+.cal-cell.today{position:relative;border-color:var(--accent)}
+.cal-cell.today::after{content:"";position:absolute;inset:-1px;border-radius:inherit;border:1px solid var(--accent);opacity:0;animation:todayPulse 3.2s ease-in-out infinite;pointer-events:none}
+@keyframes todayPulse{0%,100%{opacity:0;transform:scale(1)}45%{opacity:.5;transform:scale(1.015)}}
+
+/* 10. Modal: content stagger — header, body, actions arrive in order */
+.modal-box > *:nth-child(1){animation:rowIn .3s var(--spring-soft) .05s backwards}
+.modal-box > *:nth-child(2){animation:rowIn .3s var(--spring-soft) .1s backwards}
+.modal-box > *:nth-child(3){animation:rowIn .3s var(--spring-soft) .15s backwards}
+
+/* 11. Scrollbar: accent tint on hover only — invisible until needed */
+::-webkit-scrollbar-thumb{background:color-mix(in srgb,var(--text-dim) 30%,transparent)}
+::-webkit-scrollbar-thumb:hover{background:var(--accent)}
+
+/* 12. Loader: logo halo + staggered skeleton entrance */
+.loader-ring{position:relative}
+.loader-ring::after{content:"";position:absolute;inset:-8px;border-radius:inherit;border:2px solid var(--accent-glow);animation:loaderRing 1.8s ease-out infinite}
+@keyframes loaderRing{0%{opacity:1;transform:scale(.85)}100%{opacity:0;transform:scale(1.25)}}
+.loader-screen .skeleton{animation:rowIn .4s var(--spring-soft) backwards}
+.loader-screen .skeleton:nth-child(2){animation-delay:.08s}
+.loader-screen .skeleton:nth-child(3){animation-delay:.16s}
+
+/* 13. Focus timer ring: hue drifts subtly as session progresses */
+.timer-ring-wrap svg circle:last-child{transition:stroke-dashoffset 1s linear}
+
+/* mode-focused: signature layer stays quiet for professionals */
+body.mode-focused .bar-fill::after,body.mode-focused .prog-fill::after,
+body.mode-focused .brand-logo-icon::before,body.mode-focused .cal-cell.today::after{animation:none;opacity:0}
+body.mode-focused .kpi-value{animation:none}
+
+/* reduced motion: everything above respects the global kill switch */
