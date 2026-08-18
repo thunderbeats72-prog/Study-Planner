@@ -11,6 +11,7 @@ import SubjectsView from "@/components/SubjectsView";
 import SettingsView from "@/components/SettingsView";
 import ChatPanel from "@/components/ChatPanel";
 import CommandPalette, { type Command } from "@/components/CommandPalette";
+import { useBackClose } from "@/lib/useBackClose";
 import type { TaskPatch } from "@/components/TaskEditor";
 import {
   IconBolt, IconBook, IconCalendar, IconClock, IconFlame, IconGear, IconHome, IconLogo,
@@ -34,6 +35,8 @@ export default function Home() {
   const [chatOpen, setChatOpen] = useState(false);
   const [thinking, setThinking] = useState(false);
   const [zen, setZen] = useState(false);
+  useBackClose(zen, () => setZen(false));
+  useBackClose(chatOpen, () => setChatOpen(false));
   const [toast, setToast] = useState("");
   const [pendingMsgs, setPendingMsgs] = useState<MessageRow[]>([]);
   const [forceWizard, setForceWizard] = useState(false);
@@ -48,8 +51,20 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (state?.settings.theme) document.body.className = `theme-${state.settings.theme}`;
-  }, [state?.settings.theme]);
+    // Theme + age-adaptive presentation mode. The same product serves a
+    // 5-year-old and a 35-year-old: nursery/school levels get a roomier,
+    // rounder, larger-type presentation; PG/PhD/professional get a denser,
+    // quieter one. Visual only — functionality is identical.
+    const theme = state?.settings.theme ? `theme-${state.settings.theme}` : "";
+    const level = state?.user.level || "";
+    const mode =
+      level === "nursery" || level === "school"
+        ? "mode-young"
+        : level === "pg" || level === "phd" || level === "professional"
+          ? "mode-focused"
+          : "";
+    document.body.className = [theme, mode].filter(Boolean).join(" ");
+  }, [state?.settings.theme, state?.user.level]);
 
   const logSession = useCallback(
     (minutes: number, subjectId: number | null, taskId: number | null, mode: string) => {
@@ -227,7 +242,13 @@ export default function Home() {
       <div className="loader-screen">
         <div className="loader-ring"><IconLogo size={28} /></div>
         <div className="loader-title">Study Planner Pro</div>
-        <div className="loader-sub">Initializing mathematical curriculum engine…</div>
+        <div className="loader-sub">Loading your study plan…</div>
+        <div style={{ width: "min(420px, 82vw)", display: "flex", flexDirection: "column", gap: 10, marginTop: 18 }}>
+          <div className="skeleton" style={{ height: 52, borderRadius: 999 }} />
+          <div className="skeleton" style={{ height: 88 }} />
+          <div className="skeleton" style={{ height: 88, opacity: .7 }} />
+          <div className="skeleton" style={{ height: 88, opacity: .4 }} />
+        </div>
       </div>
     );
   }
