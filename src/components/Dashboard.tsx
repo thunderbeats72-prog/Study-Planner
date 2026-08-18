@@ -72,7 +72,7 @@ export default function Dashboard({
     <div className="fade-in">
       <div className="page-header">
         <div>
-          <h1 className="page-title">Hey {state.user.name}<span className="wave-emoji">👋</span></h1>
+          <h1 className="page-title">Hey {state.user.name}</h1>
           <p className="page-subtitle">
             {ctx.daysLeft} days to {prettyLong(state.settings.examDate)} · {state.user.courseName}
           </p>
@@ -166,8 +166,25 @@ export default function Dashboard({
           <span className="day-meta">{doneToday}/{todayTasks.length} done · {totalPlannedMin} min planned</span>
         </div>
         {!todayTasks.length && (
-          <div style={{ fontSize: ".84rem", color: "var(--text-dim)" }}>
-            Nothing scheduled today — rest day or plan not generated yet.
+          <div className="empty-state">
+            <div className="empty-state-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="3" /><path d="M16 2v4M8 2v4M3 10h18" />
+              </svg>
+            </div>
+            <h4 className="empty-state-title">No sessions scheduled today</h4>
+            <p className="empty-state-sub">This may be a rest day, or your plan hasn&apos;t been generated yet. Re-plan to fill your schedule.</p>
+            <button className="btn btn-secondary btn-sm" onClick={onReplan} disabled={replanning}>
+              {replanning ? "Re-planning…" : "Generate Plan"}
+            </button>
+          </div>
+        )}
+        {todayTasks.length > 0 && doneToday === todayTasks.length && (
+          <div className="day-complete">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20 6 9 17l-5-5" />
+            </svg>
+            All done for today. Well earned — see you tomorrow.
           </div>
         )}
         {todayTasks.map((task) => {
