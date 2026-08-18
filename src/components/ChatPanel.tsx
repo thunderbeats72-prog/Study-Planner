@@ -49,7 +49,7 @@ export default function ChatPanel({
             <div className="brand-logo-icon" style={{ width: 32, height: 32 }}><IconSpark size={16} /></div>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: ".9rem", fontWeight: 800 }}>AETHER AI Tutor</div>
-              <div className="ai-status">● {provider ? `${provider} connected` : "hybrid engine online"}</div>
+              <div className="ai-status">{provider ? `${provider} connected` : "hybrid engine online"}</div>
             </div>
             <button className="btn btn-xs btn-secondary" onClick={() => setOpen(false)}><IconClose size={13} /></button>
           </div>
