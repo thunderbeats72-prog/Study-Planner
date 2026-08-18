@@ -76,7 +76,7 @@ export default function FocusView({
           </div>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
+        <div className="grid-2" style={{ marginBottom: 14 }}>
           <div>
             <label className="lbl">Studying subject</label>
             <select className="input-field" value={clock.subjectId ?? ""}
@@ -144,7 +144,7 @@ export default function FocusView({
           {timer.mode === "custom" && (
             <div className="flex-row gap-sm mb-md">
               <span style={{ fontSize: ".78rem", fontWeight: 700, color: "var(--text-muted)" }}>Minutes</span>
-              <input type="number" className="input-field" style={{ width: 90, height: 34 }} min={1} max={180}
+              <input type="number" className="input-field" style={{ width: "min(90px, 24vw)", height: 34 }} min={1} max={180}
                 value={timer.customMin} onChange={(e) => timer.setCustomMin(Number(e.target.value) || 1)} />
             </div>
           )}
