@@ -13,7 +13,7 @@ export default function PlannerView({
   state, onTaskStatus, onTaskUpdate, onSkipSubject, onFocusTask, activeTaskId, activeClockSeconds, onAskTutor, replanning, onReplan,
 }: {
   state: AppState;
-  onTaskStatus: (id: number, status: string) => void;
+  onTaskStatus: (id: number, status: string, rating?: number) => void;
   onTaskUpdate: (id: number, patch: TaskPatch) => void;
   onSkipSubject: (subjectId: number, date: string) => void;
   onFocusTask: (taskId: number) => void;
@@ -28,6 +28,7 @@ export default function PlannerView({
   const [openDay, setOpenDay] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<number | null>(null);
   const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
+  const [ratingTaskId, setRatingTaskId] = useState<number | null>(null);
   const [month, setMonth] = useState(() => {
     const d = new Date(); return { y: d.getFullYear(), m: d.getMonth() };
   });
@@ -87,7 +88,13 @@ export default function PlannerView({
           )}
           <button className="btn btn-xs btn-secondary" onClick={() => onFocusTask(task.id)}>Clock in</button>
           <button className={`btn btn-xs ${task.status === "done" ? "btn-secondary" : "btn-primary"}`}
-            onClick={() => onTaskStatus(task.id, task.status === "done" ? "pending" : "done")}>
+            onClick={() => {
+              if (task.status === "done") { onTaskStatus(task.id, "pending"); return; }
+              // Recall/revision tasks ask for a memory rating — that one tap
+              // trains the spaced-repetition model that schedules reviews.
+              if (task.kind === "revise" && task.topicId) { setRatingTaskId(ratingTaskId === task.id ? null : task.id); return; }
+              onTaskStatus(task.id, "done");
+            }}>
             {task.status === "done" ? "Undo" : "Done"}
           </button>
           {task.status !== "skipped" && (
@@ -95,6 +102,17 @@ export default function PlannerView({
               onClick={() => onTaskStatus(task.id, "skipped")}>Skip</button>
           )}
         </div>
+        {ratingTaskId === task.id && task.status !== "done" && (
+          <div className="rating-strip glass-panel slide-in">
+            <span className="rating-q">How well did you recall it?</span>
+            <div className="rating-btns">
+              <button className="rate-btn rate-again" onClick={() => { setRatingTaskId(null); onTaskStatus(task.id, "done", 1); }}>Again</button>
+              <button className="rate-btn rate-hard" onClick={() => { setRatingTaskId(null); onTaskStatus(task.id, "done", 2); }}>Hard</button>
+              <button className="rate-btn rate-good" onClick={() => { setRatingTaskId(null); onTaskStatus(task.id, "done", 3); }}>Good</button>
+              <button className="rate-btn rate-easy" onClick={() => { setRatingTaskId(null); onTaskStatus(task.id, "done", 4); }}>Easy</button>
+            </div>
+          </div>
+        )}
         {open && topic && (
           <div className="glass-panel slide-in" style={{ padding: 16, margin: "0 0 10px 22px", borderLeft: `3px solid ${subj?.color || "var(--accent)"}` }}>
             <div style={{ fontSize: ".74rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: ".7px", color: "var(--text-muted)", marginBottom: 6 }}>
