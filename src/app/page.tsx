@@ -240,14 +240,16 @@ export default function Home() {
   if (loading) {
     return (
       <div className="loader-screen">
-        <div className="loader-ring"><IconLogo size={28} /></div>
-        <div className="loader-title">Study Planner Pro</div>
-        <div className="loader-sub">Loading your study plan…</div>
-        <div style={{ width: "min(420px, 82vw)", display: "flex", flexDirection: "column", gap: 10, marginTop: 18 }}>
-          <div className="skeleton" style={{ height: 52, borderRadius: 999 }} />
-          <div className="skeleton" style={{ height: 88 }} />
-          <div className="skeleton" style={{ height: 88, opacity: .7 }} />
-          <div className="skeleton" style={{ height: 88, opacity: .4 }} />
+        <div className="loader-stack">
+          <div className="loader-ring"><IconLogo size={28} /></div>
+          <div className="loader-title">Study Planner Pro</div>
+          <div className="loader-sub">Loading your study plan…</div>
+          <div className="loader-skeletons">
+            <div className="skeleton skeleton-strong" style={{ height: 52, borderRadius: 999 }} />
+            <div className="skeleton skeleton-strong" style={{ height: 84 }} />
+            <div className="skeleton skeleton-strong" style={{ height: 84, opacity: .72 }} />
+            <div className="skeleton skeleton-strong" style={{ height: 84, opacity: .45 }} />
+          </div>
         </div>
       </div>
     );
@@ -416,13 +418,7 @@ export default function Home() {
         </div>
       )}
 
-      {toast && (
-        <div className="glass-panel slide-in" style={{
-          position: "fixed", bottom: 96, left: "50%", transform: "translateX(-50%)", zIndex: 350,
-          padding: "12px 22px", fontSize: ".86rem", fontWeight: 700, background: "var(--surface-solid)",
-          boxShadow: "0 10px 30px rgba(0,0,0,0.15)", borderRadius: 12
-        }}>{toast}</div>
-      )}
+      {toast && <div className="toast">{toast}</div>}
     </>
   );
 }
