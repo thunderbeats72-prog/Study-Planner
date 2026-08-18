@@ -6,6 +6,7 @@ import {
 } from "@/lib/client";
 import { IconSpark, IconClose } from "./icons";
 import TaskEditor, { type TaskPatch } from "./TaskEditor";
+import { useBackClose } from "@/lib/useBackClose";
 
 type View = "list" | "calendar" | "kanban";
 
@@ -33,6 +34,7 @@ export default function PlannerView({
     const d = new Date(); return { y: d.getFullYear(), m: d.getMonth() };
   });
   const t = today();
+  useBackClose(!!openDay, () => setOpenDay(null));
 
   const filtered = useMemo(() => {
     let list = state.tasks;
@@ -192,8 +194,19 @@ export default function PlannerView({
       {view === "list" && (
         <div>
           {!upcoming.length && (
-            <div className="glass-panel" style={{ padding: 24, fontSize: ".86rem", color: "var(--text-muted)" }}>
-              No upcoming tasks. Hit <strong>Re-plan</strong> to generate the next stretch of your schedule.
+            <div className="glass-panel">
+              <div className="empty-state">
+                <div className="empty-state-icon">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="4" width="18" height="18" rx="3" /><path d="M16 2v4M8 2v4M3 10h18" />
+                  </svg>
+                </div>
+                <h4 className="empty-state-title">No upcoming sessions</h4>
+                <p className="empty-state-sub">Generate the next stretch of your schedule and your daily plan will appear here.</p>
+                <button className="btn btn-primary btn-sm" onClick={onReplan} disabled={replanning}>
+                  {replanning ? "Re-planning…" : "Generate Plan"}
+                </button>
+              </div>
             </div>
           )}
           {upcoming.map(([date, list]) => {
