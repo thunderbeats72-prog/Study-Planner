@@ -68,8 +68,7 @@ export default function ChatPanel({
             ))}
             {thinking && (
               <div className="ai-msg bot">
-                <span className="typing-dot" /> <span className="typing-dot" style={{ animationDelay: ".2s" }} />{" "}
-                <span className="typing-dot" style={{ animationDelay: ".4s" }} />
+                <span className="thinking-dots"><i /><i /><i /></span>
               </div>
             )}
             <div ref={endRef} />
