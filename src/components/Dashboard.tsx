@@ -10,7 +10,7 @@ export default function Dashboard({
   state, onTaskStatus, onTaskUpdate, onSkipSubject, onFocusTask, activeTaskId, activeClockSeconds, replanning, onReplan,
 }: {
   state: AppState;
-  onTaskStatus: (id: number, status: string) => void;
+  onTaskStatus: (id: number, status: string, rating?: number) => void;
   onTaskUpdate: (id: number, patch: TaskPatch) => void;
   onSkipSubject: (subjectId: number, date: string) => void;
   onFocusTask: (taskId: number) => void;
