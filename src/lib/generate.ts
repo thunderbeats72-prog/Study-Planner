@@ -3,7 +3,10 @@ import { subjects, topics, tasks } from "@/db/schema";
 import { and, eq, inArray } from "drizzle-orm";
 import { aiGenerateTopics } from "./ai";
 import { buildPlan, todayStr, diffDays, type PlanSettings, type PlanTopic } from "./planner";
-import { learnPace, learnWeekdays, paceFor, weekdayLoadFactor, decayedMastery } from "./ml";
+import {
+  learnPace, learnWeekdays, paceFor, weekdayLoadFactor, decayedMastery,
+  learnClusterPace, topicPace, retrievability,
+} from "./ml";
 
 export async function synthesiseTopicsForSubject(
   userId: number,
@@ -67,6 +70,7 @@ export async function regeneratePlan(userId: number, settingsRow: {
   const allHistory = await db.select().from(tasks).where(eq(tasks.userId, userId));
   const historyRows = allHistory.map((t) => ({
     subjectId: t.subjectId,
+    topicId: t.topicId,
     date: t.date,
     kind: t.kind,
     status: t.status,
@@ -75,6 +79,9 @@ export async function regeneratePlan(userId: number, settingsRow: {
   }));
   const pace = learnPace(historyRows);
   const weekdays = learnWeekdays(historyRows);
+  // Cluster-level pace: needs topic titles to group related units
+  const titleById = new Map(tps.map((t) => [t.id, t.title]));
+  const clusters = learnClusterPace(historyRows, titleById);
 
   // Last date each topic was actually worked on (for mastery decay)
   const lastTouch = new Map<number, string>();
@@ -97,13 +104,19 @@ export async function regeneratePlan(userId: number, settingsRow: {
       subjectId: t.subjectId,
       title: t.title,
       unit: t.unit,
-      // ML pace adjustment: schedule the time THIS user actually needs.
-      // Neutral (×1.0) until ~5 completed tasks exist for the subject.
-      estMinutes: Math.round((t.estMinutes * paceFor(pace, t.subjectId)) / 5) * 5,
+      // ML pace adjustment: subject-level pace refined by topic-cluster
+      // evidence ("Testing of Hypothesis" may be slower for this user
+      // than the rest of Quant Methods). Neutral ×1.0 until data exists.
+      estMinutes:
+        Math.round((t.estMinutes * topicPace(paceFor(pace, t.subjectId), clusters, t.title)) / 5) * 5,
       difficulty: t.difficulty,
-      // ML decay: long-untouched topics report lower effective mastery,
-      // which pushes them up the revision priority queue.
-      mastery: decayedMastery(t.mastery, daysSince(t.id)),
+      // FSRS-aware mastery: topics with review history report their
+      // current recall probability; others fall back to Ebbinghaus decay.
+      // Low effective mastery pushes a topic up the revision queue.
+      mastery:
+        t.stability > 0 && t.lastReview
+          ? Math.round(t.mastery * retrievability(t.stability, Math.max(0, diffDays(t.lastReview, today))))
+          : decayedMastery(t.mastery, daysSince(t.id)),
     }));
 
   const ps: PlanSettings = { ...settingsRow, startDate: start };
