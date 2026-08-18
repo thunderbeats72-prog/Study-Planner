@@ -298,7 +298,9 @@ body.theme-dark .tracker-bar,body.theme-obsidian .tracker-bar,body.theme-nebula 
 .fade-in{animation:fadeIn .3s ease}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 
-.loader-screen{position:fixed;inset:0;z-index:600;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:var(--app-bg);background-image:var(--bg-gradient)}
+.loader-screen{position:fixed;inset:0;z-index:600;display:grid;place-items:center;background:var(--app-bg);background-image:var(--bg-gradient);padding:24px}
+.loader-stack{display:flex;flex-direction:column;align-items:center;gap:14px;width:min(440px,88vw)}
+.loader-skeletons{width:100%;display:flex;flex-direction:column;gap:10px;margin-top:20px}
 .loader-ring{width:56px;height:56px;border-radius:var(--radius-xl);background:var(--accent-gradient);color:#fff;display:flex;align-items:center;justify-content:center;animation:float 2s ease-in-out infinite}
 @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
 .loader-title{font-size:1.05rem;font-weight:800}
@@ -908,6 +910,10 @@ body.mode-young .empty-state-title{font-size:1.05rem}
 
 /* §35 Loading: soft shimmer skeletons, never blank screens */
 .skeleton{position:relative;overflow:hidden;background:var(--row-bg);border-radius:var(--radius-sm)}
+/* On the app canvas (loader screen) row-bg is invisible — use a
+   bordered surface tone so skeleton bodies always read as shapes. */
+.skeleton-strong{background:var(--surface);border:1px solid var(--glass-border);box-shadow:var(--shadow-sm)}
+body.theme-dark .skeleton-strong,body.theme-obsidian .skeleton-strong,body.theme-nebula .skeleton-strong{background:var(--surface-hover)}
 .skeleton::after{content:"";position:absolute;inset:0;transform:translateX(-100%);
   background:linear-gradient(90deg,transparent,rgba(255,255,255,.5),transparent);
   animation:shimmer 1.4s ease infinite}
@@ -1245,4 +1251,160 @@ body.mode-focused .kanban > *,body.mode-focused .grid-fit-300 > *,
 body.mode-focused .main-workspace > :not(.tracker-bar){animation:none}
 @media (prefers-reduced-motion: reduce){
   .day-block,.heat-cell,.kanban > *,.grid-fit-300 > *,.ai-quick button{animation:none !important}
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   COMPONENT REFINEMENT EXPANSION
+   Complete visual coverage: every remaining component brought to
+   design-system quality, with alignment hardening throughout.
+═══════════════════════════════════════════════════════════════ */
+
+/* ── Toast: brand notification pill (replaces inline styles) ── */
+.toast{
+  position:fixed;bottom:max(96px,calc(76px + env(safe-area-inset-bottom)));left:50%;z-index:350;
+  padding:12px 22px;font-size:.86rem;font-weight:600;color:var(--text-main);
+  background:var(--surface-elevated);border:1px solid var(--glass-border);
+  border-radius:999px;box-shadow:var(--shadow-lg);
+  max-width:min(480px,calc(100vw - 32px));text-align:center;
+  animation:toastIn .4s var(--spring) forwards;
+}
+@keyframes toastIn{from{opacity:0;transform:translate(-50%,14px) scale(.95)}to{opacity:1;transform:translate(-50%,0) scale(1)}}
+@media(max-width:640px){.toast{bottom:calc(96px + env(safe-area-inset-bottom));width:calc(100vw - 28px)}}
+
+/* ── Alignment hardening: consistent gutters everywhere ── */
+html{scrollbar-gutter:stable}
+.main-workspace{display:flex;flex-direction:column}
+.main-workspace > *{width:100%}
+.page-header{align-items:center}
+.day-head{align-items:baseline}
+.kpi-grid{align-items:stretch}
+.kpi-card{display:flex;flex-direction:column;justify-content:space-between;min-height:112px}
+.flex-row{min-width:0}
+.task-row > *{align-self:center}
+
+/* ── Onboarding wizard: brand-quality steps ── */
+.ob-progress{display:flex;gap:6px;margin-bottom:24px}
+.ob-progress > div{height:4px;border-radius:99px;flex:1;background:var(--row-hover);overflow:hidden;position:relative}
+.ob-progress > div.done{background:var(--accent)}
+.ob-progress > div.done::after{content:"";position:absolute;inset:0;background:linear-gradient(105deg,transparent 30%,rgba(255,255,255,.4) 50%,transparent 70%);transform:translateX(-100%);animation:progShine 2.4s ease-in-out infinite}
+.ob-card{animation:pageIn .4s var(--spring-soft)}
+.ob-level-btn.selected,.ob-level-btn[data-selected="true"]{border-color:var(--accent);background:var(--color-primary-soft);box-shadow:0 0 0 1px var(--accent) inset}
+body.theme-dark .ob-level-btn.selected{background:var(--nav-active-bg)}
+
+/* ── Focus view: timer as the hero ── */
+.timer-ring-wrap{filter:drop-shadow(0 6px 24px var(--accent-glow))}
+#t-digits{font-variant-numeric:tabular-nums;letter-spacing:-1px}
+.focus-grid-2 .glass-panel{display:flex;flex-direction:column}
+
+/* ── Settings: section headers with hairline dividers ── */
+.settings-section-title{font-size:.8rem;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--text-dim);padding-bottom:8px;border-bottom:1px solid var(--glass-border);margin-bottom:14px}
+
+/* ── Form perfection: labels, hints, validation states ── */
+.input-field::placeholder{color:var(--text-dim);font-weight:450}
+.input-field:hover:not(:focus){border-color:var(--glass-border-hover)}
+.input-field.error{border-color:var(--danger-accent);box-shadow:0 0 0 3px rgba(224,82,82,.12)}
+.field-hint{font-size:.72rem;color:var(--text-dim);margin-top:5px;line-height:1.45}
+.field-error{font-size:.72rem;color:var(--danger-accent);margin-top:5px;font-weight:600}
+
+/* ── Keyboard hints: consistent kbd styling ── */
+.cmdk-kbd,kbd{font-family:"JetBrains Mono",monospace;box-shadow:inset 0 -1.5px 0 var(--glass-border-hover)}
+
+/* ── Selection states: table/list rows ── */
+.task-row.selected{border-color:var(--accent);background:var(--color-primary-soft)}
+body.theme-dark .task-row.selected,body.theme-obsidian .task-row.selected,body.theme-nebula .task-row.selected{background:var(--nav-active-bg)}
+
+/* ── Dividers: soft gradient hairlines for section breaks ── */
+.divider{height:1px;border:none;margin:18px 0;background:linear-gradient(90deg,transparent,var(--glass-border) 20%,var(--glass-border) 80%,transparent)}
+
+/* ── Badges: notification counts ── */
+.count-badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:99px;background:var(--accent);color:#fff;font-size:.62rem;font-weight:700}
+
+/* ── Progress semantics: color encodes state (§24) ── */
+.bar-fill.warn{background:linear-gradient(180deg,#F0B252,var(--warning-accent))}
+.bar-fill.danger{background:linear-gradient(180deg,#EA7A7A,var(--danger-accent))}
+.bar-fill.complete{background:linear-gradient(180deg,#3DBE8B,var(--success-accent))}
+
+/* ═══ MOTION REFINEMENT — physics polish across themes ═══ */
+
+/* Live clock row: soft heartbeat on the active dot */
+.task-row.active-clock .task-dot{animation:heartbeat 2s ease-in-out infinite}
+@keyframes heartbeat{0%,100%{transform:scale(1)}25%{transform:scale(1.25)}40%{transform:scale(1)}}
+
+/* Streak: flame warms up as streak grows (data-attr hook) */
+.streak-badge[data-hot="true"]{background:var(--status-pending-bg);color:var(--status-pending-text)}
+
+/* Panel headers: title underline draws in on view change */
+.day-head h3{position:relative}
+
+/* Chip micro-entrance when status flips */
+.chip-done{animation:chipFlip .35s var(--spring)}
+@keyframes chipFlip{from{transform:scale(.7);opacity:0}to{transform:scale(1);opacity:1}}
+
+/* Zen: gentle vignette so digits float in space */
+.zen::after{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,transparent 40%,rgba(0,0,0,.35) 100%)}
+
+/* ═══ RESPONSIVE PERFECTION PASS ═══ */
+
+/* Consistent content max-width rhythm on every band */
+@media(min-width:861px){
+  .main-workspace{padding-left:2px;padding-right:2px}
+}
+
+/* Phablet landscape: two-column planner day-blocks */
+@media(min-width:700px) and (max-width:1023px) and (orientation:landscape){
+  .kpi-grid{grid-template-columns:repeat(4,1fr)}
+}
+
+/* Very tall phones (aspect > 2:1): more breathing room */
+@media(max-width:480px) and (min-height:800px){
+  .day-block{margin-bottom:14px}
+  .main-workspace{padding-bottom:132px !important}
+}
+
+/* Hover-capable laptops with small screens (11-13") */
+@media(min-width:1024px) and (max-width:1279px) and (hover:hover){
+  :root{--sidebar-w:232px}
+  .app-wrapper{gap:16px;padding:16px}
+}
+
+/* Pointer-precision scroll areas: thin elegant scrollbars in panels */
+.ai-msgs::-webkit-scrollbar,.modal-box::-webkit-scrollbar,.cmdk-list::-webkit-scrollbar{width:4px}
+
+/* ═══ THEME-SPECIFIC FINE TUNING ═══ */
+
+/* Mint & Sunset: warm the shadows to match temperature */
+body.theme-mint .glass-panel{box-shadow:0 1px 3px rgba(6,78,59,.05)}
+body.theme-sunset .glass-panel{box-shadow:0 1px 3px rgba(67,20,7,.05)}
+
+/* Nebula: faint starfield shimmer on the canvas (decorative, subtle) */
+body.theme-nebula{background-image:var(--bg-gradient),radial-gradient(1.5px 1.5px at 20% 30%,rgba(255,255,255,.12),transparent),radial-gradient(1px 1px at 70% 15%,rgba(255,255,255,.1),transparent),radial-gradient(1.2px 1.2px at 45% 60%,rgba(255,255,255,.08),transparent),radial-gradient(1px 1px at 85% 45%,rgba(255,255,255,.09),transparent)}
+
+/* Obsidian: cooler text selection */
+body.theme-obsidian ::selection{background:rgba(56,189,248,.25)}
+body.theme-nebula ::selection{background:rgba(168,85,247,.3)}
+
+/* Dark themes: elevated surfaces get subtle top-edge light */
+body.theme-dark .ai-panel,body.theme-dark .cmdk,body.theme-dark .modal-box,
+body.theme-obsidian .ai-panel,body.theme-obsidian .cmdk,body.theme-obsidian .modal-box,
+body.theme-nebula .ai-panel,body.theme-nebula .cmdk,body.theme-nebula .modal-box{
+  box-shadow:0 8px 28px rgba(0,0,0,.55),0 32px 90px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.05);
+}
+
+/* ═══ ACCESSIBILITY DEPTH ═══ */
+@media (prefers-contrast: more){
+  :root{--glass-border:rgba(22,22,29,.22);--text-muted:#3F4149}
+  body.theme-dark{--glass-border:rgba(255,255,255,.25);--text-muted:#C5CBDC}
+  .btn-primary{border:1.5px solid #fff3}
+}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+/* Focus trap affordance in modals */
+.modal-box:focus{outline:none}
+
+/* mode guards for new decorative pieces */
+body.mode-focused .ob-progress > div.done::after,
+body.mode-focused .task-row.active-clock .task-dot{animation:none}
+@media (prefers-reduced-motion: reduce){
+  .toast,.ob-card,.chip-done{animation:none !important}
 }
