@@ -68,6 +68,9 @@ export const topics = pgTable("topics", {
   position: integer("position").notNull().default(0),
   mastery: integer("mastery").notNull().default(0),
   status: text("status").notNull().default("pending"),
+  // FSRS-lite spaced-repetition state
+  stability: real("stability").notNull().default(0),
+  lastReview: text("last_review").notNull().default(""),
 });
 
 export const tasks = pgTable("tasks", {
