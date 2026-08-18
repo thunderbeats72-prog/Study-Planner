@@ -355,11 +355,10 @@ body.theme-dark .tracker-bar,body.theme-obsidian .tracker-bar,body.theme-nebula 
   .heat-cell{width:11px;height:11px}
   /* Structured mobile task card: title block on top (full width),
      then one clean action row. No arbitrary wrap order. */
-  .task-row{flex-wrap:wrap;gap:6px 8px;padding:12px;border-radius:var(--radius-md);background:var(--surface);border:1px solid var(--glass-border)}
-  .task-row > .task-dot{position:absolute;margin:0}
-  .task-row{position:relative}
-  .task-row > div[style*="flex: 1"]{flex-basis:100%;order:-1;margin-bottom:4px;padding-left:16px}
-  .task-row .task-dot{left:12px;top:17px}
+  .task-row{position:relative;flex-wrap:wrap;gap:6px 8px;padding:12px;border-radius:var(--radius-md);background:var(--surface);border:1px solid var(--glass-border)}
+  .task-row > .task-dot{position:absolute;left:12px;top:19px;margin:0}
+  /* Title block ALWAYS takes the full card width on phones */
+  .task-main{flex:1 1 100%;width:100%;min-width:100%;order:-1;margin-bottom:4px;padding-left:22px}
   .task-row .task-title{font-size:.84rem;line-height:1.35}
   .task-row .task-sub{font-size:.68rem;line-height:1.5;margin-top:3px}
   .task-row > .chip{order:1;font-size:.58rem;padding:3px 8px;margin-right:auto}
@@ -1425,11 +1424,11 @@ body.mode-focused .task-row.active-clock .task-dot{animation:none}
 
 /* 4. Card sheen: light sweeps across panels on hover (desktop) */
 @media(hover:hover) and (pointer:fine){
-  .glass-panel{position:relative;overflow:hidden}
-  .glass-panel::after{content:"";position:absolute;top:0;bottom:0;width:60%;left:-80%;
+  .glass-panel:not(.ai-panel){position:relative;overflow:hidden}
+  .glass-panel:not(.ai-panel)::after{content:"";position:absolute;top:0;bottom:0;width:60%;left:-80%;
     background:linear-gradient(105deg,transparent,rgba(255,255,255,.06),transparent);
     transform:skewX(-15deg);transition:left .7s ease;pointer-events:none}
-  .glass-panel:hover::after{left:120%}
+  .glass-panel:not(.ai-panel):hover::after{left:120%}
   body.theme-mint .glass-panel::after,body.theme-sunset .glass-panel::after,
   body:not([class*=theme-]) .glass-panel::after{background:linear-gradient(105deg,transparent,rgba(94,106,210,.05),transparent)}
 }
@@ -1521,6 +1520,7 @@ body.mode-focused .pulse-dot.live::after{animation:none;transition:none}
    ever leak upward regardless of cascade order. */
 @media(min-width:641px){
   .ai-panel{
+    position:fixed !important;
     left:auto !important;right:22px;bottom:88px;
     width:min(430px,calc(100vw - 44px));
     height:min(620px,calc(100vh - 130px));

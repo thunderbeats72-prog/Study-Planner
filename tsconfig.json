@@ -38,7 +38,8 @@
   ],
   "exclude": [
     "node_modules",
-    "deploy-package",
-    "staging"
+    "**/deploy-package",
+    "**/direct-upload",
+    "**/staging"
   ]
 }
