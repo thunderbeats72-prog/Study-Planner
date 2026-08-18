@@ -34,7 +34,7 @@ export default function SubjectsView({
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr", gap: 18 }} className="subs-wrap">
+      <div className="subs-wrap">
         <div className="flex-col gap-md">
           {state.subjects.map((s) => {
             const list = state.topics.filter((x) => x.subjectId === s.id);
@@ -95,7 +95,7 @@ export default function SubjectsView({
             <label className="lbl">Subject Name</label>
             <input className="input-field" value={name} placeholder="e.g. Organizational Behavior" onChange={(e) => setName(e.target.value)} />
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }} className="mb-md">
+          <div className="grid-2 mb-md">
             <div><label className="lbl">Units / Lessons</label>
               <input type="number" className="input-field" min={1} max={50} value={units} onChange={(e) => setUnits(Number(e.target.value))} /></div>
             <div><label className="lbl">Colour</label>
@@ -127,7 +127,7 @@ export default function SubjectsView({
             <div className="flex-col gap-md">
               <div><label className="lbl">Subject Name</label>
                 <input className="input-field" value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} /></div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+              <div className="grid-2" style={{ gap: 14 }}>
                 <div><label className="lbl">Units / Lessons</label>
                   <input type="number" className="input-field" min={1} max={50} value={editing.units}
                     onChange={(e) => setEditing({ ...editing, units: Number(e.target.value) })} /></div>

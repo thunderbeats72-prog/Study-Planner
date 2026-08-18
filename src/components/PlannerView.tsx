@@ -221,7 +221,7 @@ export default function PlannerView({
                     </div>
                     <div className="day-meta">{list.length} tasks · {mins} min · {done} done</div>
                   </div>
-                  <div className="bar-track" style={{ width: 120 }}>
+                  <div className="bar-track" style={{ width: "min(120px, 30vw)" }}>
                     <div className="bar-fill" style={{ width: `${list.length ? (done / list.length) * 100 : 0}%` }} />
                   </div>
                 </div>

@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { today, type AppState, type TaskRow } from "@/lib/client";
 import { IconClose } from "./icons";
+import { useBackClose } from "@/lib/useBackClose";
 
 export type TaskPatch = {
   title?: string;
@@ -43,6 +44,8 @@ export default function TaskEditor({
     setStatus(task.status);
   }, [task]);
 
+  useBackClose(!!task, onClose);
+
   if (!task) return null;
 
   const subject = state.subjects.find((s) => s.id === task.subjectId);
@@ -67,7 +70,7 @@ export default function TaskEditor({
             <label className="lbl">Study instruction</label>
             <textarea className="input-field" rows={4} value={detail} onChange={(e) => setDetail(e.target.value)} />
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }} className="task-edit-grid">
+          <div className="grid-2 task-edit-grid">
             <div>
               <label className="lbl">Planned minutes</label>
               <input className="input-field" type="number" min={5} max={480} value={minutes}

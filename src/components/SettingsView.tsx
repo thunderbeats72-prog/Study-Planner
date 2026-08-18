@@ -30,7 +30,7 @@ export default function SettingsView({
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))", gap: 16 }}>
+      <div className="grid-fit-300">
         <div className="glass-panel tilt-card" style={{ padding: 22 }}>
           <h3 style={{ fontSize: ".95rem", fontWeight: 800, margin: "0 0 16px" }}>Schedule Engine</h3>
           <div className="mb-md"><label className="lbl">Your Name</label>
@@ -76,7 +76,7 @@ export default function SettingsView({
         <div className="flex-col gap-md">
           <div className="glass-panel tilt-card" style={{ padding: 22 }}>
             <h3 style={{ fontSize: ".95rem", fontWeight: 800, margin: "0 0 16px" }}>Appearance</h3>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 9 }}>
+            <div className="grid-2" style={{ gap: 9 }}>
               {THEMES.map((th) => (
                 <button key={th.id} className={`btn ${s.theme === th.id ? "btn-primary" : "btn-secondary"}`}
                   onClick={() => onPatch({ theme: th.id })}>{th.label}</button>

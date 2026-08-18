@@ -34,17 +34,17 @@ export async function POST(req: Request) {
       replanned = true;
     }
     const confirmations: Record<string, string> = {
-      navigate: `Opening **${String(action.payload)}** for you. ✅`,
-      startTimer: `⏱️ Clocked in. Time is now recording against today's task and will show in your Planner. Put the phone in another room — one lesson, one focus.`,
-      stopTimer: `✅ Clocked out and your minutes are saved to today's task in the Planner.`,
-      break: `☕ Break started. Stand, look 6 m away for 20 s, hydrate. Say *"resume"* when you're back.`,
-      pause: `⏸️ Timer paused. Say *"resume"* whenever you're ready to continue.`,
-      resume: `▶️ Back on the clock — picking up right where you left off.`,
-      zen: `🧘 Zen mode on — just you and the timer.`,
-      replan: `Rebalancing your schedule now — unfinished lessons are being pushed forward and re-spread across your remaining **${ctx.daysLeft} days**, weakest subject kept first. Done in a moment. ✅`,
-      theme: `Done! Switched your active theme instantly. Let me know if you want to try any other style like *obsidian*, *nebula*, *sunset*, *mint*, or *lavender*. 🎨`,
+      navigate: `Opening **${String(action.payload)}**.`,
+      startTimer: `Clocked in. Time is recording against today's task — one lesson, one focus.`,
+      stopTimer: `Clocked out. Your minutes are saved to today's task.`,
+      break: `Break started. Stand up, rest your eyes, hydrate. Say *"resume"* when you're back.`,
+      pause: `Timer paused. Say *"resume"* when you're ready to continue.`,
+      resume: `Back on the clock — picking up where you left off.`,
+      zen: `Zen mode on — just you and the timer.`,
+      replan: `Rebalancing your schedule now — unfinished lessons are being pushed forward and re-spread across your remaining **${ctx.daysLeft} days**, weakest subject kept first. Done in a moment.`,
+      theme: `Theme updated. Other styles: *obsidian*, *nebula*, *sunset*, *mint*, *lavender*.`,
     };
-    finalText = confirmations[action.type] || "Done. ✅";
+    finalText = confirmations[action.type] || "Done.";
   } else {
     // Normal question → LLM if available, else the local reasoning engine.
     let reply: string | null = null;
@@ -60,7 +60,7 @@ export async function POST(req: Request) {
       // regex parser didn't recognise (unusual phrasing, other languages).
       // Strip the tag from the visible reply and execute the action.
       const extracted = extractLlmAction(reply);
-      finalText = extracted.text || "Done. ✅";
+      finalText = extracted.text || "Done.";
       if (extracted.action) {
         action = extracted.action;
         if (action.type === "replan") {
