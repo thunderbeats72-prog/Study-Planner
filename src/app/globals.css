@@ -957,3 +957,113 @@ body.mode-young .day-complete{font-size:.95rem;padding:15px 18px}
 /* Modal close affordance */
 .modal-overlay{cursor:pointer}
 .modal-box{cursor:default}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   UNIVERSAL DEVICE COMPATIBILITY LAYER
+   Overflow-proof by construction; fluid type; every viewport class
+   from 320px feature-phones to 4K desktops, incl. foldables,
+   notched phones and high-DPI screens.
+═══════════════════════════════════════════════════════════════ */
+
+/* 1. Overflow guards — horizontal scroll becomes impossible */
+html,body{max-width:100vw;overflow-x:hidden}
+*{min-width:0}                       /* flex/grid children may always shrink */
+img,svg,video,canvas{max-width:100%;height:auto}
+.glass-panel,.day-block,.modal-box,.task-row{overflow-wrap:break-word;word-break:break-word}
+.task-title,.day-date,.kpi-label,.brand-course{overflow-wrap:anywhere}
+
+/* 2. Fluid type — scales continuously with viewport, no jumps */
+.page-title{font-size:clamp(1.35rem,4.5vw,2rem)}
+.kpi-value{font-size:clamp(1.5rem,5vw,2rem)}
+.zen .zen-digits{font-size:clamp(3.5rem,20vw,10rem)}
+.tracker-bar .mono{font-size:clamp(1rem,3.4vw,1.2rem)}
+
+/* 3. Responsive utility grids (replace inline fixed grids) */
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid-fit-300{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(300px,100%),1fr));gap:16px}
+.subs-wrap{display:grid;grid-template-columns:1.6fr 1fr;gap:18px}
+@media(max-width:640px){
+  .grid-2{grid-template-columns:1fr}
+  .subs-wrap{grid-template-columns:1fr;gap:14px}
+}
+
+/* 4. S24-class phones (360-430px): the tightest mainstream band */
+@media(max-width:430px){
+  .app-wrapper{padding-left:10px;padding-right:10px}
+  .main-workspace{padding-left:0;padding-right:0}
+  .tracker-bar{padding:12px;gap:8px}
+  .tracker-bar .btn-xs{min-width:0;flex:1 1 auto}
+  .page-header{gap:10px;margin-bottom:16px}
+  .page-header .btn{width:100%}
+  .kpi-grid{grid-template-columns:repeat(2,1fr);gap:10px}
+  .kpi-card{padding:14px}
+  .day-block{padding:12px 11px;margin-bottom:10px}
+  .task-row{padding:11px 10px}
+  .task-row > .btn{padding:6px 9px;font-size:.67rem}
+  .cal-grid{gap:3px}
+  .cal-cell{min-height:44px;padding:3px;border-radius:var(--radius-sm)}
+  .cal-cell .cal-num{font-size:.68rem}
+  .vtab{padding:8px 4px;font-size:.72rem}
+  .modal-box{padding:14px 12px calc(16px + env(safe-area-inset-bottom))}
+  .ai-panel{bottom:0;right:0;left:0;width:100%;height:min(82vh,640px);border-radius:var(--radius-xl) var(--radius-xl) 0 0}
+  .ai-fab{bottom:calc(84px + env(safe-area-inset-bottom))}
+  .rating-btns{gap:5px}
+  .heat-cell{width:9px;height:9px}
+  .streak-badge{font-size:.66rem;padding:4px 9px}
+}
+
+/* 5. Small phones (<=360px): SE, older Androids */
+@media(max-width:360px){
+  .kpi-grid{grid-template-columns:1fr 1fr;gap:8px}
+  .kpi-value{font-size:1.35rem}
+  .tracker-bar > .flex-row:first-child .mono{display:none} /* timer lives in Focus */
+  .chip{font-size:.56rem;padding:2px 7px}
+  .vtab{font-size:.66rem}
+}
+
+/* 6. Foldables & phablets portrait (431-640px) */
+@media(min-width:431px) and (max-width:640px){
+  .kpi-grid{grid-template-columns:repeat(2,1fr)}
+}
+
+/* 7. Unfolded foldables / small tablets portrait (641-860px) */
+@media(min-width:641px) and (max-width:860px){
+  .kpi-grid{grid-template-columns:repeat(2,1fr)}
+  .dash-grid-2{grid-template-columns:1fr}
+  .kanban{grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+}
+
+/* 8. Safe areas: notches, punch-holes, gesture bars, curved edges */
+.app-wrapper{padding-left:max(22px,env(safe-area-inset-left));padding-right:max(22px,env(safe-area-inset-right))}
+@media(max-width:860px){
+  .app-wrapper{padding-left:max(12px,env(safe-area-inset-left));padding-right:max(12px,env(safe-area-inset-right))}
+  .mobile-header{padding-top:env(safe-area-inset-top);height:calc(54px + env(safe-area-inset-top))}
+  .main-workspace{padding-top:calc(64px + env(safe-area-inset-top))}
+}
+.zen{padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+
+/* 9. Short-viewport phones in landscape & in-app browsers */
+@media(max-height:600px) and (max-width:900px){
+  .tracker-bar{position:relative;top:auto}
+  .timer-ring-wrap{width:150px;height:150px}
+}
+
+/* 10. Dynamic viewport units: URL bars that collapse (Chrome/Safari) */
+@supports (height:100dvh){
+  .sidebar{height:calc(100dvh - 44px)}
+  .ai-panel{height:min(620px,calc(100dvh - 130px))}
+  @media(max-width:430px){.ai-panel{height:min(82dvh,640px)}}
+  .ob-overlay{min-height:100dvh}
+}
+
+/* 11. High-DPI: hairlines stay hairlines */
+@media(min-resolution:2dppx){
+  .glass-panel,.task-row,.btn-secondary,.input-field{border-width:.5px}
+}
+
+/* 12. Ultra-wide & 4K: content stays centered and readable */
+@media(min-width:1800px){
+  .app-wrapper{max-width:1680px}
+  html{font-size:17px}
+}
