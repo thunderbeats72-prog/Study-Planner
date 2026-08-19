@@ -37,11 +37,11 @@
   --font-display:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
 }
 
-body.theme-dark{--color-ai:#22D3EE;--color-ai-soft:rgba(34,211,238,.1);--ai-rgb:34,211,238;--color-ai-bright:#67E8F9;--app-bg:#050506;--bg-gradient:radial-gradient(1100px 480px at 50% -12%,rgba(255,255,255,.04),transparent 65%);--surface:#0E0E10;--surface-solid:#0E0E10;--surface-elevated:#161618;--surface-hover:#1A1A1D;--glass-border:#232326;--glass-border-hover:#333338;--glass-shadow:0 1px 3px rgba(0,0,0,.6);--glass-shadow-hover:0 8px 28px rgba(0,0,0,.65);--text-main:#F5F5F7;--text-muted:#A3A3AB;--text-dim:#5C5C66;--accent:#8A8AF4;--accent-hover:#9C9CF6;--accent-light:#AEAEF8;--accent-glow:rgba(138,138,244,.2);--accent-gradient:linear-gradient(135deg,#9494F5,#6E6EF0);--nav-active-bg:rgba(138,138,244,.13);--nav-active-text:#B4B4F9;--nav-active-border:rgba(138,138,244,.3);--row-bg:rgba(255,255,255,.035);--row-hover:rgba(255,255,255,.07);--status-pending-bg:rgba(245,176,65,.15);--status-pending-text:#EFBE6E;--status-done-bg:rgba(52,211,153,.14);--status-done-text:#5EE0A8;--status-skipped-bg:rgba(248,113,113,.14);--status-skipped-text:#F49E9E;--chart-bar:rgba(138,138,244,.75);--input-bg:#161618}
-body.theme-obsidian{--color-ai:#34D399;--color-ai-soft:rgba(52,211,153,.1);--ai-rgb:52,211,153;--color-ai-bright:#6EE7B7;--surface-elevated:#1A2338;--app-bg:#0B0F1A;--bg-gradient:radial-gradient(1000px 420px at 50% -12%,rgba(56,189,248,.05),transparent 70%);--surface:#131A2A;--surface-solid:#131A2A;--surface-hover:#1A2338;--glass-border:#263349;--glass-border-hover:#354765;--glass-shadow:0 1px 3px rgba(0,0,0,.35);--glass-shadow-hover:0 6px 20px rgba(0,0,0,.45);--text-main:#F1F5F9;--text-muted:#94A3B8;--text-dim:#556179;--accent:#38BDF8;--accent-hover:#5BC9F9;--accent-light:#7DD3FC;--accent-glow:rgba(56,189,248,.14);--accent-gradient:linear-gradient(180deg,#4CC5F9,#22A8E6);--nav-active-bg:rgba(56,189,248,.11);--nav-active-text:#7DD3FC;--nav-active-border:rgba(56,189,248,.26);--row-bg:rgba(255,255,255,.03);--row-hover:rgba(255,255,255,.06);--status-pending-bg:rgba(229,154,36,.14);--status-pending-text:#E0B35C;--status-done-bg:rgba(22,163,122,.14);--status-done-text:#4BC59E;--status-skipped-bg:rgba(224,82,82,.14);--status-skipped-text:#E58080;--chart-bar:rgba(56,189,248,.6);--input-bg:#1A2338}
-body.theme-nebula{--color-ai:#C084FC;--color-ai-soft:rgba(192,132,252,.13);--ai-rgb:192,132,252;--color-ai-bright:#D8B4FE;--surface-elevated:#221940;--app-bg:#100B20;--bg-gradient:radial-gradient(1000px 420px at 50% -12%,rgba(168,85,247,.07),transparent 70%);--surface:#191230;--surface-solid:#191230;--surface-hover:#221940;--glass-border:#32264F;--glass-border-hover:#453567;--glass-shadow:0 1px 3px rgba(0,0,0,.4);--glass-shadow-hover:0 6px 20px rgba(0,0,0,.5);--text-main:#F5F3FA;--text-muted:#B3A6D4;--text-dim:#6A5C90;--accent:#A855F7;--accent-hover:#B672F9;--accent-light:#C495FA;--accent-glow:rgba(168,85,247,.15);--accent-gradient:linear-gradient(180deg,#B168F8,#9333EA);--nav-active-bg:rgba(168,85,247,.12);--nav-active-text:#D8B4FE;--nav-active-border:rgba(168,85,247,.28);--row-bg:rgba(255,255,255,.03);--row-hover:rgba(255,255,255,.06);--status-pending-bg:rgba(229,154,36,.14);--status-pending-text:#E0B35C;--status-done-bg:rgba(22,163,122,.14);--status-done-text:#4BC59E;--status-skipped-bg:rgba(224,82,82,.14);--status-skipped-text:#E58080;--chart-bar:rgba(168,85,247,.6);--input-bg:#221940}
-body.theme-mint{--color-ai:#0D9488;--color-ai-soft:#E5F5F2;--ai-rgb:13,148,136;--color-ai-bright:#14B8A6;--app-bg:#F4FAF7;--bg-gradient:radial-gradient(1100px 460px at 50% -12%,rgba(16,163,127,.06),transparent 70%);--surface:#FFFFFF;--surface-solid:#FFFFFF;--surface-hover:#F8FCFA;--glass-border:#E2EDE7;--glass-border-hover:#CFE2D8;--glass-shadow:0 1px 3px rgba(6,78,59,.05);--glass-shadow-hover:0 4px 16px rgba(6,78,59,.08);--text-main:#0E2A20;--text-muted:#5B7268;--text-dim:#93A8A0;--accent:#0FA37F;--accent-hover:#0C8A6B;--accent-light:#34D399;--accent-glow:rgba(15,163,127,.13);--accent-gradient:linear-gradient(180deg,#16B08A,#0FA37F);--nav-active-bg:#E5F5EF;--nav-active-text:#0C7A60;--nav-active-border:rgba(15,163,127,.22);--row-bg:#F4FAF7;--row-hover:#EAF5F0;--chart-bar:rgba(15,163,127,.55);--input-bg:#FFFFFF}
-body.theme-sunset{--color-ai:#D9530B;--color-ai-soft:#FBEDE3;--ai-rgb:217,83,11;--color-ai-bright:#F97316;--app-bg:#FBF6F1;--bg-gradient:radial-gradient(1100px 460px at 50% -12%,rgba(234,88,12,.05),transparent 70%);--surface:#FFFFFF;--surface-solid:#FFFFFF;--surface-hover:#FDF9F5;--glass-border:#F0E5DC;--glass-border-hover:#E4D2C4;--glass-shadow:0 1px 3px rgba(67,20,7,.05);--glass-shadow-hover:0 4px 16px rgba(67,20,7,.08);--text-main:#2D1A10;--text-muted:#77604F;--text-dim:#AE9C8D;--accent:#E1620F;--accent-hover:#C4540C;--accent-light:#FB923C;--accent-glow:rgba(225,98,15,.13);--accent-gradient:linear-gradient(180deg,#EE6F1B,#DC5E0C);--nav-active-bg:#FBEDE0;--nav-active-text:#B34E0A;--nav-active-border:rgba(225,98,15,.22);--row-bg:#FBF6F1;--row-hover:#F6EDE3;--chart-bar:rgba(225,98,15,.55);--input-bg:#FFFFFF}
+body.theme-dark{--color-ai:#9C9CF6;--color-ai-soft:rgba(156,156,246,.12);--ai-rgb:156,156,246;--color-ai-bright:#B6B6F9;--app-bg:#050506;--bg-gradient:radial-gradient(1100px 480px at 50% -12%,rgba(255,255,255,.04),transparent 65%);--surface:#0E0E10;--surface-solid:#0E0E10;--surface-elevated:#161618;--surface-hover:#1A1A1D;--glass-border:#232326;--glass-border-hover:#333338;--glass-shadow:0 1px 3px rgba(0,0,0,.6);--glass-shadow-hover:0 8px 28px rgba(0,0,0,.65);--text-main:#F5F5F7;--text-muted:#A3A3AB;--text-dim:#5C5C66;--accent:#8A8AF4;--accent-hover:#9C9CF6;--accent-light:#AEAEF8;--accent-glow:rgba(138,138,244,.2);--accent-gradient:linear-gradient(135deg,#9494F5,#6E6EF0);--nav-active-bg:rgba(138,138,244,.13);--nav-active-text:#B4B4F9;--nav-active-border:rgba(138,138,244,.3);--row-bg:rgba(255,255,255,.035);--row-hover:rgba(255,255,255,.07);--status-pending-bg:rgba(245,176,65,.15);--status-pending-text:#EFBE6E;--status-done-bg:rgba(52,211,153,.14);--status-done-text:#5EE0A8;--status-skipped-bg:rgba(248,113,113,.14);--status-skipped-text:#F49E9E;--chart-bar:rgba(138,138,244,.75);--input-bg:#161618}
+body.theme-obsidian{--color-ai:#4CC5F9;--color-ai-soft:rgba(76,197,249,.12);--ai-rgb:76,197,249;--color-ai-bright:#7DD3FC;--surface-elevated:#1A2338;--app-bg:#0B0F1A;--bg-gradient:radial-gradient(1000px 420px at 50% -12%,rgba(56,189,248,.05),transparent 70%);--surface:#131A2A;--surface-solid:#131A2A;--surface-hover:#1A2338;--glass-border:#263349;--glass-border-hover:#354765;--glass-shadow:0 1px 3px rgba(0,0,0,.35);--glass-shadow-hover:0 6px 20px rgba(0,0,0,.45);--text-main:#F1F5F9;--text-muted:#94A3B8;--text-dim:#556179;--accent:#38BDF8;--accent-hover:#5BC9F9;--accent-light:#7DD3FC;--accent-glow:rgba(56,189,248,.14);--accent-gradient:linear-gradient(180deg,#4CC5F9,#22A8E6);--nav-active-bg:rgba(56,189,248,.11);--nav-active-text:#7DD3FC;--nav-active-border:rgba(56,189,248,.26);--row-bg:rgba(255,255,255,.03);--row-hover:rgba(255,255,255,.06);--status-pending-bg:rgba(229,154,36,.14);--status-pending-text:#E0B35C;--status-done-bg:rgba(22,163,122,.14);--status-done-text:#4BC59E;--status-skipped-bg:rgba(224,82,82,.14);--status-skipped-text:#E58080;--chart-bar:rgba(56,189,248,.6);--input-bg:#1A2338}
+body.theme-nebula{--color-ai:#BF7DFA;--color-ai-soft:rgba(191,125,250,.13);--ai-rgb:191,125,250;--color-ai-bright:#D8B4FE;--surface-elevated:#221940;--app-bg:#100B20;--bg-gradient:radial-gradient(1000px 420px at 50% -12%,rgba(168,85,247,.07),transparent 70%);--surface:#191230;--surface-solid:#191230;--surface-hover:#221940;--glass-border:#32264F;--glass-border-hover:#453567;--glass-shadow:0 1px 3px rgba(0,0,0,.4);--glass-shadow-hover:0 6px 20px rgba(0,0,0,.5);--text-main:#F5F3FA;--text-muted:#B3A6D4;--text-dim:#6A5C90;--accent:#A855F7;--accent-hover:#B672F9;--accent-light:#C495FA;--accent-glow:rgba(168,85,247,.15);--accent-gradient:linear-gradient(180deg,#B168F8,#9333EA);--nav-active-bg:rgba(168,85,247,.12);--nav-active-text:#D8B4FE;--nav-active-border:rgba(168,85,247,.28);--row-bg:rgba(255,255,255,.03);--row-hover:rgba(255,255,255,.06);--status-pending-bg:rgba(229,154,36,.14);--status-pending-text:#E0B35C;--status-done-bg:rgba(22,163,122,.14);--status-done-text:#4BC59E;--status-skipped-bg:rgba(224,82,82,.14);--status-skipped-text:#E58080;--chart-bar:rgba(168,85,247,.6);--input-bg:#221940}
+body.theme-mint{--color-ai:#10B389;--color-ai-soft:#E3F6F0;--ai-rgb:16,179,137;--color-ai-bright:#2DD4A8;--app-bg:#F4FAF7;--bg-gradient:radial-gradient(1100px 460px at 50% -12%,rgba(16,163,127,.06),transparent 70%);--surface:#FFFFFF;--surface-solid:#FFFFFF;--surface-hover:#F8FCFA;--glass-border:#E2EDE7;--glass-border-hover:#CFE2D8;--glass-shadow:0 1px 3px rgba(6,78,59,.05);--glass-shadow-hover:0 4px 16px rgba(6,78,59,.08);--text-main:#0E2A20;--text-muted:#5B7268;--text-dim:#93A8A0;--accent:#0FA37F;--accent-hover:#0C8A6B;--accent-light:#34D399;--accent-glow:rgba(15,163,127,.13);--accent-gradient:linear-gradient(180deg,#16B08A,#0FA37F);--nav-active-bg:#E5F5EF;--nav-active-text:#0C7A60;--nav-active-border:rgba(15,163,127,.22);--row-bg:#F4FAF7;--row-hover:#EAF5F0;--chart-bar:rgba(15,163,127,.55);--input-bg:#FFFFFF}
+body.theme-sunset{--color-ai:#EE7118;--color-ai-soft:#FBEFE2;--ai-rgb:238,113,24;--color-ai-bright:#FB923C;--app-bg:#FBF6F1;--bg-gradient:radial-gradient(1100px 460px at 50% -12%,rgba(234,88,12,.05),transparent 70%);--surface:#FFFFFF;--surface-solid:#FFFFFF;--surface-hover:#FDF9F5;--glass-border:#F0E5DC;--glass-border-hover:#E4D2C4;--glass-shadow:0 1px 3px rgba(67,20,7,.05);--glass-shadow-hover:0 4px 16px rgba(67,20,7,.08);--text-main:#2D1A10;--text-muted:#77604F;--text-dim:#AE9C8D;--accent:#E1620F;--accent-hover:#C4540C;--accent-light:#FB923C;--accent-glow:rgba(225,98,15,.13);--accent-gradient:linear-gradient(180deg,#EE6F1B,#DC5E0C);--nav-active-bg:#FBEDE0;--nav-active-text:#B34E0A;--nav-active-border:rgba(225,98,15,.22);--row-bg:#FBF6F1;--row-hover:#F6EDE3;--chart-bar:rgba(225,98,15,.55);--input-bg:#FFFFFF}
 
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{padding:0;margin:0}
@@ -193,11 +193,11 @@ select.input-field{appearance:none;background-image:linear-gradient(45deg,transp
 .ob-level-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-bottom:20px}
 .ob-level-btn{padding:15px;border-radius:var(--radius-lg);border:1.5px solid var(--glass-border);background:var(--row-bg);color:var(--text-main);font-size:.88rem;font-weight:750;cursor:pointer;text-align:left;transition:all .2s ease;font-family:inherit}
 .ob-level-btn:hover{border-color:var(--accent);background:var(--row-hover)}
-.ob-level-btn.selected{border-color:var(--accent);background:var(--accent-glow);box-shadow:0 0 0 3px var(--accent-glow)}
+.ob-level-btn.selected{border-color:var(--accent);background:var(--nav-active-bg);color:var(--nav-active-text);box-shadow:0 0 0 3px var(--accent-glow)}
 .ob-course-list{max-height:270px;overflow-y:auto;display:flex;flex-direction:column;gap:7px;margin-bottom:16px}
 .ob-course-item{display:flex;align-items:center;gap:11px;padding:12px 14px;border-radius:var(--radius-md);border:1.5px solid transparent;background:var(--row-bg);font-size:.86rem;font-weight:650;cursor:pointer;transition:all .2s ease}
 .ob-course-item:hover{background:var(--row-hover)}
-.ob-course-item.selected{border-color:var(--accent);background:var(--accent-glow)}
+.ob-course-item.selected{border-color:var(--accent);background:var(--nav-active-bg);color:var(--nav-active-text)}
 .ob-course-check{width:19px;height:19px;border-radius:var(--radius-sm);border:1.5px solid var(--glass-border-hover);display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .ob-course-item.selected .ob-course-check{background:var(--accent);border-color:var(--accent)}
 .ob-subs-grid{display:flex;flex-direction:column;gap:8px;max-height:250px;overflow-y:auto;margin-bottom:12px}
@@ -1279,8 +1279,7 @@ html{scrollbar-gutter:stable}
 .ob-progress > div.done{background:var(--accent)}
 .ob-progress > div.done::after{content:"";position:absolute;inset:0;background:linear-gradient(105deg,transparent 30%,rgba(255,255,255,.4) 50%,transparent 70%);transform:translateX(-100%);animation:progShine 2.4s ease-in-out infinite}
 .ob-card{animation:pageIn .4s var(--spring-soft)}
-.ob-level-btn.selected,.ob-level-btn[data-selected="true"]{border-color:var(--accent);background:var(--color-primary-soft);box-shadow:0 0 0 1px var(--accent) inset}
-body.theme-dark .ob-level-btn.selected{background:var(--nav-active-bg)}
+.ob-level-btn.selected,.ob-level-btn[data-selected="true"]{border-color:var(--accent);background:var(--nav-active-bg);color:var(--nav-active-text);box-shadow:0 0 0 1px var(--accent) inset}
 
 /* ── Focus view: timer as the hero ── */
 .timer-ring-wrap{filter:drop-shadow(0 6px 24px var(--accent-glow))}
@@ -1540,3 +1539,89 @@ body.mode-focused .pulse-dot.live::after{animation:none;transition:none}
 .ai-msg.user{background:linear-gradient(135deg,var(--color-ai-bright),var(--color-ai)) !important;box-shadow:0 2px 10px rgba(var(--ai-rgb),.25)}
 .ai-input-row .btn-primary{background:linear-gradient(180deg,var(--color-ai-bright),var(--color-ai)) !important;border-color:transparent}
 .ai-fab{box-shadow:0 4px 14px rgba(var(--ai-rgb),.35),0 12px 32px rgba(var(--ai-rgb),.22),inset 0 1px 0 rgba(255,255,255,.25) !important}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   SIGNATURE DELIGHT LAYER — universally engaging, 5 to 35 years old
+═══════════════════════════════════════════════════════════════ */
+
+/* 1. THE GLOSS — the shine you loved, everywhere it belongs.
+   KPI cards, buttons, chips, onboarding cards, day blocks. */
+@media(hover:hover) and (pointer:fine){
+  .kpi-card,.btn-primary,.day-block,.ob-level-btn,.streak-badge,.nav-item.active{position:relative;overflow:hidden}
+  .kpi-card::before,.btn-primary::after,.day-block::before,.ob-level-btn::before,.streak-badge::before,.nav-item.active::after{
+    content:"";position:absolute;top:0;bottom:0;width:55%;left:-75%;
+    background:linear-gradient(105deg,transparent,rgba(255,255,255,.16),transparent);
+    transform:skewX(-18deg);transition:left .55s ease;pointer-events:none;
+  }
+  .kpi-card:hover::before,.btn-primary:hover::after,.day-block:hover::before,
+  .ob-level-btn:hover::before,.streak-badge:hover::before{left:120%}
+  .nav-item.active::after{animation:navGloss 3.6s ease 1s infinite}
+  @keyframes navGloss{0%{left:-75%}35%,100%{left:120%}}
+}
+
+/* 2. AURORA CANVAS — a living, slowly-drifting light behind everything.
+   Imperceptibly slow: alive, never distracting. */
+body::before{
+  content:"";position:fixed;inset:-20%;z-index:-1;pointer-events:none;
+  background:
+    radial-gradient(38% 30% at 25% 18%,rgba(var(--ai-rgb),.05),transparent 70%),
+    radial-gradient(32% 28% at 78% 12%,var(--accent-glow),transparent 70%);
+  animation:aurora 26s ease-in-out infinite alternate;
+  opacity:.8;
+}
+@keyframes aurora{
+  0%{transform:translate(0,0) scale(1)}
+  50%{transform:translate(2.5%,1.5%) scale(1.04)}
+  100%{transform:translate(-2%,2.5%) scale(1.02)}
+}
+
+/* 3. KPI progress underlines fill on load, staggered */
+.kpi-card .bar-track .bar-fill{animation:progGrow .9s var(--spring-soft) backwards}
+.kpi-grid .kpi-card:nth-child(2) .bar-fill{animation-delay:.12s}
+.kpi-grid .kpi-card:nth-child(3) .bar-fill{animation-delay:.24s}
+.kpi-grid .kpi-card:nth-child(4) .bar-fill{animation-delay:.36s}
+
+/* 4. Onboarding: level cards pop in like dealt cards */
+.ob-level-grid > *{animation:cardDeal .4s var(--spring) backwards}
+.ob-level-grid > *:nth-child(2){animation-delay:.05s}
+.ob-level-grid > *:nth-child(3){animation-delay:.1s}
+.ob-level-grid > *:nth-child(4){animation-delay:.15s}
+.ob-level-grid > *:nth-child(5){animation-delay:.2s}
+.ob-level-grid > *:nth-child(6){animation-delay:.25s}
+.ob-level-grid > *:nth-child(7){animation-delay:.3s}
+.ob-level-grid > *:nth-child(8){animation-delay:.35s}
+@keyframes cardDeal{from{opacity:0;transform:translateY(14px) scale(.96)}to{opacity:1;transform:none}}
+.ob-level-btn.selected{animation:selectedPulse .45s var(--spring)}
+@keyframes selectedPulse{0%{transform:scale(1)}40%{transform:scale(1.03)}100%{transform:scale(1)}}
+
+/* 5. Subject dots breathe once when their row appears */
+.task-dot{animation:dotPop .45s var(--spring) backwards}
+@keyframes dotPop{from{transform:scale(0)}to{transform:scale(1)}}
+
+/* 6. Weekly chart bars grow from the baseline */
+.wk-bar,.bar-chart > div{transform-origin:bottom;animation:barGrow .6s var(--spring-soft) backwards}
+@keyframes barGrow{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+
+/* 7. Send button: paper-plane tilts, ready to fly */
+.ai-input-row .btn-primary svg{transition:transform .3s var(--spring)}
+.ai-input-row .btn-primary:hover svg{transform:rotate(-12deg) translateX(1px)}
+.ai-input-row .btn-primary:active svg{transform:translateX(14px) rotate(-20deg);transition-duration:.15s}
+
+/* 8. Numbers everywhere: tabular + smooth color transitions */
+.kpi-value,.day-meta,.tracker-bar .mono{transition:color .4s ease}
+
+/* 9. Focus ring on cards for keyboard users — glows, not jumps */
+.ob-level-btn:focus-visible,.task-row:focus-within{box-shadow:0 0 0 3px var(--accent-glow)}
+
+/* 10. mode-young: gloss becomes slightly more playful (longer sweep) */
+body.mode-young .kpi-card::before{background:linear-gradient(105deg,transparent,rgba(255,255,255,.24),transparent)}
+
+/* Guards */
+body.mode-focused .kpi-card::before,body.mode-focused .day-block::before,
+body.mode-focused .nav-item.active::after,body.mode-focused .ob-level-grid > *,
+body.mode-focused .task-dot,body.mode-focused .wk-bar{animation:none}
+body.mode-focused::before{animation:none;opacity:.4}
+@media (prefers-reduced-motion: reduce){
+  body::before,.ob-level-grid > *,.task-dot,.wk-bar,.nav-item.active::after{animation:none !important}
+}
