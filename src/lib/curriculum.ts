@@ -196,9 +196,14 @@ export function nmimsSem1Subjects(): SeedSubject[] {
 
 /** True when a course query refers to the NMIMS CDOE MBA program. */
 export function isNmimsQuery(q: string): boolean {
-  return /nmims|cdoe|nga[\s.-]?sce|distance[\s.-]*mba|online[\s.-]*mba|mba[\s.-]*\(?\s*(in\s+)?marketing|marketing[\s.-]*mba/i.test(
-    q || ""
-  );
+  const s = q || "";
+  // If a DIFFERENT institution is explicitly named, this is not an
+  // NMIMS query even if it mentions "MBA marketing" — that syllabus
+  // belongs to the named university, not the NMIMS catalog.
+  if (/university|college|institute|iim\b|school of/i.test(s) && !/nmims|cdoe|nga[\s.-]?sce/i.test(s)) {
+    return false;
+  }
+  return /nmims|cdoe|nga[\s.-]?sce|distance[\s.-]*mba|online[\s.-]*mba|mba[\s.-]*\(?\s*(in\s+)?marketing|marketing[\s.-]*mba/i.test(s);
 }
 
 /**
@@ -271,6 +276,29 @@ export const CBSE_CATALOGS: Record<string, CbseSubject[]> = {
         "Grammar & Writing: letters, analytical paragraphs",
       ],
     },
+    {
+      name: "Hindi (Class 10 — Sparsh & Sanchayan)", units: 10, difficulty: "Medium", color: "#E05252",
+      chapters: [
+        "साखी (कबीर) / पद (मीरा)", "दोहे (बिहारी) / मनुष्यता (मैथिलीशरण गुप्त)",
+        "पर्वत प्रदेश में पावस / मधुर-मधुर मेरे दीपक जल",
+        "तोप / कर चले हम फ़िदा / आत्मत्राण",
+        "बड़े भाई साहब (प्रेमचंद)", "डायरी का एक पन्ना / तताँरा-वामीरो कथा",
+        "तीसरी कसम के शिल्पकार शैलेंद्र / गिरगिट",
+        "अब कहाँ दूसरे के दुख से दुखी होने वाले / पतझर में टूटी पत्तियाँ / कारतूस",
+        "संचयन: हरिहर काका / सपनों के-से दिन / टोपी शुक्ला",
+        "व्याकरण एवं लेखन: पदबंध, समास, मुहावरे, पत्र, अनुच्छेद",
+      ],
+    },
+    {
+      name: "Information Technology (Class 10 — CBSE 402)", units: 5, difficulty: "Easy", color: "#0D9488",
+      chapters: [
+        "Digital Documentation (Advanced) — Word Processing",
+        "Electronic Spreadsheet (Advanced)",
+        "Database Management System (Base)",
+        "Web Applications and Security",
+        "Employability Skills: Communication, Self-Management, ICT, Entrepreneurship, Green Skills",
+      ],
+    },
   ],
   class_9: [
     {
@@ -315,6 +343,27 @@ export const CBSE_CATALOGS: Record<string, CbseSubject[]> = {
         "Moments: The Lost Child / The Adventures of Toto",
         "Moments: In the Kingdom of Fools / The Happy Prince / A House Is Not a Home",
         "Grammar & Writing: descriptive paragraphs, stories, diary entries",
+      ],
+    },
+    {
+      name: "Hindi (Class 9 — Sparsh & Sanchayan)", units: 9, difficulty: "Easy", color: "#E05252",
+      chapters: [
+        "दुख का अधिकार / एवरेस्ट: मेरी शिखर यात्रा", "तुम कब जाओगे, अतिथि / वैज्ञानिक चेतना के वाहक",
+        "धर्म की आड़ / शुक्रतारे के समान",
+        "रैदास के पद / रहीम के दोहे", "आदमी नामा / एक फूल की चाह",
+        "गीत-अगीत / अग्नि पथ / नए इलाके में",
+        "संचयन: गिल्लू / स्मृति / कल्लू कुम्हार की उनाकोटी",
+        "संचयन: मेरा छोटा-सा निजी पुस्तकालय / हामिद खाँ",
+        "व्याकरण एवं लेखन: वर्ण-विच्छेद, अनुस्वार, उपसर्ग-प्रत्यय, संधि",
+      ],
+    },
+    {
+      name: "Information Technology (Class 9 — CBSE 402)", units: 4, difficulty: "Easy", color: "#0D9488",
+      chapters: [
+        "Introduction to IT–ITeS Industry",
+        "Digital Documentation — Word Processing Basics",
+        "Electronic Spreadsheet — Basics",
+        "Digital Presentation + Employability Skills",
       ],
     },
   ],
@@ -1069,7 +1118,7 @@ const RULES: Rule[] = [
   { match: /computer|software|\bit\b|informatics|\bcse\b|\bbca\b|\bmca\b|programming|coding/i, subjects: [
     sub("Data Structures", 10, "Hard"), sub("Operating System", 8, "Hard"),
     sub("Database", 8), sub("Computer Networks", 7), sub("Algorithms", 8, "Hard")] },
-  { match: /nmims|cdoe|nga[\s.-]?sce|mba.*marketing|marketing.*mba|distance.*mba|online.*mba/i, subjects: [
+  { match: /nmims|cdoe|nga[\s.-]?sce/i, subjects: [
     sub("Business Communication", 12, "Medium"), sub("Financial Accounting", 12, "Hard"),
     sub("Micro Economics & Macro Economics", 12, "Hard"), sub("Organizational Behavior", 16, "Medium"),
     sub("Marketing Management", 12, "Medium"), sub("Quantitative Methods - I", 12, "Hard"),

@@ -162,22 +162,14 @@ export async function aiSuggestSubjects(
   // NMIMS / CDOE / MBA / Marketing queries never touch the LLM: the
   // verified Semester 1 catalog (6 subjects, 76 units) is returned
   // directly so unit counts can never be hallucinated.
-  if (
-    isNmimsQuery(courseName) ||
-    query.includes("nmims") ||
-    query.includes("cdoe") ||
-    query.includes("marketing") ||
-    query.includes("mba")
-  ) {
-    // synthesiseSubjects already resolves NMIMS ground truth (and handles
-    // explicit semester filters); if it returned the locked Sem-1 set use
-    // it as-is, otherwise fall back to the canonical catalog directly.
-    const nmims = isNmimsQuery(courseName);
+  // Bypass ONLY for genuine NMIMS/CDOE queries. Broad keywords like
+  // "marketing"/"mba" previously hijacked institution-specific queries
+  // ("B.Com Honours — ITM University — Banking and Marketing") away
+  // from the LLM, which is the only layer able to fetch a specific
+  // institution's syllabus.
+  if (isNmimsQuery(courseName) || query.includes("nmims") || query.includes("cdoe")) {
     const verified = fallback.length >= 3 ? fallback : nmimsSem1Subjects();
-    return {
-      subjects: verified,
-      source: nmims ? "Verified NMIMS Database" : "Verified Catalog",
-    };
+    return { subjects: verified, source: "Verified NMIMS Database" };
   }
 
   const raw = await callLLM(
@@ -186,8 +178,12 @@ export async function aiSuggestSubjects(
       {
         role: "user",
         content: `Course/exam: "${courseName}". Education level: ${level}.
-        Generate the core subjects for Semester 1 as a JSON array:
-        [{"name":"Exact Subject Name","units":12,"difficulty":"Medium","color":"#6366f1"}]`
+        If an institution/university is named, use THAT institution's actual
+        published curriculum for the named program/specialisation and term.
+        If a board is named (CBSE/ICSE/state), use that board's official
+        syllabus. Return the real subject names with realistic unit counts.
+        Respond with a JSON array ONLY:
+        [{"name":"Exact Subject Name","units":12,"difficulty":"Easy|Medium|Hard","color":"#6366f1"}]`
       }
     ],
     2500
@@ -199,7 +195,7 @@ export async function aiSuggestSubjects(
     const parsed = extractJson<SeedSubject[]>(raw);
     if (Array.isArray(parsed) && parsed.length > 0) {
       const palette = ["#6366f1", "#10b981", "#f59e0b", "#ef4444", "#06b6d4", "#ec4899", "#84cc16"];
-      const validated = parsed.slice(0, 8).map((s, i) => ({
+      const validated = parsed.slice(0, 10).map((s, i) => ({
         name: String(s.name).slice(0, 80),
         units: Math.min(40, Math.max(2, Number(s.units) || 8)),
         difficulty: (["Easy", "Medium", "Hard"].includes(String(s.difficulty)) ? s.difficulty : "Medium") as SeedSubject["difficulty"],
