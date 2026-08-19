@@ -99,6 +99,20 @@ export const sessions = pgTable("sessions", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+/**
+ * Coverage telemetry: every course-suggestion query is logged with the
+ * resolution source, so we know exactly which courses users search for
+ * that only get generic/LLM fallbacks — a ranked to-do list for adding
+ * verified catalog entries where they matter most.
+ */
+export const courseQueries = pgTable("course_queries", {
+  id: serial("id").primaryKey(),
+  query: text("query").notNull(),
+  level: text("level").notNull().default(""),
+  source: text("source").notNull().default("unknown"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 export const messages = pgTable("messages", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(),

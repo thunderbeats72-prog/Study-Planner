@@ -212,6 +212,137 @@ export function getNmimsChapters(subjectName: string): string[] | null {
   return hit ? [...hit.chapters] : null;
 }
 
+/* ============================================================
+   CBSE / NCERT GROUND TRUTH — Classes 9 & 10 (rationalised NCERT
+   syllabus). Chapter titles transcribed from the official NCERT
+   textbook contents pages (publicly published). Same lock rules
+   as the NMIMS catalog: strict-equality topic resolution, never
+   overridden by heuristics or the LLM.
+============================================================ */
+export type CbseSubject = SeedSubject & { chapters: string[] };
+
+export const CBSE_CATALOGS: Record<string, CbseSubject[]> = {
+  class_10: [
+    {
+      name: "Mathematics (Class 10 NCERT)", units: 14, difficulty: "Hard", color: "#5B5CE2",
+      chapters: [
+        "Real Numbers", "Polynomials", "Pair of Linear Equations in Two Variables",
+        "Quadratic Equations", "Arithmetic Progressions", "Triangles",
+        "Coordinate Geometry", "Introduction to Trigonometry",
+        "Some Applications of Trigonometry", "Circles", "Areas Related to Circles",
+        "Surface Areas and Volumes", "Statistics", "Probability",
+      ],
+    },
+    {
+      name: "Science (Class 10 NCERT)", units: 13, difficulty: "Hard", color: "#16A37A",
+      chapters: [
+        "Chemical Reactions and Equations", "Acids, Bases and Salts",
+        "Metals and Non-metals", "Carbon and its Compounds", "Life Processes",
+        "Control and Coordination", "How do Organisms Reproduce?",
+        "Heredity", "Light – Reflection and Refraction",
+        "The Human Eye and the Colourful World", "Electricity",
+        "Magnetic Effects of Electric Current", "Our Environment",
+      ],
+    },
+    {
+      name: "Social Science (Class 10 NCERT)", units: 19, difficulty: "Medium", color: "#E59A24",
+      chapters: [
+        "The Rise of Nationalism in Europe", "Nationalism in India",
+        "The Making of a Global World", "The Age of Industrialisation", "Print Culture and the Modern World",
+        "Resources and Development", "Forest and Wildlife Resources", "Water Resources",
+        "Agriculture", "Minerals and Energy Resources", "Manufacturing Industries",
+        "Lifelines of National Economy",
+        "Power-sharing", "Federalism", "Gender, Religion and Caste",
+        "Political Parties", "Outcomes of Democracy",
+        "Development", "Sectors of the Indian Economy",
+      ],
+    },
+    {
+      name: "English (Class 10 — First Flight & Footprints)", units: 10, difficulty: "Medium", color: "#8B5CF6",
+      chapters: [
+        "A Letter to God / Nelson Mandela: Long Walk to Freedom",
+        "Two Stories about Flying / From the Diary of Anne Frank",
+        "Glimpses of India / Mijbil the Otter",
+        "Madam Rides the Bus / The Sermon at Benares", "The Proposal (Play)",
+        "Poetry: Dust of Snow, Fire and Ice, A Tiger in the Zoo",
+        "Poetry: The Ball Poem, Amanda!, The Trees",
+        "Footprints: A Triumph of Surgery / The Thief's Story",
+        "Footprints: The Midnight Visitor / A Question of Trust / The Necklace",
+        "Grammar & Writing: letters, analytical paragraphs",
+      ],
+    },
+  ],
+  class_9: [
+    {
+      name: "Mathematics (Class 9 NCERT)", units: 12, difficulty: "Medium", color: "#5B5CE2",
+      chapters: [
+        "Number Systems", "Polynomials", "Coordinate Geometry",
+        "Linear Equations in Two Variables", "Introduction to Euclid's Geometry",
+        "Lines and Angles", "Triangles", "Quadrilaterals", "Circles",
+        "Heron's Formula", "Surface Areas and Volumes", "Statistics",
+      ],
+    },
+    {
+      name: "Science (Class 9 NCERT)", units: 12, difficulty: "Medium", color: "#16A37A",
+      chapters: [
+        "Matter in Our Surroundings", "Is Matter Around Us Pure?",
+        "Atoms and Molecules", "Structure of the Atom",
+        "The Fundamental Unit of Life", "Tissues", "Motion",
+        "Force and Laws of Motion", "Gravitation", "Work and Energy",
+        "Sound", "Improvement in Food Resources",
+      ],
+    },
+    {
+      name: "Social Science (Class 9 NCERT)", units: 16, difficulty: "Medium", color: "#E59A24",
+      chapters: [
+        "The French Revolution", "Socialism in Europe and the Russian Revolution",
+        "Nazism and the Rise of Hitler", "Forest Society and Colonialism",
+        "Pastoralists in the Modern World",
+        "India – Size and Location", "Physical Features of India", "Drainage",
+        "Climate", "Natural Vegetation and Wildlife", "Population",
+        "What is Democracy? Why Democracy?", "Constitutional Design",
+        "Electoral Politics", "Working of Institutions", "Democratic Rights",
+      ],
+    },
+    {
+      name: "English (Class 9 — Beehive & Moments)", units: 10, difficulty: "Easy", color: "#8B5CF6",
+      chapters: [
+        "The Fun They Had / The Sound of Music", "The Little Girl / A Truly Beautiful Mind",
+        "The Snake and the Mirror / My Childhood", "Reach for the Top / Kathmandu",
+        "If I Were You (Play)",
+        "Poetry: The Road Not Taken, Wind, Rain on the Roof",
+        "Poetry: A Legend of the Northland, No Men Are Foreign",
+        "Moments: The Lost Child / The Adventures of Toto",
+        "Moments: In the Kingdom of Fools / The Happy Prince / A House Is Not a Home",
+        "Grammar & Writing: descriptive paragraphs, stories, diary entries",
+      ],
+    },
+  ],
+};
+
+/** CBSE class number detection scoped to boards where NCERT applies. */
+export function cbseCatalogFor(q: string): CbseSubject[] | null {
+  const n = q.toLowerCase();
+  const m = n.match(/(?:class|grade|std|standard)\s*(\d{1,2})/);
+  if (!m) return null;
+  const cls = Number(m[1]);
+  // Explicit other-board mentions opt out of the NCERT ground truth
+  if (/icse|isc|igcse|cambridge|ib\b|state board/.test(n)) return null;
+  if (cls === 10) return CBSE_CATALOGS.class_10;
+  if (cls === 9) return CBSE_CATALOGS.class_9;
+  return null;
+}
+
+/** Exact NCERT chapters for a CBSE catalog subject, or null. */
+export function getCbseChapters(subjectName: string): string[] | null {
+  const n = normalise(subjectName);
+  for (const set of Object.values(CBSE_CATALOGS)) {
+    const hit = set.find((s) => normalise(s.name) === n);
+    if (hit) return [...hit.chapters];
+  }
+  return null;
+}
+
 export const COURSE_DB: Record<string, Course> = {
   nursery_foundation: {
     id: "nursery_foundation",
@@ -716,6 +847,9 @@ export function lookupTopicBank(subjectName: string): string[] | null {
   // textbook chapters, never a fuzzy neighbour like "Quantitative Aptitude".
   const nmims = getNmimsChapters(subjectName);
   if (nmims) return nmims;
+  // CBSE/NCERT verified subjects: same strict-equality ground truth.
+  const cbse = getCbseChapters(subjectName);
+  if (cbse) return cbse;
 
   const n = normalise(subjectName);
   let best: { key: string; score: number } | null = null;
@@ -762,6 +896,8 @@ export function generateTopics(
   // exact textbook chapters (12 / 16 units per the physical books).
   const nmimsChapters = getNmimsChapters(subjectName);
   if (nmimsChapters) unitCount = nmimsChapters.length;
+  const cbseChapters = getCbseChapters(subjectName);
+  if (cbseChapters) unitCount = cbseChapters.length;
 
   const bank = lookupTopicBank(subjectName);
   const titles: string[] = [];
@@ -1108,6 +1244,14 @@ export function synthesiseSubjects(courseName: string, level: string): SeedSubje
     const { sem, year } = detectSemester(q);
     const wantsSem1 = (!sem && !year) || sem === 1;
     if (wantsSem1) return nmimsSem1Subjects();
+  }
+
+  // ── CBSE/NCERT GROUND-TRUTH INTERCEPTION ────────────────────────
+  // "Class 10", "class 10 CBSE", "std 9" etc. resolve to the exact
+  // NCERT catalog (verified chapter lists) before any heuristic runs.
+  const cbse = cbseCatalogFor(q);
+  if (cbse) {
+    return cbse.map((s) => ({ name: s.name, units: s.units, difficulty: s.difficulty, color: s.color }));
   }
 
   const isResearch = /\bphd\b|doctoral|m\.?phil|research schol/i.test(q);

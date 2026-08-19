@@ -4,6 +4,8 @@ import {
   nmimsSem1Subjects,
   isNmimsQuery,
   getNmimsChapters,
+  cbseCatalogFor,
+  getCbseChapters,
   type SeedSubject,
   type GeneratedTopic,
 } from "./curriculum";
@@ -151,6 +153,11 @@ export async function aiSuggestSubjects(
   const fallback = synthesiseSubjects(courseName, level);
   const query = courseName.toLowerCase();
 
+  // CBSE/NCERT ground truth: exact verified catalog, LLM never invoked.
+  if (cbseCatalogFor(courseName)) {
+    return { subjects: fallback, source: "Verified NCERT Catalog" };
+  }
+
   // ── GROUND-TRUTH INTERCEPTION (LLM BYPASS) ──────────────────────
   // NMIMS / CDOE / MBA / Marketing queries never touch the LLM: the
   // verified Semester 1 catalog (6 subjects, 76 units) is returned
@@ -222,6 +229,10 @@ export async function aiGenerateTopics(
   const nmimsChapters = getNmimsChapters(subjectName);
   if (nmimsChapters) {
     return generateTopics(subjectName, nmimsChapters.length, difficulty, level);
+  }
+  const cbseChapters = getCbseChapters(subjectName);
+  if (cbseChapters) {
+    return generateTopics(subjectName, cbseChapters.length, difficulty, level);
   }
   if (isNmimsQuery(courseName) || isNmimsQuery(subjectName)) {
     return generateTopics(subjectName, units, difficulty, level);
