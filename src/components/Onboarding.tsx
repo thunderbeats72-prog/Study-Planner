@@ -204,7 +204,7 @@ export default function Onboarding({ onDone }: { onDone: (s: AppState) => void }
             <input className="ob-name-input" autoFocus value={name} placeholder="e.g. Rakshit"
               onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && next()} />
             <div className="ob-hint">
-              {provider ? `AETHER engine online — connected to ${provider}.` : "AETHER hybrid engine online — curriculum synthesis runs locally, no API key needed."}
+              {provider ? `SHIGUN engine online — connected to ${provider}.` : "SHIGUN hybrid engine online — curriculum synthesis runs locally, no API key needed."}
             </div>
           </>
         )}
@@ -507,7 +507,7 @@ export default function Onboarding({ onDone }: { onDone: (s: AppState) => void }
             </div>
             {busy && (
               <div style={{ background: "var(--accent-glow)", padding: 14, borderRadius: 12, fontSize: ".84rem", fontWeight: 650, marginBottom: 16 }}>
-                AETHER is analysing your syllabus and sequencing {totalUnits} lessons… this takes a few seconds.
+                SHIGUN is analysing your syllabus and sequencing {totalUnits} lessons… this takes a few seconds.
               </div>
             )}
           </>

@@ -374,7 +374,7 @@ export function tutorSystemPrompt(ctx: TutorContext): string {
   const dateStr = now.toLocaleDateString("en-IN", {
     weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: "Asia/Kolkata",
   });
-  return `You are AETHER, the built-in study coach for Study Planner Pro.
+  return `You are SHIGUN, the built-in study coach for Study Planner Pro.
 
 TODAY'S DATE IS ${dateStr}. This is the real current date — trust it completely,
 even if it is later than your training data. Never call the current date "the

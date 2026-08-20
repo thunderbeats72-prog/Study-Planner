@@ -1174,7 +1174,7 @@ body.mode-focused .kpi-value{animation:none}
   .kpi-card:hover{transform:translateY(-2px)}
 }
 
-/* ── D. AETHER entrance: panel + FAB morph feel ── */
+/* ── D. SHIGUN entrance: panel + FAB morph feel ── */
 .ai-fab svg{transition:transform .35s var(--spring)}
 .ai-fab:hover svg{transform:rotate(90deg)}
 .ai-quick button{animation:rowIn .3s var(--spring-soft) backwards}
@@ -1713,3 +1713,69 @@ body.mode-focused::before{animation:none;opacity:.4}
 .intel-pace-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
 .intel-pace-val{font-size:.76rem;font-weight:650;color:var(--text-muted);flex-shrink:0}
 @media(max-width:640px){.intel-grid{grid-template-columns:1fr;gap:10px}}
+
+
+/* ═══ CALENDAR DAY MODAL — fix clipped buttons + polish ═══════════
+   Screenshot bug: desktop modal used the mobile action-hiding rules'
+   sibling layout, letting Done/Skip overflow the card edge. Inside
+   the modal, rows get a dedicated two-line layout with contained,
+   wrapping actions. */
+.modal-box .task-row{flex-wrap:wrap;row-gap:8px;overflow:hidden}
+.modal-box .task-main{flex:1 1 100%;min-width:0}
+.modal-box .task-row > .btn,.modal-box .task-row > .chip{flex:0 0 auto}
+.modal-box .task-row > .btn:last-of-type{margin-right:0}
+
+/* Calendar grid: premium pass */
+.cal-cell{position:relative;transition:background .18s ease,border-color .18s ease,box-shadow .22s ease}
+.cal-cell:hover{box-shadow:var(--shadow-md);z-index:2}
+.cal-pill{transition:transform .18s var(--spring-soft)}
+.cal-cell:hover .cal-pill{transform:translateX(1.5px)}
+/* Weekend headers slightly dimmed — visual rhythm */
+.cal-grid > .cal-dow:first-child,.cal-grid > .cal-dow:last-child{opacity:.6}
+/* Month cells cascade in */
+.cal-grid .cal-cell{animation:calIn .35s var(--spring-soft) backwards}
+.cal-grid .cal-cell:nth-child(7n+2){animation-delay:.02s}
+.cal-grid .cal-cell:nth-child(7n+3){animation-delay:.04s}
+.cal-grid .cal-cell:nth-child(7n+4){animation-delay:.06s}
+.cal-grid .cal-cell:nth-child(7n+5){animation-delay:.08s}
+.cal-grid .cal-cell:nth-child(7n+6){animation-delay:.1s}
+.cal-grid .cal-cell:nth-child(7n){animation-delay:.12s}
+@keyframes calIn{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:none}}
+/* Task-count dot cluster on busy days */
+.cal-cell .cal-more{font-size:.6rem;font-weight:700;color:var(--accent)}
+
+/* ═══ DASHBOARD PREMIUM REFINEMENT ═══ */
+.kpi-card{background:linear-gradient(180deg,var(--surface) 0%,var(--surface) 88%,var(--row-bg) 100%)}
+.kpi-label{font-size:.66rem;letter-spacing:.9px}
+.dash-grid-2 .glass-panel{overflow:hidden}
+/* Section headers: consistent editorial treatment */
+.day-head h3,.glass-panel > h3{letter-spacing:-.2px}
+
+/* ═══ VOICE UI (Shigun speaks + listens) ═══ */
+.voice-btn{
+  width:40px;height:40px;border-radius:50%;border:1px solid var(--glass-border);
+  background:var(--surface);color:var(--text-muted);cursor:pointer;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  transition:background .2s ease,color .2s ease,transform .2s var(--spring),box-shadow .25s ease;
+}
+.voice-btn:hover{color:var(--color-ai);border-color:rgba(var(--ai-rgb),.4)}
+.voice-btn:active{transform:scale(.9)}
+.voice-btn.listening{
+  background:var(--color-ai);color:#fff;border-color:transparent;
+  animation:listenPulse 1.6s ease-in-out infinite;
+}
+@keyframes listenPulse{0%,100%{box-shadow:0 0 0 0 rgba(var(--ai-rgb),.45)}50%{box-shadow:0 0 0 10px rgba(var(--ai-rgb),0)}}
+.voice-btn.speaking{color:var(--color-ai);border-color:rgba(var(--ai-rgb),.5)}
+.voice-btn.speaking svg{animation:speakBars .9s ease-in-out infinite}
+@keyframes speakBars{0%,100%{transform:scaleY(1)}50%{transform:scaleY(.75)}}
+
+
+/* Voice select + error strip */
+.voice-select{
+  font-size:.7rem;font-weight:650;padding:6px 8px;border-radius:var(--radius-sm);
+  border:1px solid var(--glass-border);background:var(--surface);color:var(--text-muted);
+  font-family:inherit;outline:none;max-width:110px;cursor:pointer;
+}
+.voice-select:focus{border-color:var(--color-ai)}
+.voice-err{padding:6px 14px;font-size:.74rem;color:var(--danger-accent);font-weight:600;background:var(--status-skipped-bg)}
+@media(max-width:640px){.voice-select{max-width:92px;font-size:.66rem}}

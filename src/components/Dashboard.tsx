@@ -161,7 +161,7 @@ export default function Dashboard({
 
       <div className="glass-panel tilt-card" style={{ padding: 20, marginBottom: 18, borderLeft: "4px solid var(--accent)" }}>
         <h3 style={{ fontSize: ".88rem", fontWeight: 800, margin: "0 0 10px", display: "flex", alignItems: "center", gap: 8 }}>
-          <IconSpark size={15} /> AETHER Coaching Insights
+          <IconSpark size={15} /> SHIGUN Coaching Insights
         </h3>
         {loadingIns ? (
           <div style={{ fontSize: ".84rem", color: "var(--text-muted)" }}>Analysing your data…</div>

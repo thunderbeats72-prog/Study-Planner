@@ -19,7 +19,7 @@ export async function GET(req: Request) {
 
   if (activeProvider()) {
     const txt = await callLLM(
-      "You are AETHER, a study coach. Reply with 3 short punchy coaching bullets (max 22 words each) in markdown. No preamble.",
+      "You are SHIGUN, a study coach. Reply with 3 short punchy coaching bullets (max 22 words each) in markdown. No preamble.",
       [
         {
           role: "user",
