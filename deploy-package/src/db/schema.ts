@@ -74,6 +74,18 @@ export const topics = pgTable(
   title: text("title").notNull(),
   summary: text("summary").notNull().default(""),
   objectives: jsonb("objectives").$type<string[]>().notNull().default([]),
+  prerequisites: jsonb("prerequisites").$type<string[]>().notNull().default([]),
+  keyConcepts: jsonb("key_concepts").$type<string[]>().notNull().default([]),
+  practice: text("practice").notNull().default(""),
+  depth: text("depth").notNull().default("Core"),
+  sources: jsonb("source_details").$type<Array<{
+    title: string;
+    publisher: string;
+    type: "Official syllabus" | "Primary text" | "Reference";
+    url?: string;
+    note?: string;
+    section?: string;
+  }>>().notNull().default([]),
   difficulty: text("difficulty").notNull().default("Medium"),
   estMinutes: integer("est_minutes").notNull().default(45),
   position: integer("position").notNull().default(0),

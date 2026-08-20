@@ -7,13 +7,15 @@ import {
   cbseCatalogFor,
   getCbseChapters,
   isAmityQuery,
+  curriculumSources,
+  type CurriculumSource,
   type SeedSubject,
   type GeneratedTopic,
 } from "./curriculum";
 import { lookupKnowledge, teachFromKnowledge } from "./knowledge";
 
 // Re-export the canonical topic shape so existing imports from "./ai" keep working.
-export type { GeneratedTopic } from "./curriculum";
+export type { GeneratedTopic, CurriculumSource } from "./curriculum";
 
 /* ============================================================
    UNIVERSAL ENVIRONMENT VARIABLE FETCHER
@@ -37,9 +39,10 @@ function getSafeKey(keyName: string): string | null {
 type ChatMsg = { role: "user" | "assistant"; content: string };
 
 export function activeProvider(): string | null {
-  if (getSafeKey("NEXT_PUBLIC_GEMINI_API_KEY") || getSafeKey("NEXT_PUBLIC_GOOGLE_API_KEY")) return "AI Cloud";
-  if (getSafeKey("NEXT_PUBLIC_GROQ_API_KEY")) return "Groq";
-  if (getSafeKey("NEXT_PUBLIC_OPENROUTER_API_KEY")) return "OpenRouter";
+  if (getSafeKey("GEMINI_API_KEY") || getSafeKey("GOOGLE_API_KEY")
+    || getSafeKey("NEXT_PUBLIC_GEMINI_API_KEY") || getSafeKey("NEXT_PUBLIC_GOOGLE_API_KEY")) return "AI Cloud";
+  if (getSafeKey("GROQ_API_KEY") || getSafeKey("NEXT_PUBLIC_GROQ_API_KEY")) return "Groq";
+  if (getSafeKey("OPENROUTER_API_KEY") || getSafeKey("NEXT_PUBLIC_OPENROUTER_API_KEY")) return "OpenRouter";
   return null;
 }
 
@@ -59,31 +62,36 @@ export async function callLLM(
       const timer = setTimeout(() => ctrl.abort(), 18000);
       let text: string | null = null;
 
-      const geminiKey = getSafeKey("NEXT_PUBLIC_GEMINI_API_KEY") || getSafeKey("NEXT_PUBLIC_GOOGLE_API_KEY");
-      const groqKey = getSafeKey("NEXT_PUBLIC_GROQ_API_KEY");
-      const openrouterKey = getSafeKey("NEXT_PUBLIC_OPENROUTER_API_KEY");
-      const geminiModel = getSafeKey("NEXT_PUBLIC_GEMINI_MODEL") || "gemini-1.5-flash";
+      const geminiKey = getSafeKey("GEMINI_API_KEY") || getSafeKey("GOOGLE_API_KEY")
+        || getSafeKey("NEXT_PUBLIC_GEMINI_API_KEY") || getSafeKey("NEXT_PUBLIC_GOOGLE_API_KEY");
+      const groqKey = getSafeKey("GROQ_API_KEY") || getSafeKey("NEXT_PUBLIC_GROQ_API_KEY");
+      const openrouterKey = getSafeKey("OPENROUTER_API_KEY") || getSafeKey("NEXT_PUBLIC_OPENROUTER_API_KEY");
+      const geminiModel = getSafeKey("GEMINI_MODEL") || getSafeKey("NEXT_PUBLIC_GEMINI_MODEL") || "gemini-3.7-flash";
 
       if (provider === "gemini" && geminiKey) {
-        const r = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiKey}`,
-          {
-            method: "POST",
-            signal: ctrl.signal,
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({
-              systemInstruction: { parts: [{ text: system }] },
-              contents: messages.map((m) => ({
-                role: m.role === "assistant" ? "model" : "user",
-                parts: [{ text: m.content }],
-              })),
-              generationConfig: { maxOutputTokens: maxTokens },
-            }),
+        const geminiModels = [...new Set([geminiModel, "gemini-3.7-flash", "gemini-2.5-flash"])];
+        for (const model of geminiModels) {
+          const r = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
+            {
+              method: "POST",
+              signal: ctrl.signal,
+              headers: { "content-type": "application/json", "x-goog-api-key": geminiKey },
+              body: JSON.stringify({
+                systemInstruction: { parts: [{ text: system }] },
+                contents: messages.map((m) => ({
+                  role: m.role === "assistant" ? "model" : "user",
+                  parts: [{ text: m.content }],
+                })),
+                generationConfig: { maxOutputTokens: maxTokens },
+              }),
+            }
+          );
+          if (r.ok) {
+            const j = await r.json();
+            text = j?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text || "").join("") ?? null;
+            if (text) break;
           }
-        );
-        if (r.ok) {
-          const j = await r.json();
-          text = j?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text || "").join("") ?? null;
         }
       } else if (provider === "groq" && groqKey) {
         const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -150,25 +158,26 @@ function extractJson<T>(raw: string): T | null {
 export async function aiSuggestSubjects(
   courseName: string,
   level: string
-): Promise<{ subjects: SeedSubject[]; source: string }> {
+): Promise<{ subjects: SeedSubject[]; source: string; sources: CurriculumSource[] }> {
   const fallback = synthesiseSubjects(courseName, level);
   const query = courseName.toLowerCase();
+  const sources = curriculumSources(courseName, "", level);
 
   // CBSE/NCERT ground truth: exact verified catalog, LLM never invoked.
   if (cbseCatalogFor(courseName)) {
-    return { subjects: fallback, source: "Verified NCERT Catalog" };
+    return { subjects: fallback, source: "Verified NCERT Catalog", sources };
   }
 
   // LEVEL GUARD: early-years learners get the age-appropriate local
   // catalog, never LLM output (which invents grown-up subject batches
   // for custom course names typed at nursery level).
   if (level === "nursery" || /nursery|pre-?primary|playgroup|kinder|\blkg\b|\bukg\b/i.test(query)) {
-    return { subjects: fallback, source: "Verified Early-Years Catalog" };
+    return { subjects: fallback, source: "Verified Early-Years Catalog", sources };
   }
 
   // ── GROUND-TRUTH INTERCEPTION (LLM BYPASS) ──────────────────────
-  // NMIMS / CDOE / MBA / Marketing queries never touch the LLM: the
-  // verified Semester 1 catalog (6 subjects, 76 units) is returned
+  // Explicit NMIMS / CDOE queries never touch the LLM: the verified
+  // Semester 1 catalog (6 subjects, 76 units) is returned
   // directly so unit counts can never be hallucinated.
   // Bypass ONLY for genuine NMIMS/CDOE queries. Broad keywords like
   // "marketing"/"mba" previously hijacked institution-specific queries
@@ -177,10 +186,10 @@ export async function aiSuggestSubjects(
   // institution's syllabus.
   if (isNmimsQuery(courseName) || query.includes("nmims") || query.includes("cdoe")) {
     const verified = fallback.length >= 3 ? fallback : nmimsSem1Subjects();
-    return { subjects: verified, source: "Verified NMIMS Database" };
+    return { subjects: verified, source: "Verified NMIMS Database", sources };
   }
   if (isAmityQuery(courseName)) {
-    return { subjects: fallback, source: "Verified Amity Catalog" };
+    return { subjects: fallback, source: "Verified Amity Catalog", sources };
   }
 
   const raw = await callLLM(
@@ -201,7 +210,7 @@ export async function aiSuggestSubjects(
     2500
   );
 
-  if (!raw) return { subjects: fallback, source: "aether-local" };
+  if (!raw) return { subjects: fallback, source: "aether-local", sources };
 
   try {
     const parsed = extractJson<SeedSubject[]>(raw);
@@ -213,11 +222,11 @@ export async function aiSuggestSubjects(
         difficulty: (["Easy", "Medium", "Hard"].includes(String(s.difficulty)) ? s.difficulty : "Medium") as SeedSubject["difficulty"],
         color: palette[i % palette.length],
       }));
-      return { subjects: validated, source: "AI Cloud Database" };
+      return { subjects: validated, source: "AI Cloud Database", sources };
     }
   } catch { /* fall through */ }
 
-  return { subjects: fallback, source: "aether-local" };
+  return { subjects: fallback, source: "aether-local", sources };
 }
 
 /* ============================================================
@@ -234,27 +243,31 @@ export async function aiGenerateTopics(
   // If this subject belongs to the verified NMIMS catalog, load the exact
   // textbook chapter titles from the ground-truth bank — never the LLM.
   // generateTopics() internally locks the unit count to the chapter list.
-  const nmimsChapters = getNmimsChapters(subjectName);
+  const nmimsChapters = isNmimsQuery(courseName) ? getNmimsChapters(subjectName) : null;
   if (nmimsChapters) {
-    return generateTopics(subjectName, nmimsChapters.length, difficulty, level);
+    return generateTopics(subjectName, nmimsChapters.length, difficulty, level, courseName);
   }
   const cbseChapters = getCbseChapters(subjectName);
   if (cbseChapters) {
-    return generateTopics(subjectName, cbseChapters.length, difficulty, level);
+    return generateTopics(subjectName, cbseChapters.length, difficulty, level, courseName);
   }
   if (isNmimsQuery(courseName) || isNmimsQuery(subjectName)) {
-    return generateTopics(subjectName, units, difficulty, level);
+    return generateTopics(subjectName, units, difficulty, level, courseName);
   }
 
-  const fallback = generateTopics(subjectName, units, difficulty, level);
+  const fallback = generateTopics(subjectName, units, difficulty, level, courseName);
   const raw = await callLLM(
     `You are a strict curriculum architect. Return a strict JSON array ONLY.`,
     [
       {
         role: "user",
-        content: `Subject: "${subjectName}". Canonical unit count: ${units}. Difficulty: ${difficulty}.
-        Generate exactly ${units} lessons.
-        Format: [{"unit":"Unit 1","title":"...","summary":"...","objectives":["..."],"difficulty":"Medium","estMinutes":45}]`,
+        content: `Course: "${courseName}". Level: ${level}. Subject: "${subjectName}".
+        Canonical unit count: ${units}. Difficulty: ${difficulty}.
+        Generate exactly ${units} ordered, rigorous lessons that progress from prerequisites to synthesis.
+        Summaries must identify methods, assumptions, edge cases, and application—not generic study advice.
+        Objectives must use higher-order actions such as derive, compare, justify, evaluate, and transfer.
+        Do not invent citations; source metadata is attached by the verified application catalog.
+        Format: [{"unit":"Unit 1","title":"...","summary":"2-3 specific sentences","objectives":["3-5 measurable outcomes"],"prerequisites":["..."],"keyConcepts":["..."],"practice":"specific graded task","depth":"Foundation|Core|Advanced|Synthesis","difficulty":"Easy|Medium|Hard","estMinutes":60}]`,
       },
     ],
     Math.min(4000, 800 + units * 120)
@@ -265,14 +278,36 @@ export async function aiGenerateTopics(
   const parsed = extractJson<GeneratedTopic[]>(raw);
   if (!parsed || !Array.isArray(parsed) || parsed.length < 2) return fallback;
 
-  return parsed.slice(0, units).map((t, i) => ({
-    unit: t.unit || `Unit ${i + 1}`,
-    title: String(t.title || fallback[i]?.title || `Lesson ${i + 1}`).slice(0, 160),
-    summary: String(t.summary || fallback[i]?.summary || ""),
-    objectives: Array.isArray(t.objectives) ? t.objectives.slice(0, 4).map(String) : [],
-    difficulty: (["Easy", "Medium", "Hard"].includes(String(t.difficulty)) ? t.difficulty : "Medium") as "Easy" | "Medium" | "Hard",
-    estMinutes: Math.min(180, Math.max(15, Number(t.estMinutes) || 45)),
-  }));
+  // Always return the canonical count. If the provider stops early, fill the
+  // missing tail from the deterministic advanced curriculum rather than
+  // silently creating a subject with fewer lessons than advertised.
+  return Array.from({ length: units }, (_, i) => {
+    const t = parsed[i] || fallback[i];
+    const base = fallback[i];
+    const depth = (["Foundation", "Core", "Advanced", "Synthesis"].includes(String(t?.depth))
+      ? t.depth : base.depth) as GeneratedTopic["depth"];
+    return {
+      unit: String(t?.unit || `Unit ${i + 1}`).slice(0, 40),
+      title: String(t?.title || base.title || `Lesson ${i + 1}`).slice(0, 160),
+      summary: String(t?.summary || base.summary).slice(0, 1200),
+      objectives: Array.isArray(t?.objectives) && t.objectives.length
+        ? t.objectives.slice(0, 5).map((item) => String(item).slice(0, 240))
+        : base.objectives,
+      prerequisites: Array.isArray(t?.prerequisites) && t.prerequisites.length
+        ? t.prerequisites.slice(0, 4).map((item) => String(item).slice(0, 200))
+        : base.prerequisites,
+      keyConcepts: Array.isArray(t?.keyConcepts) && t.keyConcepts.length
+        ? t.keyConcepts.slice(0, 6).map((item) => String(item).slice(0, 160))
+        : base.keyConcepts,
+      practice: String(t?.practice || base.practice).slice(0, 600),
+      depth,
+      // Source details only come from the curated application catalog.
+      sources: base.sources,
+      difficulty: (["Easy", "Medium", "Hard"].includes(String(t?.difficulty))
+        ? t.difficulty : base.difficulty) as "Easy" | "Medium" | "Hard",
+      estMinutes: Math.min(180, Math.max(20, Number(t?.estMinutes) || base.estMinutes)),
+    };
+  });
 }
 
 export type TutorContext = {

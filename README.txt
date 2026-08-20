@@ -46,13 +46,42 @@ LOCAL DEVELOPMENT
 DATABASE
 --------
 `npm run build` runs `drizzle-kit push` first, so schema changes
-(including the new indexes) are applied automatically on deploy.
+(including advanced lesson metadata and source details) are applied
+automatically on deploy. Existing plans are enriched non-destructively
+when state is loaded; rebuilding is not required.
+
 Re-running the Setup Wizard performs a HARD RESET of course data
 (subjects, lessons, schedule, sessions, chat) — always behind a
 confirmation dialog in the UI.
 
-v3 FIXES (this build)
+CONSISTENT SHIGUN VOICE
+-----------------------
+Set `GEMINI_API_KEY` (preferred server-only name) or `GOOGLE_API_KEY` in
+Vercel. Shigun generates one fixed named cloud voice, delivered as WAV,
+so phones and desktops no longer select different operating-system
+voices. `SHIGUN_TTS_MODEL` is optional; the app defaults to the current
+Gemini TTS model and has a compatibility fallback. If cloud TTS is
+unavailable, a generation-guarded native voice remains as a fallback.
+
+v4 FIXES (this build)
 ---------------------
+ - Mobile voice transcripts use overlap-aware deduplication and
+   single-utterance recognition; cumulative Android/WebKit result
+   batches can no longer repeat words or submit stale sessions
+ - Shigun uses fixed Gemini voice profiles (Kore, Aoede, Charon) on
+   every platform, with Web Audio pre-authorized from the mic gesture
+ - Playback has cancellation generation guards, preventing cancelled
+   native utterances from restarting through late onerror callbacks
+ - Curriculum lessons now include prerequisites, key concepts, depth,
+   measurable higher-order outcomes, applied practice, and curated
+   official/primary/reference source details with links
+ - Verified catalog unit counts remain locked; cloud curricula are
+   filled to the canonical count if a provider stops early
+ - Older saved plans receive advanced metadata without losing titles,
+   mastery, completion history, or timing
+
+v3 FIXES
+--------
  - Full course name + tracker task title never truncate
  - 40px sidebar collapse toggle with smooth icon-rail animation
  - Mic pre-warm + watchdog + confidence-scored transcripts (review

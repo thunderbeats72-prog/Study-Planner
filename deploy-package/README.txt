@@ -1,5 +1,5 @@
-DRAG & DROP DEPLOY PACKAGE — Study Planner Pro (v3 · All-Fixes Build)
-======================================================================
+DRAG & DROP DEPLOY PACKAGE — Study Planner Pro (v4 · Voice + Curriculum Build)
+============================================================================
 
 This folder contains the complete, build-verified source of the app.
 Everything in here goes to the SAME location in your repository.
@@ -35,6 +35,13 @@ WHAT'S FIXED IN THIS BUILD
     scanning the whole history every minute.
 11. Responsive across everything: 320px phones → Galaxy S24 → tablets
     → desktops → 4K TVs, with safe-area and foldable support.
+12. Permanent mobile transcript fix: cumulative Android/WebKit result
+    batches are overlap-deduplicated and stale sessions cannot submit.
+13. One Shigun voice everywhere: replies use fixed Gemini TTS profiles
+    instead of unrelated phone/desktop operating-system voices.
+14. Advanced curricula: every lesson now carries prerequisites, depth,
+    key concepts, higher-order outcomes, applied practice, and curated
+    source details/links. Existing plans are enriched without a reset.
 
 DEPLOY STEPS (GitHub web — no git commands needed)
  1. In your repo, open "Add file" → "Upload files".
@@ -53,8 +60,12 @@ VERIFIED
  - The package mirrors src/ exactly — nothing else is needed.
 
 NOTES
+ - Set `GEMINI_API_KEY` (preferred) or `GOOGLE_API_KEY` in Vercel for
+   the identical cloud-generated Shigun voice on every platform. The
+   app retains a guarded native fallback if cloud TTS is unavailable.
  - Voice recognition is browser-native (Web Speech API): works best in
    Chrome/Edge on desktop and Android. iOS Safari support depends on
    the OS version. Text chat always works everywhere.
- - If your Vercel DB already has the old tables, the new indexes are
-   created automatically by `drizzle-kit push` during the build.
+ - If your Vercel DB already has the old tables, the new indexes and
+   curriculum metadata columns are created automatically by
+   `drizzle-kit push` during the build.

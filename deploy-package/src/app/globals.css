@@ -2280,3 +2280,57 @@ button,a,.nav-item,.vtab,.cal-cell,.chip,.task-row,.rate-btn,input,select{touch-
 }
 .ob-cancel-link:hover{color:var(--text-main)}
 .ob-cancel-link:disabled{opacity:.5;cursor:not-allowed}
+
+/* ═══ ADVANCED CURRICULUM + SOURCE DETAILS ═══ */
+.curriculum-sources{
+  margin-top:14px;padding:13px;border:1px solid var(--glass-border);border-radius:var(--radius-md);
+  background:var(--row-bg);display:flex;flex-direction:column;gap:9px;
+}
+.curriculum-sources-title{
+  font-size:.7rem;font-weight:850;text-transform:uppercase;letter-spacing:.7px;color:var(--text-muted);
+}
+.curriculum-source{display:grid;grid-template-columns:auto 1fr;gap:9px;align-items:start;font-size:.75rem;line-height:1.45}
+.curriculum-source-type{
+  padding:3px 7px;border-radius:99px;background:var(--accent-glow);color:var(--accent);
+  font-size:.6rem;font-weight:800;white-space:nowrap;
+}
+.curriculum-source a,.lesson-source a{color:var(--accent);font-weight:800;text-decoration:none}
+.curriculum-source a:hover,.lesson-source a:hover{text-decoration:underline}
+.curriculum-source div div{color:var(--text-muted);margin-top:2px}
+
+.lesson-detail{
+  margin:-1px 0 10px 32px;padding:16px;border:1px solid var(--glass-border);
+  border-left:3px solid var(--accent);border-radius:0 var(--radius-md) var(--radius-md) 0;background:var(--row-bg);
+}
+.lesson-brief-heading{
+  font-size:.69rem;font-weight:850;text-transform:uppercase;letter-spacing:.7px;color:var(--text-muted);margin-bottom:7px;
+}
+.lesson-summary{font-size:.84rem;font-weight:620;line-height:1.6;margin:0 0 12px;color:var(--text)}
+.lesson-detail-block{margin-top:12px;font-size:.78rem;color:var(--text-muted)}
+.lesson-detail-block>strong{display:block;color:var(--text);font-size:.68rem;text-transform:uppercase;letter-spacing:.55px;margin-bottom:5px}
+.lesson-detail-block ul,.lesson-outcomes{margin:5px 0 0;padding-left:18px;line-height:1.65}
+.lesson-detail-block.compact{display:flex;gap:8px;align-items:baseline;margin:0 0 10px}
+.lesson-detail-block.compact>strong{display:inline;margin:0;white-space:nowrap}
+.lesson-concepts{display:flex;gap:5px;flex-wrap:wrap}
+.lesson-concepts .chip{font-size:.61rem;padding:3px 7px;text-transform:none;letter-spacing:0}
+.lesson-outcomes{margin:0 0 12px;font-size:.8rem;line-height:1.65;color:var(--text-muted);font-weight:550}
+.lesson-practice{
+  margin-top:11px;padding:10px 12px;border-radius:var(--radius-sm);background:var(--accent-glow);
+  display:flex;flex-direction:column;gap:3px;font-size:.77rem;line-height:1.5;color:var(--text-muted);
+}
+.lesson-practice strong{font-size:.65rem;text-transform:uppercase;letter-spacing:.55px;color:var(--accent)}
+.lesson-source-list{display:flex;flex-direction:column;gap:7px;margin-top:6px}
+.lesson-source-list.compact{margin:10px 0}
+.lesson-source{
+  display:grid;grid-template-columns:minmax(72px,auto) 1fr;gap:8px;padding:8px 9px;
+  border:1px solid var(--glass-border);border-radius:var(--radius-sm);background:var(--surface);font-size:.73rem;
+}
+.lesson-source>span{font-size:.58rem;font-weight:850;text-transform:uppercase;letter-spacing:.45px;color:var(--text-dim)}
+.lesson-source b{font-weight:800}
+.lesson-source small{display:block;color:var(--text-muted);line-height:1.4;margin-top:2px}
+@media(max-width:640px){
+  .curriculum-source{grid-template-columns:1fr}.curriculum-source-type{width:max-content}
+  .lesson-detail{margin-left:0;padding:13px}
+  .lesson-detail-block.compact{align-items:flex-start;flex-direction:column;gap:3px}
+  .lesson-source{grid-template-columns:1fr;gap:3px}
+}
