@@ -310,6 +310,54 @@ export async function aiGenerateTopics(
   });
 }
 
+const LANGUAGE_CAPABILITY_RE = /\b(speak|talk|chat|communicate|reply|respond|answer)\b/i;
+
+/** Deterministic language-capability replies prevent the tutor from falsely
+ * claiming it only supports English/Hindi. The cloud and local speech layers
+ * both support these scripts, so the response is immediately usable aloud. */
+export function languageCapabilityReply(query: string): string | null {
+  if (!LANGUAGE_CAPABILITY_RE.test(query)) return null;
+  const languages: Array<{ match: RegExp; reply: string }> = [
+    {
+      match: /\b(bangla|bengali)\b/i,
+      reply: "হ্যাঁ, আমি বাংলায় কথা বলতে পারি। আপনার পড়াশোনা নিয়ে কীভাবে সাহায্য করতে পারি?",
+    },
+    {
+      match: /\bhindi\b/i,
+      reply: "हाँ, मैं हिंदी में बात कर सकता हूँ। आपकी पढ़ाई में किस तरह मदद करूँ?",
+    },
+    {
+      match: /\bmarathi\b/i,
+      reply: "हो, मी मराठीत बोलू शकतो. तुमच्या अभ्यासात मी कशी मदत करू?",
+    },
+    {
+      match: /\btamil\b/i,
+      reply: "ஆம், நான் தமிழில் பேச முடியும். உங்கள் படிப்பில் எப்படி உதவலாம்?",
+    },
+    {
+      match: /\btelugu\b/i,
+      reply: "అవును, నేను తెలుగులో మాట్లాడగలను. మీ చదువులో ఎలా సహాయం చేయాలి?",
+    },
+    {
+      match: /\bkannada\b/i,
+      reply: "ಹೌದು, ನಾನು ಕನ್ನಡದಲ್ಲಿ ಮಾತನಾಡಬಲ್ಲೆ. ನಿಮ್ಮ ಓದಿನಲ್ಲಿ ಹೇಗೆ ಸಹಾಯ ಮಾಡಲಿ?",
+    },
+    {
+      match: /\bgujarati\b/i,
+      reply: "હા, હું ગુજરાતીમાં વાત કરી શકું છું. તમારા અભ્યાસમાં કેવી રીતે મદદ કરું?",
+    },
+    {
+      match: /\b(punjabi|panjabi)\b/i,
+      reply: "ਹਾਂ, ਮੈਂ ਪੰਜਾਬੀ ਵਿੱਚ ਗੱਲ ਕਰ ਸਕਦਾ ਹਾਂ। ਤੁਹਾਡੀ ਪੜ੍ਹਾਈ ਵਿੱਚ ਕਿਵੇਂ ਮਦਦ ਕਰਾਂ?",
+    },
+    {
+      match: /\barabic\b/i,
+      reply: "نعم، يمكنني التحدث بالعربية. كيف أساعدك في دراستك؟",
+    },
+  ];
+  return languages.find((language) => language.match.test(query))?.reply || null;
+}
+
 export type TutorContext = {
   name: string; courseName: string; level: string; examDate: string; daysLeft: number; dailyHours: number;
   subjects: { id: number; name: string; difficulty: string; done: number; total: number }[];
@@ -431,6 +479,12 @@ Teach step-by-step using clear markdown formatting.
 Voice: intelligent, concise, supportive, confident — like a calm senior tutor.
 Use at most one emoji per reply, and only when it genuinely helps; usually use none.
 Never use hype ("CRUSHING IT!!!"), all-caps excitement, or emoji chains.
+
+LANGUAGE: You are multilingual. Reply in the language/script the learner uses or explicitly
+requests, including Bengali/Bangla, Hindi, Marathi, Tamil, Telugu, Kannada, Gujarati,
+Punjabi, Arabic, and English. Never claim that you only support English or Hindi. If the
+learner writes an Indian language in Latin script, answer naturally in that language;
+use its native script when they explicitly ask whether you can speak it.
 
 APP CONTROL — you CAN control this app. When the user asks you to perform an app action
 (in ANY language or phrasing), append ONE action tag on its own final line, then it will

@@ -42,6 +42,11 @@ WHAT'S FIXED IN THIS BUILD
 14. Advanced curricula: every lesson now carries prerequisites, depth,
     key concepts, higher-order outcomes, applied practice, and curated
     source details/links. Existing plans are enriched without a reset.
+15. Chat and replan actions are single-flight: double taps cannot add the
+    same turn twice or launch two competing schedule rebuilds.
+16. Shigun answers Bengali/Bangla and other supported-language requests
+    correctly; mobile chat now has live voice visuals, assistant avatars,
+    a cleaner composer, and a smoother full conversation sheet.
 
 DEPLOY STEPS (GitHub web — no git commands needed)
  1. In your repo, open "Add file" → "Upload files".

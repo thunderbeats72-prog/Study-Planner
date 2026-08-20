@@ -3,8 +3,12 @@ import { db } from "@/db";
 import { messages } from "@/db/schema";
 import { asc, eq } from "drizzle-orm";
 import { buildContext, fullState, getOrCreateUser, getSettings, keyFrom } from "@/lib/state";
-import { callLLM, localTutor, parseCommand, tutorSystemPrompt, activeProvider, extractLlmAction } from "@/lib/ai";
+import {
+  callLLM, localTutor, parseCommand, tutorSystemPrompt, activeProvider,
+  extractLlmAction, languageCapabilityReply,
+} from "@/lib/ai";
 import { regeneratePlan } from "@/lib/generate";
+import { mergeTranscriptSegments } from "@/lib/transcript";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -12,20 +16,26 @@ export const maxDuration = 120;
 export async function POST(req: Request) {
   const key = keyFrom(req);
   const user = await getOrCreateUser(key);
-  const { message } = (await req.json()) as { message: string };
-  const text = (message || "").trim();
+  const { message, source } = (await req.json()) as { message: string; source?: "voice" | "text" };
+  const rawText = (message || "").trim();
+  // Apply strict echo cleanup only to microphone messages. Typed prose is
+  // preserved exactly, including intentional repetition.
+  const text = source === "voice" ? mergeTranscriptSegments([rawText]) : rawText;
   if (!text) return NextResponse.json({ error: "empty" }, { status: 400 });
 
   const state = await fullState(key);
   const ctx = buildContext(state);
   let action = parseCommand(text);
+  const languageReply = languageCapabilityReply(text);
 
   await db.insert(messages).values({ userId: user.id, role: "user", content: text });
 
   let finalText: string;
   let replanned = false;
 
-  if (action) {
+  if (languageReply) {
+    finalText = languageReply;
+  } else if (action) {
     // A recognised in-app command: give a short, deterministic confirmation and
     // let the app perform the action. No LLM/knowledge lookup needed.
     if (action.type === "replan") {

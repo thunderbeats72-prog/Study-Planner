@@ -79,6 +79,14 @@ v4 FIXES (this build)
    filled to the canonical count if a provider stops early
  - Older saved plans receive advanced metadata without losing titles,
    mastery, completion history, or timing
+ - Duplicate chat submission and replan races are blocked synchronously;
+   a spoken message or rebalance action can execute only once at a time
+ - Shigun now answers language-capability requests deterministically in
+   Bengali, Hindi, Marathi, Tamil, Telugu, Kannada, Gujarati, Punjabi,
+   and Arabic instead of incorrectly claiming English/Hindi-only support
+ - Mobile chat is a header-anchored conversation sheet with a scrim,
+   activity states, assistant avatars, live voice waveform, improved
+   composer, horizontal prompts, and reduced-motion accessibility
 
 v3 FIXES
 --------

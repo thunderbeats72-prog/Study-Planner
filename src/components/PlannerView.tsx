@@ -205,8 +205,9 @@ export default function PlannerView({
             <option value="all">All subjects</option>
             {state.subjects.map((s) => <option key={s.id} value={String(s.id)}>{s.name}</option>)}
           </select>
-          <button className="btn btn-primary" onClick={onReplan} disabled={replanning}>
-            <IconSpark size={14} />{replanning ? "Re-planning…" : "Re-plan"}
+          <button className="btn btn-primary" onClick={onReplan} disabled={replanning} aria-busy={replanning}>
+            <span className={replanning ? "replanning-spark" : ""}><IconSpark size={14} /></span>
+            {replanning ? "Rebalancing schedule…" : "Rebalance schedule"}
           </button>
         </div>
       </div>
@@ -219,7 +220,10 @@ export default function PlannerView({
           <div style={{ fontSize: ".78rem", color: "var(--text-muted)", marginTop: 4, marginBottom: 10 }}>
             Don&apos;t cram them into today — let the engine redistribute them across your remaining days.
           </div>
-          <button className="btn btn-sm btn-primary" onClick={onReplan} disabled={replanning}>Rebalance my schedule</button>
+          <button className="btn btn-sm btn-primary" onClick={onReplan} disabled={replanning} aria-busy={replanning}>
+            {replanning && <span className="replanning-spark"><IconSpark size={12} /></span>}
+            {replanning ? "Moving overdue work…" : "Rebalance my schedule"}
+          </button>
         </div>
       )}
 
