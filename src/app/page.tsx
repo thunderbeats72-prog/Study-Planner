@@ -336,23 +336,23 @@ export default function Home() {
 
         <main className="main-workspace">
           <div className="tracker-bar">
-            <div className="flex-row gap-md" style={{ flexWrap: "wrap" }}>
+            <div className="flex-row gap-md tracker-status">
               <div className={`pulse-dot${clock.running ? " live" : ""}`} />
-              <div>
-                <div style={{ fontSize: ".8rem", fontWeight: 800 }}>
+              <div className="tracker-labels">
+                <div className="tracker-state">
                   {clock.running ? "Clocked in" : clock.onBreak ? "On break" : "Not clocked in"}
                 </div>
-                <div style={{ fontSize: ".72rem", color: "var(--text-muted)", fontWeight: 650 }}>
+                <div className="tracker-task">
                   {state.tasks.find((x) => x.id === clock.taskId)?.title.slice(0, 36) ||
                     state.subjects.find((x) => x.id === clock.subjectId)?.name ||
                     "Free session"}
                 </div>
               </div>
-              <div className="mono" style={{ fontSize: "1.2rem", fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>
+              <div className="mono tracker-time">
                 {mmss(clock.elapsed)}
               </div>
             </div>
-            <div className="flex-row gap-sm" style={{ flexWrap: "wrap" }}>
+            <div className="flex-row gap-sm tracker-actions">
               <span className="chip chip-kind">{todayDone}/{todayTotal} today</span>
               <span className="chip chip-pending">{ctx.daysLeft}d to {prettyLong(state.settings.examDate)}</span>
               {!clock.running && !clock.onBreak && (

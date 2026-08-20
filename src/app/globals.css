@@ -1905,26 +1905,6 @@ html{scroll-behavior:smooth}
 }
 
 
-/* ═══ MOBILE TRACKER REDESIGN — clean single-row status (screenshot fix) ═══ */
-@media(max-width:640px){
-  .tracker-bar{
-    flex-direction:row;align-items:center;justify-content:space-between;
-    padding:8px 12px;border-radius:var(--radius-lg);gap:8px;min-height:0;
-  }
-  .tracker-bar .pulse-dot{width:8px;height:8px}
-  /* Left cluster: dot + status stacked tight */
-  .tracker-bar > .flex-row:first-child{gap:9px;flex:1;min-width:0}
-  .tracker-bar > .flex-row:first-child > div:nth-child(2){min-width:0}
-  .tracker-bar > .flex-row:first-child > div:nth-child(2) > div:first-child{font-size:.74rem;white-space:nowrap}
-  .tracker-bar > .flex-row:first-child > div:nth-child(2) > div:last-child{font-size:.62rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px}
-  .tracker-bar .mono{font-size:.92rem}
-  /* Right cluster: chips hidden on phones (info lives in KPIs); just actions */
-  .tracker-bar .chip{display:none}
-  .tracker-bar > .flex-row:last-child{gap:6px;flex-wrap:nowrap;flex-shrink:0}
-  .tracker-bar .btn-xs{flex:0 0 auto;min-width:0;padding:7px 12px}
-  /* Zen collapses to icon-only on phones */
-  .tracker-bar .btn-xs:last-child{padding:7px 10px}
-}
 
 /* Ambient sound pill: playing indicator bars */
 .ambient-bars{display:inline-flex;align-items:flex-end;gap:2px;height:12px}
@@ -1935,3 +1915,40 @@ html{scroll-behavior:smooth}
 @keyframes eq{0%,100%{transform:scaleY(1)}50%{transform:scaleY(.55)}}
 .ambient-pill{color:var(--accent) !important;border-color:var(--nav-active-border) !important}
 @media (prefers-reduced-motion: reduce){.ambient-bars i{animation:none}}
+
+
+/* ═══ TRACKER BAR — definitive layout (desktop + mobile) ═══════════
+   Base typography now lives in classes (no inline styles), so mobile
+   rules can actually win. */
+.tracker-status{gap:10px;min-width:0;flex:1}
+.tracker-labels{min-width:0}
+.tracker-state{font-size:.8rem;font-weight:800}
+.tracker-task{font-size:.72rem;color:var(--text-muted);font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tracker-time{font-size:1.2rem;font-weight:800;font-variant-numeric:tabular-nums;flex-shrink:0}
+.tracker-actions{flex-shrink:0}
+
+@media(max-width:640px){
+  .tracker-bar{
+    display:flex;flex-direction:row;flex-wrap:nowrap;align-items:center;
+    justify-content:space-between;gap:8px;
+    padding:8px 12px;border-radius:var(--radius-lg);min-height:0;
+  }
+  .tracker-status{gap:8px}
+  .tracker-status .pulse-dot{width:8px;height:8px}
+  .tracker-state{font-size:.72rem;white-space:nowrap}
+  .tracker-task{font-size:.6rem;max-width:96px}
+  .tracker-time{font-size:.95rem}
+  .tracker-actions{gap:5px;flex-wrap:nowrap}
+  .tracker-actions .chip{display:none}
+  .tracker-actions .btn-xs{flex:0 0 auto;min-width:0;padding:6px 11px;font-size:.68rem;min-height:30px;white-space:nowrap}
+  /* Zen: icon-only on phones — the bolt says it */
+  .tracker-actions .btn-xs:last-child{padding:6px 9px;font-size:0;gap:0}
+  .tracker-actions .btn-xs:last-child svg{width:14px;height:14px}
+  /* Ambient stop pill: bars-only */
+  .tracker-actions .ambient-pill{font-size:0;gap:0;padding:6px 9px}
+  .tracker-actions .ambient-pill .ambient-bars{margin:0}
+}
+/* Ultra-narrow: hide the running task label, keep state + time + actions */
+@media(max-width:380px){
+  .tracker-task{display:none}
+}
