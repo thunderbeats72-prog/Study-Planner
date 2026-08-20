@@ -88,7 +88,49 @@ export async function GET(req: Request) {
     } else strong++; // recently learned, no review cycle yet
   }
 
+  // ── Up Next prediction: the pending task the learner most likely
+  // needs now — today's plan order weighted by peak-hour proximity and
+  // subject momentum (recently touched subjects rank higher).
+  const nowH = new Date().getHours();
+  const pendingToday = allTasks
+    .filter((t) => t.date === today && t.status === "pending")
+    .sort((a, b) => a.position - b.position);
+  const lastTouchBySub = new Map<number, string>();
+  for (const t of allTasks) {
+    if (t.subjectId && t.status === "done") {
+      const prev = lastTouchBySub.get(t.subjectId);
+      if (!prev || t.date > prev) lastTouchBySub.set(t.subjectId, t.date);
+    }
+  }
+  const upNext = pendingToday
+    .map((t) => {
+      let score = 100 - t.position; // plan order is the base signal
+      if (focus.peakHour !== null && Math.abs(nowH - focus.peakHour) <= 1) {
+        // during peak hours, prefer the hardest pending item
+        const topic = allTopics.find((x) => x.id === t.topicId);
+        if (topic?.difficulty === "Hard") score += 25;
+      }
+      const touched = t.subjectId ? lastTouchBySub.get(t.subjectId) : undefined;
+      if (touched && diffDays(touched, today) <= 1) score += 10; // momentum
+      return { t, score };
+    })
+    .sort((a, b) => b.score - a.score)[0]?.t || null;
+
+  // ── Focus-window suggestion from the hour profile ──
+  const focusSuggestion =
+    focus.peakHour !== null
+      ? {
+          startHour: focus.peakHour,
+          endHour: (focus.peakHour + 2) % 24,
+          isNow: Math.abs(nowH - focus.peakHour) <= 1,
+        }
+      : null;
+
   return NextResponse.json({
+    upNext: upNext
+      ? { id: upNext.id, title: upNext.title, minutes: upNext.plannedMinutes, kind: upNext.kind, subjectId: upNext.subjectId }
+      : null,
+    focusSuggestion,
     pace: {
       global: pace.global,
       samples: pace.samples,

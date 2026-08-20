@@ -21,6 +21,8 @@ export default function Dashboard({
 }) {
   const [insights, setInsights] = useState<string>("");
   const [intel, setIntel] = useState<{
+    upNext?: { id: number; title: string; minutes: number; kind: string; subjectId: number | null } | null;
+    focusSuggestion?: { startHour: number; endHour: number; isNow: boolean } | null;
     pace: { global: number; samples: number; bySubject: { id: number; name: string; color: string; pace: number }[] };
     weekdays: number[] | null;
     peakHour: number | null;
@@ -113,6 +115,24 @@ export default function Dashboard({
           <IconSpark size={15} />{replanning ? "Re-planning…" : "Re-plan with AI"}
         </button>
       </div>
+
+      {intel?.upNext && (
+        <div className="glass-panel up-next" onClick={() => onFocusTask(intel.upNext!.id)}>
+          <div className="up-next-glow" />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="intel-label" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              Up next
+              {intel.focusSuggestion?.isNow && <span className="up-next-now">peak focus window</span>}
+            </div>
+            <div className="up-next-title">{intel.upNext.title}</div>
+            <div className="up-next-sub">{intel.upNext.minutes} min · one tap to clock in</div>
+          </div>
+          <button className="btn btn-primary" aria-label="Start this task"
+            onClick={(e) => { e.stopPropagation(); onFocusTask(intel.upNext!.id); }}>
+            Start
+          </button>
+        </div>
+      )}
 
       <div className="momentum-strip">
         <span className="momentum-pill">This week <strong>{momentum.thisHrs}h</strong>

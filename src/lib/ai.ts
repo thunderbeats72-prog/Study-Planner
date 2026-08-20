@@ -322,9 +322,11 @@ export function parseCommand(q: string): TutorReply["action"] | undefined {
     if (/(nebula)/.test(n)) return { type: "theme", payload: "nebula" };
     if (/(emerald|mint)/.test(n)) return { type: "theme", payload: "mint" };
     if (/(sunset|champagne)/.test(n)) return { type: "theme", payload: "sunset" };
-    if (/(light|samsung|clean)/.test(n)) return { type: "theme", payload: "sunset" };
+    if (/(bright|lighter|light|samsung|clean|white)/.test(n)) return { type: "theme", payload: "silver-lavender" };
     if (/(silver|lavender)/.test(n)) return { type: "theme", payload: "silver-lavender" };
-    return { type: "theme", payload: "dark" };
+    // Vague requests ("something nicer/brighter/cooler") fall through to
+    // the LLM, which understands intent and replies with [[action:theme:x]].
+    // The old catch-all returned DARK here and hijacked every vague ask.
   }
   return undefined;
 }

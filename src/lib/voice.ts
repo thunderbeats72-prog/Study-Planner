@@ -80,6 +80,11 @@ function pickVoice(optionId: string, lang: string): SpeechSynthesisVoice | null 
       wantFemale ? /female|woman|swara|kalpana|lekha|heera/i.test(v.name) : /male|man|hemant|ravi/i.test(v.name));
     return genderHit || langVoices[0];
   }
+  // NON-ENGLISH run with no matching voice installed: return null and
+  // let the utterance carry lang (e.g. hi-IN) — the OS speech engine
+  // then uses its own native-language synthesis instead of an English
+  // voice mangling the pronunciation.
+  if (lang !== "en") return null;
   return voices.find((v) => v.lang.startsWith("en")) || voices[0] || null;
 }
 
@@ -200,28 +205,49 @@ export function listen(
   const rec = new SR();
   rec.lang = lang;
   rec.interimResults = true;
-  rec.continuous = false;
-  rec.maxAlternatives = 5; // score alternatives, keep the most confident
+  // PATIENT LISTENING: continuous mode + our own silence window. The
+  // engine no longer finalizes at the first brief pause — we accumulate
+  // segments and only finish after ~1.8s of true silence (or stop()).
+  rec.continuous = true;
+  rec.maxAlternatives = 5;
+
+  const SILENCE_MS = 1800;
+  let collected = "";
+  let silenceTimer: ReturnType<typeof setTimeout> | null = null;
+  let finished = false;
+
+  const finish = () => {
+    if (finished) return;
+    finished = true;
+    if (silenceTimer) clearTimeout(silenceTimer);
+    try { rec.stop(); } catch { /* noop */ }
+    const text = collected.trim();
+    if (text) onFinal(text);
+  };
+  const armSilence = () => {
+    if (silenceTimer) clearTimeout(silenceTimer);
+    silenceTimer = setTimeout(finish, SILENCE_MS);
+  };
 
   rec.onresult = (e: any) => {
     let interim = "";
-    let final = "";
     for (let i = e.resultIndex; i < e.results.length; i++) {
       const res = e.results[i];
       if (res.isFinal) {
-        // pick highest-confidence alternative
         let best = res[0];
         for (let a = 1; a < res.length; a++) {
           if (res[a].confidence > best.confidence) best = res[a];
         }
-        final += best.transcript;
+        collected += (collected ? " " : "") + best.transcript.trim();
       } else {
         interim += res[0].transcript;
       }
     }
-    if (interim) onInterim(interim);
-    if (final) onFinal(final.trim());
+    onInterim((collected + " " + interim).trim());
+    armSilence(); // any speech activity extends the window
   };
+  rec.onspeechend = () => armSilence();
+  rec.onend = () => finish(); // engine gave up (e.g. hard timeout) — use what we have
   rec.onerror = (e: any) => {
     onError(e.error === "not-allowed"
       ? "Microphone access was blocked. Allow it in your browser settings."
@@ -229,6 +255,6 @@ export function listen(
         ? "Didn't catch that — try speaking a bit louder or closer to the mic."
         : "Voice input error — please try again.");
   };
-  try { rec.start(); } catch { onError("Could not start the microphone."); return null; }
-  return { stop: () => { try { rec.stop(); } catch { /* noop */ } } };
+  try { rec.start(); armSilence(); } catch { onError("Could not start the microphone."); return null; }
+  return { stop: finish };
 }
