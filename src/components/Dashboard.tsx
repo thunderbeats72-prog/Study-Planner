@@ -336,7 +336,7 @@ export default function Dashboard({
                 <div className="task-title">{task.title}</div>
                 <div className="task-sub">
                   {meta.label} · {task.plannedMinutes} min{taskLogged(task.id) ? ` · ${fmtMin(taskLogged(task.id))} logged` : task.actualMinutes ? ` · ${task.actualMinutes}m logged` : ""}
-                  {activeTaskId === task.id && activeClockSeconds ? ` · live +${Math.floor(activeClockSeconds / 60)}m ${activeClockSeconds % 60}s` : ""}
+                  {activeTaskId === task.id && activeClockSeconds ? ` · live ${Math.max(1, Math.ceil(activeClockSeconds / 60))}m` : ""}
                 </div>
               </div>
               <button className="btn btn-xs btn-secondary" onClick={() => setEditingTaskId(task.id)}>Edit</button>

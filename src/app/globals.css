@@ -1255,7 +1255,15 @@ body.mode-focused .main-workspace > :not(.tracker-bar){animation:none}
   animation:toastIn .4s var(--spring) forwards;
 }
 @keyframes toastIn{from{opacity:0;transform:translate(-50%,14px) scale(.95)}to{opacity:1;transform:translate(-50%,0) scale(1)}}
-@media(max-width:640px){.toast{bottom:calc(96px + env(safe-area-inset-bottom));width:calc(100vw - 28px)}}
+@media(max-width:640px){
+  .toast{
+    bottom:auto;top:calc(64px + env(safe-area-inset-top));
+    width:auto;max-width:calc(100vw - 32px);
+    padding:9px 16px;font-size:.78rem;
+    animation:toastDown .35s var(--spring) forwards;
+  }
+  @keyframes toastDown{from{opacity:0;transform:translate(-50%,-10px) scale(.96)}to{opacity:1;transform:translate(-50%,0) scale(1)}}
+}
 
 /* ── Alignment hardening: consistent gutters everywhere ── */
 html{scrollbar-gutter:stable}
@@ -2036,4 +2044,26 @@ body.mode-focused .btn-primary.w-full::before,body.mode-focused .page-header .bt
 @media(max-width:640px){
   .tracker-actions .btn-primary{transition:transform .2s var(--spring)}
   .tracker-actions .btn-primary:active{transform:scale(.88)}
+}
+
+
+/* ═══ CLOCKED-IN MOBILE LAYOUT — no overlap, ever ═══ */
+@media(max-width:640px){
+  /* labels can never paint over the timer */
+  .tracker-labels{overflow:hidden}
+  .tracker-status{overflow:hidden}
+  /* while a session is LIVE: dot + timer only on the left —
+     the state text is redundant (dot is green, timer breathes) */
+  body.focus-live .tracker-labels{display:none}
+  body.focus-live .tracker-status{flex:0 1 auto;gap:7px}
+  body.focus-live .tracker-time{font-size:1.05rem;font-weight:800}
+  /* three-button cluster fits comfortably now */
+  body.focus-live .tracker-actions{gap:4px}
+  body.focus-live .tracker-actions .act-pause,
+  body.focus-live .tracker-actions .act-break{padding:6px 8px;font-size:.6rem}
+  body.focus-live .tracker-actions .act-out{padding:6px 8px;font-size:.6rem}
+}
+/* Paused/on-break states keep labels but truncate safely */
+@media(max-width:640px){
+  .tracker-state{overflow:hidden;text-overflow:ellipsis;max-width:92px}
 }
