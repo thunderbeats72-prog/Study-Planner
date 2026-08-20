@@ -372,7 +372,10 @@ export const CBSE_CATALOGS: Record<string, CbseSubject[]> = {
 /** CBSE class number detection scoped to boards where NCERT applies. */
 export function cbseCatalogFor(q: string): CbseSubject[] | null {
   const n = q.toLowerCase();
-  const m = n.match(/(?:class|grade|std|standard)\s*(\d{1,2})/);
+  // Typo tolerance: clas/calss/klass, grde, standrd + bare "10th/9th"
+  const m =
+    n.match(/(?:class|clas|calss|klass|grade|grde|std|standard|standrd)\s*(\d{1,2})/) ||
+    n.match(/\b(9|10)\s*th\b/);
   if (!m) return null;
   const cls = Number(m[1]);
   // Explicit other-board mentions opt out of the NCERT ground truth

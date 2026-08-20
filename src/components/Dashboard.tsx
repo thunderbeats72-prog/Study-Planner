@@ -20,6 +20,15 @@ export default function Dashboard({
   onReplan: () => void;
 }) {
   const [insights, setInsights] = useState<string>("");
+  const [intel, setIntel] = useState<{
+    pace: { global: number; samples: number; bySubject: { id: number; name: string; color: string; pace: number }[] };
+    weekdays: number[] | null;
+    peakHour: number | null;
+    tomorrowRisk: number;
+    readiness: { onTrack: boolean; loadPct: number; likelyDays: number; optimisticDays: number; pessimisticDays: number; samples: number };
+    memory: { strong: number; fading: number; atRisk: number; tracked: number };
+  } | null>(null);
+  const [intelOpen, setIntelOpen] = useState(false);
   const [loadingIns, setLoadingIns] = useState(true);
   const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
   const [moreActionsId, setMoreActionsId] = useState<number | null>(null);
@@ -28,6 +37,7 @@ export default function Dashboard({
 
   useEffect(() => {
     setLoadingIns(true);
+    api<typeof intel>("/api/analytics").then(setIntel).catch(() => {});
     api<{ insights: string }>("/api/insights")
       .then((d) => setInsights(d.insights))
       .catch(() => setInsights(""))
@@ -160,6 +170,100 @@ export default function Dashboard({
             dangerouslySetInnerHTML={{ __html: mdToHtml(insights) }} />
         )}
       </div>
+
+      {intel && intel.readiness && (
+        <div className="glass-panel tilt-card intel-card" style={{ padding: 20, marginBottom: 18 }}>
+          <div className="day-head" style={{ marginBottom: 12 }}>
+            <h3 style={{ fontSize: ".88rem", fontWeight: 800, margin: 0 }}>Intelligence</h3>
+            <span className="day-meta">learned from your own study data</span>
+          </div>
+
+          <div className="intel-grid">
+            <div className="intel-stat">
+              <span className={`intel-dot ${intel.readiness.onTrack ? "ok" : "warn"}`} />
+              <div>
+                <div className="intel-label">Exam readiness</div>
+                <div className="intel-value">
+                  {intel.readiness.onTrack ? "On track" : "Behind pace"}
+                  <span className="intel-sub"> · needs ~{intel.readiness.likelyDays}d of your remaining time</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="intel-stat">
+              <span className={`intel-dot ${intel.tomorrowRisk < 0.4 ? "ok" : intel.tomorrowRisk < 0.65 ? "mid" : "warn"}`} />
+              <div>
+                <div className="intel-label">Tomorrow&apos;s plan</div>
+                <div className="intel-value">
+                  {intel.tomorrowRisk < 0.4 ? "Looks doable" : intel.tomorrowRisk < 0.65 ? "A bit heavy" : "Overloaded"}
+                  <span className="intel-sub"> · {Math.round(intel.tomorrowRisk * 100)}% skip risk</span>
+                </div>
+              </div>
+            </div>
+
+            {intel.memory.tracked > 0 && (
+              <div className="intel-stat">
+                <span className={`intel-dot ${intel.memory.atRisk === 0 ? "ok" : "mid"}`} />
+                <div>
+                  <div className="intel-label">Memory health</div>
+                  <div className="intel-value">
+                    {intel.memory.strong} strong
+                    {intel.memory.fading > 0 && <span className="intel-sub"> · {intel.memory.fading} fading</span>}
+                    {intel.memory.atRisk > 0 && <span className="intel-sub warn-text"> · {intel.memory.atRisk} need review</span>}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {intel.peakHour !== null && (
+              <div className="intel-stat">
+                <span className="intel-dot ok" />
+                <div>
+                  <div className="intel-label">Your peak focus</div>
+                  <div className="intel-value">{intel.peakHour % 12 || 12}{intel.peakHour < 12 ? "am" : "pm"}–{(intel.peakHour + 2) % 12 || 12}{(intel.peakHour + 2) < 12 || (intel.peakHour + 2) >= 24 ? "am" : "pm"}
+                    <span className="intel-sub"> · schedule hard topics here</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <button className="more-options-toggle" onClick={() => setIntelOpen(!intelOpen)}>
+            {intelOpen ? "Hide details" : "More details"}
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"
+              style={{ transform: intelOpen ? "rotate(180deg)" : "none", transition: "transform .25s ease" }}>
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </button>
+
+          {intelOpen && (
+            <div className="intel-details slide-in">
+              {intel.pace.samples >= 3 ? (
+                <>
+                  <div className="intel-label" style={{ marginBottom: 8 }}>Your pace vs plan (learned from {intel.pace.samples} sessions)</div>
+                  {intel.pace.bySubject.slice(0, 6).map((p) => (
+                    <div key={p.id} className="intel-pace-row">
+                      <span className="task-dot" style={{ background: p.color, position: "static" }} />
+                      <span className="intel-pace-name">{p.name}</span>
+                      <span className={`intel-pace-val ${p.pace > 1.15 ? "warn-text" : p.pace < 0.9 ? "ok-text" : ""}`}>
+                        {p.pace > 1.05 ? `${Math.round((p.pace - 1) * 100)}% slower` : p.pace < 0.95 ? `${Math.round((1 - p.pace) * 100)}% faster` : "on pace"}
+                      </span>
+                    </div>
+                  ))}
+                </>
+              ) : (
+                <div style={{ fontSize: ".8rem", color: "var(--text-dim)" }}>
+                  Complete a few more sessions and the pace model will show which subjects run faster or slower for you.
+                </div>
+              )}
+              <div className="intel-label" style={{ margin: "12px 0 4px" }}>Finish-time projection</div>
+              <div style={{ fontSize: ".8rem", color: "var(--text-muted)" }}>
+                Best case ~{intel.readiness.optimisticDays}d · likely ~{intel.readiness.likelyDays}d · worst case ~{intel.readiness.pessimisticDays}d of study time remaining.
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="glass-panel tilt-card" style={{ padding: 20 }}>
         <div className="day-head">

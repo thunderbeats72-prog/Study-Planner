@@ -385,3 +385,52 @@ function clamp(v: number, lo: number, hi: number): number {
 function round2(v: number): number {
   return Math.round(v * 100) / 100;
 }
+
+
+// ── 8. Exam-readiness projection with uncertainty ─────────────
+//
+// Instead of a single "finishes Oct 5", project a P10/P50/P90 band
+// from the user's OWN pace variance. Honest uncertainty builds trust:
+// "Oct 1 - Oct 12, most likely Oct 5".
+
+export type ReadinessProjection = {
+  onTrack: boolean;
+  /** 0-100: share of remaining days actually needed (100 = exactly on time). */
+  loadPct: number;
+  optimisticDays: number;   // P10
+  likelyDays: number;       // P50
+  pessimisticDays: number;  // P90
+  samples: number;
+};
+
+export function projectReadiness(
+  history: TaskHistoryRow[],
+  remainingPlannedMinutes: number,
+  dailyBudgetMinutes: number,
+  daysLeft: number
+): ReadinessProjection {
+  const done = history.filter(
+    (t) => t.status === "done" && t.plannedMinutes >= 10 && t.actualMinutes >= 5 &&
+      t.actualMinutes <= t.plannedMinutes * 4
+  );
+  const ratios = done.map((t) => Math.min(3, Math.max(0.33, t.actualMinutes / t.plannedMinutes)));
+  const n = ratios.length;
+  const mean = n ? ratios.reduce((a, b) => a + b, 0) / n : 1;
+  const sd = n > 3
+    ? Math.sqrt(ratios.reduce((a, r) => a + (r - mean) * (r - mean), 0) / (n - 1))
+    : 0.25; // prior spread until evidence exists
+  const capacity = Math.max(20, dailyBudgetMinutes) * 0.78; // learn-capacity ratio
+  const days = (mul: number) =>
+    Math.max(0, Math.ceil((remainingPlannedMinutes * mul) / capacity));
+  const p10 = days(Math.max(0.5, mean - 1.282 * sd));
+  const p50 = days(mean);
+  const p90 = days(mean + 1.282 * sd);
+  return {
+    onTrack: p50 <= daysLeft,
+    loadPct: daysLeft > 0 ? Math.round((p50 / daysLeft) * 100) : 999,
+    optimisticDays: p10,
+    likelyDays: p50,
+    pessimisticDays: p90,
+    samples: n,
+  };
+}
