@@ -110,6 +110,14 @@ export default function Home() {
     } catch { notify("Update failed."); }
   };
 
+  const quickAddTask = async (payload: { title: string; plannedMinutes: number; date: string; subjectId: number | null }) => {
+    try {
+      const s = await api<AppState>("/api/tasks", { method: "POST", body: JSON.stringify(payload) });
+      setState(s);
+      notify("Task added to your plan.");
+    } catch { notify("Could not add the task."); }
+  };
+
   const updateTask = async (id: number, patch: TaskPatch) => {
     try {
       const s = await api<AppState>("/api/tasks", { method: "PATCH", body: JSON.stringify({ id, ...patch }) });
@@ -376,7 +384,7 @@ export default function Home() {
               replanning={busy} onReplan={replan} />
           )}
           {page === "planner" && (
-            <PlannerView state={state} onTaskStatus={setTaskStatus} onTaskUpdate={updateTask}
+            <PlannerView state={state} onTaskStatus={setTaskStatus} onTaskUpdate={updateTask} onQuickAdd={quickAddTask}
               onSkipSubject={skipSubjectForDay} onFocusTask={focusTask}
               activeTaskId={clock.taskId} activeClockSeconds={clock.elapsed}
               onAskTutor={askTutor} replanning={busy} onReplan={replan} />

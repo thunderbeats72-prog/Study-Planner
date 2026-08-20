@@ -11,11 +11,12 @@ import { useBackClose } from "@/lib/useBackClose";
 type View = "list" | "calendar" | "kanban";
 
 export default function PlannerView({
-  state, onTaskStatus, onTaskUpdate, onSkipSubject, onFocusTask, activeTaskId, activeClockSeconds, onAskTutor, replanning, onReplan,
+  state, onTaskStatus, onTaskUpdate, onQuickAdd, onSkipSubject, onFocusTask, activeTaskId, activeClockSeconds, onAskTutor, replanning, onReplan,
 }: {
   state: AppState;
   onTaskStatus: (id: number, status: string, rating?: number) => void;
   onTaskUpdate: (id: number, patch: TaskPatch) => void;
+  onQuickAdd?: (payload: { title: string; plannedMinutes: number; date: string; subjectId: number | null }) => void;
   onSkipSubject: (subjectId: number, date: string) => void;
   onFocusTask: (taskId: number) => void;
   activeTaskId?: number | null;
@@ -30,6 +31,11 @@ export default function PlannerView({
   const [expanded, setExpanded] = useState<number | null>(null);
   const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
   const [ratingTaskId, setRatingTaskId] = useState<number | null>(null);
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const [qaTitle, setQaTitle] = useState("");
+  const [qaMinutes, setQaMinutes] = useState(30);
+  const [qaSubject, setQaSubject] = useState<string>("");
+  useBackClose(quickAddOpen, () => setQuickAddOpen(false));
   const [month, setMonth] = useState(() => {
     const d = new Date(); return { y: d.getFullYear(), m: d.getMonth() };
   });
@@ -306,6 +312,42 @@ export default function PlannerView({
             </div>
             {dayTasks(openDay).map(renderTask)}
             <button className="btn btn-secondary w-full mt-md" onClick={() => setOpenDay(null)}>Close</button>
+          </div>
+        </div>
+      )}
+
+      {onQuickAdd && (
+        <button className="quick-fab" aria-label="Add task" onClick={() => { setQaTitle(""); setQaMinutes(30); setQuickAddOpen(true); }}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+      )}
+      {quickAddOpen && (
+        <div className="modal-overlay" onClick={() => setQuickAddOpen(false)}>
+          <div className="glass-panel modal-box quick-add-box" onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ margin: "0 0 14px", fontSize: "1.05rem", fontWeight: 700 }}>Add a task</h3>
+            <label className="lbl">What will you study?</label>
+            <input className="input-field" autoFocus placeholder="e.g. Revise Unit 3 notes" value={qaTitle}
+              onChange={(e) => setQaTitle(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && qaTitle.trim()) { onQuickAdd!({ title: qaTitle.trim(), plannedMinutes: qaMinutes, date: t, subjectId: qaSubject ? Number(qaSubject) : null }); setQuickAddOpen(false); } }} />
+            <div className="grid-2" style={{ marginTop: 12 }}>
+              <div>
+                <label className="lbl">Minutes</label>
+                <select className="input-field" value={qaMinutes} onChange={(e) => setQaMinutes(Number(e.target.value))}>
+                  {[15, 30, 45, 60, 90].map((m) => <option key={m} value={m}>{m} min</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="lbl">Subject (optional)</label>
+                <select className="input-field" value={qaSubject} onChange={(e) => setQaSubject(e.target.value)}>
+                  <option value="">None</option>
+                  {state.subjects.map((su) => <option key={su.id} value={su.id}>{su.name}</option>)}
+                </select>
+              </div>
+            </div>
+            <button className="btn btn-primary w-full" style={{ marginTop: 16 }} disabled={!qaTitle.trim()}
+              onClick={() => { onQuickAdd!({ title: qaTitle.trim(), plannedMinutes: qaMinutes, date: t, subjectId: qaSubject ? Number(qaSubject) : null }); setQuickAddOpen(false); }}>
+              Save
+            </button>
           </div>
         </div>
       )}

@@ -1625,3 +1625,40 @@ body.mode-focused::before{animation:none;opacity:.4}
 @media (prefers-reduced-motion: reduce){
   body::before,.ob-level-grid > *,.task-dot,.wk-bar,.nav-item.active::after{animation:none !important}
 }
+
+
+/* ═══════════════════════════════════════════════════════════════
+   SIMPLICITY BLUEPRINT LAYER — 3-tap workflows, icon-first mobile
+═══════════════════════════════════════════════════════════════ */
+
+/* Quick-add FAB: primary accent, left of the AI orb, 56px target */
+.quick-fab{
+  position:fixed;right:22px;bottom:90px;width:52px;height:52px;border-radius:50%;
+  background:var(--accent-gradient);color:#fff;border:none;cursor:pointer;z-index:199;
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 4px 14px var(--accent-glow),0 12px 32px var(--accent-glow),inset 0 1px 0 rgba(255,255,255,.25);
+  transition:transform .25s var(--spring),box-shadow .2s ease;
+}
+.quick-fab:hover{transform:scale(1.06) rotate(90deg)}
+.quick-fab:active{transform:scale(.92)}
+@media(max-width:860px){
+  .quick-fab{right:14px;bottom:calc(148px + env(safe-area-inset-bottom));width:50px;height:50px}
+}
+.quick-add-box{max-width:420px}
+
+/* Icon-first mobile nav: bigger icons, labels stay for 5-year-olds
+   but icons lead (44px+ targets already enforced) */
+@media(max-width:860px){
+  .nav-item svg{width:22px;height:22px}
+  .nav-item{min-height:48px}
+}
+
+/* Blueprint: component uniformity — one card language everywhere */
+.task-row,.kpi-card,.day-block{border-radius:var(--radius-md)}
+
+/* Progressive disclosure affordance */
+.more-options-toggle{
+  display:inline-flex;align-items:center;gap:6px;font-size:.76rem;font-weight:650;
+  color:var(--text-muted);background:none;border:none;cursor:pointer;padding:8px 0;font-family:inherit;
+}
+.more-options-toggle:hover{color:var(--accent)}
