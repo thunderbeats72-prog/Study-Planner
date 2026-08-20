@@ -1917,8 +1917,8 @@ html{scroll-behavior:smooth}
 /* ═══ TRACKER BAR — definitive layout (desktop + mobile) ═══════════
    Base typography now lives in classes (no inline styles), so mobile
    rules can actually win. */
-.tracker-status{gap:10px;min-width:0;flex:1}
-.tracker-labels{min-width:0}
+.tracker-status{gap:10px;min-width:0;flex:1 1 auto;flex-wrap:nowrap;overflow:hidden}
+.tracker-labels{min-width:0;overflow:hidden}
 .tracker-state{font-size:.8rem;font-weight:800}
 .tracker-task{font-size:.72rem;color:var(--text-muted);font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tracker-time{font-size:1.2rem;font-weight:800;font-variant-numeric:tabular-nums;flex-shrink:0}
@@ -2072,3 +2072,24 @@ button,a,.nav-item,.vtab,.cal-cell,.chip,.task-row,.rate-btn,input,select{touch-
 }
 .tracker-status{overflow:hidden}
 .tracker-actions{flex-shrink:0;min-width:0}
+
+
+/* ═══ CLOCKED-IN MOBILE LAYOUT v2 — overlap structurally impossible ═══
+   (Re-instated after regression; now covered by the package guard.) */
+@media(max-width:640px){
+  body.focus-live .tracker-labels{display:none}
+  body.focus-live .tracker-status{flex:0 1 auto;gap:7px}
+  body.focus-live .tracker-time{font-size:1.05rem;font-weight:800}
+  body.focus-live .tracker-actions{gap:4px}
+  body.focus-live .tracker-actions .btn-xs{padding:6px 8px;font-size:.6rem}
+}
+
+/* ═══ COLLAPSED SIDEBAR — no clipped text ever ═══
+   Text hides the INSTANT the class applies; the shrinking container
+   clips cleanly during the width transition. */
+.sidebar{overflow:hidden}
+.brand-title,.brand-course{white-space:nowrap}
+.app-wrapper.side-collapsed .brand-title,
+.app-wrapper.side-collapsed .brand-course,
+.app-wrapper.side-collapsed .nav-item span,
+.app-wrapper.side-collapsed .sidebar-foot{display:none !important}
