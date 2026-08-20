@@ -536,12 +536,12 @@ export default function Onboarding({
               {busy ? "Generating…" : isRerun ? "Wipe old plan & Generate New" : "Generate My AI Plan"}
             </button>
           )}
-          {isRerun && onCancel && (
-            <button className="ob-btn ob-btn-ghost" onClick={onCancel} disabled={busy}>
-              Cancel — keep my current plan
-            </button>
-          )}
         </div>
+        {isRerun && onCancel && (
+          <button className="ob-cancel-link" onClick={onCancel} disabled={busy}>
+            Cancel — keep my current plan
+          </button>
+        )}
       </div>
     </div>
   );

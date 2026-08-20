@@ -173,7 +173,13 @@ export function stopSpeaking(): void {
 ============================================================ */
 
 export type ListenHandle = { stop: () => void };
-export type ListenFinal = { text: string; confidence: number };
+export type ListenFinal = {
+  text: string;
+  confidence: number;
+  /** true when the user stopped listening manually (mic tap) and nothing
+   *  was captured — the UI should stay quiet instead of showing an error */
+  cancelled?: boolean;
+};
 
 const LAST_LANG_KEY = "shigun-stt-lang";
 
@@ -269,7 +275,7 @@ export async function listen(
 
   const confidence = () => (confCount ? Math.round((confSum / confCount) * 100) / 100 : 0);
 
-  const finish = () => {
+  const finish = (cancelled = false) => {
     if (finished) return;
     finished = true;
     clearTimers();
@@ -279,6 +285,9 @@ export async function listen(
     if (text) {
       learnSttLang(text);
       onFinal({ text, confidence: confidence() });
+    } else {
+      // always deliver — the UI must never hang in "listening" state
+      onFinal({ text: "", confidence: 0, cancelled });
     }
   };
 
@@ -347,6 +356,7 @@ export async function listen(
         }, 350);
         return;
       }
+      finished = true; clearTimers(); activeRec = null;
       onError("Microphone access was blocked. Allow it in your browser settings.");
     } else if (e.error === "no-speech") {
       if (restarts < 2) {
@@ -356,13 +366,16 @@ export async function listen(
         }, 300);
         return;
       }
+      finished = true; clearTimers(); activeRec = null;
       onError("Didn't catch that — tap the mic, wait for the pulse, then speak closer to the phone.");
     } else if (e.error === "aborted") {
-      /* user stopped / superseded — silence, finish below */
+      /* user stopped / superseded — finalize quietly below */
       if (!finished) finish();
     } else if (e.error === "network") {
+      finished = true; clearTimers(); activeRec = null;
       onError("Voice needs a network connection — check your internet and try again.");
     } else {
+      finished = true; clearTimers(); activeRec = null;
       onError("Voice input error — please try again.");
     }
   };
@@ -392,7 +405,7 @@ export async function listen(
     }
   }
 
-  const handle: ListenHandle = { stop: finish };
+  const handle: ListenHandle = { stop: () => finish(true) };
   activeRec = handle;
   return handle;
 }

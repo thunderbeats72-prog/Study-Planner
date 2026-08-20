@@ -99,7 +99,8 @@ export default function ChatPanel({
         listenRef.current = null;
         if (!openRef.current) return; // panel was closed mid-listen — discard
         if (!final.text.trim()) {
-          setVoiceErr("I didn't hear anything clearly — tap the mic and try once more.");
+          // manual stop with nothing captured = stay quiet; engine gave up = explain
+          if (!final.cancelled) setVoiceErr("I didn't hear anything clearly — tap the mic and try once more.");
           return;
         }
         setText(final.text);
