@@ -211,8 +211,11 @@ export function listen(
   rec.continuous = true;
   rec.maxAlternatives = 5;
 
-  const SILENCE_MS = 1800;
+  const SILENCE_MS = 2200;
   let collected = "";
+  let lastInterim = "";
+  let restarted = false;
+  const startedAt = Date.now();
   let silenceTimer: ReturnType<typeof setTimeout> | null = null;
   let finished = false;
 
@@ -221,7 +224,8 @@ export function listen(
     finished = true;
     if (silenceTimer) clearTimeout(silenceTimer);
     try { rec.stop(); } catch { /* noop */ }
-    const text = collected.trim();
+    // Android often never finalizes — the freshest interim IS the speech.
+    const text = (collected.trim() || lastInterim.trim());
     if (text) onFinal(text);
   };
   const armSilence = () => {
@@ -243,11 +247,20 @@ export function listen(
         interim += res[0].transcript;
       }
     }
+    if (interim) lastInterim = (collected + " " + interim).trim();
     onInterim((collected + " " + interim).trim());
     armSilence(); // any speech activity extends the window
   };
   rec.onspeechend = () => armSilence();
-  rec.onend = () => finish(); // engine gave up (e.g. hard timeout) — use what we have
+  rec.onend = () => {
+    // Android quirk: engine can self-end in <1.5s before the user speaks.
+    // Restart once silently instead of returning an empty result.
+    if (!finished && !collected && !lastInterim && !restarted && Date.now() - startedAt < 2500) {
+      restarted = true;
+      try { rec.start(); armSilence(); return; } catch { /* fall through */ }
+    }
+    finish(); // engine gave up — deliver whatever we heard
+  };
   rec.onerror = (e: any) => {
     onError(e.error === "not-allowed"
       ? "Microphone access was blocked. Allow it in your browser settings."
