@@ -1952,3 +1952,59 @@ html{scroll-behavior:smooth}
 @media(max-width:380px){
   .tracker-task{display:none}
 }
+
+
+/* ═══ PRD BUILD: sidebar collapse, focus-live, live timer, CTAs ═══ */
+
+/* Collapsible sidebar (desktop) */
+.side-toggle{
+  position:absolute;top:18px;right:-11px;width:22px;height:22px;border-radius:50%;
+  background:var(--surface-elevated);border:1px solid var(--glass-border);color:var(--text-muted);
+  cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:5;
+  box-shadow:var(--shadow-sm);transition:color .2s ease,border-color .2s ease,transform .2s var(--spring);
+}
+.side-toggle:hover{color:var(--accent);border-color:var(--nav-active-border)}
+.sidebar{position:sticky}
+.app-wrapper.side-collapsed{--sidebar-w:68px}
+.app-wrapper.side-collapsed .sidebar{padding:22px 10px}
+.app-wrapper.side-collapsed .brand-title,.app-wrapper.side-collapsed .brand-course,
+.app-wrapper.side-collapsed .nav-item span,.app-wrapper.side-collapsed .sidebar-foot{display:none}
+.app-wrapper.side-collapsed .nav-item{justify-content:center;padding:11px 0}
+.app-wrapper.side-collapsed .brand-header{justify-content:center;padding-bottom:14px}
+.sidebar,.app-wrapper{transition:all .35s var(--spring-soft)}
+@media(max-width:860px){.side-toggle{display:none}}
+
+/* Focus-live: ambient cue while clocked in — accent hairline atop the app */
+body.focus-live::after{
+  content:"";position:fixed;top:0;left:0;right:0;height:2.5px;z-index:1000;
+  background:linear-gradient(90deg,transparent,var(--success-accent),transparent);
+  animation:focusSweep 3s ease-in-out infinite;
+}
+@keyframes focusSweep{0%,100%{opacity:.5}50%{opacity:1}}
+body.focus-live .tracker-bar{border-color:rgba(22,163,122,.3)}
+
+/* Live timer emphasis while running */
+body.focus-live .tracker-time{color:var(--success-accent);text-shadow:0 0 18px rgba(22,163,122,.25)}
+
+/* Mobile: clocked-in actions compress — Pause/Break icon-size, Clock Out stays worded */
+@media(max-width:640px){
+  .tracker-actions .act-pause,.tracker-actions .act-break{padding:6px 9px;font-size:.62rem}
+  .tracker-actions .act-out{font-size:.62rem;padding:6px 9px}
+}
+
+/* CTA affordances: Re-plan + primary CTAs get a slow attention shimmer */
+.btn-primary.w-full,.page-header .btn-primary{position:relative;overflow:hidden}
+.btn-primary.w-full::before,.page-header .btn-primary::before{
+  content:"";position:absolute;top:0;bottom:0;width:40%;left:-60%;
+  background:linear-gradient(105deg,transparent,rgba(255,255,255,.25),transparent);
+  transform:skewX(-18deg);animation:ctaShine 5s ease-in-out 2s infinite;
+}
+@keyframes ctaShine{0%,70%,100%{left:-60%}85%{left:130%}}
+
+/* Zen kiosk lock: explicit exit affordance */
+.zen-exit{position:absolute;top:max(18px,env(safe-area-inset-top));right:18px}
+body.mode-focused .btn-primary.w-full::before,body.mode-focused .page-header .btn-primary::before{animation:none}
+@media (prefers-reduced-motion: reduce){
+  body.focus-live::after{animation:none}
+  .btn-primary.w-full::before,.page-header .btn-primary::before{animation:none}
+}

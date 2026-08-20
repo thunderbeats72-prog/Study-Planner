@@ -167,11 +167,31 @@ export type ListenHandle = { stop: () => void };
  * by confidence, and auto language detection between English and
  * Hindi where the engine supports it.
  */
+const LAST_LANG_KEY = "shigun-stt-lang";
+
+/** Persisted auto-detected speaking language (defaults to en-IN). */
+export function preferredSttLang(): string {
+  if (typeof window === "undefined") return "en-IN";
+  return localStorage.getItem(LAST_LANG_KEY) || "en-IN";
+}
+
+/** Update the preference from a transcript's dominant script. */
+export function learnSttLang(transcript: string): void {
+  for (const l of LANGS) {
+    if (l.range.test(transcript)) {
+      localStorage.setItem(LAST_LANG_KEY, l.bcp);
+      return;
+    }
+  }
+  // Latin transcript: keep en-IN (handles Hinglish naturally)
+  localStorage.setItem(LAST_LANG_KEY, "en-IN");
+}
+
 export function listen(
   onInterim: (text: string) => void,
   onFinal: (text: string) => void,
   onError: (err: string) => void,
-  lang = "en-IN"
+  lang = preferredSttLang()
 ): ListenHandle | null {
   const W = window as unknown as Record<string, any>;
   const SR = W.SpeechRecognition || W.webkitSpeechRecognition;

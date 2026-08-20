@@ -1,4 +1,4 @@
-/* Keyless knowledge retrieval used by the AETHER tutor when no LLM key is set.
+/* Keyless knowledge retrieval used by the SHIGUN tutor when no LLM key is set.
    Runs server-side only. */
 
 const UA = "StudyPlannerPro/1.0 (educational study planner)";

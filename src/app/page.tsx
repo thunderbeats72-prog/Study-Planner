@@ -36,6 +36,7 @@ export default function Home() {
   const [chatOpen, setChatOpen] = useState(false);
   const [thinking, setThinking] = useState(false);
   const [zen, setZen] = useState(false);
+  const [sideCollapsed, setSideCollapsed] = useState(false);
   const [ambient, setAmbient] = useState("none");
   useEffect(() => onSoundChange(setAmbient), []);
   useBackClose(zen, () => setZen(false));
@@ -69,6 +70,7 @@ export default function Home() {
     document.body.className = [theme, mode].filter(Boolean).join(" ");
   }, [state?.settings.theme, state?.user.level]);
 
+
   const logSession = useCallback(
     (minutes: number, subjectId: number | null, taskId: number | null, mode: string) => {
       api<AppState>("/api/sessions", {
@@ -81,6 +83,9 @@ export default function Home() {
 
   // 1) The study clock — tracks actual studied time
   const clock = useStudyClock(logSession);
+  useEffect(() => {
+    document.body.classList.toggle("focus-live", clock.running);
+  }, [clock.running]);
 
   // 2) Focus timer — pomodoro ritual
   const onBlockComplete = useCallback((mode: TimerMode, minutes: number) => {
@@ -302,8 +307,15 @@ export default function Home() {
         <span className="streak-badge"><IconFlame /> {state.user.streak}d</span>
       </header>
 
-      <div className="app-wrapper">
+      <div className={`app-wrapper${sideCollapsed ? " side-collapsed" : ""}`}>
         <aside className="sidebar">
+          <button className="side-toggle" aria-label={sideCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            onClick={() => setSideCollapsed(!sideCollapsed)}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"
+              style={{ transform: sideCollapsed ? "rotate(180deg)" : "none", transition: "transform .3s ease" }}>
+              <path d="m15 18-6-6 6-6" />
+            </svg>
+          </button>
           <div className="brand-header">
             <div className="brand-logo-icon"><IconLogo /></div>
             <div>
@@ -360,9 +372,9 @@ export default function Home() {
               )}
               {clock.running && (
                 <>
-                  <button className="btn btn-xs btn-secondary" onClick={clock.pause}>Pause</button>
-                  <button className="btn btn-xs btn-secondary" onClick={clock.takeBreak}>Break</button>
-                  <button className="btn btn-xs btn-danger" onClick={clock.clockOut}>Clock Out</button>
+                  <button className="btn btn-xs btn-secondary act-pause" onClick={clock.pause}>Pause</button>
+                  <button className="btn btn-xs btn-secondary act-break" onClick={clock.takeBreak}>Break</button>
+                  <button className="btn btn-xs btn-danger act-out" onClick={clock.clockOut}>Clock Out</button>
                 </>
               )}
               {clock.onBreak && (
@@ -410,6 +422,7 @@ export default function Home() {
 
       {zen && (
         <div className="zen">
+          <button className="btn btn-secondary btn-sm zen-exit" onClick={() => setZen(false)}>Exit Focus</button>
           <div style={{ fontSize: ".78rem", letterSpacing: 3, textTransform: "uppercase", opacity: 0.7 }}>
             {state.subjects.find((x) => x.id === clock.subjectId)?.name || "Deep Focus Session"}
           </div>
