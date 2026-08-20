@@ -1253,7 +1253,15 @@ body.mode-focused .main-workspace > :not(.tracker-bar){animation:none}
   animation:toastIn .4s var(--spring) forwards;
 }
 @keyframes toastIn{from{opacity:0;transform:translate(-50%,14px) scale(.95)}to{opacity:1;transform:translate(-50%,0) scale(1)}}
-@media(max-width:640px){.toast{bottom:calc(96px + env(safe-area-inset-bottom));width:calc(100vw - 28px)}}
+@media(max-width:640px){
+  .toast{
+    bottom:auto;top:calc(64px + env(safe-area-inset-top));
+    width:auto;max-width:calc(100vw - 32px);
+    padding:9px 16px;font-size:.78rem;
+    animation:toastDown .35s var(--spring) forwards;
+  }
+}
+@keyframes toastDown{from{opacity:0;transform:translate(-50%,-10px) scale(.96)}to{opacity:1;transform:translate(-50%,0) scale(1)}}
 
 /* ── Alignment hardening: consistent gutters everywhere ── */
 html{scrollbar-gutter:stable}
