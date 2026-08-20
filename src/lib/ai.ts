@@ -6,7 +6,6 @@ import {
   getNmimsChapters,
   cbseCatalogFor,
   getCbseChapters,
-  isAmityQuery,
   type SeedSubject,
   type GeneratedTopic,
 } from "./curriculum";
@@ -178,9 +177,6 @@ export async function aiSuggestSubjects(
   if (isNmimsQuery(courseName) || query.includes("nmims") || query.includes("cdoe")) {
     const verified = fallback.length >= 3 ? fallback : nmimsSem1Subjects();
     return { subjects: verified, source: "Verified NMIMS Database" };
-  }
-  if (isAmityQuery(courseName)) {
-    return { subjects: fallback, source: "Verified Amity Catalog" };
   }
 
   const raw = await callLLM(

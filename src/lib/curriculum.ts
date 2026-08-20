@@ -395,33 +395,6 @@ export function getCbseChapters(subjectName: string): string[] | null {
   return null;
 }
 
-/* ============================================================
-   AMITY ONLINE MBA — Semester 1 (subject list verified from
-   amityonline.com published syllabus). Unit counts are reasonable
-   defaults pending textbook verification — update in place when
-   the learner's official material is available.
-============================================================ */
-export const AMITY_MBA_SEM1: SeedSubject[] = [
-  { name: "Accounting for Managers", units: 10, difficulty: "Hard", color: "#5B5CE2" },
-  { name: "Marketing Management", units: 12, difficulty: "Medium", color: "#06B6D4" },
-  { name: "Managerial Economics", units: 10, difficulty: "Hard", color: "#E59A24" },
-  { name: "Statistics for Management", units: 10, difficulty: "Hard", color: "#EC4899" },
-  { name: "Professional Communication", units: 8, difficulty: "Easy", color: "#16A37A" },
-];
-
-export const AMITY_MBA_SEM2: SeedSubject[] = [
-  { name: "Business Research Methods", units: 10, difficulty: "Hard", color: "#5B5CE2" },
-  { name: "Financial Management", units: 10, difficulty: "Hard", color: "#16A37A" },
-  { name: "Human Resource Management", units: 9, difficulty: "Medium", color: "#E59A24" },
-  { name: "Conflict Resolution and Management", units: 8, difficulty: "Medium", color: "#EC4899" },
-  { name: "Legal Aspects of Business", units: 9, difficulty: "Medium", color: "#06B6D4" },
-];
-
-/** True when a course query refers to Amity's online/distance MBA. */
-export function isAmityQuery(q: string): boolean {
-  return /amity/i.test(q || "");
-}
-
 export const COURSE_DB: Record<string, Course> = {
   nursery_foundation: {
     id: "nursery_foundation",
@@ -620,12 +593,6 @@ export const COURSE_DB: Record<string, Course> = {
     level: "pg",
     subjects: nmimsSem1Subjects(),
   },
-  amity_mba_sem1: {
-    id: "amity_mba_sem1",
-    name: "Amity Online MBA — Semester 1",
-    level: "pg",
-    subjects: AMITY_MBA_SEM1.map((x) => ({ ...x })),
-  },
   mba: {
     id: "mba",
     name: "MBA — Master of Business Administration",
@@ -804,7 +771,7 @@ export const LEVEL_COURSES: Record<string, string[]> = {
   school: ["class_5", "class_8", "class_10", "class_12_pcm", "class_12_pcb", "class_12_commerce"],
   diploma: ["diploma_mech", "diploma_cs"],
   ug: ["btech_cse", "bsc_physics", "bcom", "ba_english", "bba", "mbbs"],
-  pg: ["amity_mba_sem1", "nmims_mba_sem1", "mba", "msc_cs", "ma_economics"],
+  pg: ["nmims_mba_sem1", "mba", "msc_cs", "ma_economics"],
   phd: ["phd_research", "phd_coursework"],
   competitive: ["jee", "neet", "upsc", "gate_cse", "cat", "ssc_cgl"],
   professional: ["ca_inter", "cfa_l1", "pmp"],
@@ -1325,12 +1292,6 @@ export function synthesiseSubjects(courseName: string, level: string): SeedSubje
   // semester 1) ALWAYS returns the verified Semester 1 catalog:
   // exactly 6 subjects, exactly 76 units (12+12+12+16+12+12), with
   // the locked colors — bypassing every heuristic below.
-  if (isAmityQuery(q)) {
-    const { sem, year } = detectSemester(q);
-    if (sem === 2 || (!sem && year === 1 && /sem\s*2/i.test(q))) return AMITY_MBA_SEM2.map((x) => ({ ...x }));
-    if ((!sem && !year) || sem === 1) return AMITY_MBA_SEM1.map((x) => ({ ...x }));
-  }
-
   if (isNmimsQuery(q)) {
     const { sem, year } = detectSemester(q);
     const wantsSem1 = (!sem && !year) || sem === 1;

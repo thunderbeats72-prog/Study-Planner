@@ -61,7 +61,7 @@ export default function PlannerView({
     const sum = state.sessions.filter((x) => x.taskId === taskId).reduce((a, x) => a + x.minutes, 0);
     return Math.round(sum * 100) / 100;
   };
-  const fmtMin = (m: number) => `${Math.round(m)}m`;
+  const fmtMin = (m: number) => Number.isInteger(m) ? `${m}m` : `${m.toFixed(2)}m`;
 
   const renderTask = (task: TaskRow) => {
     const meta = KIND_META[task.kind] || KIND_META.learn;
@@ -80,7 +80,7 @@ export default function PlannerView({
               {task.plannedMinutes} min
               {topic ? ` · ${topic.unit} · ${topic.difficulty}` : ""}
               {taskLogged(task.id) ? ` · ${fmtMin(taskLogged(task.id))} logged` : task.actualMinutes ? ` · ${task.actualMinutes}m logged` : ""}
-              {activeTaskId === task.id && activeClockSeconds ? ` · live ${Math.max(1, Math.ceil(activeClockSeconds / 60))}m` : ""}
+              {activeTaskId === task.id && activeClockSeconds ? ` · live +${Math.floor(activeClockSeconds / 60)}m ${activeClockSeconds % 60}s` : ""}
             </div>
           </div>
           <span className={`chip chip-${task.status}`}>{task.status}</span>

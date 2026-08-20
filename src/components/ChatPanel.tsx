@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { mdToHtml, type MessageRow } from "@/lib/client";
+import { mdToHtml, escapeHtml, type MessageRow } from "@/lib/client";
 import { IconChat, IconClose, IconSend, IconSpark } from "./icons";
 import { VOICE_OPTIONS, voiceSupported, speak, stopSpeaking, listen, learnSttLang, type ListenHandle } from "@/lib/voice";
 
@@ -103,7 +103,7 @@ export default function ChatPanel({
                 {VOICE_OPTIONS.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
               </select>
             )}
-            <button className="btn btn-xs btn-secondary" onClick={() => setOpen(false)}><IconClose size={13} /></button>
+            <button className="btn btn-xs btn-secondary" aria-label="Close chat" onClick={() => setOpen(false)}><IconClose size={13} /></button>
           </div>
 
           <div className="ai-msgs">
@@ -130,7 +130,7 @@ export default function ChatPanel({
             )}
             {messages.map((m) => (
               <div key={m.id} className={`ai-msg ${m.role === "user" ? "user" : "bot"}`}
-                dangerouslySetInnerHTML={{ __html: m.role === "user" ? m.content : mdToHtml(m.content) }} />
+                dangerouslySetInnerHTML={{ __html: m.role === "user" ? escapeHtml(m.content) : mdToHtml(m.content) }} />
             ))}
             {thinking && (
               <div className="ai-msg bot">
@@ -162,7 +162,7 @@ export default function ChatPanel({
             )}
             <input className="input-field" placeholder={listening ? "Listening…" : "Ask anything, or tap the mic…"} value={text}
               onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()} />
-            <button className="btn btn-primary" onClick={() => send()} disabled={thinking}><IconSend /></button>
+            <button className="btn btn-primary" aria-label="Send message" onClick={() => send()} disabled={thinking}><IconSend /></button>
           </div>
         </div>
       )}

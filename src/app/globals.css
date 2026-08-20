@@ -1005,6 +1005,7 @@ img,svg,video,canvas{max-width:100%;height:auto}
 @media(max-width:360px){
   .kpi-grid{grid-template-columns:1fr 1fr;gap:8px}
   .kpi-value{font-size:1.35rem}
+  .tracker-bar > .flex-row:first-child .mono{display:none} /* timer lives in Focus */
   .chip{font-size:.56rem;padding:2px 7px}
   .vtab{font-size:.66rem}
 }
@@ -1255,15 +1256,7 @@ body.mode-focused .main-workspace > :not(.tracker-bar){animation:none}
   animation:toastIn .4s var(--spring) forwards;
 }
 @keyframes toastIn{from{opacity:0;transform:translate(-50%,14px) scale(.95)}to{opacity:1;transform:translate(-50%,0) scale(1)}}
-@media(max-width:640px){
-  .toast{
-    bottom:auto;top:calc(64px + env(safe-area-inset-top));
-    width:auto;max-width:calc(100vw - 32px);
-    padding:9px 16px;font-size:.78rem;
-    animation:toastDown .35s var(--spring) forwards;
-  }
-  @keyframes toastDown{from{opacity:0;transform:translate(-50%,-10px) scale(.96)}to{opacity:1;transform:translate(-50%,0) scale(1)}}
-}
+@media(max-width:640px){.toast{bottom:calc(96px + env(safe-area-inset-bottom));width:calc(100vw - 28px)}}
 
 /* ── Alignment hardening: consistent gutters everywhere ── */
 html{scrollbar-gutter:stable}
@@ -1965,16 +1958,13 @@ html{scroll-behavior:smooth}
 
 /* Collapsible sidebar (desktop) */
 .side-toggle{
-  position:absolute;top:50%;right:-13px;transform:translateY(-50%);
-  width:26px;height:56px;border-radius:99px;
-  background:var(--surface-elevated);border:1px solid var(--glass-border-hover);color:var(--text-muted);
+  position:absolute;top:18px;right:-11px;width:22px;height:22px;border-radius:50%;
+  background:var(--surface-elevated);border:1px solid var(--glass-border);color:var(--text-muted);
   cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:5;
-  box-shadow:var(--shadow-md);
-  transition:color .2s ease,border-color .2s ease,box-shadow .25s ease,width .2s var(--spring);
+  box-shadow:var(--shadow-sm);transition:color .2s ease,border-color .2s ease,transform .2s var(--spring);
 }
-.side-toggle:hover{color:var(--accent);border-color:var(--accent);box-shadow:0 0 0 4px var(--accent-glow);width:30px}
-.side-toggle:active{transform:translateY(-50%) scale(.94)}
-@media(min-width:861px){.sidebar{position:sticky}}
+.side-toggle:hover{color:var(--accent);border-color:var(--nav-active-border)}
+.sidebar{position:sticky}
 .app-wrapper.side-collapsed{--sidebar-w:68px}
 .app-wrapper.side-collapsed .sidebar{padding:22px 10px}
 .app-wrapper.side-collapsed .brand-title,.app-wrapper.side-collapsed .brand-course,
@@ -2020,50 +2010,25 @@ body.mode-focused .btn-primary.w-full::before,body.mode-focused .page-header .bt
 }
 
 
-/* ═══ MOBILE DELIGHT PASS — dock, tracker, and touch feedback ═══ */
-@media(max-width:860px){
-  /* Dock: deeper float, springier active tab */
-  .sidebar{box-shadow:0 -2px 10px rgba(10,12,26,.08),0 10px 40px rgba(10,12,26,.18)}
-  .nav-item{transition:transform .35s var(--spring),background .25s ease,color .25s ease}
-  .nav-item.active{transform:translateY(-4px);box-shadow:0 8px 18px var(--accent-glow)}
-  .nav-item.active svg{animation:iconPop .45s var(--spring)}
-  /* Active tab gets a little landing dot beneath */
-  .nav-item{position:relative}
-  .nav-item.active::after{content:"";position:absolute;bottom:2px;left:50%;transform:translateX(-50%);
-    width:4px;height:4px;border-radius:50%;background:currentColor;opacity:.7;animation:dotPop .4s var(--spring)}
-  /* Tracker: live timer breathes green when clocked in */
-  body.focus-live .tracker-time{animation:digitBreath 2s ease-in-out infinite}
-  /* Tap feedback everywhere in the dock */
-  .nav-item:active{transform:scale(.9)}
+/* ═══ TOUCH & PERFORMANCE PASS (enhancement doc §17-18) ═══ */
+/* Kill double-tap zoom + 300ms delay on every interactive element */
+button,a,.nav-item,.vtab,.cal-cell,.chip,.task-row,.rate-btn,input,select{touch-action:manipulation}
+/* Prevent iOS zoom-on-focus globally: all inputs >=16px on touch */
+@media (hover:none) and (pointer:coarse){
+  .input-field,select.input-field,.ob-name-input,.ob-course-search,.ob-add-sub-input{font-size:16px}
 }
-
-/* Timer visibility is sacred: never hidden at any width */
-.tracker-time{display:block !important}
-
-/* Mobile clock-in press: satisfying grow-shrink */
+/* Scroll performance: contain paint work in heavy scrollables */
+.ai-msgs,.modal-box,.cmdk-list,.ob-course-list{contain:content;-webkit-overflow-scrolling:touch}
+/* Calendar: horizontal snap scrolling on phones (doc §5) */
 @media(max-width:640px){
-  .tracker-actions .btn-primary{transition:transform .2s var(--spring)}
-  .tracker-actions .btn-primary:active{transform:scale(.88)}
+  .cal-scroll{overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none}
+  .cal-scroll::-webkit-scrollbar{display:none}
+  .cal-scroll > *{scroll-snap-align:start}
 }
-
-
-/* ═══ CLOCKED-IN MOBILE LAYOUT — no overlap, ever ═══ */
-@media(max-width:640px){
-  /* labels can never paint over the timer */
-  .tracker-labels{overflow:hidden}
-  .tracker-status{overflow:hidden}
-  /* while a session is LIVE: dot + timer only on the left —
-     the state text is redundant (dot is green, timer breathes) */
-  body.focus-live .tracker-labels{display:none}
-  body.focus-live .tracker-status{flex:0 1 auto;gap:7px}
-  body.focus-live .tracker-time{font-size:1.05rem;font-weight:800}
-  /* three-button cluster fits comfortably now */
-  body.focus-live .tracker-actions{gap:4px}
-  body.focus-live .tracker-actions .act-pause,
-  body.focus-live .tracker-actions .act-break{padding:6px 8px;font-size:.6rem}
-  body.focus-live .tracker-actions .act-out{padding:6px 8px;font-size:.6rem}
+/* WCAG focus ring: always visible for keyboard users on every control */
+.nav-item:focus-visible,.vtab:focus-visible,.cal-cell:focus-visible,.rate-btn:focus-visible{
+  outline:2px solid var(--accent);outline-offset:2px;
 }
-/* Paused/on-break states keep labels but truncate safely */
-@media(max-width:640px){
-  .tracker-state{overflow:hidden;text-overflow:ellipsis;max-width:92px}
-}
+/* Priority color coding on difficulty (doc §4) — chips only, subtle */
+.chip[data-diff="Hard"]{background:var(--status-skipped-bg);color:var(--status-skipped-text)}
+.chip[data-diff="Easy"]{background:var(--status-done-bg);color:var(--status-done-text)}

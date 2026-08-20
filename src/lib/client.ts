@@ -82,6 +82,10 @@ export const prettyDate = (s: string) =>
 export const prettyLong = (s: string) =>
   parseDate(s).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
 
+export function escapeHtml(t: string): string {
+  return t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
 export function mdToHtml(md: string): string {
   const esc = md
     .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");

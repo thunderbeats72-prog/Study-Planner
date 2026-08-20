@@ -12,6 +12,7 @@ import SettingsView from "@/components/SettingsView";
 import ChatPanel from "@/components/ChatPanel";
 import CommandPalette, { type Command } from "@/components/CommandPalette";
 import { onSoundChange, stopSound } from "@/lib/sound";
+import { haptic } from "@/lib/haptics";
 import { useBackClose } from "@/lib/useBackClose";
 import type { TaskPatch } from "@/components/TaskEditor";
 import {
@@ -107,6 +108,7 @@ export default function Home() {
       const s = await api<AppState>("/api/tasks", { method: "PATCH", body: JSON.stringify({ id, status, rating }) });
       setState(s);
       if (status === "done") {
+        haptic([10, 40, 18]);
         notify(
           rating
             ? rating === 1
@@ -385,7 +387,7 @@ export default function Home() {
                   <span className="ambient-bars"><i /><i /><i /></span> Stop sound
                 </button>
               )}
-              <button className="btn btn-xs btn-secondary" onClick={() => setZen(true)}><IconBolt size={12} /> Zen</button>
+              <button className="btn btn-xs btn-secondary" aria-label="Enter Zen focus mode" onClick={() => setZen(true)}><IconBolt size={12} /> Zen</button>
             </div>
           </div>
 
