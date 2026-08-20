@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { api, prettyLong, today, type AppState, type MessageRow } from "@/lib/client";
 import { mmss, useFocusTimer, useStudyClock, type TimerMode } from "@/lib/useTimer";
 import Onboarding from "@/components/Onboarding";
@@ -16,7 +16,8 @@ import { haptic } from "@/lib/haptics";
 import { useBackClose } from "@/lib/useBackClose";
 import type { TaskPatch } from "@/components/TaskEditor";
 import {
-  IconBolt, IconBook, IconCalendar, IconClock, IconFlame, IconGear, IconHome, IconLogo,
+  IconBolt, IconBook, IconCalendar, IconCheck, IconClock, IconFlame, IconGear, IconHome,
+  IconLogo, IconPanelLeft, IconSpark, IconWarn,
 } from "@/components/icons";
 
 type Page = "dashboard" | "planner" | "focus" | "subjects" | "settings";
@@ -28,6 +29,11 @@ const NAV: { id: Page; label: string; icon: React.ReactNode }[] = [
   { id: "subjects", label: "Subjects", icon: <IconBook /> },
   { id: "settings", label: "Settings", icon: <IconGear /> },
 ];
+
+type ToastTone = "success" | "info" | "error";
+type Toast = { id: number; msg: string; tone: ToastTone };
+
+const SIDEBAR_KEY = "spp-sidebar-collapsed";
 
 export default function Home() {
   const [state, setState] = useState<AppState | null>(null);
@@ -41,24 +47,44 @@ export default function Home() {
   useEffect(() => onSoundChange(setAmbient), []);
   useBackClose(zen, () => setZen(false));
   useBackClose(chatOpen, () => setChatOpen(false));
-  const [toast, setToast] = useState("");
+  const [toast, setToast] = useState<Toast | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [pendingMsgs, setPendingMsgs] = useState<MessageRow[]>([]);
   const [forceWizard, setForceWizard] = useState(false);
+  const [confirmWipe, setConfirmWipe] = useState(false);
+  useBackClose(confirmWipe, () => setConfirmWipe(false));
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    // restore the user's sidebar preference (desktop only; harmless on mobile)
+    try {
+      if (typeof window !== "undefined") return localStorage.getItem(SIDEBAR_KEY) === "1";
+    } catch { /* private mode */ }
+    return false;
+  });
+  const toggleSidebar = () => {
+    setSidebarCollapsed((v) => {
+      try { localStorage.setItem(SIDEBAR_KEY, v ? "0" : "1"); } catch { /* noop */ }
+      return !v;
+    });
+  };
 
-  const notify = (m: string) => { setToast(m); setTimeout(() => setToast(""), 3200); };
+  /** Structured toast: one per event, auto-dismissed, stack-safe. */
+  const notify = useCallback((m: string, tone: ToastTone = "info") => {
+    const id = Date.now() + Math.random();
+    setToast({ id, msg: m, tone });
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 3400);
+  }, []);
+  useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current); }, []);
 
   useEffect(() => {
     api<AppState>("/api/state")
       .then(setState)
-      .catch(() => notify("Could not reach the server."))
+      .catch(() => notify("Could not reach the server.", "error"))
       .finally(() => setLoading(false));
-  }, []);
+  }, [notify]);
 
   useEffect(() => {
-    // Theme + age-adaptive presentation mode. The same product serves a
-    // 5-year-old and a 35-year-old: nursery/school levels get a roomier,
-    // rounder, larger-type presentation; PG/PhD/professional get a denser,
-    // quieter one. Visual only — functionality is identical.
+    // Theme + age-adaptive presentation mode.
     const theme = state?.settings.theme ? `theme-${state.settings.theme}` : "";
     const level = state?.user.level || "";
     const mode =
@@ -70,12 +96,13 @@ export default function Home() {
     document.body.className = [theme, mode].filter(Boolean).join(" ");
   }, [state?.settings.theme, state?.user.level]);
 
-
   const logSession = useCallback(
     (minutes: number, subjectId: number | null, taskId: number | null, mode: string) => {
+      // Send the CLIENT's local date: the server's clock/timezone must
+      // never shift a session into a different day than the user sees.
       api<AppState>("/api/sessions", {
         method: "POST",
-        body: JSON.stringify({ minutes, subjectId, taskId, mode }),
+        body: JSON.stringify({ minutes, subjectId, taskId, mode, date: today() }),
       }).then(setState).catch(() => {});
     },
     []
@@ -90,8 +117,8 @@ export default function Home() {
   // 2) Focus timer — pomodoro ritual
   const onBlockComplete = useCallback((mode: TimerMode, minutes: number) => {
     if (mode === "short" || mode === "long") { notify("Break complete — back to studying."); return; }
-    notify(`Focus block completed (${minutes} min). Great job!`);
-  }, []);
+    notify(`Focus block completed (${minutes} min). Great job!`, "success");
+  }, [notify]);
 
   const timer = useFocusTimer(
     {
@@ -113,18 +140,19 @@ export default function Home() {
             ? rating === 1
               ? "Logged — this topic will come back sooner for another pass."
               : "Logged — the memory model scheduled your next review."
-            : "Lesson marked done — mastery updated."
+            : "Lesson marked done — mastery updated.",
+          "success"
         );
       }
-    } catch { notify("Update failed."); }
+    } catch { notify("Update failed.", "error"); }
   };
 
   const updateTask = async (id: number, patch: TaskPatch) => {
     try {
       const s = await api<AppState>("/api/tasks", { method: "PATCH", body: JSON.stringify({ id, ...patch }) });
       setState(s);
-      notify("Task updated successfully.");
-    } catch { notify("Could not update task."); }
+      notify("Task updated successfully.", "success");
+    } catch { notify("Could not update task.", "error"); }
   };
 
   const skipSubjectForDay = async (subjectId: number, date: string) => {
@@ -136,7 +164,7 @@ export default function Home() {
       setState(s);
       const name = s.subjects.find((x) => x.id === subjectId)?.name || "subject";
       notify(`Skipped ${name} for that day.`);
-    } catch { notify("Could not skip subject."); }
+    } catch { notify("Could not skip subject.", "error"); }
   };
 
   const replan = async () => {
@@ -144,8 +172,8 @@ export default function Home() {
     try {
       const s = await api<AppState>("/api/replan", { method: "POST" });
       setState(s);
-      notify("Schedule mathematically rebalanced from today.");
-    } catch { notify("Re-plan failed."); } finally { setBusy(false); }
+      notify("Schedule mathematically rebalanced from today.", "success");
+    } catch { notify("Re-plan failed.", "error"); } finally { setBusy(false); }
   };
 
   const patchSettings = async (patch: Record<string, unknown>, replanIt = false) => {
@@ -156,24 +184,24 @@ export default function Home() {
         body: JSON.stringify({ ...patch, _replan: replanIt }),
       });
       setState(s);
-      notify(replanIt ? "Settings saved — schedule regenerated." : "Saved.");
-    } catch { notify("Save failed."); } finally { setBusy(false); }
+      notify(replanIt ? "Settings saved — schedule regenerated." : "Saved.", "success");
+    } catch { notify("Save failed.", "error"); } finally { setBusy(false); }
   };
 
   const addSubject = async (payload: { name: string; units: number; difficulty: string; color: string }) => {
     setBusy(true);
     try {
       setState(await api<AppState>("/api/subjects", { method: "POST", body: JSON.stringify(payload) }));
-      notify("Subject added and lessons generated.");
-    } catch { notify("Could not add subject."); } finally { setBusy(false); }
+      notify("Subject added and lessons generated.", "success");
+    } catch { notify("Could not add subject.", "error"); } finally { setBusy(false); }
   };
 
   const editSubject = async (payload: { id: number; name: string; units: number; difficulty: string; color: string }) => {
     setBusy(true);
     try {
       setState(await api<AppState>("/api/subjects", { method: "PATCH", body: JSON.stringify(payload) }));
-      notify("Subject updated, schedule rebalanced.");
-    } catch { notify("Could not update."); } finally { setBusy(false); }
+      notify("Subject updated, schedule rebalanced.", "success");
+    } catch { notify("Could not update.", "error"); } finally { setBusy(false); }
   };
 
   const deleteSubject = async (id: number) => {
@@ -181,7 +209,7 @@ export default function Home() {
     try {
       setState(await api<AppState>(`/api/subjects?id=${id}`, { method: "DELETE" }));
       notify("Subject removed.");
-    } catch { notify("Could not delete."); } finally { setBusy(false); }
+    } catch { notify("Could not delete.", "error"); } finally { setBusy(false); }
   };
 
   const startSmartClock = () => {
@@ -202,6 +230,21 @@ export default function Home() {
     const task = state?.tasks.find((x) => x.id === taskId);
     clock.clockIn({ taskId, subjectId: task?.subjectId ?? null });
     notify(`Clocked in: ${task ? task.title.slice(0, 42) : "session"} — timer recording.`);
+  };
+
+  /** Entry point for every "Re-run Setup" button — always confirm first. */
+  const requestWizardRestart = () => {
+    if (state?.user.onboarded && (state.subjects.length || state.sessions.length || state.tasks.length)) {
+      setConfirmWipe(true);
+    } else {
+      startWizard();
+    }
+  };
+  const startWizard = () => {
+    setConfirmWipe(false);
+    // bank any live study time before entering the wizard
+    if (clock.running) clock.pause();
+    setForceWizard(true);
   };
 
   const askTutor = useCallback(
@@ -232,7 +275,7 @@ export default function Home() {
           if (a.type === "theme") { void patchSettings({ theme: String(a.payload) }); }
         }
       } catch {
-        notify("Tutor unavailable right now.");
+        notify("Tutor unavailable right now.", "error");
         setPendingMsgs((prev) => [
           ...prev,
           {
@@ -274,7 +317,12 @@ export default function Home() {
   }
 
   if (!state.user.onboarded || forceWizard) {
-    return <Onboarding onDone={(s) => { setState(s); setForceWizard(false); setPage("dashboard"); }} />;
+    return <Onboarding
+      onDone={(s) => { setState(s); setForceWizard(false); setPage("dashboard"); }}
+      isRerun={state.user.onboarded}
+      initialName={state.user.onboarded ? state.user.name : ""}
+      onCancel={state.user.onboarded ? () => setForceWizard(false) : undefined}
+    />;
   }
 
   const ctx = state.context;
@@ -282,6 +330,13 @@ export default function Home() {
   const todayDone = state.tasks.filter((x) => x.date === t && x.status === "done").length;
   const todayTotal = state.tasks.filter((x) => x.date === t).length;
   const allMsgs = [...state.messages, ...pendingMsgs];
+
+  // The full task title, untruncated — CSS wraps it cleanly instead of
+  // slicing it in JS (fixes "Principles of Marketing: Introduction…").
+  const clockTaskTitle =
+    state.tasks.find((x) => x.id === clock.taskId)?.title ||
+    state.subjects.find((x) => x.id === clock.subjectId)?.name ||
+    "Free session";
 
   const commands: Command[] = [
     { id: "nav-dash", group: "Navigate", label: "Go to Overview", hint: "Dashboard", keywords: "home stats", run: () => setPage("dashboard") },
@@ -295,7 +350,7 @@ export default function Home() {
     { id: "ai", group: "AI Tutor", label: "Ask AI Tutor", hint: "Open chat", keywords: "help question doubt", run: () => setChatOpen(true) },
     { id: "ai-today", group: "AI Tutor", label: "What should I study today?", keywords: "plan today", run: () => askTutor("What should I study today and in what order?") },
     { id: "replan", group: "Plan", label: "Re-plan Mathematically", hint: "Rebalance", keywords: "regenerate schedule", run: () => { setPage("planner"); replan(); } },
-    { id: "setup", group: "Plan", label: "Re-run Setup Wizard", keywords: "onboarding restart course", run: () => setForceWizard(true) },
+    { id: "setup", group: "Plan", label: "Re-run Setup Wizard", keywords: "onboarding restart course", run: () => requestWizardRestart() },
   ];
 
   return (
@@ -308,18 +363,35 @@ export default function Home() {
         <span className="streak-badge"><IconFlame /> {state.user.streak}d</span>
       </header>
 
-      <div className="app-wrapper">
+      <div className={`app-wrapper${sidebarCollapsed ? " sb-collapsed" : ""}`}>
         <aside className="sidebar">
+          <button
+            className="sb-toggle"
+            onClick={toggleSidebar}
+            aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          >
+            <IconPanelLeft size={16} />
+          </button>
           <div className="brand-header">
             <div className="brand-logo-icon"><IconLogo /></div>
-            <div>
+            <div className="brand-text">
               <div className="brand-title">Study Planner Pro</div>
               <div className="brand-course">{state.user.courseName}</div>
             </div>
           </div>
           <nav className="nav-list">
             {NAV.map((n) => (
-              <div key={n.id} className={`nav-item${page === n.id ? " active" : ""}`} onClick={() => setPage(n.id)}>
+              <div
+                key={n.id}
+                className={`nav-item${page === n.id ? " active" : ""}`}
+                onClick={() => setPage(n.id)}
+                title={sidebarCollapsed ? n.label : undefined}
+                aria-label={n.label}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setPage(n.id); } }}
+              >
                 {n.icon}<span>{n.label}</span>
               </div>
             ))}
@@ -333,7 +405,7 @@ export default function Home() {
               <p style={{ fontSize: ".76rem", color: "var(--text-muted)", lineHeight: 1.45, margin: "0 0 12px" }}>
                 {ctx.daysLeft} days left · {ctx.progressPct}% syllabus completed.
               </p>
-              <button className="btn btn-secondary w-full" style={{ fontSize: ".78rem", padding: 8 }} onClick={() => setForceWizard(true)}>
+              <button className="btn btn-secondary w-full" style={{ fontSize: ".78rem", padding: 8 }} onClick={requestWizardRestart}>
                 Re-run Setup
               </button>
             </div>
@@ -348,11 +420,7 @@ export default function Home() {
                 <div className="tracker-state">
                   {clock.running ? "Clocked in" : clock.onBreak ? "On break" : "Not clocked in"}
                 </div>
-                <div className="tracker-task">
-                  {state.tasks.find((x) => x.id === clock.taskId)?.title.slice(0, 36) ||
-                    state.subjects.find((x) => x.id === clock.subjectId)?.name ||
-                    "Free session"}
-                </div>
+                <div className="tracker-task">{clockTaskTitle}</div>
               </div>
               <div className="mono tracker-time">
                 {mmss(clock.elapsed)}
@@ -402,7 +470,7 @@ export default function Home() {
             <SubjectsView state={state} onAdd={addSubject} onEdit={editSubject} onDelete={deleteSubject} busy={busy} onAskTutor={askTutor} />
           )}
           {page === "settings" && (
-            <SettingsView state={state} onPatch={patchSettings} onRestart={() => setForceWizard(true)} busy={busy} />
+            <SettingsView state={state} onPatch={patchSettings} onRestart={requestWizardRestart} busy={busy} />
           )}
         </main>
       </div>
@@ -433,7 +501,37 @@ export default function Home() {
         </div>
       )}
 
-      {toast && <div className="toast">{toast}</div>}
+      {/* ── Re-run Setup confirmation (data-wipe warning) ── */}
+      {confirmWipe && (
+        <div className="modal-overlay" onClick={() => setConfirmWipe(false)}>
+          <div className="glass-panel modal-box confirm-box" onClick={(e) => e.stopPropagation()}>
+            <div className="confirm-icon"><IconWarn size={22} /></div>
+            <h3 style={{ margin: "0 0 6px", fontSize: "1.05rem" }}>Start fresh with the Setup Wizard?</h3>
+            <p style={{ fontSize: ".86rem", color: "var(--text-muted)", lineHeight: 1.6, margin: "0 0 6px" }}>
+              Re-running setup <strong>completely wipes</strong> your current course data — subjects, lessons,
+              schedule, logged study minutes and AI chat history — and rebuilds everything from scratch.
+            </p>
+            <p style={{ fontSize: ".78rem", color: "var(--text-dim)", margin: "0 0 18px" }}>
+              Your name and app preferences (theme, timer lengths) are kept.
+            </p>
+            <div className="flex-row gap-sm" style={{ flexWrap: "wrap" }}>
+              <button className="btn btn-primary" onClick={startWizard}>Wipe &amp; restart</button>
+              <button className="btn btn-secondary" onClick={() => setConfirmWipe(false)}>Keep my plan</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {toast && (
+        <div className={`toast toast-${toast.tone}`} role="status" aria-live="polite" key={toast.id}>
+          <span className="toast-icon">
+            {toast.tone === "success" ? <IconCheck size={13} /> : toast.tone === "error" ? <IconWarn size={13} /> : <IconSpark size={13} />}
+          </span>
+          <span className="toast-msg">{toast.msg}</span>
+          <button className="toast-close" aria-label="Dismiss notification" onClick={() => setToast(null)}>×</button>
+          <span className="toast-life" aria-hidden="true" />
+        </div>
+      )}
     </>
   );
 }

@@ -61,7 +61,11 @@ export default function PlannerView({
     const sum = state.sessions.filter((x) => x.taskId === taskId).reduce((a, x) => a + x.minutes, 0);
     return Math.round(sum * 100) / 100;
   };
-  const fmtMin = (m: number) => `${Math.round(m)}m`;
+  // 13.5 minutes displays as "13.5m" — never rounded to a different number
+  const fmtMin = (m: number) => {
+    const r = Math.round(m * 10) / 10;
+    return `${Number.isInteger(r) ? r : r.toFixed(1)}m`;
+  };
 
   const renderTask = (task: TaskRow) => {
     const meta = KIND_META[task.kind] || KIND_META.learn;

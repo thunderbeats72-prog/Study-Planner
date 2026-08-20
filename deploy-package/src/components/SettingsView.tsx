@@ -100,7 +100,7 @@ export default function SettingsView({
           <div className="glass-panel tilt-card" style={{ padding: 22 }}>
             <h3 style={{ fontSize: ".95rem", fontWeight: 800, margin: "0 0 10px" }}>Engine Status</h3>
             <div style={{ fontSize: ".82rem", color: "var(--text-muted)", lineHeight: 1.7, fontWeight: 600 }}>
-              <div>AI provider: <strong>{state.aiProvider || "AETHER local engine"}</strong></div>
+              <div>AI provider: <strong>{state.aiProvider || "SHIGUN local engine"}</strong></div>
               <div>Lessons generated: <strong>{state.topics.length}</strong></div>
               <div>Scheduled tasks: <strong>{state.tasks.length}</strong></div>
               <div>Sessions logged: <strong>{state.sessions.length}</strong></div>

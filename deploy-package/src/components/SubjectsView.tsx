@@ -53,7 +53,6 @@ export default function SubjectsView({
                       {open ? "Hide lessons" : "View lessons"}
                     </button>
                     <button className="btn btn-xs btn-secondary" onClick={() => setEditing(s)}>Edit</button>
-                    <button className="btn btn-xs btn-danger" onClick={() => onDelete(s.id)} disabled={busy}><IconTrash /></button>
                   </div>
                 </div>
                 <div className="bar-track"><div className="bar-fill" style={{ width: `${pct}%`, background: s.color }} /></div>
@@ -144,6 +143,12 @@ export default function SubjectsView({
                 <button className="btn btn-primary" style={{ flex: 2 }} disabled={busy}
                   onClick={() => { onEdit({ id: editing.id, name: editing.name, units: editing.units, difficulty: editing.difficulty, color: editing.color }); setEditing(null); }}>
                   Save &amp; Rebalance
+                </button>
+              </div>
+              <div style={{ borderTop: "1px solid var(--glass-border)", paddingTop: 12 }}>
+                <button className="btn btn-danger w-full" disabled={busy}
+                  onClick={() => { if (confirm(`Delete "${editing.name}" and all its lessons? This cannot be undone.`)) { onDelete(editing.id); setEditing(null); } }}>
+                  <IconTrash /> Delete this subject
                 </button>
               </div>
             </div>

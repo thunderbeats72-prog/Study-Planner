@@ -1,33 +1,63 @@
-STUDY PLANNER PRO — FINAL DEPLOYMENT PACKAGE (2026-08-18)
-==========================================================
-Copy every file into the SAME path in your repository (drag the src
-folder over yours), then:
+STUDY PLANNER PRO — Repository Guide
+====================================
 
-  git add src/
-  git commit -m "UI/UX final: mobile title fix, chat sheet, full responsive + animation pack"
-  git push origin main
+THE SOURCE OF TRUTH IS THE `src/` FOLDER
+----------------------------------------
+Everything the app actually runs lives in `src/`:
 
-FILES
-  src/app/globals.css             all styling: title-squeeze fix, opaque
-                                  header/dock, chat bottom sheet, themes,
-                                  animations, full device coverage
-  src/app/page.tsx                loader, toast, age modes, back-close
-  src/app/layout.tsx              viewport (safe areas, no zoom lock)
-  src/app/api/chat/route.ts       brand-voice confirmations
-  src/lib/ai.ts                   AI voice rules + action bridge
-  src/lib/useBackClose.ts         Android back button closes overlays
-  src/components/PlannerView.tsx  .task-main title fix + rating strip
-  src/components/Dashboard.tsx    .task-main + designed empty states
-  src/components/ChatPanel.tsx    thinking dots, single status dot
-  src/components/FocusView.tsx    fluid input widths
-  src/components/SettingsView.tsx responsive grids
-  src/components/SubjectsView.tsx responsive grids
-  src/components/TaskEditor.tsx   responsive grids
+  src/app/page.tsx            app shell: sidebar, tracker bar, toasts
+  src/app/layout.tsx          viewport / safe-area config
+  src/app/globals.css         ALL styling (themes, responsive, sheets)
+  src/components/*.tsx        Dashboard, Planner, Focus, Subjects,
+                              Settings, Onboarding, ChatPanel, etc.
+  src/lib/voice.ts            mic listening + spoken replies
+  src/lib/useTimer.ts         study clock + focus timer (accurate to
+                              the second, fractional-minute logging)
+  src/lib/ml.ts               on-device ML (pace, weekdays, FSRS-lite,
+                              decay, skip-risk, focus hours)
+  src/lib/planner.ts          the mathematical scheduler
+  src/lib/ai.ts               Gemini/Groq/OpenRouter chain + local engine
+  src/db/schema.ts            tables + performance indexes
+  src/app/api/**              every API route
 
-KEY FIXES IN THIS BUILD
-- Task titles no longer stack letter-by-letter on phones (.task-main)
-- Chat is a full-width bottom sheet on mobile: grab handle, swipeable
-  quick suggestions, 44px input, no iOS zoom-on-focus
-- Mobile header + dock fully opaque (no text ghosting through)
-- LESSON/PENDING chips never wrap inside their pills
-- Titles clamp to 2 lines with ellipsis on very small screens
+Root-level config files (package.json, tsconfig.json, next.config.ts,
+postcss.config.mjs, eslint.config.mjs, drizzle.config.ts) are real and
+used by the build.
+
+DEPLOYMENT
+----------
+The easiest deploy path is drag-and-drop through the GitHub website:
+
+  1. Open the repo on GitHub → "Add file" → "Upload files".
+  2. Drag in `tsconfig.json` and the `src` folder from
+     `deploy-package/` (it mirrors this repo's fixed source).
+  3. Commit to main → Vercel auto-deploys.
+
+After any deploy, hard-refresh (Ctrl+Shift+R; on phones close and
+reopen the tab) so the new CSS/JS is picked up.
+
+LOCAL DEVELOPMENT
+-----------------
+  npm install
+  DATABASE_URL=postgres://... npm run dev     # or `npm run build`
+  npx tsc --noEmit                            # type check
+  npm run lint                                # eslint
+
+DATABASE
+--------
+`npm run build` runs `drizzle-kit push` first, so schema changes
+(including the new indexes) are applied automatically on deploy.
+Re-running the Setup Wizard performs a HARD RESET of course data
+(subjects, lessons, schedule, sessions, chat) — always behind a
+confirmation dialog in the UI.
+
+v3 FIXES (this build)
+---------------------
+ - Full course name + tracker task title never truncate
+ - 40px sidebar collapse toggle with smooth icon-rail animation
+ - Mic pre-warm + watchdog + confidence-scored transcripts (review
+   before send when unsure) — no more multi-tap retries
+ - Full-screen mobile chat sheet; redesigned bottom-anchored toasts
+ - Time tracking accurate to the minute with client-timezone dates
+ - Re-run Setup wipes ALL previous data (zero carryover)
+ - DB indexes + SQL-aggregated streak for scale without lag

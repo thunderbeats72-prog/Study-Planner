@@ -102,7 +102,11 @@ export default function Dashboard({
     const sum = state.sessions.filter((x) => x.taskId === taskId).reduce((a, x) => a + x.minutes, 0);
     return Math.round(sum * 100) / 100;
   };
-  const fmtMin = (m: number) => `${Math.round(m)}m`;
+  // 13.5 minutes displays as "13.5m" — never rounded to a different number
+  const fmtMin = (m: number) => {
+    const r = Math.round(m * 10) / 10;
+    return `${Number.isInteger(r) ? r : r.toFixed(1)}m`;
+  };
 
   return (
     <div className="fade-in">
@@ -165,7 +169,7 @@ export default function Dashboard({
         <div className="glass-panel tilt-card kpi-card">
           <div className="kpi-label">Hours This Week</div>
           <div className="kpi-value">{ctx.hoursThisWeek}</div>
-          <div className="kpi-sub">Target {Math.round(state.settings.dailyHours * 7)}h · {Math.round(loggedTodayMin)}m today</div>
+          <div className="kpi-sub">Target {Math.round(state.settings.dailyHours * 7)}h · {fmtMin(loggedTodayMin)} today</div>
         </div>
         <div className="glass-panel tilt-card kpi-card">
           <div className="kpi-label">Consistency</div>

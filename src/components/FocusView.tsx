@@ -46,7 +46,10 @@ export default function FocusView({
     : timer.total ? timer.seconds / timer.total : 0;
   const circ = 2 * Math.PI * 104;
   const clockTask = state.tasks.find((x) => x.id === clock.taskId);
-  const loggedToday = Math.round(state.sessions.filter((x) => x.date === t).reduce((a, x) => a + x.minutes, 0));
+  const loggedTodayRaw = state.sessions.filter((x) => x.date === t).reduce((a, x) => a + x.minutes, 0);
+  // 13.5 minutes logged displays as exactly "13.5 min logged today"
+  const loggedToday = Math.round(loggedTodayRaw * 10) / 10;
+  const loggedTodayLabel = Number.isInteger(loggedToday) ? String(loggedToday) : loggedToday.toFixed(1);
 
   return (
     <div className="fade-in">
@@ -67,7 +70,7 @@ export default function FocusView({
             <h3 style={{ fontSize: ".95rem", fontWeight: 800, margin: 0 }}>Study Clock — time tracking</h3>
             <div className="day-meta">
               {clock.running ? "Recording your study time" : clock.onBreak ? "On a break — clock paused" : "Not clocked in"}
-              {" · "}{loggedToday} min logged today
+              {" · "}{loggedTodayLabel} min logged today
             </div>
           </div>
           <div className="mono" style={{ fontSize: "1.9rem", fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>
