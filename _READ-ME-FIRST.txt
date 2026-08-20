@@ -1,0 +1,19 @@
+DRAG & DROP DEPLOY — Study Planner Pro (seamless voice edition)
+================================================================
+UPLOAD: extract -> GitHub -> Add file -> Upload files -> drag
+tsconfig.json + src (items INSIDE this folder) -> commit to main.
+
+NEW
+ - Seamless voice: tap mic -> speak -> Shigun answers aloud. No
+   toggle. Voice picker: Female Voice 1/2, Male Voice.
+ - Hindi (and mixed Hindi-English) replies now spoken with a native
+   hi-IN voice - no more English-accented Hindi.
+ - Better transcription: 5 alternatives scored by confidence.
+ - Mobile: denser type/tiles/buttons - visibly less scrolling.
+ - Shigun panel: premium AI-tinted gradient border + avatar ring.
+ - All previous fixes included.
+
+NOTE: voice quality depends on the device's installed voices.
+Chrome/Android best; iOS Safari limited.
+
+After deploy: hard-refresh (Ctrl+Shift+R).

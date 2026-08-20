@@ -25,7 +25,7 @@ export default function ChatPanel({
   provider?: string | null;
 }) {
   const [text, setText] = useState("");
-  const [voiceMode, setVoiceMode] = useState(false);
+  const voiceReplyArmed = useRef(false); // speak the next reply only after mic input
   const [voiceId, setVoiceId] = useState("f1");
   const [listening, setListening] = useState(false);
   const [speaking, setSpeaking] = useState(false);
@@ -39,16 +39,17 @@ export default function ChatPanel({
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length, thinking, open]);
 
-  // Voice mode: speak each new Shigun reply aloud
+  // Seamless voice: if the user SPOKE their message, Shigun speaks back.
   useEffect(() => {
-    if (!voiceMode || !support.tts) return;
+    if (!voiceReplyArmed.current || !support.tts) return;
     const last = messages[messages.length - 1];
     if (last && last.role === "assistant" && last.id !== lastSpokenId.current && last.id > 0) {
       lastSpokenId.current = last.id;
+      voiceReplyArmed.current = false;
       setSpeaking(true);
       speak(last.content, voiceId, () => setSpeaking(false));
     }
-  }, [messages, voiceMode, voiceId, support.tts]);
+  }, [messages, voiceId, support.tts]);
 
   // Stop everything when the panel closes
   useEffect(() => {
@@ -68,7 +69,7 @@ export default function ChatPanel({
     stopSpeaking(); setSpeaking(false);
     const h = listen(
       (interim) => setText(interim),
-      (final) => { setListening(false); setText(""); if (final) { setVoiceMode(true); onSend(final); } },
+      (final) => { setListening(false); setText(""); if (final) { voiceReplyArmed.current = true; onSend(final); } },
       (err) => { setListening(false); setVoiceErr(err); }
     );
     if (h) { listenRef.current = h; setListening(true); }
@@ -93,14 +94,11 @@ export default function ChatPanel({
             {support.tts && (
               <select
                 className="voice-select"
-                value={voiceMode ? voiceId : "off"}
-                onChange={(e) => {
-                  if (e.target.value === "off") { setVoiceMode(false); stopSpeaking(); setSpeaking(false); }
-                  else { setVoiceMode(true); setVoiceId(e.target.value); }
-                }}
+                value={voiceId}
+                onChange={(e) => setVoiceId(e.target.value)}
                 aria-label="Voice"
+                title="Shigun's voice"
               >
-                <option value="off">Voice off</option>
                 {VOICE_OPTIONS.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
               </select>
             )}
