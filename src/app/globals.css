@@ -1631,20 +1631,6 @@ body.mode-focused::before{animation:none;opacity:.4}
    SIMPLICITY BLUEPRINT LAYER — 3-tap workflows, icon-first mobile
 ═══════════════════════════════════════════════════════════════ */
 
-/* Quick-add FAB: primary accent, left of the AI orb, 56px target */
-.quick-fab{
-  position:fixed;right:22px;bottom:90px;width:52px;height:52px;border-radius:50%;
-  background:var(--accent-gradient);color:#fff;border:none;cursor:pointer;z-index:199;
-  display:flex;align-items:center;justify-content:center;
-  box-shadow:0 4px 14px var(--accent-glow),0 12px 32px var(--accent-glow),inset 0 1px 0 rgba(255,255,255,.25);
-  transition:transform .25s var(--spring),box-shadow .2s ease;
-}
-.quick-fab:hover{transform:scale(1.06) rotate(90deg)}
-.quick-fab:active{transform:scale(.92)}
-@media(max-width:860px){
-  .quick-fab{right:14px;bottom:calc(148px + env(safe-area-inset-bottom));width:50px;height:50px}
-}
-.quick-add-box{max-width:420px}
 
 /* Icon-first mobile nav: bigger icons, labels stay for 5-year-olds
    but icons lead (44px+ targets already enforced) */
@@ -1662,3 +1648,48 @@ body.mode-focused::before{animation:none;opacity:.4}
   color:var(--text-muted);background:none;border:none;cursor:pointer;padding:8px 0;font-family:inherit;
 }
 .more-options-toggle:hover{color:var(--accent)}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   MOBILE DECLUTTER + VISUAL REFRESH
+   Primary actions visible; secondary behind a "..." toggle.
+   Softer canvas, tighter type rhythm, calmer chips.
+═══════════════════════════════════════════════════════════════ */
+
+@media(max-width:640px){
+  /* Task cards: ONE action row — Done (primary), Clock in, then "..."
+     which reveals Edit / Skip subject / Skip on tap */
+  .task-row > .btn,.task-row > .chip{display:none}
+  .task-row > .chip.chip-kind{display:inline-flex}
+  .task-row > .btn.task-primary,.task-row > .btn.task-clock,.task-row > .btn.task-more{display:inline-flex}
+  .task-row.expanded-actions > .btn{display:inline-flex}
+  .task-row.expanded-actions > .chip{display:inline-flex}
+  /* PENDING chip hidden on phones — the card state already says it */
+  .task-row > .chip.chip-pending{display:none !important}
+  .task-row.expanded-actions > .chip.chip-pending{display:inline-flex !important}
+
+  /* Calmer card visuals */
+  .task-row{padding:13px 14px;gap:8px}
+  .task-row .task-sub{opacity:.85}
+  .day-block{padding:14px 13px}
+  .day-head .day-meta{font-size:.72rem}
+}
+
+/* The "..." more button */
+.task-more{font-weight:800;letter-spacing:1px}
+
+/* Softer light canvas: barely-warm porcelain, calmer than pure grey */
+:root{--app-bg:#F6F6F9}
+
+/* Chips: lowercase-elegant instead of shouty uppercase on phones */
+@media(max-width:640px){
+  .chip{text-transform:none;letter-spacing:.2px;font-size:.68rem;font-weight:650}
+}
+
+/* Headings: slightly warmer ink, tighter rhythm */
+.day-date{font-size:.98rem;font-weight:700;letter-spacing:-.3px}
+
+/* Card entrance on mobile: subtle rise, fast */
+@media(max-width:640px){
+  .day-block .task-row{animation:rowIn .26s var(--spring-soft) backwards}
+}

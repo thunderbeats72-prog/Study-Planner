@@ -158,6 +158,13 @@ export async function aiSuggestSubjects(
     return { subjects: fallback, source: "Verified NCERT Catalog" };
   }
 
+  // LEVEL GUARD: early-years learners get the age-appropriate local
+  // catalog, never LLM output (which invents grown-up subject batches
+  // for custom course names typed at nursery level).
+  if (level === "nursery" || /nursery|pre-?primary|playgroup|kinder|\blkg\b|\bukg\b/i.test(query)) {
+    return { subjects: fallback, source: "Verified Early-Years Catalog" };
+  }
+
   // ── GROUND-TRUTH INTERCEPTION (LLM BYPASS) ──────────────────────
   // NMIMS / CDOE / MBA / Marketing queries never touch the LLM: the
   // verified Semester 1 catalog (6 subjects, 76 units) is returned
@@ -178,6 +185,7 @@ export async function aiSuggestSubjects(
       {
         role: "user",
         content: `Course/exam: "${courseName}". Education level: ${level}.
+        Subjects MUST be age- and level-appropriate for ${level} students; never include subjects outside this level.
         If an institution/university is named, use THAT institution's actual
         published curriculum for the named program/specialisation and term.
         If a board is named (CBSE/ICSE/state), use that board's official

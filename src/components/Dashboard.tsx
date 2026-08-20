@@ -22,6 +22,7 @@ export default function Dashboard({
   const [insights, setInsights] = useState<string>("");
   const [loadingIns, setLoadingIns] = useState(true);
   const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
+  const [moreActionsId, setMoreActionsId] = useState<number | null>(null);
   const t = today();
   const ctx = state.context;
 
@@ -191,7 +192,7 @@ export default function Dashboard({
           const meta = KIND_META[task.kind] || KIND_META.learn;
           const subj = state.subjects.find((s) => s.id === task.subjectId);
           return (
-            <div key={task.id} className={`task-row${task.status === "done" ? " done" : ""}${activeTaskId === task.id ? " active-clock" : ""}`}>
+            <div key={task.id} className={`task-row${task.status === "done" ? " done" : ""}${activeTaskId === task.id ? " active-clock" : ""}${moreActionsId === task.id ? " expanded-actions" : ""}`}>
               <div className="task-dot" style={{ background: subj?.color || meta.color }} />
               <div className="task-main">
                 <div className="task-title">{task.title}</div>
@@ -204,8 +205,10 @@ export default function Dashboard({
               {subj && task.status !== "skipped" && (
                 <button className="btn btn-xs btn-secondary" onClick={() => onSkipSubject(subj.id, task.date)}>Skip subject</button>
               )}
-              <button className="btn btn-xs btn-secondary" onClick={() => onFocusTask(task.id)}>Clock in</button>
-              <button className={`btn btn-xs ${task.status === "done" ? "btn-secondary" : "btn-primary"}`}
+              <button className="btn btn-xs btn-secondary task-clock" onClick={() => onFocusTask(task.id)}>Clock in</button>
+              <button className="btn btn-xs btn-secondary task-more" aria-label="More actions"
+                onClick={() => setMoreActionsId(moreActionsId === task.id ? null : task.id)}>⋯</button>
+              <button className={`btn btn-xs task-primary ${task.status === "done" ? "btn-secondary" : "btn-primary"}`}
                 onClick={() => onTaskStatus(task.id, task.status === "done" ? "pending" : "done")}>
                 {task.status === "done" ? "Undo" : "Done"}
               </button>
