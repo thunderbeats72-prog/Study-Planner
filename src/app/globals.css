@@ -1907,3 +1907,34 @@ html{scroll-behavior:smooth}
   .companion-hello{padding:26px 16px 18px}
   .companion-orb{width:52px;height:52px}
 }
+
+
+/* ═══ MOBILE TRACKER REDESIGN — clean single-row status (screenshot fix) ═══ */
+@media(max-width:640px){
+  .tracker-bar{
+    flex-direction:row;align-items:center;justify-content:space-between;
+    padding:10px 14px;border-radius:var(--radius-lg);gap:10px;
+  }
+  /* Left cluster: dot + status stacked tight */
+  .tracker-bar > .flex-row:first-child{gap:9px;flex:1;min-width:0}
+  .tracker-bar > .flex-row:first-child > div:nth-child(2){min-width:0}
+  .tracker-bar > .flex-row:first-child > div:nth-child(2) > div:first-child{font-size:.74rem;white-space:nowrap}
+  .tracker-bar > .flex-row:first-child > div:nth-child(2) > div:last-child{font-size:.62rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px}
+  .tracker-bar .mono{font-size:.92rem}
+  /* Right cluster: chips hidden on phones (info lives in KPIs); just actions */
+  .tracker-bar .chip{display:none}
+  .tracker-bar > .flex-row:last-child{gap:6px;flex-wrap:nowrap;flex-shrink:0}
+  .tracker-bar .btn-xs{flex:0 0 auto;min-width:0;padding:7px 12px}
+  /* Zen collapses to icon-only on phones */
+  .tracker-bar .btn-xs:last-child{padding:7px 10px}
+}
+
+/* Ambient sound pill: playing indicator bars */
+.ambient-bars{display:inline-flex;align-items:flex-end;gap:2px;height:12px}
+.ambient-bars i{width:2.5px;border-radius:99px;background:currentColor;animation:eq 1s ease-in-out infinite}
+.ambient-bars i:nth-child(1){height:6px}
+.ambient-bars i:nth-child(2){height:11px;animation-delay:.2s}
+.ambient-bars i:nth-child(3){height:8px;animation-delay:.4s}
+@keyframes eq{0%,100%{transform:scaleY(1)}50%{transform:scaleY(.55)}}
+.ambient-pill{color:var(--accent) !important;border-color:var(--nav-active-border) !important}
+@media (prefers-reduced-motion: reduce){.ambient-bars i{animation:none}}

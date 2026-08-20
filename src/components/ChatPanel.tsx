@@ -28,6 +28,7 @@ export default function ChatPanel({
   const [text, setText] = useState("");
   const voiceReplyArmed = useRef(false); // speak the next reply only after mic input
   const [voiceId, setVoiceId] = useState("f1");
+  const [sttLang, setSttLang] = useState("en-IN");
   const [listening, setListening] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const [voiceErr, setVoiceErr] = useState("");
@@ -71,7 +72,8 @@ export default function ChatPanel({
     const h = listen(
       (interim) => setText(interim),
       (final) => { setListening(false); setText(""); if (final) { voiceReplyArmed.current = true; onSend(final); } },
-      (err) => { setListening(false); setVoiceErr(err); }
+      (err) => { setListening(false); setVoiceErr(err); },
+      sttLang
     );
     if (h) { listenRef.current = h; setListening(true); }
   };
@@ -92,6 +94,20 @@ export default function ChatPanel({
                 {listening ? "listening…" : speaking ? "speaking…" : provider ? `${provider} connected` : "hybrid engine online"}
               </div>
             </div>
+            {support.stt && (
+              <select className="voice-select" value={sttLang} onChange={(e) => setSttLang(e.target.value)}
+                aria-label="Speaking language" title="Language you speak to Shigun">
+                <option value="en-IN">English</option>
+                <option value="hi-IN">हिन्दी</option>
+                <option value="bn-IN">বাংলা</option>
+                <option value="ta-IN">தமிழ்</option>
+                <option value="te-IN">తెలుగు</option>
+                <option value="kn-IN">ಕನ್ನಡ</option>
+                <option value="gu-IN">ગુજરાતી</option>
+                <option value="pa-IN">ਪੰਜਾਬੀ</option>
+                <option value="ar-SA">العربية</option>
+              </select>
+            )}
             {support.tts && (
               <select
                 className="voice-select"

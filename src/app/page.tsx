@@ -11,6 +11,7 @@ import SubjectsView from "@/components/SubjectsView";
 import SettingsView from "@/components/SettingsView";
 import ChatPanel from "@/components/ChatPanel";
 import CommandPalette, { type Command } from "@/components/CommandPalette";
+import { onSoundChange, stopSound } from "@/lib/sound";
 import { useBackClose } from "@/lib/useBackClose";
 import type { TaskPatch } from "@/components/TaskEditor";
 import {
@@ -35,6 +36,8 @@ export default function Home() {
   const [chatOpen, setChatOpen] = useState(false);
   const [thinking, setThinking] = useState(false);
   const [zen, setZen] = useState(false);
+  const [ambient, setAmbient] = useState("none");
+  useEffect(() => onSoundChange(setAmbient), []);
   useBackClose(zen, () => setZen(false));
   useBackClose(chatOpen, () => setChatOpen(false));
   const [toast, setToast] = useState("");
@@ -364,6 +367,11 @@ export default function Home() {
               )}
               {clock.onBreak && (
                 <button className="btn btn-xs btn-primary" onClick={clock.endBreak}>Resume</button>
+              )}
+              {ambient !== "none" && (
+                <button className="btn btn-xs btn-secondary ambient-pill" onClick={() => stopSound()} title="Stop ambient sound">
+                  <span className="ambient-bars"><i /><i /><i /></span> Stop sound
+                </button>
               )}
               <button className="btn btn-xs btn-secondary" onClick={() => setZen(true)}><IconBolt size={12} /> Zen</button>
             </div>

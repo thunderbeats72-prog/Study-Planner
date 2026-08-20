@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { today, type AppState } from "@/lib/client";
 import { mmss, type ClockApi, type TimerApi, type TimerMode } from "@/lib/useTimer";
-import { playSound, setVolume, stopSound } from "@/lib/sound";
+import { playSound, setVolume, stopSound, currentSound } from "@/lib/sound";
 import { IconExpand, IconVolume } from "./icons";
 
 const SOUNDS = [
@@ -32,15 +32,14 @@ export default function FocusView({
   onCompleteTask: (id: number) => void;
   onZen: () => void;
 }) {
-  const [sound, setSound] = useState("none");
+  const [sound, setSound] = useState(() => currentSound());
   const [vol, setVol] = useState(0.3);
   const t = today();
   const todayTasks = state.tasks.filter((x) => x.date === t);
 
-  useEffect(() => () => stopSound(), []);
   useEffect(() => { setVolume(vol); }, [vol]);
 
-  const pick = (id: string) => { setSound(id); playSound(id, vol); };
+  const pick = (id: string) => { setSound(id); if (id === "none") stopSound(); else playSound(id, vol); };
 
   const pct = timer.mode === "stopwatch"
     ? (timer.seconds % 3600) / 3600

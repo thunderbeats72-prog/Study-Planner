@@ -3,6 +3,13 @@
 type Ctx = { ac: AudioContext; gain: GainNode; nodes: AudioNode[] };
 let current: Ctx | null = null;
 let activeName = "none";
+const listeners = new Set<(name: string) => void>();
+function emit() { listeners.forEach((l) => l(activeName)); }
+/** Subscribe to ambient-sound changes; returns unsubscribe. */
+export function onSoundChange(fn: (name: string) => void): () => void {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+}
 
 function noiseBuffer(ac: AudioContext, brown = false): AudioBuffer {
   const len = ac.sampleRate * 4;
@@ -23,6 +30,7 @@ export function stopSound() {
     current = null;
   }
   activeName = "none";
+  emit();
 }
 
 export function currentSound() { return activeName; }
@@ -74,6 +82,7 @@ export function playSound(name: string, volume = 0.3) {
   }
   current = { ac, gain, nodes };
   activeName = name;
+  emit();
 }
 
 export function setVolume(v: number) {

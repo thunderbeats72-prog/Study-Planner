@@ -23,6 +23,18 @@ export const VOICE_OPTIONS: VoiceOption[] = [
   { id: "m1", label: "Male Voice", gender: "male" },
 ];
 
+/** Supported reply languages: script ranges + BCP-47 + voice prefs. */
+export const LANGS: { code: string; bcp: string; range: RegExp }[] = [
+  { code: "hi", bcp: "hi-IN", range: /[\u0900-\u097F]/ },  // Devanagari (Hindi/Marathi share)
+  { code: "bn", bcp: "bn-IN", range: /[\u0980-\u09FF]/ },  // Bengali
+  { code: "ta", bcp: "ta-IN", range: /[\u0B80-\u0BFF]/ },  // Tamil
+  { code: "te", bcp: "te-IN", range: /[\u0C00-\u0C7F]/ },  // Telugu
+  { code: "kn", bcp: "kn-IN", range: /[\u0C80-\u0CFF]/ },  // Kannada
+  { code: "gu", bcp: "gu-IN", range: /[\u0A80-\u0AFF]/ },  // Gujarati
+  { code: "pa", bcp: "pa-IN", range: /[\u0A00-\u0A7F]/ },  // Gurmukhi (Punjabi)
+  { code: "ar", bcp: "ar-SA", range: /[\u0600-\u06FF]/ },  // Arabic
+];
+
 /** Quality-ranked name fragments per option, per language family. */
 const VOICE_PREFS: Record<string, Record<string, string[]>> = {
   en: {
@@ -51,16 +63,23 @@ function loadVoices(): Promise<SpeechSynthesisVoice[]> {
   });
 }
 
-function pickVoice(optionId: string, lang: "en" | "hi"): SpeechSynthesisVoice | null {
+function pickVoice(optionId: string, lang: string): SpeechSynthesisVoice | null {
   const prefs = VOICE_PREFS[lang]?.[optionId] || [];
   const voices = cachedVoices.length ? cachedVoices : window.speechSynthesis?.getVoices() || [];
   for (const p of prefs) {
     const hit = voices.find((v) => v.name.toLowerCase().includes(p.toLowerCase()) || v.lang.toLowerCase().includes(p.toLowerCase()));
     if (hit) return hit;
   }
-  // language fallback: ANY voice of that language beats an accent mismatch
-  const byLang = voices.find((v) => v.lang.toLowerCase().startsWith(lang));
-  if (byLang) return byLang;
+  // NATIVE-ACCENT RULE: any voice of the target language beats an
+  // accent mismatch. Prefer gender match within the language when
+  // discernible from common voice-name conventions.
+  const langVoices = voices.filter((v) => v.lang.toLowerCase().startsWith(lang));
+  if (langVoices.length) {
+    const wantFemale = optionId !== "m1";
+    const genderHit = langVoices.find((v) =>
+      wantFemale ? /female|woman|swara|kalpana|lekha|heera/i.test(v.name) : /male|man|hemant|ravi/i.test(v.name));
+    return genderHit || langVoices[0];
+  }
   return voices.find((v) => v.lang.startsWith("en")) || voices[0] || null;
 }
 
@@ -81,26 +100,31 @@ function cleanForSpeech(md: string): string {
     .slice(0, 800);
 }
 
-const DEVANAGARI = /[\u0900-\u097F]/;
+/** Detect the language of a word by script range; Latin defaults to en. */
+function wordLang(w: string): string {
+  for (const l of LANGS) if (l.range.test(w)) return l.code;
+  return "en";
+}
 
 /**
  * Split text into language runs so each segment is spoken by a voice
- * of the matching language ("Chapter 3 begins with साखी by कबीर" →
- * en:"Chapter 3 begins with", hi:"साखी", en:"by", hi:"कबीर").
- * Adjacent same-language runs merge; short runs stay attached to
- * their neighbour to avoid choppy delivery.
+ * of the matching language. Works across all supported scripts.
  */
-export function splitLanguageRuns(text: string): { lang: "en" | "hi"; text: string }[] {
+export function splitLanguageRuns(text: string): { lang: string; text: string }[] {
   const words = text.split(/\s+/);
-  const runs: { lang: "en" | "hi"; text: string }[] = [];
+  const runs: { lang: string; text: string }[] = [];
   for (const w of words) {
-    const lang: "en" | "hi" = DEVANAGARI.test(w) ? "hi" : "en";
+    const lang = wordLang(w);
     const last = runs[runs.length - 1];
     if (last && last.lang === lang) last.text += " " + w;
     else runs.push({ lang, text: w });
   }
-  // merge tiny englsh runs sandwiched between hindi (and vice versa)
   return runs.filter((r) => r.text.trim().length > 0);
+}
+
+/** BCP-47 tag for a language code. */
+function bcpFor(code: string): string {
+  return LANGS.find((l) => l.code === code)?.bcp || "en-IN";
 }
 
 export async function speak(
@@ -122,8 +146,8 @@ export async function speak(
     const utter = new SpeechSynthesisUtterance(run.text);
     const v = pickVoice(voiceId, run.lang);
     if (v) { utter.voice = v; utter.lang = v.lang; }
-    else utter.lang = run.lang === "hi" ? "hi-IN" : "en-IN";
-    utter.rate = run.lang === "hi" ? 0.98 : 1.02;
+    else utter.lang = bcpFor(run.lang);
+    utter.rate = run.lang === "en" ? 1.02 : 0.98;
     utter.pitch = voiceId === "m1" ? 0.95 : 1.05;
     utter.onend = speakNext;
     utter.onerror = speakNext;
