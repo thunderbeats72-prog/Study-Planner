@@ -1005,7 +1005,6 @@ img,svg,video,canvas{max-width:100%;height:auto}
 @media(max-width:360px){
   .kpi-grid{grid-template-columns:1fr 1fr;gap:8px}
   .kpi-value{font-size:1.35rem}
-  .tracker-bar > .flex-row:first-child .mono{display:none} /* timer lives in Focus */
   .chip{font-size:.56rem;padding:2px 7px}
   .vtab{font-size:.66rem}
 }
@@ -1958,13 +1957,16 @@ html{scroll-behavior:smooth}
 
 /* Collapsible sidebar (desktop) */
 .side-toggle{
-  position:absolute;top:18px;right:-11px;width:22px;height:22px;border-radius:50%;
-  background:var(--surface-elevated);border:1px solid var(--glass-border);color:var(--text-muted);
+  position:absolute;top:50%;right:-13px;transform:translateY(-50%);
+  width:26px;height:56px;border-radius:99px;
+  background:var(--surface-elevated);border:1px solid var(--glass-border-hover);color:var(--text-muted);
   cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:5;
-  box-shadow:var(--shadow-sm);transition:color .2s ease,border-color .2s ease,transform .2s var(--spring);
+  box-shadow:var(--shadow-md);
+  transition:color .2s ease,border-color .2s ease,box-shadow .25s ease,width .2s var(--spring);
 }
-.side-toggle:hover{color:var(--accent);border-color:var(--nav-active-border)}
-.sidebar{position:sticky}
+.side-toggle:hover{color:var(--accent);border-color:var(--accent);box-shadow:0 0 0 4px var(--accent-glow);width:30px}
+.side-toggle:active{transform:translateY(-50%) scale(.94)}
+@media(min-width:861px){.sidebar{position:sticky}}
 .app-wrapper.side-collapsed{--sidebar-w:68px}
 .app-wrapper.side-collapsed .sidebar{padding:22px 10px}
 .app-wrapper.side-collapsed .brand-title,.app-wrapper.side-collapsed .brand-course,
@@ -2007,4 +2009,31 @@ body.mode-focused .btn-primary.w-full::before,body.mode-focused .page-header .bt
 @media (prefers-reduced-motion: reduce){
   body.focus-live::after{animation:none}
   .btn-primary.w-full::before,.page-header .btn-primary::before{animation:none}
+}
+
+
+/* ═══ MOBILE DELIGHT PASS — dock, tracker, and touch feedback ═══ */
+@media(max-width:860px){
+  /* Dock: deeper float, springier active tab */
+  .sidebar{box-shadow:0 -2px 10px rgba(10,12,26,.08),0 10px 40px rgba(10,12,26,.18)}
+  .nav-item{transition:transform .35s var(--spring),background .25s ease,color .25s ease}
+  .nav-item.active{transform:translateY(-4px);box-shadow:0 8px 18px var(--accent-glow)}
+  .nav-item.active svg{animation:iconPop .45s var(--spring)}
+  /* Active tab gets a little landing dot beneath */
+  .nav-item{position:relative}
+  .nav-item.active::after{content:"";position:absolute;bottom:2px;left:50%;transform:translateX(-50%);
+    width:4px;height:4px;border-radius:50%;background:currentColor;opacity:.7;animation:dotPop .4s var(--spring)}
+  /* Tracker: live timer breathes green when clocked in */
+  body.focus-live .tracker-time{animation:digitBreath 2s ease-in-out infinite}
+  /* Tap feedback everywhere in the dock */
+  .nav-item:active{transform:scale(.9)}
+}
+
+/* Timer visibility is sacred: never hidden at any width */
+.tracker-time{display:block !important}
+
+/* Mobile clock-in press: satisfying grow-shrink */
+@media(max-width:640px){
+  .tracker-actions .btn-primary{transition:transform .2s var(--spring)}
+  .tracker-actions .btn-primary:active{transform:scale(.88)}
 }
