@@ -348,7 +348,6 @@ body.theme-dark .tracker-bar,body.theme-obsidian .tracker-bar,body.theme-nebula 
   textarea.input-field{resize:vertical;min-height:86px}
 }
 @media(max-width:640px){
-  .tracker-bar{position:relative;top:auto}
   .heat-cell{width:11px;height:11px}
   /* Structured mobile task card: title block on top (full width),
      then one clean action row. No arbitrary wrap order. */
@@ -1005,7 +1004,6 @@ img,svg,video,canvas{max-width:100%;height:auto}
 @media(max-width:360px){
   .kpi-grid{grid-template-columns:1fr 1fr;gap:8px}
   .kpi-value{font-size:1.35rem}
-  .tracker-bar > .flex-row:first-child .mono{display:none} /* timer lives in Focus */
   .chip{font-size:.56rem;padding:2px 7px}
   .vtab{font-size:.66rem}
 }
@@ -1032,7 +1030,6 @@ img,svg,video,canvas{max-width:100%;height:auto}
 
 /* 9. Short-viewport phones in landscape & in-app browsers */
 @media(max-height:600px) and (max-width:900px){
-  .tracker-bar{position:relative;top:auto}
   .timer-ring-wrap{width:150px;height:150px}
 }
 
@@ -1964,7 +1961,7 @@ html{scroll-behavior:smooth}
   box-shadow:var(--shadow-sm);transition:color .2s ease,border-color .2s ease,transform .2s var(--spring);
 }
 .side-toggle:hover{color:var(--accent);border-color:var(--nav-active-border)}
-.sidebar{position:sticky}
+@media(min-width:861px){.sidebar{position:sticky}}
 .app-wrapper.side-collapsed{--sidebar-w:68px}
 .app-wrapper.side-collapsed .sidebar{padding:22px 10px}
 .app-wrapper.side-collapsed .brand-title,.app-wrapper.side-collapsed .brand-course,
@@ -2053,3 +2050,25 @@ button,a,.nav-item,.vtab,.cal-cell,.chip,.task-row,.rate-btn,input,select{touch-
   .up-next{padding:13px 14px;gap:10px}
   .up-next-title{font-size:.85rem;white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 }
+
+
+/* ═══ STATUS BAR PINNED TO TOP (mobile) ═══════════════════════════
+   The session strip sticks to the absolute top of the viewport on
+   phones — always visible, never floating mid-content. */
+@media(max-width:860px){
+  .tracker-bar{
+    position:sticky;top:calc(58px + env(safe-area-inset-top));
+    z-index:90;margin-top:0;
+  }
+}
+@media(max-width:640px){
+  .tracker-bar{top:calc(56px + env(safe-area-inset-top))}
+}
+
+/* ═══ TIMER STRICT BOUNDING — can never clip or overlap ═══ */
+.tracker-time{
+  flex:0 0 auto;min-width:0;max-width:30vw;overflow:visible;
+  font-variant-numeric:tabular-nums;white-space:nowrap;
+}
+.tracker-status{overflow:hidden}
+.tracker-actions{flex-shrink:0;min-width:0}
