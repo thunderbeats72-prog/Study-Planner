@@ -61,7 +61,7 @@ export default function PlannerView({
     const sum = state.sessions.filter((x) => x.taskId === taskId).reduce((a, x) => a + x.minutes, 0);
     return Math.round(sum * 100) / 100;
   };
-  const fmtMin = (m: number) => Number.isInteger(m) ? `${m}m` : `${m.toFixed(2)}m`;
+  const fmtMin = (m: number) => `${Math.round(m)}m`;
 
   const renderTask = (task: TaskRow) => {
     const meta = KIND_META[task.kind] || KIND_META.learn;

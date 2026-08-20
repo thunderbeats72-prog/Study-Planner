@@ -152,8 +152,15 @@ export async function speak(
     const v = pickVoice(voiceId, run.lang);
     if (v) { utter.voice = v; utter.lang = v.lang; }
     else utter.lang = bcpFor(run.lang);
-    utter.rate = run.lang === "en" ? 1.02 : 0.98;
-    utter.pitch = voiceId === "m1" ? 0.95 : 1.05;
+    // Distinct per-option delivery: audible difference even when the
+    // device has only one voice per language.
+    const profile = voiceId === "m1"
+      ? { rate: 0.97, pitch: 0.78 }   // Male: deeper, measured
+      : voiceId === "f2"
+        ? { rate: 1.08, pitch: 1.12 } // Female 2: brighter, quicker
+        : { rate: 1.0, pitch: 1.0 };  // Female 1: natural baseline
+    utter.rate = profile.rate * (run.lang === "en" ? 1.02 : 0.96);
+    utter.pitch = profile.pitch;
     utter.onend = speakNext;
     utter.onerror = speakNext;
     window.speechSynthesis.speak(utter);
@@ -234,21 +241,27 @@ export function listen(
   };
 
   rec.onresult = (e: any) => {
+    // Rebuild the COMPLETE transcript from scratch each event.
+    // (Android re-reports results cumulatively; incremental appends
+    // duplicated segments — the "change change change" bug.)
+    let finals = "";
     let interim = "";
-    for (let i = e.resultIndex; i < e.results.length; i++) {
+    for (let i = 0; i < e.results.length; i++) {
       const res = e.results[i];
       if (res.isFinal) {
         let best = res[0];
         for (let a = 1; a < res.length; a++) {
           if (res[a].confidence > best.confidence) best = res[a];
         }
-        collected += (collected ? " " : "") + best.transcript.trim();
+        finals += (finals ? " " : "") + best.transcript.trim();
       } else {
         interim += res[0].transcript;
       }
     }
-    if (interim) lastInterim = (collected + " " + interim).trim();
-    onInterim((collected + " " + interim).trim());
+    collected = finals;
+    const full = (finals + " " + interim).trim();
+    if (full) lastInterim = full;
+    onInterim(full);
     armSilence(); // any speech activity extends the window
   };
   rec.onspeechend = () => armSilence();

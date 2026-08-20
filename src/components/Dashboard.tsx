@@ -68,7 +68,9 @@ export default function Dashboard({
     const perDay = new Map<string, number>();
     for (const s of state.sessions) perDay.set(s.date, (perDay.get(s.date) || 0) + s.minutes);
     const days = new Set([...perDay.entries()].filter(([, m]) => m >= 1).map(([d]) => d));
-    const span = Math.max(1, Math.min(30, dayDiff(state.settings.startDate, t) + 1));
+    // Minimum 7-day window: day-one '100%' was technically true but
+    // misleading; a week-floor gives an honest early signal.
+    const span = Math.max(7, Math.min(30, dayDiff(state.settings.startDate, t) + 1));
     let hit = 0;
     for (let i = 0; i < span; i++) if (days.has(addDays(t, -i))) hit++;
     return Math.round((hit / span) * 100);
@@ -100,7 +102,7 @@ export default function Dashboard({
     const sum = state.sessions.filter((x) => x.taskId === taskId).reduce((a, x) => a + x.minutes, 0);
     return Math.round(sum * 100) / 100;
   };
-  const fmtMin = (m: number) => Number.isInteger(m) ? `${m}m` : `${m.toFixed(2)}m`;
+  const fmtMin = (m: number) => `${Math.round(m)}m`;
 
   return (
     <div className="fade-in">

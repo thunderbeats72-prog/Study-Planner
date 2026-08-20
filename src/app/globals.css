@@ -233,10 +233,10 @@ select.input-field{appearance:none;background-image:linear-gradient(45deg,transp
 body.theme-dark .ai-panel,body.theme-obsidian .ai-panel,body.theme-nebula .ai-panel{box-shadow:0 8px 28px rgba(0,0,0,.55),0 32px 90px rgba(0,0,0,.45)}
 /* Header: violet AI identity strip with soft luminous wash */
 .ai-head{padding:15px 18px;display:flex;align-items:center;gap:11px;position:relative;
-  background:linear-gradient(135deg,rgba(var(--ai-rgb),.12),rgba(var(--ai-rgb),0) 65%),var(--surface-elevated);
+  background:var(--surface-elevated);
   border-bottom:1px solid var(--glass-border);color:var(--text-main)}
-.ai-head::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:1px;
-  background:linear-gradient(90deg,rgba(var(--ai-rgb),.5),transparent 60%)}
+.ai-head::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:1.5px;
+  background:linear-gradient(90deg,rgba(var(--ai-rgb),.55),rgba(var(--ai-rgb),.08) 70%,transparent)}
 .ai-status{font-size:.64rem;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--color-ai);display:inline-flex;align-items:center;gap:5px}
 .ai-status::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--color-ai);animation:aiPulse 2.4s ease-in-out infinite}
 @keyframes aiPulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(var(--ai-rgb),.4)}50%{opacity:.6;box-shadow:0 0 0 4px rgba(var(--ai-rgb),0)}}
@@ -1954,22 +1954,7 @@ html{scroll-behavior:smooth}
 /* ═══ PRD BUILD: sidebar collapse, focus-live, live timer, CTAs ═══ */
 
 /* Collapsible sidebar (desktop) */
-.side-toggle{
-  position:absolute;top:18px;right:-11px;width:22px;height:22px;border-radius:50%;
-  background:var(--surface-elevated);border:1px solid var(--glass-border);color:var(--text-muted);
-  cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:5;
-  box-shadow:var(--shadow-sm);transition:color .2s ease,border-color .2s ease,transform .2s var(--spring);
-}
-.side-toggle:hover{color:var(--accent);border-color:var(--nav-active-border)}
 @media(min-width:861px){.sidebar{position:sticky}}
-.app-wrapper.side-collapsed{--sidebar-w:68px}
-.app-wrapper.side-collapsed .sidebar{padding:22px 10px}
-.app-wrapper.side-collapsed .brand-title,.app-wrapper.side-collapsed .brand-course,
-.app-wrapper.side-collapsed .nav-item span,.app-wrapper.side-collapsed .sidebar-foot{display:none}
-.app-wrapper.side-collapsed .nav-item{justify-content:center;padding:11px 0}
-.app-wrapper.side-collapsed .brand-header{justify-content:center;padding-bottom:14px}
-.sidebar,.app-wrapper{transition:all .35s var(--spring-soft)}
-@media(max-width:860px){.side-toggle{display:none}}
 
 /* Focus-live: ambient cue while clocked in — accent hairline atop the app */
 body.focus-live::after{
@@ -2089,7 +2074,3 @@ button,a,.nav-item,.vtab,.cal-cell,.chip,.task-row,.rate-btn,input,select{touch-
    clips cleanly during the width transition. */
 .sidebar{overflow:hidden}
 .brand-title,.brand-course{white-space:nowrap}
-.app-wrapper.side-collapsed .brand-title,
-.app-wrapper.side-collapsed .brand-course,
-.app-wrapper.side-collapsed .nav-item span,
-.app-wrapper.side-collapsed .sidebar-foot{display:none !important}
