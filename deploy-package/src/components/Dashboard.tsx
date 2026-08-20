@@ -20,13 +20,26 @@ export default function Dashboard({
   onReplan: () => void;
 }) {
   const [insights, setInsights] = useState<string>("");
+  const [intel, setIntel] = useState<{
+    upNext?: { id: number; title: string; minutes: number; kind: string; subjectId: number | null } | null;
+    focusSuggestion?: { startHour: number; endHour: number; isNow: boolean } | null;
+    pace: { global: number; samples: number; bySubject: { id: number; name: string; color: string; pace: number }[] };
+    weekdays: number[] | null;
+    peakHour: number | null;
+    tomorrowRisk: number;
+    readiness: { onTrack: boolean; loadPct: number; likelyDays: number; optimisticDays: number; pessimisticDays: number; samples: number };
+    memory: { strong: number; fading: number; atRisk: number; tracked: number };
+  } | null>(null);
+  const [intelOpen, setIntelOpen] = useState(false);
   const [loadingIns, setLoadingIns] = useState(true);
   const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
+  const [moreActionsId, setMoreActionsId] = useState<number | null>(null);
   const t = today();
   const ctx = state.context;
 
   useEffect(() => {
     setLoadingIns(true);
+    api<typeof intel>("/api/analytics").then(setIntel).catch(() => {});
     api<{ insights: string }>("/api/insights")
       .then((d) => setInsights(d.insights))
       .catch(() => setInsights(""))
@@ -55,18 +68,45 @@ export default function Dashboard({
     const perDay = new Map<string, number>();
     for (const s of state.sessions) perDay.set(s.date, (perDay.get(s.date) || 0) + s.minutes);
     const days = new Set([...perDay.entries()].filter(([, m]) => m >= 1).map(([d]) => d));
-    const span = Math.max(1, Math.min(30, dayDiff(state.settings.startDate, t) + 1));
+    // Minimum 7-day window: day-one '100%' was technically true but
+    // misleading; a week-floor gives an honest early signal.
+    const span = Math.max(7, Math.min(30, dayDiff(state.settings.startDate, t) + 1));
     let hit = 0;
     for (let i = 0; i < span; i++) if (days.has(addDays(t, -i))) hit++;
     return Math.round((hit / span) * 100);
   })();
   const totalPlannedMin = todayTasks.reduce((a, x) => a + x.plannedMinutes, 0);
   const loggedTodayMin = state.sessions.filter((s) => s.date === t).reduce((a, s) => a + s.minutes, 0);
+
+  // Momentum: this-week vs last-week study minutes, avg session length,
+  // and completion rate over the past 7 days — small honest trends.
+  const momentum = useMemo(() => {
+    const dayMs = 86400000;
+    const now = new Date(t + "T00:00:00").getTime();
+    const inRange = (d: string, from: number, to: number) => {
+      const x = new Date(d + "T00:00:00").getTime();
+      return x >= from && x < to;
+    };
+    const thisWk = state.sessions.filter((s) => inRange(s.date, now - 6 * dayMs, now + dayMs));
+    const lastWk = state.sessions.filter((s) => inRange(s.date, now - 13 * dayMs, now - 6 * dayMs));
+    const thisMin = thisWk.reduce((a, s) => a + s.minutes, 0);
+    const lastMin = lastWk.reduce((a, s) => a + s.minutes, 0);
+    const delta = lastMin > 0 ? Math.round(((thisMin - lastMin) / lastMin) * 100) : null;
+    const focusSessions = thisWk.filter((s) => s.mode !== "break");
+    const avgSession = focusSessions.length ? Math.round(thisMin / focusSessions.length) : 0;
+    const recent = state.tasks.filter((x) => inRange(x.date, now - 6 * dayMs, now + dayMs) && x.kind !== "buffer");
+    const compRate = recent.length ? Math.round((recent.filter((x) => x.status === "done").length / recent.length) * 100) : null;
+    return { thisHrs: Math.round((thisMin / 60) * 10) / 10, delta, avgSession, compRate };
+  }, [state.sessions, state.tasks, t]);
   const taskLogged = (taskId: number) => {
     const sum = state.sessions.filter((x) => x.taskId === taskId).reduce((a, x) => a + x.minutes, 0);
     return Math.round(sum * 100) / 100;
   };
-  const fmtMin = (m: number) => Number.isInteger(m) ? `${m}m` : `${m.toFixed(2)}m`;
+  // 13.5 minutes displays as "13.5m" — never rounded to a different number
+  const fmtMin = (m: number) => {
+    const r = Math.round(m * 10) / 10;
+    return `${Number.isInteger(r) ? r : r.toFixed(1)}m`;
+  };
 
   return (
     <div className="fade-in">
@@ -80,6 +120,37 @@ export default function Dashboard({
         <button className="btn btn-primary" onClick={onReplan} disabled={replanning}>
           <IconSpark size={15} />{replanning ? "Re-planning…" : "Re-plan with AI"}
         </button>
+      </div>
+
+      {intel?.upNext && (
+        <div className="glass-panel up-next" onClick={() => onFocusTask(intel.upNext!.id)}>
+          <div className="up-next-glow" />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="intel-label" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              Up next
+              {intel.focusSuggestion?.isNow && <span className="up-next-now">peak focus window</span>}
+            </div>
+            <div className="up-next-title">{intel.upNext.title}</div>
+            <div className="up-next-sub">{intel.upNext.minutes} min · one tap to clock in</div>
+          </div>
+          <button className="btn btn-primary" aria-label="Start this task"
+            onClick={(e) => { e.stopPropagation(); onFocusTask(intel.upNext!.id); }}>
+            Start
+          </button>
+        </div>
+      )}
+
+      <div className="momentum-strip">
+        <span className="momentum-pill">This week <strong>{momentum.thisHrs}h</strong>
+          {momentum.delta !== null && (
+            <span className={momentum.delta >= 0 ? "up" : "down"}>
+              {momentum.delta >= 0 ? "▲" : "▼"} {Math.abs(momentum.delta)}%
+            </span>
+          )}
+        </span>
+        {momentum.avgSession > 0 && <span className="momentum-pill">Avg session <strong>{momentum.avgSession}m</strong></span>}
+        {momentum.compRate !== null && <span className="momentum-pill">7-day completion <strong>{momentum.compRate}%</strong></span>}
+        {state.user.streak > 1 && <span className="momentum-pill">Streak <strong>{state.user.streak}d</strong></span>}
       </div>
 
       <div className="kpi-grid">
@@ -98,7 +169,7 @@ export default function Dashboard({
         <div className="glass-panel tilt-card kpi-card">
           <div className="kpi-label">Hours This Week</div>
           <div className="kpi-value">{ctx.hoursThisWeek}</div>
-          <div className="kpi-sub">Target {Math.round(state.settings.dailyHours * 7)}h · {Math.round(loggedTodayMin)}m today</div>
+          <div className="kpi-sub">Target {Math.round(state.settings.dailyHours * 7)}h · {fmtMin(loggedTodayMin)} today</div>
         </div>
         <div className="glass-panel tilt-card kpi-card">
           <div className="kpi-label">Consistency</div>
@@ -150,7 +221,7 @@ export default function Dashboard({
 
       <div className="glass-panel tilt-card" style={{ padding: 20, marginBottom: 18, borderLeft: "4px solid var(--accent)" }}>
         <h3 style={{ fontSize: ".88rem", fontWeight: 800, margin: "0 0 10px", display: "flex", alignItems: "center", gap: 8 }}>
-          <IconSpark size={15} /> AETHER Coaching Insights
+          <IconSpark size={15} /> SHIGUN Coaching Insights
         </h3>
         {loadingIns ? (
           <div style={{ fontSize: ".84rem", color: "var(--text-muted)" }}>Analysing your data…</div>
@@ -159,6 +230,100 @@ export default function Dashboard({
             dangerouslySetInnerHTML={{ __html: mdToHtml(insights) }} />
         )}
       </div>
+
+      {intel && intel.readiness && (
+        <div className="glass-panel tilt-card intel-card" style={{ padding: 20, marginBottom: 18 }}>
+          <div className="day-head" style={{ marginBottom: 12 }}>
+            <h3 style={{ fontSize: ".88rem", fontWeight: 800, margin: 0 }}>Intelligence</h3>
+            <span className="day-meta">learned from your own study data</span>
+          </div>
+
+          <div className="intel-grid">
+            <div className="intel-stat">
+              <span className={`intel-dot ${intel.readiness.onTrack ? "ok" : "warn"}`} />
+              <div>
+                <div className="intel-label">Exam readiness</div>
+                <div className="intel-value">
+                  {intel.readiness.onTrack ? "On track" : "Behind pace"}
+                  <span className="intel-sub"> · needs ~{intel.readiness.likelyDays}d of your remaining time</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="intel-stat">
+              <span className={`intel-dot ${intel.tomorrowRisk < 0.4 ? "ok" : intel.tomorrowRisk < 0.65 ? "mid" : "warn"}`} />
+              <div>
+                <div className="intel-label">Tomorrow&apos;s plan</div>
+                <div className="intel-value">
+                  {intel.tomorrowRisk < 0.4 ? "Looks doable" : intel.tomorrowRisk < 0.65 ? "A bit heavy" : "Overloaded"}
+                  <span className="intel-sub"> · {Math.round(intel.tomorrowRisk * 100)}% skip risk</span>
+                </div>
+              </div>
+            </div>
+
+            {intel.memory.tracked > 0 && (
+              <div className="intel-stat">
+                <span className={`intel-dot ${intel.memory.atRisk === 0 ? "ok" : "mid"}`} />
+                <div>
+                  <div className="intel-label">Memory health</div>
+                  <div className="intel-value">
+                    {intel.memory.strong} strong
+                    {intel.memory.fading > 0 && <span className="intel-sub"> · {intel.memory.fading} fading</span>}
+                    {intel.memory.atRisk > 0 && <span className="intel-sub warn-text"> · {intel.memory.atRisk} need review</span>}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {intel.peakHour !== null && (
+              <div className="intel-stat">
+                <span className="intel-dot ok" />
+                <div>
+                  <div className="intel-label">Your peak focus</div>
+                  <div className="intel-value">{intel.peakHour % 12 || 12}{intel.peakHour < 12 ? "am" : "pm"}–{(intel.peakHour + 2) % 12 || 12}{(intel.peakHour + 2) < 12 || (intel.peakHour + 2) >= 24 ? "am" : "pm"}
+                    <span className="intel-sub"> · schedule hard topics here</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <button className="more-options-toggle" onClick={() => setIntelOpen(!intelOpen)}>
+            {intelOpen ? "Hide details" : "More details"}
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"
+              style={{ transform: intelOpen ? "rotate(180deg)" : "none", transition: "transform .25s ease" }}>
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </button>
+
+          {intelOpen && (
+            <div className="intel-details slide-in">
+              {intel.pace.samples >= 3 ? (
+                <>
+                  <div className="intel-label" style={{ marginBottom: 8 }}>Your pace vs plan (learned from {intel.pace.samples} sessions)</div>
+                  {intel.pace.bySubject.slice(0, 6).map((p) => (
+                    <div key={p.id} className="intel-pace-row">
+                      <span className="task-dot" style={{ background: p.color, position: "static" }} />
+                      <span className="intel-pace-name">{p.name}</span>
+                      <span className={`intel-pace-val ${p.pace > 1.15 ? "warn-text" : p.pace < 0.9 ? "ok-text" : ""}`}>
+                        {p.pace > 1.05 ? `${Math.round((p.pace - 1) * 100)}% slower` : p.pace < 0.95 ? `${Math.round((1 - p.pace) * 100)}% faster` : "on pace"}
+                      </span>
+                    </div>
+                  ))}
+                </>
+              ) : (
+                <div style={{ fontSize: ".8rem", color: "var(--text-dim)" }}>
+                  Complete a few more sessions and the pace model will show which subjects run faster or slower for you.
+                </div>
+              )}
+              <div className="intel-label" style={{ margin: "12px 0 4px" }}>Finish-time projection</div>
+              <div style={{ fontSize: ".8rem", color: "var(--text-muted)" }}>
+                Best case ~{intel.readiness.optimisticDays}d · likely ~{intel.readiness.likelyDays}d · worst case ~{intel.readiness.pessimisticDays}d of study time remaining.
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="glass-panel tilt-card" style={{ padding: 20 }}>
         <div className="day-head">
@@ -191,7 +356,7 @@ export default function Dashboard({
           const meta = KIND_META[task.kind] || KIND_META.learn;
           const subj = state.subjects.find((s) => s.id === task.subjectId);
           return (
-            <div key={task.id} className={`task-row${task.status === "done" ? " done" : ""}${activeTaskId === task.id ? " active-clock" : ""}`}>
+            <div key={task.id} className={`task-row${task.status === "done" ? " done" : ""}${activeTaskId === task.id ? " active-clock" : ""}${moreActionsId === task.id ? " expanded-actions" : ""}`}>
               <div className="task-dot" style={{ background: subj?.color || meta.color }} />
               <div className="task-main">
                 <div className="task-title">{task.title}</div>
@@ -204,8 +369,10 @@ export default function Dashboard({
               {subj && task.status !== "skipped" && (
                 <button className="btn btn-xs btn-secondary" onClick={() => onSkipSubject(subj.id, task.date)}>Skip subject</button>
               )}
-              <button className="btn btn-xs btn-secondary" onClick={() => onFocusTask(task.id)}>Clock in</button>
-              <button className={`btn btn-xs ${task.status === "done" ? "btn-secondary" : "btn-primary"}`}
+              <button className="btn btn-xs btn-secondary task-clock" onClick={() => onFocusTask(task.id)}>Clock in</button>
+              <button className="btn btn-xs btn-secondary task-more" aria-label="More actions"
+                onClick={() => setMoreActionsId(moreActionsId === task.id ? null : task.id)}>⋯</button>
+              <button className={`btn btn-xs task-primary ${task.status === "done" ? "btn-secondary" : "btn-primary"}`}
                 onClick={() => onTaskStatus(task.id, task.status === "done" ? "pending" : "done")}>
                 {task.status === "done" ? "Undo" : "Done"}
               </button>

@@ -66,10 +66,13 @@ body{
   transition:box-shadow var(--anim-dur) ease,border-color var(--anim-dur) ease;
 }
 .tilt-card:hover{box-shadow:var(--glass-shadow-hover);border-color:var(--glass-border-hover)}
-.brand-header{display:flex;align-items:center;gap:11px;padding:0 6px 18px;margin-bottom:6px;border-bottom:1px solid var(--glass-border)}
+.brand-header{display:flex;align-items:center;gap:11px;padding:0 44px 18px 6px;margin-bottom:6px;border-bottom:1px solid var(--glass-border);position:relative}
+.brand-text{flex:1;min-width:0}
 .brand-logo-icon{width:34px;height:34px;border-radius:var(--radius-md);background:var(--accent-gradient);color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 1px 2px rgba(22,22,29,.2),inset 0 1px 0 rgba(255,255,255,.18)}
 .brand-title{font-family:var(--font-display);font-size:.93rem;font-weight:700;letter-spacing:-.25px;line-height:1.1}
-.brand-course{font-size:.7rem;color:var(--text-muted);font-weight:600;margin-top:2px}
+/* Full course name ALWAYS visible — wraps to as many lines as needed
+   ("B.Com (Honours) (Marketing and Banking)" never gets chopped). */
+.brand-course{font-size:.7rem;color:var(--text-muted);font-weight:600;margin-top:2px;white-space:normal;overflow-wrap:anywhere;line-height:1.35}
 .nav-list{display:flex;flex-direction:column;gap:4px;margin-top:14px}
 .nav-item{display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:var(--radius-md);font-size:.85rem;font-weight:550;color:var(--text-muted);cursor:pointer;border:1px solid transparent;transition:background .15s ease,color .15s ease;user-select:none}
 .nav-item:hover{background:var(--row-hover);color:var(--text-main)}
@@ -349,6 +352,21 @@ body.theme-dark .tracker-bar,body.theme-obsidian .tracker-bar,body.theme-nebula 
 }
 @media(max-width:640px){
   .heat-cell{width:11px;height:11px}
+  /* AI chat = true full-screen bottom sheet on phones (431-640px band
+     included): grab handle, 86dvh height, safe-area padded input */
+  .ai-panel{
+    bottom:0;right:0;left:0;width:100%;height:min(86dvh,680px);
+    border-radius:var(--radius-xl) var(--radius-xl) 0 0;
+    box-shadow:0 -10px 40px rgba(10,12,26,.2);
+  }
+  .ai-sheet-handle{display:block}
+  .ai-head{padding:12px 14px 12px 16px}
+  .ai-msgs{padding:12px 14px;gap:10px}
+  .ai-quick{overflow-x:auto;flex-wrap:nowrap;scrollbar-width:none;padding:8px 14px 12px}
+  .ai-quick::-webkit-scrollbar{display:none}
+  .ai-quick button{flex-shrink:0}
+  .ai-input-row{padding:10px 12px calc(10px + env(safe-area-inset-bottom));gap:8px}
+  .ai-msg{max-width:92%;font-size:.82rem}
   /* Structured mobile task card: title block on top (full width),
      then one clean action row. No arbitrary wrap order. */
   .task-row{position:relative;flex-wrap:wrap;gap:6px 8px;padding:12px;border-radius:var(--radius-md);background:var(--surface);border:1px solid var(--glass-border)}
@@ -993,8 +1011,13 @@ img,svg,video,canvas{max-width:100%;height:auto}
   .cal-cell .cal-num{font-size:.68rem}
   .vtab{padding:8px 4px;font-size:.72rem}
   .modal-box{padding:14px 12px calc(16px + env(safe-area-inset-bottom))}
-  .ai-panel{bottom:0;right:0;left:0;width:100%;height:min(82vh,640px);border-radius:var(--radius-xl) var(--radius-xl) 0 0}
+  .ai-panel{
+    bottom:0;right:0;left:0;width:100%;height:min(86dvh,680px);
+    border-radius:var(--radius-xl) var(--radius-xl) 0 0;
+    box-shadow:0 -10px 40px rgba(10,12,26,.2);
+  }
   .ai-fab{bottom:calc(88px + env(safe-area-inset-bottom))}
+  .ai-sheet-handle{display:block}
   .rating-btns{gap:5px}
   .heat-cell{width:9px;height:9px}
   .streak-badge{font-size:.66rem;padding:4px 9px}
@@ -1243,25 +1266,52 @@ body.mode-focused .main-workspace > :not(.tracker-bar){animation:none}
    design-system quality, with alignment hardening throughout.
 ═══════════════════════════════════════════════════════════════ */
 
-/* ── Toast: brand notification pill (replaces inline styles) ── */
+/* ── Toast: structured notification card (icon + message + close) ──
+   Desktop: bottom-right, stacked above the AI fab. Mobile: bottom-center
+   above the dock. Never floats at the top of the screen anymore. */
 .toast{
-  position:fixed;bottom:max(96px,calc(76px + env(safe-area-inset-bottom)));left:50%;z-index:350;
-  padding:12px 22px;font-size:.86rem;font-weight:600;color:var(--text-main);
+  position:fixed;right:22px;bottom:88px;z-index:400;
+  display:flex;align-items:center;gap:11px;
+  max-width:min(380px,calc(100vw - 28px));
+  padding:11px 14px;
+  font-size:.84rem;font-weight:600;line-height:1.45;color:var(--text-main);
   background:var(--surface-elevated);border:1px solid var(--glass-border);
-  border-radius:999px;box-shadow:var(--shadow-lg);
-  max-width:min(480px,calc(100vw - 32px));text-align:center;
-  animation:toastIn .4s var(--spring) forwards;
+  border-left:3px solid var(--accent);
+  border-radius:var(--radius-lg);box-shadow:0 6px 18px rgba(10,12,26,.12),0 24px 60px rgba(10,12,26,.16);
+  animation:toastIn .38s var(--spring-soft) backwards;
 }
-@keyframes toastIn{from{opacity:0;transform:translate(-50%,14px) scale(.95)}to{opacity:1;transform:translate(-50%,0) scale(1)}}
+.toast-icon{
+  width:26px;height:26px;border-radius:50%;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  background:var(--accent-glow);color:var(--accent);
+}
+.toast-success{border-left-color:var(--success-accent)}
+.toast-success .toast-icon{background:var(--status-done-bg);color:var(--status-done-text)}
+.toast-error{border-left-color:var(--danger-accent)}
+.toast-error .toast-icon{background:var(--status-skipped-bg);color:var(--status-skipped-text)}
+.toast-msg{flex:1;min-width:0;overflow-wrap:anywhere}
+.toast-close{
+  flex-shrink:0;width:26px;height:26px;border-radius:50%;border:none;background:transparent;
+  color:var(--text-dim);font-size:1.05rem;line-height:1;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;font-family:inherit;
+}
+.toast-close:hover{background:var(--row-hover);color:var(--text-main)}
+.toast-life{
+  position:absolute;left:12px;right:12px;bottom:0;height:2px;border-radius:99px;
+  background:currentColor;opacity:.35;transform-origin:left;
+  animation:toastLife 3.4s linear forwards;
+}
+.toast-success .toast-life{color:var(--success-accent)}
+.toast-error .toast-life{color:var(--danger-accent)}
+@keyframes toastIn{from{opacity:0;transform:translateY(12px) scale(.96)}to{opacity:1;transform:none}}
 @media(max-width:640px){
   .toast{
-    bottom:auto;top:calc(64px + env(safe-area-inset-top));
-    width:auto;max-width:calc(100vw - 32px);
-    padding:9px 16px;font-size:.78rem;
-    animation:toastDown .35s var(--spring) forwards;
+    right:12px;left:12px;bottom:calc(96px + env(safe-area-inset-bottom));
+    max-width:none;margin:0 auto;
+    animation:toastUpMobile .38s var(--spring-soft) backwards;
   }
 }
-@keyframes toastDown{from{opacity:0;transform:translate(-50%,-10px) scale(.96)}to{opacity:1;transform:translate(-50%,0) scale(1)}}
+@keyframes toastUpMobile{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1;transform:none}}
 
 /* ── Alignment hardening: consistent gutters everywhere ── */
 html{scrollbar-gutter:stable}
@@ -1457,8 +1507,6 @@ body.mode-focused .task-row.active-clock .task-dot{animation:none}
 
 /* 10. Toast: progress underline counts down its lifetime */
 .toast{overflow:hidden}
-.toast::after{content:"";position:absolute;left:10%;right:10%;bottom:0;height:2px;border-radius:99px;
-  background:var(--accent);transform-origin:left;animation:toastLife 3.2s linear forwards}
 @keyframes toastLife{from{transform:scaleX(1)}to{transform:scaleX(0)}}
 
 /* 11. Input caret + focus lift */
@@ -1926,9 +1974,15 @@ html{scroll-behavior:smooth}
    Base typography now lives in classes (no inline styles), so mobile
    rules can actually win. */
 .tracker-status{gap:10px;min-width:0;flex:1 1 auto;flex-wrap:nowrap;overflow:hidden}
-.tracker-labels{min-width:0;overflow:hidden}
+.tracker-labels{min-width:0;overflow:hidden;flex:1}
 .tracker-state{font-size:.8rem;font-weight:800}
-.tracker-task{font-size:.72rem;color:var(--text-muted);font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* FULL task title — wraps instead of being sliced ("Principles of
+   Marketing: Introduction to Marketing Principles" shows in full). */
+.tracker-task{
+  font-size:.72rem;color:var(--text-muted);font-weight:650;line-height:1.35;
+  white-space:normal;overflow-wrap:anywhere;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+}
 .tracker-time{font-size:1.2rem;font-weight:800;font-variant-numeric:tabular-nums;flex-shrink:0}
 .tracker-actions{flex-shrink:0}
 
@@ -1941,7 +1995,9 @@ html{scroll-behavior:smooth}
   .tracker-status{gap:8px}
   .tracker-status .pulse-dot{width:8px;height:8px}
   .tracker-state{font-size:.72rem;white-space:nowrap}
-  .tracker-task{font-size:.6rem;max-width:96px}
+  /* single line, ellipsis — the pill is tiny on phones, and the full
+     title is always available on the Focus/Planner pages */
+  .tracker-task{font-size:.6rem;-webkit-line-clamp:1}
   .tracker-time{font-size:.95rem}
   .tracker-actions{gap:5px;flex-wrap:nowrap}
   .tracker-actions .chip{display:none}
@@ -2077,8 +2133,150 @@ button,a,.nav-item,.vtab,.cal-cell,.chip,.task-row,.rate-btn,input,select{touch-
   body.focus-live .tracker-actions .btn-xs{padding:6px 8px;font-size:.6rem}
 }
 
-/* ═══ COLLAPSED SIDEBAR — no clipped text ever ═══
-   Text hides the INSTANT the class applies; the shrinking container
-   clips cleanly during the width transition. */
-.sidebar{overflow:hidden}
-.brand-title,.brand-course{white-space:nowrap}
+/* ═══════════════════════════════════════════════════════════════
+   COLLAPSIBLE SIDEBAR — properly sized toggle + smooth icon-rail state
+═══════════════════════════════════════════════════════════════ */
+.sidebar{overflow:hidden;transition:width .32s var(--spring-soft),padding .32s var(--spring-soft)}
+/* Toggle: 40px round button, pinned top-right of the brand header.
+   Big enough to hit confidently on tablets and touch laptops. */
+.sb-toggle{
+  position:absolute;top:2px;right:0;width:40px;height:40px;border-radius:var(--radius-md);
+  display:flex;align-items:center;justify-content:center;cursor:pointer;
+  background:transparent;border:1px solid transparent;color:var(--text-muted);
+  transition:background .15s ease,color .15s ease,transform .15s var(--spring);
+  z-index:2;flex-shrink:0;
+}
+.sb-toggle:hover{background:var(--row-hover);color:var(--text-main);border-color:var(--glass-border)}
+.sb-toggle:active{transform:scale(.92)}
+.sb-toggle svg{transition:transform .3s var(--spring-soft)}
+
+/* ── Collapsed rail: icons only ── */
+.app-wrapper.sb-collapsed .sidebar{width:78px;padding-left:10px;padding-right:10px}
+.app-wrapper.sb-collapsed .sb-toggle{position:static;margin:0 auto 12px}
+.app-wrapper.sb-collapsed .sb-toggle svg{transform:rotate(180deg)}
+.app-wrapper.sb-collapsed .brand-header{justify-content:center;padding:0 0 14px}
+.app-wrapper.sb-collapsed .brand-text{display:none}
+.app-wrapper.sb-collapsed .brand-header{display:flex}
+.app-wrapper.sb-collapsed .nav-list{gap:6px;margin-top:6px}
+.app-wrapper.sb-collapsed .nav-item{justify-content:center;padding:11px 0;gap:0}
+.app-wrapper.sb-collapsed .nav-item span{display:none}
+.app-wrapper.sb-collapsed .nav-item svg{width:20px;height:20px}
+.app-wrapper.sb-collapsed .sidebar-foot{display:none}
+/* icon-only nav keeps its pill geometry centred */
+.app-wrapper.sb-collapsed .nav-item.active::before{display:none}
+@media(min-width:861px) and (max-width:1100px){
+  .app-wrapper.sb-collapsed .sidebar{width:68px}
+}
+/* On mobile the sidebar IS the bottom dock — the collapse toggle is hidden */
+@media(max-width:860px){
+  .sb-toggle{display:none}
+  .brand-header{padding-right:6px}
+}
+/* Icons need the room; the rail never clips tooltips (native title attr) */
+
+/* ═══════════════════════════════════════════════════════════════
+   BUILD v3 — truncation fixes · sidebar collapse · voice review ·
+   structured toasts · confirm-wipe dialog · device coverage
+═══════════════════════════════════════════════════════════════ */
+
+/* ── AI sheet grab handle (visible on phones, hidden on desktop) ── */
+.ai-sheet-handle{
+  display:none;width:40px;height:4.5px;border-radius:99px;margin:8px auto 0;
+  background:var(--text-dim);opacity:.45;flex-shrink:0;
+}
+
+/* ── Voice: generous tap target + review hint strip ── */
+.voice-btn{width:44px;height:44px}
+.voice-hint{
+  padding:7px 14px;font-size:.74rem;font-weight:600;
+  color:var(--warning-accent);background:var(--status-pending-bg);
+  border-top:1px solid var(--glass-border);
+}
+.voice-hint + .ai-quick{border-top:none}
+@media(max-width:640px){
+  .voice-btn{width:46px;height:46px}
+}
+
+/* ── Confirm-wipe dialog (Re-run Setup) ── */
+.confirm-box{max-width:440px;text-align:left}
+.confirm-icon{
+  width:46px;height:46px;border-radius:14px;margin-bottom:14px;
+  display:flex;align-items:center;justify-content:center;
+  background:var(--status-pending-bg);color:var(--warning-accent);
+}
+.confirm-box .flex-row{gap:10px}
+.confirm-box .btn{flex:1 1 auto}
+
+/* ── Onboarding wipe banner (re-run mode) ── */
+.ob-wipe-banner{
+  position:fixed;top:0;left:0;right:0;z-index:600;
+  background:var(--status-pending-bg);color:var(--status-pending-text);
+  font-size:.78rem;font-weight:650;text-align:center;
+  padding:9px 16px calc(9px + env(safe-area-inset-top));
+}
+.ob-overlay:has(.ob-wipe-banner){padding-top:calc(66px + env(safe-area-inset-top))}
+.ob-wipe-banner strong{font-weight:800}
+@media(max-width:640px){
+  .ob-wipe-banner{font-size:.72rem;padding:8px 14px calc(8px + env(safe-area-inset-top))}
+}
+
+/* ── Cross-device robustness ──
+   Tiny (320px) → phone (S24 ~384px) → tablet → desktop → 4K TV.
+   Everything already flows; these rules tune the extremes. */
+@media(max-width:340px){
+  .kpi-grid{grid-template-columns:1fr 1fr;gap:6px}
+  .kpi-card{padding:10px;min-height:74px}
+  .kpi-value{font-size:1.25rem}
+  .page-header{gap:8px}
+  .task-row{padding:10px}
+  .tracker-bar{padding:8px 10px;gap:6px}
+}
+
+/* Small tablets & large phones landscape: floating chat returns to
+   a comfortable panel instead of a full sheet */
+@media(min-width:641px) and (max-width:860px){
+  .ai-panel{height:min(66vh,560px)}
+}
+
+/* Big desktop / smart TV (1080p→4K): more air, capped width, bigger
+   type rhythm — nothing stretches or breaks on huge canvases */
+@media(min-width:1800px){
+  :root{--sidebar-w:280px}
+  .app-wrapper{max-width:1700px;gap:26px;padding:28px}
+  .main-workspace{padding-bottom:80px}
+  .page-title{font-size:2.3rem}
+  .kpi-grid{gap:20px}
+  .dash-grid-2{gap:20px}
+  .tracker-bar{padding:16px 26px;border-radius:999px}
+  .ai-panel{width:min(460px,calc(100vw - 48px));height:min(680px,calc(100vh - 150px))}
+}
+@media(min-width:2400px){
+  .app-wrapper{max-width:1900px}
+  .kpi-grid{grid-template-columns:repeat(4,1fr)}
+}
+@media(max-height:600px) and (min-width:861px){
+  /* short desktop windows: slimmer top bar, tighter page header */
+  .tracker-bar{padding:9px 18px;margin-bottom:16px}
+  .page-header{margin-bottom:14px}
+}
+
+/* Toast shouldn't collide with the collapsed rail or sheet on tablets */
+@media(min-width:641px) and (max-width:860px){
+  .toast{bottom:calc(96px + env(safe-area-inset-bottom));right:14px}
+}
+
+/* Ensure the sticky tracker bar never clips its two-line title */
+.tracker-bar{align-items:center}
+.tracker-labels{display:flex;flex-direction:column;gap:2px;justify-content:center}
+
+/* Nav keyboard affordance */
+.nav-item:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* Wizard cancel link (re-run mode) — available on every step */
+.ob-cancel-link{
+  display:block;margin:14px auto 0;background:none;border:none;cursor:pointer;
+  font-family:inherit;font-size:.8rem;font-weight:650;color:var(--text-muted);
+  text-decoration:underline;text-underline-offset:3px;padding:6px 10px;
+}
+.ob-cancel-link:hover{color:var(--text-main)}
+.ob-cancel-link:disabled{opacity:.5;cursor:not-allowed}

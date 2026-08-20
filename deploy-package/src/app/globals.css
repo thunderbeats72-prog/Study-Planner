@@ -6,7 +6,7 @@
 :root {
   /* ═══ Study Planner Pro — Master Brand Tokens (guideline §47) ═══ */
   --color-primary:#5B5CE2; --color-primary-hover:#4647C8; --color-primary-soft:#EEF0FF;
-  --color-ai:#8B5CF6; --color-ai-soft:#F3EEFF; --ai-rgb:139,92,246; --color-ai-bright:#9B6DF8;
+  --color-ai:#7C3AED; --color-ai-soft:#F1EAFE; --ai-rgb:124,58,237; --color-ai-bright:#8F5BF3;
   --radius-sm:6px; --radius-md:10px; --radius-lg:14px; --radius-xl:18px;
   --shadow-sm:0 1px 3px rgba(15,23,42,0.05);
   --shadow-md:0 4px 16px rgba(15,23,42,0.07);
@@ -37,11 +37,11 @@
   --font-display:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
 }
 
-body.theme-dark{--color-ai:#A78BFA;--color-ai-soft:rgba(167,139,250,.12);--ai-rgb:167,139,250;--color-ai-bright:#B79EFB;--app-bg:#0B0E1A;--bg-gradient:radial-gradient(1100px 480px at 50% -12%,rgba(129,140,248,.13),transparent 65%);--surface:#141829;--surface-solid:#141829;--surface-elevated:#1B2035;--surface-hover:#1C2138;--glass-border:#262D45;--glass-border-hover:#39415F;--glass-shadow:0 1px 3px rgba(0,0,0,.45);--glass-shadow-hover:0 8px 28px rgba(0,0,0,.5);--text-main:#F4F6FF;--text-muted:#A9B1CC;--text-dim:#606A8A;--accent:#818CF8;--accent-hover:#93A0FB;--accent-light:#A5B0FA;--accent-glow:rgba(129,140,248,.22);--accent-gradient:linear-gradient(135deg,#8B96F9,#6366F1);--nav-active-bg:rgba(129,140,248,.14);--nav-active-text:#B0B9FB;--nav-active-border:rgba(129,140,248,.32);--row-bg:rgba(255,255,255,.035);--row-hover:rgba(255,255,255,.07);--status-pending-bg:rgba(245,176,65,.16);--status-pending-text:#F0BE6E;--status-done-bg:rgba(52,211,153,.15);--status-done-text:#5EE0A8;--status-skipped-bg:rgba(248,113,113,.15);--status-skipped-text:#F49E9E;--chart-bar:rgba(129,140,248,.75);--input-bg:#1B2035}
-body.theme-obsidian{--color-ai:#5BC9F9;--color-ai-soft:rgba(91,201,249,.12);--ai-rgb:91,201,249;--color-ai-bright:#7DD3FC;--surface-elevated:#1A2338;--app-bg:#0B0F1A;--bg-gradient:radial-gradient(1000px 420px at 50% -12%,rgba(56,189,248,.05),transparent 70%);--surface:#131A2A;--surface-solid:#131A2A;--surface-hover:#1A2338;--glass-border:#263349;--glass-border-hover:#354765;--glass-shadow:0 1px 3px rgba(0,0,0,.35);--glass-shadow-hover:0 6px 20px rgba(0,0,0,.45);--text-main:#F1F5F9;--text-muted:#94A3B8;--text-dim:#556179;--accent:#38BDF8;--accent-hover:#5BC9F9;--accent-light:#7DD3FC;--accent-glow:rgba(56,189,248,.14);--accent-gradient:linear-gradient(180deg,#4CC5F9,#22A8E6);--nav-active-bg:rgba(56,189,248,.11);--nav-active-text:#7DD3FC;--nav-active-border:rgba(56,189,248,.26);--row-bg:rgba(255,255,255,.03);--row-hover:rgba(255,255,255,.06);--status-pending-bg:rgba(229,154,36,.14);--status-pending-text:#E0B35C;--status-done-bg:rgba(22,163,122,.14);--status-done-text:#4BC59E;--status-skipped-bg:rgba(224,82,82,.14);--status-skipped-text:#E58080;--chart-bar:rgba(56,189,248,.6);--input-bg:#1A2338}
-body.theme-nebula{--color-ai:#C084FC;--color-ai-soft:rgba(192,132,252,.13);--ai-rgb:192,132,252;--color-ai-bright:#D8B4FE;--surface-elevated:#221940;--app-bg:#100B20;--bg-gradient:radial-gradient(1000px 420px at 50% -12%,rgba(168,85,247,.07),transparent 70%);--surface:#191230;--surface-solid:#191230;--surface-hover:#221940;--glass-border:#32264F;--glass-border-hover:#453567;--glass-shadow:0 1px 3px rgba(0,0,0,.4);--glass-shadow-hover:0 6px 20px rgba(0,0,0,.5);--text-main:#F5F3FA;--text-muted:#B3A6D4;--text-dim:#6A5C90;--accent:#A855F7;--accent-hover:#B672F9;--accent-light:#C495FA;--accent-glow:rgba(168,85,247,.15);--accent-gradient:linear-gradient(180deg,#B168F8,#9333EA);--nav-active-bg:rgba(168,85,247,.12);--nav-active-text:#D8B4FE;--nav-active-border:rgba(168,85,247,.28);--row-bg:rgba(255,255,255,.03);--row-hover:rgba(255,255,255,.06);--status-pending-bg:rgba(229,154,36,.14);--status-pending-text:#E0B35C;--status-done-bg:rgba(22,163,122,.14);--status-done-text:#4BC59E;--status-skipped-bg:rgba(224,82,82,.14);--status-skipped-text:#E58080;--chart-bar:rgba(168,85,247,.6);--input-bg:#221940}
-body.theme-mint{--color-ai:#0D9488;--color-ai-soft:#E5F5F2;--ai-rgb:13,148,136;--color-ai-bright:#14B8A6;--app-bg:#F4FAF7;--bg-gradient:radial-gradient(1100px 460px at 50% -12%,rgba(16,163,127,.06),transparent 70%);--surface:#FFFFFF;--surface-solid:#FFFFFF;--surface-hover:#F8FCFA;--glass-border:#E2EDE7;--glass-border-hover:#CFE2D8;--glass-shadow:0 1px 3px rgba(6,78,59,.05);--glass-shadow-hover:0 4px 16px rgba(6,78,59,.08);--text-main:#0E2A20;--text-muted:#5B7268;--text-dim:#93A8A0;--accent:#0FA37F;--accent-hover:#0C8A6B;--accent-light:#34D399;--accent-glow:rgba(15,163,127,.13);--accent-gradient:linear-gradient(180deg,#16B08A,#0FA37F);--nav-active-bg:#E5F5EF;--nav-active-text:#0C7A60;--nav-active-border:rgba(15,163,127,.22);--row-bg:#F4FAF7;--row-hover:#EAF5F0;--chart-bar:rgba(15,163,127,.55);--input-bg:#FFFFFF}
-body.theme-sunset{--color-ai:#D9530B;--color-ai-soft:#FBEDE3;--ai-rgb:217,83,11;--color-ai-bright:#F97316;--app-bg:#FBF6F1;--bg-gradient:radial-gradient(1100px 460px at 50% -12%,rgba(234,88,12,.05),transparent 70%);--surface:#FFFFFF;--surface-solid:#FFFFFF;--surface-hover:#FDF9F5;--glass-border:#F0E5DC;--glass-border-hover:#E4D2C4;--glass-shadow:0 1px 3px rgba(67,20,7,.05);--glass-shadow-hover:0 4px 16px rgba(67,20,7,.08);--text-main:#2D1A10;--text-muted:#77604F;--text-dim:#AE9C8D;--accent:#E1620F;--accent-hover:#C4540C;--accent-light:#FB923C;--accent-glow:rgba(225,98,15,.13);--accent-gradient:linear-gradient(180deg,#EE6F1B,#DC5E0C);--nav-active-bg:#FBEDE0;--nav-active-text:#B34E0A;--nav-active-border:rgba(225,98,15,.22);--row-bg:#FBF6F1;--row-hover:#F6EDE3;--chart-bar:rgba(225,98,15,.55);--input-bg:#FFFFFF}
+body.theme-dark{--color-ai:#9C9CF6;--color-ai-soft:rgba(156,156,246,.12);--ai-rgb:156,156,246;--color-ai-bright:#B6B6F9;--app-bg:#050506;--bg-gradient:radial-gradient(1100px 480px at 50% -12%,rgba(255,255,255,.04),transparent 65%);--surface:#0E0E10;--surface-solid:#0E0E10;--surface-elevated:#161618;--surface-hover:#1A1A1D;--glass-border:#232326;--glass-border-hover:#333338;--glass-shadow:0 1px 3px rgba(0,0,0,.6);--glass-shadow-hover:0 8px 28px rgba(0,0,0,.65);--text-main:#F5F5F7;--text-muted:#A3A3AB;--text-dim:#5C5C66;--accent:#8A8AF4;--accent-hover:#9C9CF6;--accent-light:#AEAEF8;--accent-glow:rgba(138,138,244,.2);--accent-gradient:linear-gradient(135deg,#9494F5,#6E6EF0);--nav-active-bg:rgba(138,138,244,.13);--nav-active-text:#B4B4F9;--nav-active-border:rgba(138,138,244,.3);--row-bg:rgba(255,255,255,.035);--row-hover:rgba(255,255,255,.07);--status-pending-bg:rgba(245,176,65,.15);--status-pending-text:#EFBE6E;--status-done-bg:rgba(52,211,153,.14);--status-done-text:#5EE0A8;--status-skipped-bg:rgba(248,113,113,.14);--status-skipped-text:#F49E9E;--chart-bar:rgba(138,138,244,.75);--input-bg:#161618}
+body.theme-obsidian{--color-ai:#4CC5F9;--color-ai-soft:rgba(76,197,249,.12);--ai-rgb:76,197,249;--color-ai-bright:#7DD3FC;--surface-elevated:#1A2338;--app-bg:#0B0F1A;--bg-gradient:radial-gradient(1000px 420px at 50% -12%,rgba(56,189,248,.05),transparent 70%);--surface:#131A2A;--surface-solid:#131A2A;--surface-hover:#1A2338;--glass-border:#263349;--glass-border-hover:#354765;--glass-shadow:0 1px 3px rgba(0,0,0,.35);--glass-shadow-hover:0 6px 20px rgba(0,0,0,.45);--text-main:#F1F5F9;--text-muted:#94A3B8;--text-dim:#556179;--accent:#38BDF8;--accent-hover:#5BC9F9;--accent-light:#7DD3FC;--accent-glow:rgba(56,189,248,.14);--accent-gradient:linear-gradient(180deg,#4CC5F9,#22A8E6);--nav-active-bg:rgba(56,189,248,.11);--nav-active-text:#7DD3FC;--nav-active-border:rgba(56,189,248,.26);--row-bg:rgba(255,255,255,.03);--row-hover:rgba(255,255,255,.06);--status-pending-bg:rgba(229,154,36,.14);--status-pending-text:#E0B35C;--status-done-bg:rgba(22,163,122,.14);--status-done-text:#4BC59E;--status-skipped-bg:rgba(224,82,82,.14);--status-skipped-text:#E58080;--chart-bar:rgba(56,189,248,.6);--input-bg:#1A2338}
+body.theme-nebula{--color-ai:#BF7DFA;--color-ai-soft:rgba(191,125,250,.13);--ai-rgb:191,125,250;--color-ai-bright:#D8B4FE;--surface-elevated:#221940;--app-bg:#100B20;--bg-gradient:radial-gradient(1000px 420px at 50% -12%,rgba(168,85,247,.07),transparent 70%);--surface:#191230;--surface-solid:#191230;--surface-hover:#221940;--glass-border:#32264F;--glass-border-hover:#453567;--glass-shadow:0 1px 3px rgba(0,0,0,.4);--glass-shadow-hover:0 6px 20px rgba(0,0,0,.5);--text-main:#F5F3FA;--text-muted:#B3A6D4;--text-dim:#6A5C90;--accent:#A855F7;--accent-hover:#B672F9;--accent-light:#C495FA;--accent-glow:rgba(168,85,247,.15);--accent-gradient:linear-gradient(180deg,#B168F8,#9333EA);--nav-active-bg:rgba(168,85,247,.12);--nav-active-text:#D8B4FE;--nav-active-border:rgba(168,85,247,.28);--row-bg:rgba(255,255,255,.03);--row-hover:rgba(255,255,255,.06);--status-pending-bg:rgba(229,154,36,.14);--status-pending-text:#E0B35C;--status-done-bg:rgba(22,163,122,.14);--status-done-text:#4BC59E;--status-skipped-bg:rgba(224,82,82,.14);--status-skipped-text:#E58080;--chart-bar:rgba(168,85,247,.6);--input-bg:#221940}
+body.theme-mint{--color-ai:#10B389;--color-ai-soft:#E3F6F0;--ai-rgb:16,179,137;--color-ai-bright:#2DD4A8;--app-bg:#F4FAF7;--bg-gradient:radial-gradient(1100px 460px at 50% -12%,rgba(16,163,127,.06),transparent 70%);--surface:#FFFFFF;--surface-solid:#FFFFFF;--surface-hover:#F8FCFA;--glass-border:#E2EDE7;--glass-border-hover:#CFE2D8;--glass-shadow:0 1px 3px rgba(6,78,59,.05);--glass-shadow-hover:0 4px 16px rgba(6,78,59,.08);--text-main:#0E2A20;--text-muted:#5B7268;--text-dim:#93A8A0;--accent:#0FA37F;--accent-hover:#0C8A6B;--accent-light:#34D399;--accent-glow:rgba(15,163,127,.13);--accent-gradient:linear-gradient(180deg,#16B08A,#0FA37F);--nav-active-bg:#E5F5EF;--nav-active-text:#0C7A60;--nav-active-border:rgba(15,163,127,.22);--row-bg:#F4FAF7;--row-hover:#EAF5F0;--chart-bar:rgba(15,163,127,.55);--input-bg:#FFFFFF}
+body.theme-sunset{--color-ai:#EE7118;--color-ai-soft:#FBEFE2;--ai-rgb:238,113,24;--color-ai-bright:#FB923C;--app-bg:#FBF6F1;--bg-gradient:radial-gradient(1100px 460px at 50% -12%,rgba(234,88,12,.05),transparent 70%);--surface:#FFFFFF;--surface-solid:#FFFFFF;--surface-hover:#FDF9F5;--glass-border:#F0E5DC;--glass-border-hover:#E4D2C4;--glass-shadow:0 1px 3px rgba(67,20,7,.05);--glass-shadow-hover:0 4px 16px rgba(67,20,7,.08);--text-main:#2D1A10;--text-muted:#77604F;--text-dim:#AE9C8D;--accent:#E1620F;--accent-hover:#C4540C;--accent-light:#FB923C;--accent-glow:rgba(225,98,15,.13);--accent-gradient:linear-gradient(180deg,#EE6F1B,#DC5E0C);--nav-active-bg:#FBEDE0;--nav-active-text:#B34E0A;--nav-active-border:rgba(225,98,15,.22);--row-bg:#FBF6F1;--row-hover:#F6EDE3;--chart-bar:rgba(225,98,15,.55);--input-bg:#FFFFFF}
 
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{padding:0;margin:0}
@@ -66,10 +66,13 @@ body{
   transition:box-shadow var(--anim-dur) ease,border-color var(--anim-dur) ease;
 }
 .tilt-card:hover{box-shadow:var(--glass-shadow-hover);border-color:var(--glass-border-hover)}
-.brand-header{display:flex;align-items:center;gap:11px;padding:0 6px 18px;margin-bottom:6px;border-bottom:1px solid var(--glass-border)}
+.brand-header{display:flex;align-items:center;gap:11px;padding:0 44px 18px 6px;margin-bottom:6px;border-bottom:1px solid var(--glass-border);position:relative}
+.brand-text{flex:1;min-width:0}
 .brand-logo-icon{width:34px;height:34px;border-radius:var(--radius-md);background:var(--accent-gradient);color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 1px 2px rgba(22,22,29,.2),inset 0 1px 0 rgba(255,255,255,.18)}
 .brand-title{font-family:var(--font-display);font-size:.93rem;font-weight:700;letter-spacing:-.25px;line-height:1.1}
-.brand-course{font-size:.7rem;color:var(--text-muted);font-weight:600;margin-top:2px}
+/* Full course name ALWAYS visible — wraps to as many lines as needed
+   ("B.Com (Honours) (Marketing and Banking)" never gets chopped). */
+.brand-course{font-size:.7rem;color:var(--text-muted);font-weight:600;margin-top:2px;white-space:normal;overflow-wrap:anywhere;line-height:1.35}
 .nav-list{display:flex;flex-direction:column;gap:4px;margin-top:14px}
 .nav-item{display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:var(--radius-md);font-size:.85rem;font-weight:550;color:var(--text-muted);cursor:pointer;border:1px solid transparent;transition:background .15s ease,color .15s ease;user-select:none}
 .nav-item:hover{background:var(--row-hover);color:var(--text-main)}
@@ -193,11 +196,11 @@ select.input-field{appearance:none;background-image:linear-gradient(45deg,transp
 .ob-level-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-bottom:20px}
 .ob-level-btn{padding:15px;border-radius:var(--radius-lg);border:1.5px solid var(--glass-border);background:var(--row-bg);color:var(--text-main);font-size:.88rem;font-weight:750;cursor:pointer;text-align:left;transition:all .2s ease;font-family:inherit}
 .ob-level-btn:hover{border-color:var(--accent);background:var(--row-hover)}
-.ob-level-btn.selected{border-color:var(--accent);background:var(--accent-glow);box-shadow:0 0 0 3px var(--accent-glow)}
+.ob-level-btn.selected{border-color:var(--accent);background:var(--nav-active-bg);color:var(--nav-active-text);box-shadow:0 0 0 3px var(--accent-glow)}
 .ob-course-list{max-height:270px;overflow-y:auto;display:flex;flex-direction:column;gap:7px;margin-bottom:16px}
 .ob-course-item{display:flex;align-items:center;gap:11px;padding:12px 14px;border-radius:var(--radius-md);border:1.5px solid transparent;background:var(--row-bg);font-size:.86rem;font-weight:650;cursor:pointer;transition:all .2s ease}
 .ob-course-item:hover{background:var(--row-hover)}
-.ob-course-item.selected{border-color:var(--accent);background:var(--accent-glow)}
+.ob-course-item.selected{border-color:var(--accent);background:var(--nav-active-bg);color:var(--nav-active-text)}
 .ob-course-check{width:19px;height:19px;border-radius:var(--radius-sm);border:1.5px solid var(--glass-border-hover);display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .ob-course-item.selected .ob-course-check{background:var(--accent);border-color:var(--accent)}
 .ob-subs-grid{display:flex;flex-direction:column;gap:8px;max-height:250px;overflow-y:auto;margin-bottom:12px}
@@ -233,10 +236,10 @@ select.input-field{appearance:none;background-image:linear-gradient(45deg,transp
 body.theme-dark .ai-panel,body.theme-obsidian .ai-panel,body.theme-nebula .ai-panel{box-shadow:0 8px 28px rgba(0,0,0,.55),0 32px 90px rgba(0,0,0,.45)}
 /* Header: violet AI identity strip with soft luminous wash */
 .ai-head{padding:15px 18px;display:flex;align-items:center;gap:11px;position:relative;
-  background:linear-gradient(135deg,rgba(var(--ai-rgb),.12),rgba(var(--ai-rgb),0) 65%),var(--surface-elevated);
+  background:var(--surface-elevated);
   border-bottom:1px solid var(--glass-border);color:var(--text-main)}
-.ai-head::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:1px;
-  background:linear-gradient(90deg,rgba(var(--ai-rgb),.5),transparent 60%)}
+.ai-head::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:1.5px;
+  background:linear-gradient(90deg,rgba(var(--ai-rgb),.55),rgba(var(--ai-rgb),.08) 70%,transparent)}
 .ai-status{font-size:.64rem;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--color-ai);display:inline-flex;align-items:center;gap:5px}
 .ai-status::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--color-ai);animation:aiPulse 2.4s ease-in-out infinite}
 @keyframes aiPulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(var(--ai-rgb),.4)}50%{opacity:.6;box-shadow:0 0 0 4px rgba(var(--ai-rgb),0)}}
@@ -348,18 +351,28 @@ body.theme-dark .tracker-bar,body.theme-obsidian .tracker-bar,body.theme-nebula 
   textarea.input-field{resize:vertical;min-height:86px}
 }
 @media(max-width:640px){
-  .tracker-bar{position:relative;top:auto;padding:14px;align-items:stretch;flex-direction:column;border-radius:var(--radius-xl)}
-  .tracker-bar > .flex-row{width:100%;justify-content:space-between}
-  .tracker-bar > .flex-row:last-child{flex-wrap:wrap;gap:8px}
-  .tracker-bar .btn-xs{flex:1;min-width:88px;justify-content:center}
   .heat-cell{width:11px;height:11px}
+  /* AI chat = true full-screen bottom sheet on phones (431-640px band
+     included): grab handle, 86dvh height, safe-area padded input */
+  .ai-panel{
+    bottom:0;right:0;left:0;width:100%;height:min(86dvh,680px);
+    border-radius:var(--radius-xl) var(--radius-xl) 0 0;
+    box-shadow:0 -10px 40px rgba(10,12,26,.2);
+  }
+  .ai-sheet-handle{display:block}
+  .ai-head{padding:12px 14px 12px 16px}
+  .ai-msgs{padding:12px 14px;gap:10px}
+  .ai-quick{overflow-x:auto;flex-wrap:nowrap;scrollbar-width:none;padding:8px 14px 12px}
+  .ai-quick::-webkit-scrollbar{display:none}
+  .ai-quick button{flex-shrink:0}
+  .ai-input-row{padding:10px 12px calc(10px + env(safe-area-inset-bottom));gap:8px}
+  .ai-msg{max-width:92%;font-size:.82rem}
   /* Structured mobile task card: title block on top (full width),
      then one clean action row. No arbitrary wrap order. */
-  .task-row{flex-wrap:wrap;gap:6px 8px;padding:12px;border-radius:var(--radius-md);background:var(--surface);border:1px solid var(--glass-border)}
-  .task-row > .task-dot{position:absolute;margin:0}
-  .task-row{position:relative}
-  .task-row > div[style*="flex: 1"]{flex-basis:100%;order:-1;margin-bottom:4px;padding-left:16px}
-  .task-row .task-dot{left:12px;top:17px}
+  .task-row{position:relative;flex-wrap:wrap;gap:6px 8px;padding:12px;border-radius:var(--radius-md);background:var(--surface);border:1px solid var(--glass-border)}
+  .task-row > .task-dot{position:absolute;left:12px;top:19px;margin:0}
+  /* Title block ALWAYS takes the full card width on phones */
+  .task-main{flex:1 1 100%;width:100%;min-width:100%;order:-1;margin-bottom:4px;padding-left:22px}
   .task-row .task-title{font-size:.84rem;line-height:1.35}
   .task-row .task-sub{font-size:.68rem;line-height:1.5;margin-top:3px}
   .task-row > .chip{order:1;font-size:.58rem;padding:3px 8px;margin-right:auto}
@@ -827,8 +840,8 @@ button{-webkit-tap-highlight-color:transparent}
 
 
 /* ═══ AI IDENTITY (guideline §6, §25) — violet, scoped to AI only ═══ */
-.ai-fab{background:linear-gradient(180deg,var(--color-ai-bright),var(--color-ai));transition:background .4s ease}
-.ai-panel .brand-logo-icon{background:linear-gradient(180deg,var(--color-ai-bright),var(--color-ai));box-shadow:none;transition:background .4s ease}
+.ai-fab{background:linear-gradient(180deg,var(--color-ai-bright),var(--color-ai)) !important;transition:background .4s ease,transform .25s var(--spring)}
+.ai-panel .brand-logo-icon{background:linear-gradient(180deg,var(--color-ai-bright),var(--color-ai)) !important;box-shadow:none;transition:background .4s ease}
 
 
 /* ═══ AGE-ADAPTIVE PRESENTATION ═════════════════════════════════
@@ -985,7 +998,6 @@ img,svg,video,canvas{max-width:100%;height:auto}
 @media(max-width:430px){
   .app-wrapper{padding-left:10px;padding-right:10px}
   .main-workspace{padding-left:0;padding-right:0}
-  .tracker-bar{padding:12px;gap:8px}
   .tracker-bar .btn-xs{min-width:0;flex:1 1 auto}
   .page-header{gap:10px;margin-bottom:16px}
   .page-header .btn{width:100%}
@@ -999,8 +1011,13 @@ img,svg,video,canvas{max-width:100%;height:auto}
   .cal-cell .cal-num{font-size:.68rem}
   .vtab{padding:8px 4px;font-size:.72rem}
   .modal-box{padding:14px 12px calc(16px + env(safe-area-inset-bottom))}
-  .ai-panel{bottom:0;right:0;left:0;width:100%;height:min(82vh,640px);border-radius:var(--radius-xl) var(--radius-xl) 0 0}
+  .ai-panel{
+    bottom:0;right:0;left:0;width:100%;height:min(86dvh,680px);
+    border-radius:var(--radius-xl) var(--radius-xl) 0 0;
+    box-shadow:0 -10px 40px rgba(10,12,26,.2);
+  }
   .ai-fab{bottom:calc(88px + env(safe-area-inset-bottom))}
+  .ai-sheet-handle{display:block}
   .rating-btns{gap:5px}
   .heat-cell{width:9px;height:9px}
   .streak-badge{font-size:.66rem;padding:4px 9px}
@@ -1010,7 +1027,6 @@ img,svg,video,canvas{max-width:100%;height:auto}
 @media(max-width:360px){
   .kpi-grid{grid-template-columns:1fr 1fr;gap:8px}
   .kpi-value{font-size:1.35rem}
-  .tracker-bar > .flex-row:first-child .mono{display:none} /* timer lives in Focus */
   .chip{font-size:.56rem;padding:2px 7px}
   .vtab{font-size:.66rem}
 }
@@ -1037,7 +1053,6 @@ img,svg,video,canvas{max-width:100%;height:auto}
 
 /* 9. Short-viewport phones in landscape & in-app browsers */
 @media(max-height:600px) and (max-width:900px){
-  .tracker-bar{position:relative;top:auto}
   .timer-ring-wrap{width:150px;height:150px}
 }
 
@@ -1175,7 +1190,7 @@ body.mode-focused .kpi-value{animation:none}
   .kpi-card:hover{transform:translateY(-2px)}
 }
 
-/* ── D. AETHER entrance: panel + FAB morph feel ── */
+/* ── D. SHIGUN entrance: panel + FAB morph feel ── */
 .ai-fab svg{transition:transform .35s var(--spring)}
 .ai-fab:hover svg{transform:rotate(90deg)}
 .ai-quick button{animation:rowIn .3s var(--spring-soft) backwards}
@@ -1251,17 +1266,52 @@ body.mode-focused .main-workspace > :not(.tracker-bar){animation:none}
    design-system quality, with alignment hardening throughout.
 ═══════════════════════════════════════════════════════════════ */
 
-/* ── Toast: brand notification pill (replaces inline styles) ── */
+/* ── Toast: structured notification card (icon + message + close) ──
+   Desktop: bottom-right, stacked above the AI fab. Mobile: bottom-center
+   above the dock. Never floats at the top of the screen anymore. */
 .toast{
-  position:fixed;bottom:max(96px,calc(76px + env(safe-area-inset-bottom)));left:50%;z-index:350;
-  padding:12px 22px;font-size:.86rem;font-weight:600;color:var(--text-main);
+  position:fixed;right:22px;bottom:88px;z-index:400;
+  display:flex;align-items:center;gap:11px;
+  max-width:min(380px,calc(100vw - 28px));
+  padding:11px 14px;
+  font-size:.84rem;font-weight:600;line-height:1.45;color:var(--text-main);
   background:var(--surface-elevated);border:1px solid var(--glass-border);
-  border-radius:999px;box-shadow:var(--shadow-lg);
-  max-width:min(480px,calc(100vw - 32px));text-align:center;
-  animation:toastIn .4s var(--spring) forwards;
+  border-left:3px solid var(--accent);
+  border-radius:var(--radius-lg);box-shadow:0 6px 18px rgba(10,12,26,.12),0 24px 60px rgba(10,12,26,.16);
+  animation:toastIn .38s var(--spring-soft) backwards;
 }
-@keyframes toastIn{from{opacity:0;transform:translate(-50%,14px) scale(.95)}to{opacity:1;transform:translate(-50%,0) scale(1)}}
-@media(max-width:640px){.toast{bottom:calc(96px + env(safe-area-inset-bottom));width:calc(100vw - 28px)}}
+.toast-icon{
+  width:26px;height:26px;border-radius:50%;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  background:var(--accent-glow);color:var(--accent);
+}
+.toast-success{border-left-color:var(--success-accent)}
+.toast-success .toast-icon{background:var(--status-done-bg);color:var(--status-done-text)}
+.toast-error{border-left-color:var(--danger-accent)}
+.toast-error .toast-icon{background:var(--status-skipped-bg);color:var(--status-skipped-text)}
+.toast-msg{flex:1;min-width:0;overflow-wrap:anywhere}
+.toast-close{
+  flex-shrink:0;width:26px;height:26px;border-radius:50%;border:none;background:transparent;
+  color:var(--text-dim);font-size:1.05rem;line-height:1;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;font-family:inherit;
+}
+.toast-close:hover{background:var(--row-hover);color:var(--text-main)}
+.toast-life{
+  position:absolute;left:12px;right:12px;bottom:0;height:2px;border-radius:99px;
+  background:currentColor;opacity:.35;transform-origin:left;
+  animation:toastLife 3.4s linear forwards;
+}
+.toast-success .toast-life{color:var(--success-accent)}
+.toast-error .toast-life{color:var(--danger-accent)}
+@keyframes toastIn{from{opacity:0;transform:translateY(12px) scale(.96)}to{opacity:1;transform:none}}
+@media(max-width:640px){
+  .toast{
+    right:12px;left:12px;bottom:calc(96px + env(safe-area-inset-bottom));
+    max-width:none;margin:0 auto;
+    animation:toastUpMobile .38s var(--spring-soft) backwards;
+  }
+}
+@keyframes toastUpMobile{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1;transform:none}}
 
 /* ── Alignment hardening: consistent gutters everywhere ── */
 html{scrollbar-gutter:stable}
@@ -1280,8 +1330,7 @@ html{scrollbar-gutter:stable}
 .ob-progress > div.done{background:var(--accent)}
 .ob-progress > div.done::after{content:"";position:absolute;inset:0;background:linear-gradient(105deg,transparent 30%,rgba(255,255,255,.4) 50%,transparent 70%);transform:translateX(-100%);animation:progShine 2.4s ease-in-out infinite}
 .ob-card{animation:pageIn .4s var(--spring-soft)}
-.ob-level-btn.selected,.ob-level-btn[data-selected="true"]{border-color:var(--accent);background:var(--color-primary-soft);box-shadow:0 0 0 1px var(--accent) inset}
-body.theme-dark .ob-level-btn.selected{background:var(--nav-active-bg)}
+.ob-level-btn.selected,.ob-level-btn[data-selected="true"]{border-color:var(--accent);background:var(--nav-active-bg);color:var(--nav-active-text);box-shadow:0 0 0 1px var(--accent) inset}
 
 /* ── Focus view: timer as the hero ── */
 .timer-ring-wrap{filter:drop-shadow(0 6px 24px var(--accent-glow))}
@@ -1425,11 +1474,11 @@ body.mode-focused .task-row.active-clock .task-dot{animation:none}
 
 /* 4. Card sheen: light sweeps across panels on hover (desktop) */
 @media(hover:hover) and (pointer:fine){
-  .glass-panel{position:relative;overflow:hidden}
-  .glass-panel::after{content:"";position:absolute;top:0;bottom:0;width:60%;left:-80%;
+  .glass-panel:not(.ai-panel){position:relative;overflow:hidden}
+  .glass-panel:not(.ai-panel)::after{content:"";position:absolute;top:0;bottom:0;width:60%;left:-80%;
     background:linear-gradient(105deg,transparent,rgba(255,255,255,.06),transparent);
     transform:skewX(-15deg);transition:left .7s ease;pointer-events:none}
-  .glass-panel:hover::after{left:120%}
+  .glass-panel:not(.ai-panel):hover::after{left:120%}
   body.theme-mint .glass-panel::after,body.theme-sunset .glass-panel::after,
   body:not([class*=theme-]) .glass-panel::after{background:linear-gradient(105deg,transparent,rgba(94,106,210,.05),transparent)}
 }
@@ -1458,8 +1507,6 @@ body.mode-focused .task-row.active-clock .task-dot{animation:none}
 
 /* 10. Toast: progress underline counts down its lifetime */
 .toast{overflow:hidden}
-.toast::after{content:"";position:absolute;left:10%;right:10%;bottom:0;height:2px;border-radius:99px;
-  background:var(--accent);transform-origin:left;animation:toastLife 3.2s linear forwards}
 @keyframes toastLife{from{transform:scaleX(1)}to{transform:scaleX(0)}}
 
 /* 11. Input caret + focus lift */
@@ -1521,6 +1568,7 @@ body.mode-focused .pulse-dot.live::after{animation:none;transition:none}
    ever leak upward regardless of cascade order. */
 @media(min-width:641px){
   .ai-panel{
+    position:fixed !important;
     left:auto !important;right:22px;bottom:88px;
     width:min(430px,calc(100vw - 44px));
     height:min(620px,calc(100vh - 130px));
@@ -1534,3 +1582,701 @@ body.mode-focused .pulse-dot.live::after{animation:none;transition:none}
 .ai-fab{z-index:200}
 .modal-overlay{z-index:300}
 .cmdk-overlay{z-index:400}
+
+
+/* ═══ AI IDENTITY COHESION — every chat element follows the theme ═══ */
+.ai-msg.user{background:linear-gradient(135deg,var(--color-ai-bright),var(--color-ai)) !important;box-shadow:0 2px 10px rgba(var(--ai-rgb),.25)}
+.ai-input-row .btn-primary{background:linear-gradient(180deg,var(--color-ai-bright),var(--color-ai)) !important;border-color:transparent}
+.ai-fab{box-shadow:0 4px 14px rgba(var(--ai-rgb),.35),0 12px 32px rgba(var(--ai-rgb),.22),inset 0 1px 0 rgba(255,255,255,.25) !important}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   SIGNATURE DELIGHT LAYER — universally engaging, 5 to 35 years old
+═══════════════════════════════════════════════════════════════ */
+
+/* 1. THE GLOSS — the shine you loved, everywhere it belongs.
+   KPI cards, buttons, chips, onboarding cards, day blocks. */
+@media(hover:hover) and (pointer:fine){
+  .kpi-card,.btn-primary,.day-block,.ob-level-btn,.streak-badge,.nav-item.active{position:relative;overflow:hidden}
+  .kpi-card::before,.btn-primary::after,.day-block::before,.ob-level-btn::before,.streak-badge::before,.nav-item.active::after{
+    content:"";position:absolute;top:0;bottom:0;width:55%;left:-75%;
+    background:linear-gradient(105deg,transparent,rgba(255,255,255,.16),transparent);
+    transform:skewX(-18deg);transition:left .55s ease;pointer-events:none;
+  }
+  .kpi-card:hover::before,.btn-primary:hover::after,.day-block:hover::before,
+  .ob-level-btn:hover::before,.streak-badge:hover::before{left:120%}
+  .nav-item.active::after{animation:navGloss 3.6s ease 1s infinite}
+  @keyframes navGloss{0%{left:-75%}35%,100%{left:120%}}
+}
+
+/* 2. AURORA CANVAS — a living, slowly-drifting light behind everything.
+   Imperceptibly slow: alive, never distracting. */
+body::before{
+  content:"";position:fixed;inset:-20%;z-index:-1;pointer-events:none;
+  background:
+    radial-gradient(38% 30% at 25% 18%,rgba(var(--ai-rgb),.05),transparent 70%),
+    radial-gradient(32% 28% at 78% 12%,var(--accent-glow),transparent 70%);
+  animation:aurora 26s ease-in-out infinite alternate;
+  opacity:.8;
+}
+@keyframes aurora{
+  0%{transform:translate(0,0) scale(1)}
+  50%{transform:translate(2.5%,1.5%) scale(1.04)}
+  100%{transform:translate(-2%,2.5%) scale(1.02)}
+}
+
+/* 3. KPI progress underlines fill on load, staggered */
+.kpi-card .bar-track .bar-fill{animation:progGrow .9s var(--spring-soft) backwards}
+.kpi-grid .kpi-card:nth-child(2) .bar-fill{animation-delay:.12s}
+.kpi-grid .kpi-card:nth-child(3) .bar-fill{animation-delay:.24s}
+.kpi-grid .kpi-card:nth-child(4) .bar-fill{animation-delay:.36s}
+
+/* 4. Onboarding: level cards pop in like dealt cards */
+.ob-level-grid > *{animation:cardDeal .4s var(--spring) backwards}
+.ob-level-grid > *:nth-child(2){animation-delay:.05s}
+.ob-level-grid > *:nth-child(3){animation-delay:.1s}
+.ob-level-grid > *:nth-child(4){animation-delay:.15s}
+.ob-level-grid > *:nth-child(5){animation-delay:.2s}
+.ob-level-grid > *:nth-child(6){animation-delay:.25s}
+.ob-level-grid > *:nth-child(7){animation-delay:.3s}
+.ob-level-grid > *:nth-child(8){animation-delay:.35s}
+@keyframes cardDeal{from{opacity:0;transform:translateY(14px) scale(.96)}to{opacity:1;transform:none}}
+.ob-level-btn.selected{animation:selectedPulse .45s var(--spring)}
+@keyframes selectedPulse{0%{transform:scale(1)}40%{transform:scale(1.03)}100%{transform:scale(1)}}
+
+/* 5. Subject dots breathe once when their row appears */
+.task-dot{animation:dotPop .45s var(--spring) backwards}
+@keyframes dotPop{from{transform:scale(0)}to{transform:scale(1)}}
+
+/* 6. Weekly chart bars grow from the baseline */
+.wk-bar,.bar-chart > div{transform-origin:bottom;animation:barGrow .6s var(--spring-soft) backwards}
+@keyframes barGrow{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+
+/* 7. Send button: paper-plane tilts, ready to fly */
+.ai-input-row .btn-primary svg{transition:transform .3s var(--spring)}
+.ai-input-row .btn-primary:hover svg{transform:rotate(-12deg) translateX(1px)}
+.ai-input-row .btn-primary:active svg{transform:translateX(14px) rotate(-20deg);transition-duration:.15s}
+
+/* 8. Numbers everywhere: tabular + smooth color transitions */
+.kpi-value,.day-meta,.tracker-bar .mono{transition:color .4s ease}
+
+/* 9. Focus ring on cards for keyboard users — glows, not jumps */
+.ob-level-btn:focus-visible,.task-row:focus-within{box-shadow:0 0 0 3px var(--accent-glow)}
+
+/* 10. mode-young: gloss becomes slightly more playful (longer sweep) */
+body.mode-young .kpi-card::before{background:linear-gradient(105deg,transparent,rgba(255,255,255,.24),transparent)}
+
+/* Guards */
+body.mode-focused .kpi-card::before,body.mode-focused .day-block::before,
+body.mode-focused .nav-item.active::after,body.mode-focused .ob-level-grid > *,
+body.mode-focused .task-dot,body.mode-focused .wk-bar{animation:none}
+body.mode-focused::before{animation:none;opacity:.4}
+@media (prefers-reduced-motion: reduce){
+  body::before,.ob-level-grid > *,.task-dot,.wk-bar,.nav-item.active::after{animation:none !important}
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   SIMPLICITY BLUEPRINT LAYER — 3-tap workflows, icon-first mobile
+═══════════════════════════════════════════════════════════════ */
+
+
+/* Icon-first mobile nav: bigger icons, labels stay for 5-year-olds
+   but icons lead (44px+ targets already enforced) */
+@media(max-width:860px){
+  .nav-item svg{width:22px;height:22px}
+  .nav-item{min-height:48px}
+}
+
+/* Blueprint: component uniformity — one card language everywhere */
+.task-row,.kpi-card,.day-block{border-radius:var(--radius-md)}
+
+/* Progressive disclosure affordance */
+.more-options-toggle{
+  display:inline-flex;align-items:center;gap:6px;font-size:.76rem;font-weight:650;
+  color:var(--text-muted);background:none;border:none;cursor:pointer;padding:8px 0;font-family:inherit;
+}
+.more-options-toggle:hover{color:var(--accent)}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   MOBILE DECLUTTER + VISUAL REFRESH
+   Primary actions visible; secondary behind a "..." toggle.
+   Softer canvas, tighter type rhythm, calmer chips.
+═══════════════════════════════════════════════════════════════ */
+
+@media(max-width:640px){
+  /* Task cards: ONE action row — Done (primary), Clock in, then "..."
+     which reveals Edit / Skip subject / Skip on tap */
+  .task-row > .btn,.task-row > .chip{display:none}
+  .task-row > .chip.chip-kind{display:inline-flex}
+  .task-row > .btn.task-primary,.task-row > .btn.task-clock,.task-row > .btn.task-more{display:inline-flex}
+  .task-row.expanded-actions > .btn{display:inline-flex}
+  .task-row.expanded-actions > .chip{display:inline-flex}
+  /* PENDING chip hidden on phones — the card state already says it */
+  .task-row > .chip.chip-pending{display:none !important}
+  .task-row.expanded-actions > .chip.chip-pending{display:inline-flex !important}
+
+  /* Calmer card visuals */
+  .task-row{padding:13px 14px;gap:8px}
+  .task-row .task-sub{opacity:.85}
+  .day-block{padding:14px 13px}
+  .day-head .day-meta{font-size:.72rem}
+}
+
+/* The "..." more button */
+.task-more{font-weight:800;letter-spacing:1px}
+
+/* Softer light canvas: barely-warm porcelain, calmer than pure grey */
+:root{--app-bg:#F6F6F9}
+
+/* Chips: lowercase-elegant instead of shouty uppercase on phones */
+@media(max-width:640px){
+  .chip{text-transform:none;letter-spacing:.2px;font-size:.68rem;font-weight:650}
+}
+
+/* Headings: slightly warmer ink, tighter rhythm */
+.day-date{font-size:.98rem;font-weight:700;letter-spacing:-.3px}
+
+/* Card entrance on mobile: subtle rise, fast */
+@media(max-width:640px){
+  .day-block .task-row{animation:rowIn .26s var(--spring-soft) backwards}
+}
+
+
+/* ═══ INTELLIGENCE CARD — calm analytics, progressive disclosure ═══ */
+.intel-card{border-left:3px solid var(--accent)}
+.intel-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(240px,100%),1fr));gap:12px 18px;margin-bottom:6px}
+.intel-stat{display:flex;align-items:flex-start;gap:10px;min-width:0}
+.intel-dot{width:9px;height:9px;border-radius:50%;margin-top:5px;flex-shrink:0}
+.intel-dot.ok{background:var(--success-accent);box-shadow:0 0 0 3px rgba(22,163,122,.14)}
+.intel-dot.mid{background:var(--warning-accent);box-shadow:0 0 0 3px rgba(229,154,36,.14)}
+.intel-dot.warn{background:var(--danger-accent);box-shadow:0 0 0 3px rgba(224,82,82,.14)}
+.intel-label{font-size:.68rem;font-weight:650;text-transform:uppercase;letter-spacing:.7px;color:var(--text-dim)}
+.intel-value{font-size:.86rem;font-weight:700;color:var(--text-main);margin-top:2px}
+.intel-sub{font-size:.76rem;font-weight:550;color:var(--text-muted)}
+.warn-text{color:var(--danger-accent) !important}
+.ok-text{color:var(--success-accent) !important}
+.intel-details{border-top:1px solid var(--glass-border);margin-top:10px;padding-top:12px}
+.intel-pace-row{display:flex;align-items:center;gap:9px;padding:5px 0;font-size:.82rem}
+.intel-pace-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.intel-pace-val{font-size:.76rem;font-weight:650;color:var(--text-muted);flex-shrink:0}
+@media(max-width:640px){.intel-grid{grid-template-columns:1fr;gap:10px}}
+
+
+/* ═══ CALENDAR DAY MODAL — fix clipped buttons + polish ═══════════
+   Screenshot bug: desktop modal used the mobile action-hiding rules'
+   sibling layout, letting Done/Skip overflow the card edge. Inside
+   the modal, rows get a dedicated two-line layout with contained,
+   wrapping actions. */
+.modal-box .task-row{flex-wrap:wrap;row-gap:8px;overflow:hidden}
+.modal-box .task-main{flex:1 1 100%;min-width:0}
+.modal-box .task-row > .btn,.modal-box .task-row > .chip{flex:0 0 auto}
+.modal-box .task-row > .btn:last-of-type{margin-right:0}
+
+/* Calendar grid: premium pass */
+.cal-cell{position:relative;transition:background .18s ease,border-color .18s ease,box-shadow .22s ease}
+.cal-cell:hover{box-shadow:var(--shadow-md);z-index:2}
+.cal-pill{transition:transform .18s var(--spring-soft)}
+.cal-cell:hover .cal-pill{transform:translateX(1.5px)}
+/* Weekend headers slightly dimmed — visual rhythm */
+.cal-grid > .cal-dow:first-child,.cal-grid > .cal-dow:last-child{opacity:.6}
+/* Month cells cascade in */
+.cal-grid .cal-cell{animation:calIn .35s var(--spring-soft) backwards}
+.cal-grid .cal-cell:nth-child(7n+2){animation-delay:.02s}
+.cal-grid .cal-cell:nth-child(7n+3){animation-delay:.04s}
+.cal-grid .cal-cell:nth-child(7n+4){animation-delay:.06s}
+.cal-grid .cal-cell:nth-child(7n+5){animation-delay:.08s}
+.cal-grid .cal-cell:nth-child(7n+6){animation-delay:.1s}
+.cal-grid .cal-cell:nth-child(7n){animation-delay:.12s}
+@keyframes calIn{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:none}}
+/* Task-count dot cluster on busy days */
+.cal-cell .cal-more{font-size:.6rem;font-weight:700;color:var(--accent)}
+
+/* ═══ DASHBOARD PREMIUM REFINEMENT ═══ */
+.kpi-card{background:linear-gradient(180deg,var(--surface) 0%,var(--surface) 88%,var(--row-bg) 100%)}
+.kpi-label{font-size:.66rem;letter-spacing:.9px}
+.dash-grid-2 .glass-panel{overflow:hidden}
+/* Section headers: consistent editorial treatment */
+.day-head h3,.glass-panel > h3{letter-spacing:-.2px}
+
+/* ═══ VOICE UI (Shigun speaks + listens) ═══ */
+.voice-btn{
+  width:40px;height:40px;border-radius:50%;border:1px solid var(--glass-border);
+  background:var(--surface);color:var(--text-muted);cursor:pointer;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  transition:background .2s ease,color .2s ease,transform .2s var(--spring),box-shadow .25s ease;
+}
+.voice-btn:hover{color:var(--color-ai);border-color:rgba(var(--ai-rgb),.4)}
+.voice-btn:active{transform:scale(.9)}
+.voice-btn.listening{
+  background:var(--color-ai);color:#fff;border-color:transparent;
+  animation:listenPulse 1.6s ease-in-out infinite;
+}
+@keyframes listenPulse{0%,100%{box-shadow:0 0 0 0 rgba(var(--ai-rgb),.45)}50%{box-shadow:0 0 0 10px rgba(var(--ai-rgb),0)}}
+.voice-btn.speaking{color:var(--color-ai);border-color:rgba(var(--ai-rgb),.5)}
+.voice-btn.speaking svg{animation:speakBars .9s ease-in-out infinite}
+@keyframes speakBars{0%,100%{transform:scaleY(1)}50%{transform:scaleY(.75)}}
+
+
+/* Voice select + error strip */
+.voice-select{
+  font-size:.7rem;font-weight:650;padding:6px 8px;border-radius:var(--radius-sm);
+  border:1px solid var(--glass-border);background:var(--surface);color:var(--text-muted);
+  font-family:inherit;outline:none;max-width:110px;cursor:pointer;
+}
+.voice-select:focus{border-color:var(--color-ai)}
+.voice-err{padding:6px 14px;font-size:.74rem;color:var(--danger-accent);font-weight:600;background:var(--status-skipped-bg)}
+@media(max-width:640px){.voice-select{max-width:92px;font-size:.66rem}}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   MOBILE DENSITY PASS — smaller, calmer, less scrolling
+═══════════════════════════════════════════════════════════════ */
+@media(max-width:640px){
+  html{font-size:15px}                       /* global 6% type scale-down */
+  .page-title{font-size:clamp(1.2rem,4vw,1.5rem)}
+  .kpi-card{padding:12px;min-height:88px}
+  .kpi-value{font-size:1.45rem}
+  .kpi-label{font-size:.58rem;letter-spacing:.7px}
+  .kpi-grid{gap:8px;margin-bottom:12px}
+  .glass-panel{border-radius:var(--radius-md)}
+  .day-block{padding:12px 11px;margin-bottom:9px}
+  .day-date{font-size:.9rem}
+  .task-row{padding:11px 12px;margin-bottom:5px}
+  .task-row .task-title{font-size:.8rem;line-height:1.3}
+  .task-row .task-sub{font-size:.64rem}
+  .task-row > .btn{padding:5px 10px;font-size:.66rem;min-height:28px}
+  .tracker-bar{padding:10px 12px;margin-bottom:14px}
+  .tracker-bar .mono{font-size:.95rem}
+  .page-header{margin-bottom:12px}
+  .day-head{margin-bottom:8px}
+  .intel-card{padding:14px !important}
+  .intel-value{font-size:.8rem}
+  .streak-badge{font-size:.62rem;padding:3px 8px}
+  /* Section rhythm: less vertical air overall */
+  .main-workspace > *{margin-bottom:0}
+  .dash-grid-2{gap:10px;margin-bottom:12px}
+}
+
+/* ═══ SHIGUN PREMIUM PASS ═══ */
+/* Identity gradient border on the panel — subtle, expensive */
+.ai-panel{position:fixed;border:none;
+  background:
+    linear-gradient(var(--surface-elevated),var(--surface-elevated)) padding-box,
+    linear-gradient(160deg,rgba(var(--ai-rgb),.5),var(--glass-border) 40%,var(--glass-border) 60%,rgba(var(--ai-rgb),.35)) border-box;
+  border:1.5px solid transparent}
+/* Avatar: soft identity ring */
+.ai-panel .brand-logo-icon{position:relative}
+.ai-panel .brand-logo-icon::after{content:"";position:absolute;inset:-4px;border-radius:inherit;border:1.5px solid rgba(var(--ai-rgb),.3);animation:shigunRing 3s ease-in-out infinite}
+@keyframes shigunRing{0%,100%{opacity:.5;transform:scale(1)}50%{opacity:1;transform:scale(1.06)}}
+/* Messages: tighter premium bubbles */
+.ai-msg{border-radius:14px;box-shadow:0 1px 2px rgba(10,12,26,.05)}
+.ai-msg.bot{backdrop-filter:none}
+/* While speaking: whole panel breathes at the border */
+.ai-panel:has(.voice-btn.speaking){border-color:rgba(var(--ai-rgb),.25)}
+
+/* ═══ GLOBAL FLUIDITY PASS ═══ */
+/* Buttons settle with micro-inertia */
+.btn{transition-timing-function:cubic-bezier(.3,1.4,.5,1)}
+/* Panels: hover lifts border ink globally (calm, consistent) */
+.glass-panel{will-change:auto}
+/* Smooth scrolling for in-page anchors */
+html{scroll-behavior:smooth}
+/* View tab underline morphs */
+.vtab{position:relative}
+.vtab.active::after{content:"";position:absolute;left:22%;right:22%;bottom:3px;height:2px;border-radius:99px;background:var(--accent);animation:tabInk .3s var(--spring-soft)}
+@keyframes tabInk{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+/* Number chips pulse subtly when they change (CSS-only best effort) */
+.day-meta{transition:color .3s ease}
+@media (prefers-reduced-motion: reduce){
+  html{scroll-behavior:auto}
+  .ai-panel .brand-logo-icon::after{animation:none}
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   COMPANION LAYER — Shigun as assistant, not chatbot
+═══════════════════════════════════════════════════════════════ */
+
+/* Hero greeting: centered orb + personal status, replaces bot bubble */
+.companion-hello{display:flex;flex-direction:column;align-items:center;text-align:center;padding:34px 22px 24px;gap:6px;animation:pageIn .45s var(--spring-soft)}
+.companion-orb{
+  width:58px;height:58px;border-radius:50%;color:#fff;margin-bottom:8px;
+  display:flex;align-items:center;justify-content:center;
+  background:radial-gradient(circle at 32% 28%,var(--color-ai-bright),var(--color-ai) 72%);
+  box-shadow:0 6px 24px rgba(var(--ai-rgb),.4),inset 0 1px 0 rgba(255,255,255,.35);
+  animation:orbFloat 5s ease-in-out infinite;position:relative;
+}
+.companion-orb::after{content:"";position:absolute;inset:-7px;border-radius:50%;border:1.5px solid rgba(var(--ai-rgb),.28);animation:shigunRing 3.2s ease-in-out infinite}
+@keyframes orbFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+.companion-title{margin:0;font-size:1.08rem;font-weight:750;letter-spacing:-.3px;color:var(--text-main)}
+.companion-sub{margin:0;font-size:.84rem;color:var(--text-muted);line-height:1.55;max-width:300px}
+.companion-hint{margin:6px 0 0;font-size:.72rem;color:var(--text-dim)}
+
+/* Header becomes a slim status strip when conversation is active */
+.ai-head .brand-logo-icon{border-radius:50%}
+
+/* ═══ "AI AT WORK" VISIBILITY — the platform thinks in front of you ═══ */
+/* Shimmering status line under headers while data loads */
+.ai-working{display:inline-flex;align-items:center;gap:7px;font-size:.7rem;font-weight:650;color:var(--color-ai)}
+.ai-working::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--color-ai);animation:aiPulse 1.6s ease-in-out infinite}
+
+/* Intelligence card: identity accent — subtly AI, not loudly */
+.intel-card{border-left:none;position:relative}
+.intel-card::before{content:"";position:absolute;left:0;top:14px;bottom:14px;width:3px;border-radius:99px;background:linear-gradient(180deg,var(--color-ai),var(--accent))}
+.intel-card .day-meta{color:var(--color-ai);font-weight:650}
+
+/* Re-plan button: breathing spark while replanning */
+.btn:disabled .spin,.replanning-spark{animation:sparkSpin 1.2s linear infinite}
+@keyframes sparkSpin{to{transform:rotate(360deg)}}
+
+/* ═══ DASHBOARD: momentum strip (new tracking, quiet design) ═══ */
+.momentum-strip{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.momentum-pill{
+  display:inline-flex;align-items:center;gap:7px;padding:7px 13px;border-radius:999px;
+  background:var(--surface);border:1px solid var(--glass-border);
+  font-size:.74rem;font-weight:650;color:var(--text-muted);
+  animation:rowIn .35s var(--spring-soft) backwards;
+}
+.momentum-pill:nth-child(2){animation-delay:.06s}
+.momentum-pill:nth-child(3){animation-delay:.12s}
+.momentum-pill:nth-child(4){animation-delay:.18s}
+.momentum-pill strong{color:var(--text-main);font-weight:750}
+.momentum-pill .up{color:var(--success-accent)}
+.momentum-pill .down{color:var(--danger-accent)}
+@media(max-width:640px){.momentum-strip{gap:6px}.momentum-pill{padding:6px 11px;font-size:.68rem}}
+
+/* ═══ ULTRA-CLEAN MOBILE POLISH ═══ */
+@media(max-width:640px){
+  /* Cards lose borders where background contrast is enough — cleaner */
+  .day-block{border-color:transparent;box-shadow:var(--shadow-sm)}
+  .kpi-card{border-color:transparent;box-shadow:var(--shadow-sm)}
+  /* Chat companion greeting scales nicely */
+  .companion-hello{padding:26px 16px 18px}
+  .companion-orb{width:52px;height:52px}
+}
+
+
+
+/* Ambient sound pill: playing indicator bars */
+.ambient-bars{display:inline-flex;align-items:flex-end;gap:2px;height:12px}
+.ambient-bars i{width:2.5px;border-radius:99px;background:currentColor;animation:eq 1s ease-in-out infinite}
+.ambient-bars i:nth-child(1){height:6px}
+.ambient-bars i:nth-child(2){height:11px;animation-delay:.2s}
+.ambient-bars i:nth-child(3){height:8px;animation-delay:.4s}
+@keyframes eq{0%,100%{transform:scaleY(1)}50%{transform:scaleY(.55)}}
+.ambient-pill{color:var(--accent) !important;border-color:var(--nav-active-border) !important}
+@media (prefers-reduced-motion: reduce){.ambient-bars i{animation:none}}
+
+
+/* ═══ TRACKER BAR — definitive layout (desktop + mobile) ═══════════
+   Base typography now lives in classes (no inline styles), so mobile
+   rules can actually win. */
+.tracker-status{gap:10px;min-width:0;flex:1 1 auto;flex-wrap:nowrap;overflow:hidden}
+.tracker-labels{min-width:0;overflow:hidden;flex:1}
+.tracker-state{font-size:.8rem;font-weight:800}
+/* FULL task title — wraps instead of being sliced ("Principles of
+   Marketing: Introduction to Marketing Principles" shows in full). */
+.tracker-task{
+  font-size:.72rem;color:var(--text-muted);font-weight:650;line-height:1.35;
+  white-space:normal;overflow-wrap:anywhere;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+}
+.tracker-time{font-size:1.2rem;font-weight:800;font-variant-numeric:tabular-nums;flex-shrink:0}
+.tracker-actions{flex-shrink:0}
+
+@media(max-width:640px){
+  .tracker-bar{
+    display:flex;flex-direction:row;flex-wrap:nowrap;align-items:center;
+    justify-content:space-between;gap:8px;
+    padding:8px 12px;border-radius:var(--radius-lg);min-height:0;
+  }
+  .tracker-status{gap:8px}
+  .tracker-status .pulse-dot{width:8px;height:8px}
+  .tracker-state{font-size:.72rem;white-space:nowrap}
+  /* single line, ellipsis — the pill is tiny on phones, and the full
+     title is always available on the Focus/Planner pages */
+  .tracker-task{font-size:.6rem;-webkit-line-clamp:1}
+  .tracker-time{font-size:.95rem}
+  .tracker-actions{gap:5px;flex-wrap:nowrap}
+  .tracker-actions .chip{display:none}
+  .tracker-actions .btn-xs{flex:0 0 auto;min-width:0;padding:6px 11px;font-size:.68rem;min-height:30px;white-space:nowrap}
+  /* Zen: icon-only on phones — the bolt says it */
+  .tracker-actions .btn-xs:last-child{padding:6px 9px;font-size:0;gap:0}
+  .tracker-actions .btn-xs:last-child svg{width:14px;height:14px}
+  /* Ambient stop pill: bars-only */
+  .tracker-actions .ambient-pill{font-size:0;gap:0;padding:6px 9px}
+  .tracker-actions .ambient-pill .ambient-bars{margin:0}
+}
+/* Ultra-narrow: hide the running task label, keep state + time + actions */
+@media(max-width:380px){
+  .tracker-task{display:none}
+}
+
+
+/* ═══ PRD BUILD: sidebar collapse, focus-live, live timer, CTAs ═══ */
+
+/* Collapsible sidebar (desktop) */
+@media(min-width:861px){.sidebar{position:sticky}}
+
+/* Focus-live: ambient cue while clocked in — accent hairline atop the app */
+body.focus-live::after{
+  content:"";position:fixed;top:0;left:0;right:0;height:2.5px;z-index:1000;
+  background:linear-gradient(90deg,transparent,var(--success-accent),transparent);
+  animation:focusSweep 3s ease-in-out infinite;
+}
+@keyframes focusSweep{0%,100%{opacity:.5}50%{opacity:1}}
+body.focus-live .tracker-bar{border-color:rgba(22,163,122,.3)}
+
+/* Live timer emphasis while running */
+body.focus-live .tracker-time{color:var(--success-accent);text-shadow:0 0 18px rgba(22,163,122,.25)}
+
+/* Mobile: clocked-in actions compress — Pause/Break icon-size, Clock Out stays worded */
+@media(max-width:640px){
+  .tracker-actions .act-pause,.tracker-actions .act-break{padding:6px 9px;font-size:.62rem}
+  .tracker-actions .act-out{font-size:.62rem;padding:6px 9px}
+}
+
+/* CTA affordances: Re-plan + primary CTAs get a slow attention shimmer */
+.btn-primary.w-full,.page-header .btn-primary{position:relative;overflow:hidden}
+.btn-primary.w-full::before,.page-header .btn-primary::before{
+  content:"";position:absolute;top:0;bottom:0;width:40%;left:-60%;
+  background:linear-gradient(105deg,transparent,rgba(255,255,255,.25),transparent);
+  transform:skewX(-18deg);animation:ctaShine 5s ease-in-out 2s infinite;
+}
+@keyframes ctaShine{0%,70%,100%{left:-60%}85%{left:130%}}
+
+/* Zen kiosk lock: explicit exit affordance */
+.zen-exit{position:absolute;top:max(18px,env(safe-area-inset-top));right:18px}
+body.mode-focused .btn-primary.w-full::before,body.mode-focused .page-header .btn-primary::before{animation:none}
+@media (prefers-reduced-motion: reduce){
+  body.focus-live::after{animation:none}
+  .btn-primary.w-full::before,.page-header .btn-primary::before{animation:none}
+}
+
+
+/* ═══ TOUCH & PERFORMANCE PASS (enhancement doc §17-18) ═══ */
+/* Kill double-tap zoom + 300ms delay on every interactive element */
+button,a,.nav-item,.vtab,.cal-cell,.chip,.task-row,.rate-btn,input,select{touch-action:manipulation}
+/* Prevent iOS zoom-on-focus globally: all inputs >=16px on touch */
+@media (hover:none) and (pointer:coarse){
+  .input-field,select.input-field,.ob-name-input,.ob-course-search,.ob-add-sub-input{font-size:16px}
+}
+/* Scroll performance: contain paint work in heavy scrollables */
+.ai-msgs,.modal-box,.cmdk-list,.ob-course-list{contain:content;-webkit-overflow-scrolling:touch}
+/* Calendar: horizontal snap scrolling on phones (doc §5) */
+@media(max-width:640px){
+  .cal-scroll{overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none}
+  .cal-scroll::-webkit-scrollbar{display:none}
+  .cal-scroll > *{scroll-snap-align:start}
+}
+/* WCAG focus ring: always visible for keyboard users on every control */
+.nav-item:focus-visible,.vtab:focus-visible,.cal-cell:focus-visible,.rate-btn:focus-visible{
+  outline:2px solid var(--accent);outline-offset:2px;
+}
+/* Priority color coding on difficulty (doc §4) — chips only, subtle */
+.chip[data-diff="Hard"]{background:var(--status-skipped-bg);color:var(--status-skipped-text)}
+.chip[data-diff="Easy"]{background:var(--status-done-bg);color:var(--status-done-text)}
+
+
+/* ═══ UP NEXT — ML-predicted one-tap start widget ═══ */
+.up-next{
+  display:flex;align-items:center;gap:14px;padding:16px 18px;margin-bottom:14px;
+  cursor:pointer;position:relative;overflow:hidden;
+  border-left:3px solid var(--accent);
+}
+.up-next:hover{border-color:var(--glass-border-hover);border-left-color:var(--accent)}
+.up-next-glow{position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(60% 120% at 0% 50%,var(--accent-glow),transparent 60%);opacity:.5}
+.up-next-title{font-size:.95rem;font-weight:750;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.up-next-sub{font-size:.72rem;color:var(--text-muted);margin-top:2px}
+.up-next-now{font-size:.6rem;font-weight:700;padding:2px 8px;border-radius:99px;
+  background:var(--status-done-bg);color:var(--status-done-text);text-transform:none;letter-spacing:.2px;
+  animation:aiPulse 2.4s ease-in-out infinite}
+.up-next .btn{flex-shrink:0}
+@media(max-width:640px){
+  .up-next{padding:13px 14px;gap:10px}
+  .up-next-title{font-size:.85rem;white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+}
+
+
+/* ═══ STATUS BAR PINNED TO TOP (mobile) ═══════════════════════════
+   The session strip sticks to the absolute top of the viewport on
+   phones — always visible, never floating mid-content. */
+@media(max-width:860px){
+  .tracker-bar{
+    position:sticky;top:calc(58px + env(safe-area-inset-top));
+    z-index:90;margin-top:0;
+  }
+}
+@media(max-width:640px){
+  .tracker-bar{top:calc(56px + env(safe-area-inset-top))}
+}
+
+/* ═══ TIMER STRICT BOUNDING — can never clip or overlap ═══ */
+.tracker-time{
+  flex:0 0 auto;min-width:0;max-width:30vw;overflow:visible;
+  font-variant-numeric:tabular-nums;white-space:nowrap;
+}
+.tracker-status{overflow:hidden}
+.tracker-actions{flex-shrink:0;min-width:0}
+
+
+/* ═══ CLOCKED-IN MOBILE LAYOUT v2 — overlap structurally impossible ═══
+   (Re-instated after regression; now covered by the package guard.) */
+@media(max-width:640px){
+  body.focus-live .tracker-labels{display:none}
+  body.focus-live .tracker-status{flex:0 1 auto;gap:7px}
+  body.focus-live .tracker-time{font-size:1.05rem;font-weight:800}
+  body.focus-live .tracker-actions{gap:4px}
+  body.focus-live .tracker-actions .btn-xs{padding:6px 8px;font-size:.6rem}
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   COLLAPSIBLE SIDEBAR — properly sized toggle + smooth icon-rail state
+═══════════════════════════════════════════════════════════════ */
+.sidebar{overflow:hidden;transition:width .32s var(--spring-soft),padding .32s var(--spring-soft)}
+/* Toggle: 40px round button, pinned top-right of the brand header.
+   Big enough to hit confidently on tablets and touch laptops. */
+.sb-toggle{
+  position:absolute;top:2px;right:0;width:40px;height:40px;border-radius:var(--radius-md);
+  display:flex;align-items:center;justify-content:center;cursor:pointer;
+  background:transparent;border:1px solid transparent;color:var(--text-muted);
+  transition:background .15s ease,color .15s ease,transform .15s var(--spring);
+  z-index:2;flex-shrink:0;
+}
+.sb-toggle:hover{background:var(--row-hover);color:var(--text-main);border-color:var(--glass-border)}
+.sb-toggle:active{transform:scale(.92)}
+.sb-toggle svg{transition:transform .3s var(--spring-soft)}
+
+/* ── Collapsed rail: icons only ── */
+.app-wrapper.sb-collapsed .sidebar{width:78px;padding-left:10px;padding-right:10px}
+.app-wrapper.sb-collapsed .sb-toggle{position:static;margin:0 auto 12px}
+.app-wrapper.sb-collapsed .sb-toggle svg{transform:rotate(180deg)}
+.app-wrapper.sb-collapsed .brand-header{justify-content:center;padding:0 0 14px}
+.app-wrapper.sb-collapsed .brand-text{display:none}
+.app-wrapper.sb-collapsed .brand-header{display:flex}
+.app-wrapper.sb-collapsed .nav-list{gap:6px;margin-top:6px}
+.app-wrapper.sb-collapsed .nav-item{justify-content:center;padding:11px 0;gap:0}
+.app-wrapper.sb-collapsed .nav-item span{display:none}
+.app-wrapper.sb-collapsed .nav-item svg{width:20px;height:20px}
+.app-wrapper.sb-collapsed .sidebar-foot{display:none}
+/* icon-only nav keeps its pill geometry centred */
+.app-wrapper.sb-collapsed .nav-item.active::before{display:none}
+@media(min-width:861px) and (max-width:1100px){
+  .app-wrapper.sb-collapsed .sidebar{width:68px}
+}
+/* On mobile the sidebar IS the bottom dock — the collapse toggle is hidden */
+@media(max-width:860px){
+  .sb-toggle{display:none}
+  .brand-header{padding-right:6px}
+}
+/* Icons need the room; the rail never clips tooltips (native title attr) */
+
+/* ═══════════════════════════════════════════════════════════════
+   BUILD v3 — truncation fixes · sidebar collapse · voice review ·
+   structured toasts · confirm-wipe dialog · device coverage
+═══════════════════════════════════════════════════════════════ */
+
+/* ── AI sheet grab handle (visible on phones, hidden on desktop) ── */
+.ai-sheet-handle{
+  display:none;width:40px;height:4.5px;border-radius:99px;margin:8px auto 0;
+  background:var(--text-dim);opacity:.45;flex-shrink:0;
+}
+
+/* ── Voice: generous tap target + review hint strip ── */
+.voice-btn{width:44px;height:44px}
+.voice-hint{
+  padding:7px 14px;font-size:.74rem;font-weight:600;
+  color:var(--warning-accent);background:var(--status-pending-bg);
+  border-top:1px solid var(--glass-border);
+}
+.voice-hint + .ai-quick{border-top:none}
+@media(max-width:640px){
+  .voice-btn{width:46px;height:46px}
+}
+
+/* ── Confirm-wipe dialog (Re-run Setup) ── */
+.confirm-box{max-width:440px;text-align:left}
+.confirm-icon{
+  width:46px;height:46px;border-radius:14px;margin-bottom:14px;
+  display:flex;align-items:center;justify-content:center;
+  background:var(--status-pending-bg);color:var(--warning-accent);
+}
+.confirm-box .flex-row{gap:10px}
+.confirm-box .btn{flex:1 1 auto}
+
+/* ── Onboarding wipe banner (re-run mode) ── */
+.ob-wipe-banner{
+  position:fixed;top:0;left:0;right:0;z-index:600;
+  background:var(--status-pending-bg);color:var(--status-pending-text);
+  font-size:.78rem;font-weight:650;text-align:center;
+  padding:9px 16px calc(9px + env(safe-area-inset-top));
+}
+.ob-overlay:has(.ob-wipe-banner){padding-top:calc(66px + env(safe-area-inset-top))}
+.ob-wipe-banner strong{font-weight:800}
+@media(max-width:640px){
+  .ob-wipe-banner{font-size:.72rem;padding:8px 14px calc(8px + env(safe-area-inset-top))}
+}
+
+/* ── Cross-device robustness ──
+   Tiny (320px) → phone (S24 ~384px) → tablet → desktop → 4K TV.
+   Everything already flows; these rules tune the extremes. */
+@media(max-width:340px){
+  .kpi-grid{grid-template-columns:1fr 1fr;gap:6px}
+  .kpi-card{padding:10px;min-height:74px}
+  .kpi-value{font-size:1.25rem}
+  .page-header{gap:8px}
+  .task-row{padding:10px}
+  .tracker-bar{padding:8px 10px;gap:6px}
+}
+
+/* Small tablets & large phones landscape: floating chat returns to
+   a comfortable panel instead of a full sheet */
+@media(min-width:641px) and (max-width:860px){
+  .ai-panel{height:min(66vh,560px)}
+}
+
+/* Big desktop / smart TV (1080p→4K): more air, capped width, bigger
+   type rhythm — nothing stretches or breaks on huge canvases */
+@media(min-width:1800px){
+  :root{--sidebar-w:280px}
+  .app-wrapper{max-width:1700px;gap:26px;padding:28px}
+  .main-workspace{padding-bottom:80px}
+  .page-title{font-size:2.3rem}
+  .kpi-grid{gap:20px}
+  .dash-grid-2{gap:20px}
+  .tracker-bar{padding:16px 26px;border-radius:999px}
+  .ai-panel{width:min(460px,calc(100vw - 48px));height:min(680px,calc(100vh - 150px))}
+}
+@media(min-width:2400px){
+  .app-wrapper{max-width:1900px}
+  .kpi-grid{grid-template-columns:repeat(4,1fr)}
+}
+@media(max-height:600px) and (min-width:861px){
+  /* short desktop windows: slimmer top bar, tighter page header */
+  .tracker-bar{padding:9px 18px;margin-bottom:16px}
+  .page-header{margin-bottom:14px}
+}
+
+/* Toast shouldn't collide with the collapsed rail or sheet on tablets */
+@media(min-width:641px) and (max-width:860px){
+  .toast{bottom:calc(96px + env(safe-area-inset-bottom));right:14px}
+}
+
+/* Ensure the sticky tracker bar never clips its two-line title */
+.tracker-bar{align-items:center}
+.tracker-labels{display:flex;flex-direction:column;gap:2px;justify-content:center}
+
+/* Nav keyboard affordance */
+.nav-item:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* Wizard cancel link (re-run mode) — available on every step */
+.ob-cancel-link{
+  display:block;margin:14px auto 0;background:none;border:none;cursor:pointer;
+  font-family:inherit;font-size:.8rem;font-weight:650;color:var(--text-muted);
+  text-decoration:underline;text-underline-offset:3px;padding:6px 10px;
+}
+.ob-cancel-link:hover{color:var(--text-main)}
+.ob-cancel-link:disabled{opacity:.5;cursor:not-allowed}

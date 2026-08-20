@@ -30,6 +30,7 @@ export default function PlannerView({
   const [expanded, setExpanded] = useState<number | null>(null);
   const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
   const [ratingTaskId, setRatingTaskId] = useState<number | null>(null);
+  const [moreActionsId, setMoreActionsId] = useState<number | null>(null);
   const [month, setMonth] = useState(() => {
     const d = new Date(); return { y: d.getFullYear(), m: d.getMonth() };
   });
@@ -60,7 +61,11 @@ export default function PlannerView({
     const sum = state.sessions.filter((x) => x.taskId === taskId).reduce((a, x) => a + x.minutes, 0);
     return Math.round(sum * 100) / 100;
   };
-  const fmtMin = (m: number) => Number.isInteger(m) ? `${m}m` : `${m.toFixed(2)}m`;
+  // 13.5 minutes displays as "13.5m" — never rounded to a different number
+  const fmtMin = (m: number) => {
+    const r = Math.round(m * 10) / 10;
+    return `${Number.isInteger(r) ? r : r.toFixed(1)}m`;
+  };
 
   const renderTask = (task: TaskRow) => {
     const meta = KIND_META[task.kind] || KIND_META.learn;
@@ -69,7 +74,7 @@ export default function PlannerView({
     const open = expanded === task.id;
     return (
       <div key={task.id}>
-        <div className={`task-row${task.status === "done" ? " done" : ""}${activeTaskId === task.id ? " active-clock" : ""}`}>
+        <div className={`task-row${task.status === "done" ? " done" : ""}${activeTaskId === task.id ? " active-clock" : ""}${moreActionsId === task.id ? " expanded-actions" : ""}`}>
           <div className="task-dot" style={{ background: subj?.color || meta.color }} />
           <div className="task-main" style={{ cursor: topic ? "pointer" : "default" }}
             onClick={() => topic && setExpanded(open ? null : task.id)}>
@@ -88,8 +93,10 @@ export default function PlannerView({
             <button className="btn btn-xs btn-secondary" title="Skip all tasks for this subject today"
               onClick={() => onSkipSubject(subj.id, task.date)}>Skip subject</button>
           )}
-          <button className="btn btn-xs btn-secondary" onClick={() => onFocusTask(task.id)}>Clock in</button>
-          <button className={`btn btn-xs ${task.status === "done" ? "btn-secondary" : "btn-primary"}`}
+          <button className="btn btn-xs btn-secondary task-clock" onClick={() => onFocusTask(task.id)}>Clock in</button>
+          <button className="btn btn-xs btn-secondary task-more" aria-label="More actions"
+            onClick={() => setMoreActionsId(moreActionsId === task.id ? null : task.id)}>⋯</button>
+          <button className={`btn btn-xs task-primary ${task.status === "done" ? "btn-secondary" : "btn-primary"}`}
             onClick={() => {
               if (task.status === "done") { onTaskStatus(task.id, "pending"); return; }
               // Recall/revision tasks ask for a memory rating — that one tap

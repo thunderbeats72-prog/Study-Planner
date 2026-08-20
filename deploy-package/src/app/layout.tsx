@@ -11,6 +11,9 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
+  // Android soft keyboard resizes the layout instead of covering the chat
+  // input; iOS sheets keep their safe-area padding.
+  interactiveWidget: "resizes-content",
   themeColor: "#5B5CE2",
 };
 
