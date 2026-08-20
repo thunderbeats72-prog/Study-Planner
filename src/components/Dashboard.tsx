@@ -73,6 +73,27 @@ export default function Dashboard({
   })();
   const totalPlannedMin = todayTasks.reduce((a, x) => a + x.plannedMinutes, 0);
   const loggedTodayMin = state.sessions.filter((s) => s.date === t).reduce((a, s) => a + s.minutes, 0);
+
+  // Momentum: this-week vs last-week study minutes, avg session length,
+  // and completion rate over the past 7 days — small honest trends.
+  const momentum = useMemo(() => {
+    const dayMs = 86400000;
+    const now = new Date(t + "T00:00:00").getTime();
+    const inRange = (d: string, from: number, to: number) => {
+      const x = new Date(d + "T00:00:00").getTime();
+      return x >= from && x < to;
+    };
+    const thisWk = state.sessions.filter((s) => inRange(s.date, now - 6 * dayMs, now + dayMs));
+    const lastWk = state.sessions.filter((s) => inRange(s.date, now - 13 * dayMs, now - 6 * dayMs));
+    const thisMin = thisWk.reduce((a, s) => a + s.minutes, 0);
+    const lastMin = lastWk.reduce((a, s) => a + s.minutes, 0);
+    const delta = lastMin > 0 ? Math.round(((thisMin - lastMin) / lastMin) * 100) : null;
+    const focusSessions = thisWk.filter((s) => s.mode !== "break");
+    const avgSession = focusSessions.length ? Math.round(thisMin / focusSessions.length) : 0;
+    const recent = state.tasks.filter((x) => inRange(x.date, now - 6 * dayMs, now + dayMs) && x.kind !== "buffer");
+    const compRate = recent.length ? Math.round((recent.filter((x) => x.status === "done").length / recent.length) * 100) : null;
+    return { thisHrs: Math.round((thisMin / 60) * 10) / 10, delta, avgSession, compRate };
+  }, [state.sessions, state.tasks, t]);
   const taskLogged = (taskId: number) => {
     const sum = state.sessions.filter((x) => x.taskId === taskId).reduce((a, x) => a + x.minutes, 0);
     return Math.round(sum * 100) / 100;
@@ -91,6 +112,19 @@ export default function Dashboard({
         <button className="btn btn-primary" onClick={onReplan} disabled={replanning}>
           <IconSpark size={15} />{replanning ? "Re-planning…" : "Re-plan with AI"}
         </button>
+      </div>
+
+      <div className="momentum-strip">
+        <span className="momentum-pill">This week <strong>{momentum.thisHrs}h</strong>
+          {momentum.delta !== null && (
+            <span className={momentum.delta >= 0 ? "up" : "down"}>
+              {momentum.delta >= 0 ? "▲" : "▼"} {Math.abs(momentum.delta)}%
+            </span>
+          )}
+        </span>
+        {momentum.avgSession > 0 && <span className="momentum-pill">Avg session <strong>{momentum.avgSession}m</strong></span>}
+        {momentum.compRate !== null && <span className="momentum-pill">7-day completion <strong>{momentum.compRate}%</strong></span>}
+        {state.user.streak > 1 && <span className="momentum-pill">Streak <strong>{state.user.streak}d</strong></span>}
       </div>
 
       <div className="kpi-grid">

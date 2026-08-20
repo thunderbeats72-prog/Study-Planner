@@ -15,7 +15,7 @@ const QUICKS = [
 ];
 
 export default function ChatPanel({
-  open, setOpen, messages, onSend, thinking, provider,
+  open, setOpen, messages, onSend, thinking, provider, learner,
 }: {
   open: boolean;
   setOpen: (v: boolean) => void;
@@ -23,6 +23,7 @@ export default function ChatPanel({
   onSend: (q: string) => void;
   thinking: boolean;
   provider?: string | null;
+  learner?: { name: string; daysLeft: number; progressPct: number; streak: number; todayDone: number; todayTotal: number };
 }) {
   const [text, setText] = useState("");
   const voiceReplyArmed = useRef(false); // speak the next reply only after mic input
@@ -106,11 +107,25 @@ export default function ChatPanel({
           </div>
 
           <div className="ai-msgs">
-            {!messages.length && (
+            {!messages.length && learner && (
+              <div className="companion-hello">
+                <div className="companion-orb"><IconSpark size={22} /></div>
+                <h4 className="companion-title">
+                  {new Date().getHours() < 12 ? "Good morning" : new Date().getHours() < 17 ? "Good afternoon" : "Good evening"}, {learner.name.split(" ")[0]}
+                </h4>
+                <p className="companion-sub">
+                  {learner.todayTotal > 0 && learner.todayDone >= learner.todayTotal
+                    ? "Everything done for today — impressive."
+                    : learner.todayTotal > 0
+                      ? `${learner.todayTotal - learner.todayDone} of ${learner.todayTotal} sessions left today · ${learner.daysLeft} days to your exam.`
+                      : `${learner.daysLeft} days to your exam · ${learner.progressPct}% of the syllabus behind you.`}
+                </p>
+                <p className="companion-hint">Ask me anything, give a command, or tap the mic and just talk.</p>
+              </div>
+            )}
+            {!messages.length && !learner && (
               <div className="ai-msg bot">
-                Hi! I&apos;m Shigun, your personal AI tutor. I can explain any lesson, solve problems step by step,
-                and run the app for you — try <strong>&quot;replan&quot;</strong>, <strong>&quot;start timer&quot;</strong>,
-                or tap the mic and just talk to me.
+                Hi! I&apos;m Shigun. Ask me anything about your studies, or tap the mic and talk to me.
               </div>
             )}
             {messages.map((m) => (

@@ -394,7 +394,8 @@ export default function Home() {
       </div>
 
       <ChatPanel open={chatOpen} setOpen={setChatOpen} messages={allMsgs} onSend={askTutor}
-        thinking={thinking} provider={state.aiProvider} />
+        thinking={thinking} provider={state.aiProvider}
+        learner={{ name: state.user.name, daysLeft: ctx.daysLeft, progressPct: ctx.progressPct, streak: state.user.streak, todayDone, todayTotal }} />
 
       <CommandPalette commands={commands} />
       <div className="cmdk-tip">Press ⌘K / Ctrl-K for commands</div>

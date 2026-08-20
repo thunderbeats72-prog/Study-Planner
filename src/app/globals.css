@@ -1844,3 +1844,66 @@ html{scroll-behavior:smooth}
   html{scroll-behavior:auto}
   .ai-panel .brand-logo-icon::after{animation:none}
 }
+
+
+/* ═══════════════════════════════════════════════════════════════
+   COMPANION LAYER — Shigun as assistant, not chatbot
+═══════════════════════════════════════════════════════════════ */
+
+/* Hero greeting: centered orb + personal status, replaces bot bubble */
+.companion-hello{display:flex;flex-direction:column;align-items:center;text-align:center;padding:34px 22px 24px;gap:6px;animation:pageIn .45s var(--spring-soft)}
+.companion-orb{
+  width:58px;height:58px;border-radius:50%;color:#fff;margin-bottom:8px;
+  display:flex;align-items:center;justify-content:center;
+  background:radial-gradient(circle at 32% 28%,var(--color-ai-bright),var(--color-ai) 72%);
+  box-shadow:0 6px 24px rgba(var(--ai-rgb),.4),inset 0 1px 0 rgba(255,255,255,.35);
+  animation:orbFloat 5s ease-in-out infinite;position:relative;
+}
+.companion-orb::after{content:"";position:absolute;inset:-7px;border-radius:50%;border:1.5px solid rgba(var(--ai-rgb),.28);animation:shigunRing 3.2s ease-in-out infinite}
+@keyframes orbFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+.companion-title{margin:0;font-size:1.08rem;font-weight:750;letter-spacing:-.3px;color:var(--text-main)}
+.companion-sub{margin:0;font-size:.84rem;color:var(--text-muted);line-height:1.55;max-width:300px}
+.companion-hint{margin:6px 0 0;font-size:.72rem;color:var(--text-dim)}
+
+/* Header becomes a slim status strip when conversation is active */
+.ai-head .brand-logo-icon{border-radius:50%}
+
+/* ═══ "AI AT WORK" VISIBILITY — the platform thinks in front of you ═══ */
+/* Shimmering status line under headers while data loads */
+.ai-working{display:inline-flex;align-items:center;gap:7px;font-size:.7rem;font-weight:650;color:var(--color-ai)}
+.ai-working::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--color-ai);animation:aiPulse 1.6s ease-in-out infinite}
+
+/* Intelligence card: identity accent — subtly AI, not loudly */
+.intel-card{border-left:none;position:relative}
+.intel-card::before{content:"";position:absolute;left:0;top:14px;bottom:14px;width:3px;border-radius:99px;background:linear-gradient(180deg,var(--color-ai),var(--accent))}
+.intel-card .day-meta{color:var(--color-ai);font-weight:650}
+
+/* Re-plan button: breathing spark while replanning */
+.btn:disabled .spin,.replanning-spark{animation:sparkSpin 1.2s linear infinite}
+@keyframes sparkSpin{to{transform:rotate(360deg)}}
+
+/* ═══ DASHBOARD: momentum strip (new tracking, quiet design) ═══ */
+.momentum-strip{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.momentum-pill{
+  display:inline-flex;align-items:center;gap:7px;padding:7px 13px;border-radius:999px;
+  background:var(--surface);border:1px solid var(--glass-border);
+  font-size:.74rem;font-weight:650;color:var(--text-muted);
+  animation:rowIn .35s var(--spring-soft) backwards;
+}
+.momentum-pill:nth-child(2){animation-delay:.06s}
+.momentum-pill:nth-child(3){animation-delay:.12s}
+.momentum-pill:nth-child(4){animation-delay:.18s}
+.momentum-pill strong{color:var(--text-main);font-weight:750}
+.momentum-pill .up{color:var(--success-accent)}
+.momentum-pill .down{color:var(--danger-accent)}
+@media(max-width:640px){.momentum-strip{gap:6px}.momentum-pill{padding:6px 11px;font-size:.68rem}}
+
+/* ═══ ULTRA-CLEAN MOBILE POLISH ═══ */
+@media(max-width:640px){
+  /* Cards lose borders where background contrast is enough — cleaner */
+  .day-block{border-color:transparent;box-shadow:var(--shadow-sm)}
+  .kpi-card{border-color:transparent;box-shadow:var(--shadow-sm)}
+  /* Chat companion greeting scales nicely */
+  .companion-hello{padding:26px 16px 18px}
+  .companion-orb{width:52px;height:52px}
+}
