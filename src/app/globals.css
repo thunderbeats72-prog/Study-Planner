@@ -2527,6 +2527,53 @@ button,a,.nav-item,.vtab,.cal-cell,.chip,.task-row,.rate-btn,input,select{touch-
 @keyframes voicePrepareSpin{to{transform:rotate(360deg)}}
 @media(prefers-reduced-motion:reduce){.voice-btn.preparing svg,.ai-panel.is-preparing .ai-head::after{animation:none!important}}
 
+/* ═══ CHAT DECLUTTER — one identity strip, voice lives in a menu ═══ */
+.ai-head{padding:12px 14px;gap:10px}
+.ai-title span{display:none}
+.ai-head-actions{display:flex;align-items:center;gap:6px;margin-left:auto;flex-shrink:0}
+.ai-identity{min-width:0;flex:1}
+.ai-status{text-transform:none;letter-spacing:.2px;font-size:.68rem;font-weight:650}
+.voice-menu-wrap{position:relative}
+.voice-menu-btn{
+  width:30px;height:30px;border-radius:10px;border:1px solid var(--glass-border);
+  background:var(--surface);color:var(--text-muted);display:grid;place-items:center;cursor:pointer;
+}
+.voice-menu-btn:hover,.voice-menu-btn.open{color:var(--color-ai);border-color:rgba(var(--ai-rgb),.4);background:var(--color-ai-soft)}
+.voice-menu{
+  position:absolute;top:calc(100% + 8px);right:0;z-index:5;width:220px;padding:10px;
+  background:var(--surface-elevated);border:1px solid var(--glass-border);border-radius:14px;
+  box-shadow:0 12px 40px rgba(10,12,26,.18);
+}
+.voice-menu-label{font-size:.62rem;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--text-dim);padding:6px 6px 4px}
+.voice-menu-item{
+  width:100%;display:flex;flex-direction:column;align-items:flex-start;gap:1px;padding:8px 10px;margin-bottom:4px;
+  border:1px solid transparent;border-radius:10px;background:transparent;color:var(--text-main);
+  font-family:inherit;cursor:pointer;text-align:left;
+}
+.voice-menu-item span{font-size:.82rem;font-weight:750}
+.voice-menu-item small{font-size:.68rem;color:var(--text-muted);font-weight:550}
+.voice-menu-item.selected{background:var(--color-ai-soft);border-color:rgba(var(--ai-rgb),.28);color:var(--color-ai)}
+.voice-speed-row{display:flex;gap:6px;padding:4px 4px 6px}
+.voice-speed-chip{
+  flex:1;height:30px;border-radius:9px;border:1px solid var(--glass-border);background:var(--surface);
+  color:var(--text-muted);font-size:.68rem;font-weight:750;font-family:inherit;cursor:pointer;
+}
+.voice-speed-chip.selected{background:var(--color-ai);color:#fff;border-color:transparent}
+.ai-quick{padding:8px 12px 10px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+.ai-quick::-webkit-scrollbar{display:none}
+.ai-quick-label{display:none}
+.ai-panel.has-thread .ai-quick{display:none}
+.companion-hello{padding:28px 18px 18px}
+.companion-hint{display:none}
+.thinking-label{display:none}
+@media(max-width:640px){
+  .ai-head{padding:8px 12px 10px;gap:8px}
+  .voice-replay,.voice-menu-btn,.ai-close{width:36px;height:36px;flex-basis:36px;border-radius:11px}
+  .voice-menu{width:min(230px,calc(100vw - 28px))}
+  .ai-status{font-size:.62rem}
+  .voice-live{margin:6px 10px 0;padding:8px 10px}
+}
+
 
 /* ═══════════════════════════════════════════════════════════════
    LIVE SESSION LAYER — "Start" becomes "Clock Out" in the same
