@@ -2235,7 +2235,7 @@ button,a,.nav-item,.vtab,.cal-cell,.chip,.task-row,.rate-btn,input,select{touch-
 .ob-wipe-banner{
   position:fixed;top:0;left:0;right:0;z-index:600;
   background:var(--status-pending-bg);color:var(--status-pending-text);
-  font-size:.78rem;font-weight:650;text-align:center;
+  font-size:.78rem;font-weight:650;text-align:left;
   padding:9px 16px calc(9px + env(safe-area-inset-top));
 }
 .ob-overlay:has(.ob-wipe-banner){padding-top:calc(66px + env(safe-area-inset-top))}

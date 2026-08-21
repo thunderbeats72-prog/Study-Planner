@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 type VoiceProfile = { name: string; direction: string; rate: number };
 const VOICES: Record<string, VoiceProfile> = {
@@ -173,11 +173,11 @@ async function synthesiseChirp(
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        input: { text: truncateUtf8(text, 4800) },
+        input: { text: truncateUtf8(text, 5000) },
         voice: { languageCode: language, name: voiceName },
         audioConfig: { audioEncoding: "MP3", speakingRate: profile.rate },
       }),
-      signal: AbortSignal.timeout(12000),
+      signal: AbortSignal.timeout(15000),
     }
   );
   if (!response.ok) return null;
@@ -199,7 +199,7 @@ async function synthesiseGemini(
   profile: VoiceProfile,
   model: string
 ): Promise<CachedAudio | null> {
-  const spokenText = truncateUtf8(text, 3900);
+  const spokenText = truncateUtf8(text, 5000);
   const response = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
     {
@@ -218,7 +218,7 @@ async function synthesiseGemini(
           },
         },
       }),
-      signal: AbortSignal.timeout(18000),
+      signal: AbortSignal.timeout(25000),
     }
   );
   if (!response.ok) return null;
@@ -283,7 +283,7 @@ export async function POST(req: Request) {
   return NextResponse.json(
     {
       error: chirpKey || gemini
-        ? `${profile.name} is temporarily unavailable. The response was left as text to preserve voice consistency.`
+        ? `${profile.name} is temporarily unavailable. Showing text instead.`
         : "Cloud voice is not configured. Set GOOGLE_CLOUD_TTS_API_KEY or GEMINI_API_KEY.",
     },
     { status: chirpKey || gemini ? 502 : 503 }
