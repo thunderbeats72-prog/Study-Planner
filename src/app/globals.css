@@ -223,32 +223,6 @@ select.input-field{appearance:none;background-image:linear-gradient(45deg,transp
 .ob-btn-secondary{background:var(--surface-hover);color:var(--text-main);border-color:var(--glass-border)}
 .ob-btn:disabled{opacity:.55;cursor:not-allowed}
 
-/* ── Onboarding: simpler, calmer wizard on phones ──
-   Desktop shows each step's detail comfortably; on a phone the same card is
-   cramped. Tighten the card, shrink headings, and trim vertical air so every
-   step reads at a glance and the whole flow stays within 2-3 taps. */
-@media(max-width:640px){
-  .ob-card{padding:22px 18px}
-  .ob-card h1{font-size:1.4rem;margin-bottom:6px}
-  .ob-card p{font-size:.84rem;margin-bottom:16px}
-  .ob-hint{font-size:.72rem;margin-bottom:14px}
-  .ob-level-btn{padding:13px;font-size:.84rem}
-  .ob-field label{font-size:.66rem;letter-spacing:.4px}
-  .ob-field input,.ob-field select{padding:12px 12px}
-  .ob-btn{padding:13px 22px;font-size:.86rem}
-  /* Source-detail chip is useful on desktop, noisy on a phone — keep it,
-     just quieter so it never crowds the step's primary action. */
-  .chip.chip-kind{font-size:.6rem;padding:3px 8px}
-}
-@media(max-width:380px){
-  .ob-card{padding:20px 15px}
-  .ob-card h1{font-size:1.28rem}
-  .ob-card p{font-size:.8rem}
-  .ob-subs-grid{max-height:220px}
-  .ob-course-list{max-height:230px}
-  .ob-level-grid{gap:9px}
-}
-
 .ob-summary-row{display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px dashed var(--glass-border);font-size:.84rem}
 .ob-summary-row span:first-child{color:var(--text-muted);font-weight:650}
 .ob-summary-row span:last-child{font-weight:800}
@@ -2287,6 +2261,19 @@ button,a,.nav-item,.vtab,.cal-cell,.chip,.task-row,.rate-btn,input,select{touch-
 }
 .confirm-box .flex-row{gap:10px}
 .confirm-box .btn{flex:1 1 auto}
+
+/* ── Onboarding wipe banner (re-run mode) ── */
+.ob-wipe-banner{
+  position:fixed;top:0;left:0;right:0;z-index:600;
+  background:var(--status-pending-bg);color:var(--status-pending-text);
+  font-size:.78rem;font-weight:650;text-align:left;
+  padding:9px 16px calc(9px + env(safe-area-inset-top));
+}
+.ob-overlay:has(.ob-wipe-banner){padding-top:calc(66px + env(safe-area-inset-top))}
+.ob-wipe-banner strong{font-weight:800}
+@media(max-width:640px){
+  .ob-wipe-banner{font-size:.72rem;padding:8px 14px calc(8px + env(safe-area-inset-top))}
+}
 
 /* ── Cross-device robustness ──
    Tiny (320px) → phone (S24 ~384px) → tablet → desktop → 4K TV.

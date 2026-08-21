@@ -573,7 +573,7 @@ export default function Home() {
       </div>
 
       <ChatPanel open={chatOpen} setOpen={setChatOpen} messages={allMsgs} onSend={askTutor}
-        thinking={thinking}
+        thinking={thinking} provider={state.aiProvider}
         learner={{ name: state.user.name, daysLeft: ctx.daysLeft, progressPct: ctx.progressPct, streak: state.user.streak, todayDone, todayTotal }}
         speechHints={speechHints} />
 

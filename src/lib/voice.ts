@@ -80,34 +80,18 @@ const BASE_SPEECH_HINTS = [
   "Explain in simple words",
 ];
 
-/** Native fallback preferences. Cloud TTS uses the fixed names above.
- *  The Shigun "Core" voice (Kore, f1) is a warm, medium-low, natural female
- *  tutor. These lists bias the browser toward the closest match in each
- *  language so the on-device fallback still reads like the SAME person — not
- *  a random system voice. Browser voice inventories vary a lot, so the gender
- *  fallback inside pickNativeVoice covers anything we don't list explicitly. */
+/** Native fallback preferences. Cloud TTS uses the fixed names above. */
 const VOICE_PREFS: Record<string, Record<string, string[]>> = {
   en: {
-    f1: ["Google UK English Female", "Microsoft Sonia", "Microsoft Aria", "Samantha", "Victoria", "female"],
-    f2: ["Google US English", "Microsoft Aria", "Microsoft Jenny", "Victoria", "Karen", "female"],
+    f1: ["Google UK English Female", "Microsoft Sonia", "Samantha", "female"],
+    f2: ["Google US English", "Microsoft Aria", "Victoria", "Karen", "female"],
     m1: ["Google UK English Male", "Microsoft Ryan", "Daniel", "Alex", "male"],
   },
   hi: {
-    f1: ["Google हिन्दी", "Microsoft Swara", "Lekha", "hi-IN", "female"],
-    f2: ["Microsoft Kalpana", "Google हिन्दी", "hi-IN", "female"],
-    m1: ["Microsoft Hemant", "Google हिन्दी", "hi-IN", "male"],
+    f1: ["Google हिन्दी", "Microsoft Swara", "Lekha", "hi-IN"],
+    f2: ["Microsoft Kalpana", "Google हिन्दी", "hi-IN"],
+    m1: ["Microsoft Hemant", "Google हिन्दी", "hi-IN"],
   },
-  mr: { f1: ["Microsoft Kalpana", "Google मराठी", "mr-IN", "female"] },
-  bn: { f1: ["Microsoft Tadora", "Google বাংলা", "bn-IN", "female"] },
-  ta: { f1: ["Google தமிழ்", "Microsoft Pallavi", "ta-IN", "female"] },
-  te: { f1: ["Google తెలుగు", "Microsoft Shruti", "te-IN", "female"] },
-  kn: { f1: ["Google ಕನ್ನಡ", "Microsoft Supriya", "kn-IN", "female"] },
-  gu: { f1: ["Google ગુજરાતી", "Microsoft Dheera", "gu-IN", "female"] },
-  pa: { f1: ["Google ਪੰਜਾਬੀ", "Microsoft Gurpreet", "pa-IN", "female"] },
-  ml: { f1: ["Google മലയാളം", "Malayalam", "ml-IN", "female"] },
-  ar: { f1: ["Microsoft Salma", "Google العربية", "ar-SA", "female"] },
-  es: { f1: ["Google español", "Microsoft Elisa", "es-ES", "female"] },
-  fr: { f1: ["Microsoft Denise", "Google français", "fr-FR", "female"] },
 };
 
 let cachedVoices: SpeechSynthesisVoice[] = [];
@@ -193,27 +177,6 @@ export function splitLanguageRuns(text: string): { lang: string; text: string }[
     else runs.push({ lang, text: word });
   }
   return runs.filter((run) => run.text.trim().length > 0);
-}
-
-/** The language that carries the MOST words in a reply. We choose one device
- *  voice from this dominant script and reuse it for the whole message, so
- *  Shigun keeps a single, stable identity whether she reads English, Hindi or
- *  mixed text — she never "changes voice" mid-answer when the script switches. */
-export function dominantLang(text: string): string {
-  const counts: Record<string, number> = {};
-  for (const word of text.split(/\s+/)) {
-    const lang = wordLang(word);
-    counts[lang] = (counts[lang] || 0) + 1;
-  }
-  let best = "en";
-  let bestCount = 0;
-  for (const [lang, count] of Object.entries(counts)) {
-    if (count > bestCount) {
-      best = lang;
-      bestCount = count;
-    }
-  }
-  return bcpFor(best);
 }
 
 function bcpFor(code: string): string {
@@ -455,21 +418,6 @@ async function speakNative(
   if (generation !== speechGeneration) return false;
 
   const runs = splitLanguageRuns(text);
-
-  // Lock ONE device voice for the entire message. The old code re-picked a
-  // voice per language run, so a Hindi word inside an English reply would
-  // suddenly swap to a different (male/regional) voice. Now the dominant
-  // script decides a single voice object and we reuse it everywhere, so the
-  // timbre, gender and "person" stay identical for short commands AND long
-  // explanations — the requested stable Core identity.
-  const dominant = dominantLang(text);
-  const chosenVoice = pickNativeVoice(voiceId, dominant);
-  const profile = voiceId === "m1"
-    ? { rate: 0.98, pitch: 0.82 }
-    : voiceId === "f2" ? { rate: 1.03, pitch: 1.05 }
-    // Kore (f1) — the "Core" voice: warm, medium-low, natural and even.
-    : { rate: 1.0, pitch: 1.0 };
-
   let index = 0;
   let playbackStarted = false;
   const speakNext = () => {
@@ -482,17 +430,17 @@ async function speakNative(
     }
     const run = runs[index++];
     const utterance = new SpeechSynthesisUtterance(run.text);
-    if (chosenVoice) {
-      // Same voice object for every run => identical identity across scripts.
-      utterance.voice = chosenVoice;
-      utterance.lang = chosenVoice.lang;
+    const voice = pickNativeVoice(voiceId, run.lang);
+    if (voice) {
+      utterance.voice = voice;
+      utterance.lang = voice.lang;
     } else {
-      utterance.lang = bcpFor(dominant);
+      utterance.lang = bcpFor(run.lang);
     }
-    // A light, consistent slow-down for non-Latin scripts keeps the natural
-    // cadence without altering the chosen voice's character.
-    const isEnglish = (chosenVoice?.lang || dominant).startsWith("en");
-    utterance.rate = Math.min(1.7, profile.rate * (isEnglish ? 1.0 : 0.97) * playbackRate);
+    const profile = voiceId === "m1"
+      ? { rate: 0.97, pitch: 0.78 }
+      : voiceId === "f2" ? { rate: 1.08, pitch: 1.12 } : { rate: 1, pitch: 1 };
+    utterance.rate = Math.min(1.8, profile.rate * (run.lang === "en" ? 1.04 : 1) * playbackRate);
     utterance.pitch = profile.pitch;
     utterance.onend = speakNext;
     utterance.onerror = speakNext;
@@ -925,14 +873,6 @@ type ActiveRecognition = { id: number; stop: () => void };
 let activeRecognition: ActiveRecognition | null = null;
 let recognitionSequence = 0;
 
-/* End-of-speech timing. Shigun should stop listening shortly after YOU stop
-   talking — like a person would — instead of staying open on a stream of
-   stale interim results. Only a real FINAL utterance resets the pause timer,
-   so a long silence (or a chatty engine emitting repeated interim text) can
-   no longer keep the mic alive indefinitely. */
-const PAUSE_END_MS = 1500; // stop ~1.5s after the last final utterance
-const SPEECH_END_MS = 800; // the engine itself flagged end-of-speech
-
 type ListenOptions = {
   lang?: string;
   hints?: string[];
@@ -1052,7 +992,7 @@ export async function listen(
     started = true;
     if (watchdog) clearTimeout(watchdog);
     // A hard upper bound means mobile can never remain stuck in listening.
-    armSilence(9000);
+    armSilence(10000);
   };
 
   recognition.onresult = (event: any) => {
@@ -1087,13 +1027,10 @@ export async function listen(
       ? Math.round((confidenceSum / confidenceCount) * 100) / 100
       : confidenceValue;
     onInterim(merged);
-    // Only a FINAL result proves the learner is still speaking. Restart the
-    // pause countdown from here; interim-only events must NOT keep resetting
-    // it, otherwise the mic would hang open on a quiet or echoing line.
-    if (finalSegments.length > 0) armSilence(PAUSE_END_MS);
+    armSilence(1600);
   };
 
-  recognition.onspeechend = () => armSilence(SPEECH_END_MS);
+  recognition.onspeechend = () => armSilence(900);
 
   recognition.onend = () => {
     if (finished || restartPending) return;

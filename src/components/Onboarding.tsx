@@ -26,6 +26,7 @@ export default function Onboarding({
   const [levels, setLevels] = useState<Level[]>([]);
   const [levelCourses, setLevelCourses] = useState<Record<string, string[]>>({});
   const [courses, setCourses] = useState<CourseMeta[]>([]);
+  const [provider, setProvider] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -62,7 +63,7 @@ export default function Onboarding({
     api<{ levels: Level[]; levelCourses: Record<string, string[]>; courses: CourseMeta[]; aiProvider: string | null }>(
       "/api/courses"
     ).then((d) => {
-      setLevels(d.levels); setLevelCourses(d.levelCourses); setCourses(d.courses);
+      setLevels(d.levels); setLevelCourses(d.levelCourses); setCourses(d.courses); setProvider(d.aiProvider);
     }).catch(() => {});
   }, []);
 
@@ -209,6 +210,12 @@ export default function Onboarding({
 
   return (
     <div className="ob-overlay">
+      {isRerun && (
+        <div className="ob-wipe-banner">
+          <strong>Fresh start mode:</strong> when you finish, your previous course, schedule and logged
+          minutes are wiped and rebuilt from scratch.
+        </div>
+      )}
       <div className="ob-progress">
         {Array.from({ length: total }, (_, i) => i + 1).map((i) => (
           <div key={i} className={`ob-dot${i === step ? " active" : i < step ? " done" : ""}`} />
@@ -223,6 +230,9 @@ export default function Onboarding({
             <label className="lbl">Your Name</label>
             <input className="ob-name-input" autoFocus value={name} placeholder="e.g. Rakshit"
               onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && next()} />
+            <div className="ob-hint">
+              {provider ? `SHIGUN engine online — connected to ${provider}.` : "SHIGUN hybrid engine online — curriculum synthesis runs locally, no API key needed."}
+            </div>
           </>
         )}
 
