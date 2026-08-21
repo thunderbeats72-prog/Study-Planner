@@ -376,7 +376,7 @@ export default function Onboarding({
                     <select value={priorPrep} onChange={(e) => setPriorPrep(e.target.value)}>
                       <option value="fresh">Starting fresh (0-20%)</option>
                       <option value="partial">Partly done (20-60%)</option>
-                      <option value="revision">Mostly done, need revision (60%+)</option>
+                      <option value="revision">Mostly done (60%+)</option>
                     </select>
                   </div>
                 </>
@@ -468,9 +468,9 @@ export default function Onboarding({
               <div className="ob-field">
                 <label>Study Style</label>
                 <select value={style} onChange={(e) => setStyle(e.target.value)}>
-                  <option value="balanced">Balanced (theory + practice)</option>
-                  <option value="theory">Theory heavy (concept first)</option>
-                  <option value="practice">Practice heavy (question first)</option>
+                  <option value="balanced">Balanced — all-round</option>
+                  <option value="theory">Theory heavy</option>
+                  <option value="practice">Practice heavy</option>
                 </select>
               </div>
               <div className="ob-field">
@@ -479,15 +479,15 @@ export default function Onboarding({
                   <option value="1">Last 1 week</option>
                   <option value="2">Last 2 weeks</option>
                   <option value="3">Last 3 weeks</option>
-                  <option value="0">No dedicated revision block</option>
+                  <option value="0">No revision block</option>
                 </select>
               </div>
               <div className="ob-field">
                 <label>Plan Mode</label>
                 <select value={planMode} onChange={(e) => setPlanMode(e.target.value)}>
-                  <option value="syllabus">Syllabus — learn everything from scratch</option>
-                  <option value="revision">Revision — I&apos;ve studied it once already</option>
-                  <option value="mock">Mock-heavy — test &amp; fix weak areas</option>
+                  <option value="syllabus">Syllabus — from scratch</option>
+                  <option value="revision">Revision — studied once</option>
+                  <option value="mock">Mock-heavy — test &amp; fix</option>
                 </select>
               </div>
             </div>

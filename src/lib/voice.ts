@@ -16,10 +16,12 @@ import { mergeTranscriptSegments } from "./transcript";
 export type VoiceOption = { id: string; label: string; gender: "female" | "male" };
 
 export const VOICE_OPTIONS: VoiceOption[] = [
-  { id: "f1", label: "Kore · steady", gender: "female" },
-  { id: "f2", label: "Aoede · clear", gender: "female" },
-  { id: "m1", label: "Charon · grounded", gender: "male" },
-  { id: "device", label: "Device fallback", gender: "female" },
+  // Labels stay short: they render inside the fixed-width chat header select
+  // on phones, where long labels get clipped at larger system font sizes.
+  { id: "f1", label: "Kore", gender: "female" },
+  { id: "f2", label: "Aoede", gender: "female" },
+  { id: "m1", label: "Charon", gender: "male" },
+  { id: "device", label: "Device", gender: "female" },
 ];
 
 /** Supported recognition languages: script ranges + BCP-47 tags. */
