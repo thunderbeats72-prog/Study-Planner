@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { today, type AppState, type TaskRow } from "@/lib/client";
 import { IconClose } from "./icons";
 import { useBackClose } from "@/lib/useBackClose";
@@ -27,22 +27,14 @@ export default function TaskEditor({
   onSave: (id: number, patch: TaskPatch) => void;
   onSkipSubject?: (subjectId: number, date: string) => void;
 }) {
-  const [title, setTitle] = useState("");
-  const [detail, setDetail] = useState("");
-  const [minutes, setMinutes] = useState(30);
-  const [date, setDate] = useState(today());
-  const [subjectId, setSubjectId] = useState<string>("");
-  const [status, setStatus] = useState("pending");
-
-  useEffect(() => {
-    if (!task) return;
-    setTitle(task.title);
-    setDetail(task.detail || "");
-    setMinutes(task.plannedMinutes);
-    setDate(task.date);
-    setSubjectId(task.subjectId ? String(task.subjectId) : "");
-    setStatus(task.status);
-  }, [task]);
+  // Initialise from the task directly; the parent remounts this editor
+  // (via key) whenever the edited task changes, so no sync effect is needed.
+  const [title, setTitle] = useState(task?.title ?? "");
+  const [detail, setDetail] = useState(task?.detail || "");
+  const [minutes, setMinutes] = useState(task?.plannedMinutes ?? 30);
+  const [date, setDate] = useState(task?.date ?? today());
+  const [subjectId, setSubjectId] = useState<string>(task?.subjectId ? String(task.subjectId) : "");
+  const [status, setStatus] = useState(task?.status ?? "pending");
 
   useBackClose(!!task, onClose);
 

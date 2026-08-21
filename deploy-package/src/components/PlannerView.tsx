@@ -347,6 +347,7 @@ export default function PlannerView({
       )}
 
       <TaskEditor
+        key={editingTaskId ?? "closed"}
         state={state}
         task={state.tasks.find((x) => x.id === editingTaskId) || null}
         onClose={() => setEditingTaskId(null)}

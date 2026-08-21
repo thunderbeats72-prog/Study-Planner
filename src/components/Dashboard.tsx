@@ -38,12 +38,15 @@ export default function Dashboard({
   const ctx = state.context;
 
   useEffect(() => {
-    setLoadingIns(true);
-    api<typeof intel>("/api/analytics").then(setIntel).catch(() => {});
+    let cancelled = false;
+    api<typeof intel>("/api/analytics")
+      .then((d) => { if (!cancelled) setIntel(d); })
+      .catch(() => {});
     api<{ insights: string }>("/api/insights")
-      .then((d) => setInsights(d.insights))
-      .catch(() => setInsights(""))
-      .finally(() => setLoadingIns(false));
+      .then((d) => { if (!cancelled) setInsights(d.insights); })
+      .catch(() => { if (!cancelled) setInsights(""); })
+      .finally(() => { if (!cancelled) setLoadingIns(false); });
+    return () => { cancelled = true; };
   }, [state.tasks.length, state.sessions.length]);
 
   const week = useMemo(() => {
@@ -381,6 +384,7 @@ export default function Dashboard({
         })}
       </div>
       <TaskEditor
+        key={editingTaskId ?? "closed"}
         state={state}
         task={state.tasks.find((x) => x.id === editingTaskId) || null}
         onClose={() => setEditingTaskId(null)}
