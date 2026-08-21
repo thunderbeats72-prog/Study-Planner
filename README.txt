@@ -54,17 +54,54 @@ Re-running the Setup Wizard performs a HARD RESET of course data
 (subjects, lessons, schedule, sessions, chat) — always behind a
 confirmation dialog in the UI.
 
-CONSISTENT SHIGUN VOICE
------------------------
-The selected persona (Kore, Aoede, or Charon) is locked for every language
-and every engine. Gemini prebuilt TTS is the first path because the same
-speaker reads Hindi, English, Tamil, and the rest. Chirp 3 HD uses that
-same persona name — never a random locale female/male stand-in. Device
-speech is a last resort and still pins one speaker instead of swapping
-voices when the script changes.
+CONSISTENT SHIGUN VOICE — KEYLESS NEURAL (v6)
+---------------------------------------------
+The default spoken voice is the Microsoft Edge multilingual neural
+engine — NO API key of any kind:
 
-Set `GEMINI_API_KEY` (and optionally `GOOGLE_CLOUD_TTS_API_KEY`) in Vercel.
-Studio timeouts retry the same locked voice before any native fallback.
+  Ava (default)   en-US-AvaMultilingualNeural   female
+  Emma            en-US-EmmaMultilingualNeural  female
+  Andrew          en-US-AndrewMultilingualNeural male
+
+The SAME voice name speaks every language (Hindi, Hinglish, English,
+Tamil, …); only the SSML `xml:lang` follows the detected reply
+language. The person never changes on a language switch, on Gemini
+chat replies, or on fallback.
+
+Engine order:
+  1. /api/voice → Microsoft Edge neural (keyless). If the server's
+     network cannot reach the service, the route answers 503 fast and
+     the browser connects DIRECTLY to the same keyless service.
+  2. Optional Gemini TTS / Chirp 3 HD — used only when a key happens
+     to exist (`GEMINI_API_KEY`, `GOOGLE_CLOUD_TTS_API_KEY`). Never
+     required, never the default.
+  3. Device `speechSynthesis` — LAST resort only, pinned to one
+     speaker per persona (never a locale-swapped voice).
+
+No Groq/Orpheus, no ElevenLabs, no quota — nothing to configure.
+Long replies still chunk into voice-sized parts with prefetch and
+play as one continuous narration.
+
+v6 FIXES (this build)
+---------------------
+ - KEYLESS NEURAL VOICE: Microsoft Edge multilingual neural TTS is the
+   default engine — Ava (f1), Emma (f2), Andrew (m1). Zero API keys.
+   The same neural person speaks Hindi, Hinglish, English, Tamil and
+   every other language; only xml:lang changes, never the voice name.
+   Gemini/Chirp TTS are optional extras when keys exist; the device
+   robot voice is a pinned last resort, never the normal path.
+   If the server's network blocks the speech service, the learner's
+   browser connects to the same keyless service directly.
+ - Chat panel is calmer: more padding/air in the thread, quieter
+   contained status/notice banners, quick replies as a divided rail
+   between the thread and the input (voice + speed stay in ONE menu).
+ - No multi-word label clips on desktop: up-next title, chat title,
+   status, calendar pills, intel pace name, live transcript all wrap;
+   ellipsis remains only on narrow phones where space is tight.
+ - Onboarding "SHIGUN engine online…" line is aligned with the name
+   input (dot + text row, consistent spacing, clean wrap).
+ - Mobile polish: 40px chat header targets, roomier chips, safer
+   small-screen fallbacks at 355px and below.
 
 v5 FIXES (this build)
 ---------------------

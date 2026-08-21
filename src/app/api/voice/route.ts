@@ -1,13 +1,30 @@
 import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { detectLanguage, type LangTag } from "@/lib/language";
+import {
+  resolveEdgeVoice,
+  synthesiseEdgeSpeech,
+} from "@/lib/edgeTts";
+import { connectEdgeSocketNode } from "@/lib/edgeTtsNode";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 export const maxDuration = 90;
 
-type VoiceProfile = { name: "Kore" | "Aoede" | "Charon"; gender: "FEMALE" | "MALE"; rate: number };
-const VOICES: Record<string, VoiceProfile> = {
+/* ============================================================
+   VOICE ENGINE ORDER — keyless neural by default
+   ------------------------------------------------------------
+   1. Microsoft Edge multilingual neural (NO API key):
+      Ava / Emma / Andrew — the SAME neural person for every
+      language; only the SSML xml:lang follows the reply language.
+   2. OPTIONAL Gemini TTS / Chirp 3 HD — only if a key happens to
+      exist in the environment. Never required, never the default.
+   3. The client's last resort is the device speechSynthesis, pinned
+      to one speaker per persona (see src/lib/voice.ts).
+============================================================ */
+
+type CloudVoiceProfile = { name: "Kore" | "Aoede" | "Charon"; gender: "FEMALE" | "MALE"; rate: number };
+const CLOUD_PERSONAS: Record<string, CloudVoiceProfile> = {
   f1: { name: "Kore", gender: "FEMALE", rate: 0.97 },
   f2: { name: "Aoede", gender: "FEMALE", rate: 0.99 },
   m1: { name: "Charon", gender: "MALE", rate: 0.96 },
@@ -38,6 +55,12 @@ const audioCache = voiceGlobal.__shigunVoiceCache ?? new Map<string, CachedAudio
 voiceGlobal.__shigunVoiceCache = audioCache;
 const CACHE_TTL_MS = 30 * 60 * 1000;
 const MAX_CACHE_ENTRIES = 16;
+
+/** How long a "the server cannot reach Edge" verdict stays fresh. The
+ *  client uses this to prefer its own direct browser connection. */
+type ReachGlobal = typeof globalThis & { __shigunEdgeDownUntil?: number };
+const reachGlobal = globalThis as ReachGlobal;
+const EDGE_OUTAGE_BACKOFF_MS = 60_000;
 
 function geminiKey(): string {
   return process.env.GEMINI_API_KEY
@@ -140,12 +163,44 @@ function audioResponse(audio: CachedAudio, cacheStatus: "HIT" | "MISS"): Respons
   });
 }
 
-/** Chirp 3 HD keeps the selected persona name (Kore/Aoede/Charon) in every locale. */
+/* ------------------------------------------------------------
+   1) KEYLESS ENGINE — Microsoft Edge multilingual neural
+------------------------------------------------------------ */
+async function synthesiseEdge(
+  text: string,
+  voiceId: string,
+  language: LangTag
+): Promise<CachedAudio | null> {
+  const result = await synthesiseEdgeSpeech(
+    { text, voiceId, language, timeoutMs: 12_000 },
+    connectEdgeSocketNode
+  );
+  if (!("bytes" in result) || !result.bytes.length) {
+    if (!("bytes" in result) && result.unreachable) {
+      reachGlobal.__shigunEdgeDownUntil = Date.now() + EDGE_OUTAGE_BACKOFF_MS;
+    }
+    return null;
+  }
+  const persona = resolveEdgeVoice(voiceId);
+  return {
+    bytes: Buffer.from(result.bytes),
+    contentType: "audio/mpeg",
+    provider: "edge-multilingual-neural",
+    voice: `${persona.label};${persona.name}`,
+    createdAt: Date.now(),
+  };
+}
+
+/* ------------------------------------------------------------
+   2) OPTIONAL KEYED ENGINES — used only when keys exist
+------------------------------------------------------------ */
+
+/** Chirp 3 HD keeps the mapped persona name in every locale. */
 async function synthesiseChirpNamed(
   apiKey: string,
   text: string,
   language: LangTag,
-  profile: VoiceProfile
+  profile: CloudVoiceProfile
 ): Promise<CachedAudio | null> {
   const spoken = truncateUtf8(text, 5000);
   const locales = Array.from(new Set([language, "en-US", "en-IN"])) as string[];
@@ -193,7 +248,7 @@ async function synthesiseGemini(
   apiKey: string,
   text: string,
   language: LangTag,
-  profile: VoiceProfile,
+  profile: CloudVoiceProfile,
   model: string
 ): Promise<GeminiSynthesis> {
   const spokenText = truncateUtf8(text, 5000);
@@ -210,7 +265,7 @@ async function synthesiseGemini(
     voiceConfig: { prebuiltVoiceConfig: { voiceName: profile.name } },
   };
 
-  const attempt = async (speechConfig: typeof speechConfigWithLang | typeof speechConfigPlain) => {
+  const attempt = async (speechConfig: unknown) => {
     return fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
       {
@@ -264,7 +319,7 @@ async function synthesiseGeminiCompatible(
   apiKey: string,
   text: string,
   language: LangTag,
-  profile: VoiceProfile
+  profile: CloudVoiceProfile
 ): Promise<CachedAudio | null> {
   for (const model of geminiTtsModels()) {
     try {
@@ -280,9 +335,15 @@ async function synthesiseGeminiCompatible(
 
 export async function GET() {
   return NextResponse.json({
-    configured: !!(cloudTtsKey() || geminiKey()),
-    provider: geminiKey() ? "gemini-tts" : cloudTtsKey() ? "google-cloud-tts" : null,
-    voiceLock: "prebuilt-persona",
+    configured: true, // the keyless Edge neural engine is ALWAYS configured
+    keyless: true,
+    provider: "edge-multilingual-neural",
+    optionalKeyProviders: {
+      geminiTts: !!geminiKey(),
+      chirp3Hd: !!cloudTtsKey(),
+    },
+    voiceLock: "edge-multilingual-persona",
+    voices: ["Ava", "Emma", "Andrew"],
   });
 }
 
@@ -297,41 +358,57 @@ export async function POST(req: Request) {
   const text = String(body.text || "").replace(/\s+/g, " ").trim().slice(0, 5000);
   if (!text) return NextResponse.json({ error: "Text is required." }, { status: 400 });
   const requested = String(body.voiceId || "f1");
-  const profile = VOICES[requested] || VOICES.f1;
+  const persona = resolveEdgeVoice(requested);
   const language = detectLanguage(text);
   const chirpKey = cloudTtsKey();
   const gemini = geminiKey();
-  const providerId = `lock:${profile.name}:${gemini ? "gemini" : ""}${chirpKey ? "+chirp" : ""}`;
-  const key = cacheKey(providerId, profile.name, language, text);
+  const providerId = `edge:${persona.id}:${gemini ? "+gemini" : ""}${chirpKey ? "+chirp" : ""}`;
+  const key = cacheKey(providerId, persona.name, language, text);
   const cached = getCached(key);
   if (cached) return audioResponse(cached, "HIT");
 
-  try {
-    // Gemini prebuilt voices (Kore / Aoede / Charon) keep the same speaker
-    // across languages. Chirp 3 HD is the same persona name, never a random
-    // locale female/male stand-in — that is what made the voice "change".
-    let audio: CachedAudio | null = null;
-    if (gemini) audio = await synthesiseGeminiCompatible(gemini, text, language, profile);
-    if (!audio && chirpKey) audio = await synthesiseChirpNamed(chirpKey, text, language, profile);
-    if (!audio && gemini && chirpKey) {
-      // Chirp was tried after Gemini; nothing more to do.
+  // 1) DEFAULT — keyless Microsoft Edge multilingual neural.
+  //    Ava stays Ava in Hindi, Hinglish, English, Tamil, … (only
+  //    xml:lang changes; the voice name never does).
+  const edgeDown = (reachGlobal.__shigunEdgeDownUntil || 0) > Date.now();
+  if (!edgeDown) {
+    try {
+      const audio = await synthesiseEdge(text, persona.id, language);
+      if (audio) {
+        putCached(key, audio);
+        return audioResponse(audio, "MISS");
+      }
+    } catch {
+      // fall through to optional keyed engines / client fallback
     }
+  }
 
-    if (audio) {
-      putCached(key, audio);
-      return audioResponse(audio, "MISS");
+  // 2) OPTIONAL — only when a key happens to exist. Never required.
+  const cloudPersona = CLOUD_PERSONAS[persona.id] || CLOUD_PERSONAS.f1;
+  if (gemini || chirpKey) {
+    try {
+      let audio: CachedAudio | null = null;
+      if (gemini) audio = await synthesiseGeminiCompatible(gemini, text, language, cloudPersona);
+      if (!audio && chirpKey) audio = await synthesiseChirpNamed(chirpKey, text, language, cloudPersona);
+      if (audio) {
+        putCached(key, audio);
+        return audioResponse(audio, "MISS");
+      }
+    } catch {
+      // surface the unified failure below
     }
-  } catch {
-    // Client may retry once; it must not switch persona.
   }
 
   return NextResponse.json(
     {
-      error: chirpKey || gemini
-        ? "Studio voice is catching up. Retrying the same locked voice."
-        : "Studio voice is not configured on this deployment.",
-      voice: profile.name,
+      error: "The neural voice service is not reachable from this server right now.",
+      engine: "edge-multilingual-neural",
+      voice: persona.label,
+      // The client should now try its own direct browser connection to
+      // the same keyless Edge service before any device fallback.
+      clientFallback: "edge-direct",
+      retryable: true,
     },
-    { status: chirpKey || gemini ? 502 : 503 }
+    { status: 503 }
   );
 }

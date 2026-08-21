@@ -296,6 +296,7 @@ export default function ChatPanel({
                             </button>
                           ))}
                         </div>
+                        <div className="voice-menu-foot">One neural speaker in every language · no API key needed</div>
                       </div>
                     )}
                   </div>
