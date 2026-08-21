@@ -1844,30 +1844,20 @@ body.mode-focused::before{animation:none;opacity:.4}
 
 /* Voice select + error strip */
 .voice-select{
-  font-size:.7rem;font-weight:650;padding:0 8px;border-radius:var(--radius-sm);
+  font-size:.7rem;font-weight:650;padding:0 10px;border-radius:var(--radius-sm);
   border:1px solid var(--glass-border);background:var(--surface);color:var(--text-muted);
-  font-family:inherit;outline:none;max-width:110px;cursor:pointer;
+  font-family:inherit;outline:none;max-width:128px;cursor:pointer;
   height:30px;line-height:28px;flex-shrink:0;text-align:center;
 }
+.voice-select:hover{border-color:rgba(var(--ai-rgb),.35);color:var(--text-main)}
 .voice-select:focus{border-color:var(--color-ai)}
-/* Language picker: same geometry as the voice picker so the header
-   stays balanced on phones; both shrink on narrow screens. */
-.lang-select{
-  font-size:.7rem;font-weight:650;padding:0 6px;border-radius:var(--radius-sm);
-  border:1px solid var(--glass-border);background:var(--surface);color:var(--text-muted);
-  font-family:inherit;outline:none;max-width:108px;cursor:pointer;
-  height:30px;line-height:28px;flex-shrink:0;text-align:center;
-}
-.lang-select:focus{border-color:var(--color-ai)}
 .voice-err{padding:6px 14px;font-size:.74rem;color:var(--danger-accent);font-weight:600;background:var(--status-skipped-bg)}
 @media(max-width:640px){
-  .voice-select{max-width:78px;font-size:.64rem}
-  .lang-select{max-width:84px;font-size:.64rem}
-  .ai-head{gap:6px}
+  .voice-select{max-width:96px;font-size:.64rem;padding:0 8px}
+  .ai-head{gap:7px}
 }
 @media(max-width:380px){
-  .voice-select{max-width:64px}
-  .lang-select{max-width:70px}
+  .voice-select{max-width:78px;padding:0 6px}
 }
 
 
