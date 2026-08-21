@@ -1792,6 +1792,17 @@ body.mode-focused::before{animation:none;opacity:.4}
    sibling layout, letting Done/Skip overflow the card edge. Inside
    the modal, rows get a dedicated two-line layout with contained,
    wrapping actions. */
+/* The desktop glass sheen rule above sets overflow:hidden on every
+   glass panel. Restore the modal's scroll container after that rule;
+   without this, long lesson/task lists are clipped at the viewport edge. */
+.glass-panel.modal-box{
+  overflow-y:auto;
+  overflow-x:hidden;
+  overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+  scrollbar-gutter:stable;
+  touch-action:pan-y;
+}
 .modal-box .task-row{flex-wrap:wrap;row-gap:8px;overflow:hidden}
 .modal-box .task-main{flex:1 1 100%;min-width:0}
 .modal-box .task-row > .btn,.modal-box .task-row > .chip{flex:0 0 auto}
