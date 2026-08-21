@@ -43,6 +43,35 @@ export const LANGS: { code: string; bcp: string; range: RegExp }[] = [
   { code: "th", bcp: "th-TH", range: /[\u0E00-\u0E7F]/ },
 ];
 
+const MAX_SPOKEN_CHARS = 24000;
+const DEFAULT_SPEECH_CHUNK_BYTES = 4200;
+const INITIAL_SPEECH_CHUNK_BYTES = 2200;
+const LONG_SPEECH_PRIME_COUNT = 2;
+const MIN_RETRY_CHUNK_BYTES = 1400;
+const BASE_SPEECH_HINTS = [
+  "Shigun",
+  "Study Planner Pro",
+  "study planner",
+  "clock in",
+  "clock out",
+  "start timer",
+  "stop timer",
+  "pause timer",
+  "resume timer",
+  "take a break",
+  "what should I study today",
+  "explain my weakest topic",
+  "give me practice questions",
+  "replan",
+  "dashboard",
+  "planner",
+  "focus mode",
+  "subjects",
+  "settings",
+  "हिंदी में समझाओ",
+  "Explain in simple words",
+];
+
 /** Native fallback preferences. Cloud TTS uses the fixed names above. */
 const VOICE_PREFS: Record<string, Record<string, string[]>> = {
   en: {
@@ -119,7 +148,7 @@ function cleanForSpeech(markdown: string): string {
     .trim()
     // Long answers stay intact here; speakLong() splits them into
     // voice-sized chunks so nothing is silently dropped mid-lesson.
-    .slice(0, 12000);
+    .slice(0, MAX_SPOKEN_CHARS);
 }
 
 function wordLang(word: string): string {
@@ -143,6 +172,63 @@ function bcpFor(code: string): string {
   return LANGS.find((language) => language.code === code)?.bcp || "en-IN";
 }
 
+function uniqueSpeechHints(hints: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of hints) {
+    const phrase = raw.replace(/\s+/g, " ").trim();
+    const key = phrase.toLowerCase();
+    if (!phrase || phrase.length < 2 || phrase.length > 80 || seen.has(key)) continue;
+    seen.add(key);
+    out.push(phrase);
+    if (out.length >= 36) break;
+  }
+  return out;
+}
+
+function grammarSafePhrase(phrase: string): string {
+  return phrase
+    .replace(/[^\p{L}\p{N}\s'’-]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+function applyRecognitionHints(
+  recognition: Record<string, any>,
+  values: Record<string, any>,
+  hints: string[]
+): void {
+  const phrases = uniqueSpeechHints([...BASE_SPEECH_HINTS, ...hints]);
+  if (!phrases.length) return;
+
+  try {
+    if ("phrases" in recognition) {
+      recognition.phrases = phrases.map((phrase) => ({
+        phrase,
+        boost: phrase.length > 24 ? 7 : 6,
+      }));
+    }
+  } catch {
+    // Phrase hints are optional and browser-specific.
+  }
+
+  try {
+    const SpeechGrammarListCtor = values.SpeechGrammarList || values.webkitSpeechGrammarList;
+    if (!SpeechGrammarListCtor) return;
+    const grammarTerms = phrases.map(grammarSafePhrase).filter(Boolean).slice(0, 24);
+    if (!grammarTerms.length) return;
+    const list = new SpeechGrammarListCtor();
+    list.addFromString(
+      `#JSGF V1.0; grammar planner; public <term> = ${grammarTerms.map((term) => `(${term})`).join(" | ")} ;`,
+      1
+    );
+    recognition.grammars = list;
+  } catch {
+    // Grammar biasing is best-effort only.
+  }
+}
+
 /* ============================================================
    PLAYBACK — fixed cloud voice, guarded native fallback
 ============================================================ */
@@ -158,7 +244,9 @@ let activeSource: AudioBufferSourceNode | null = null;
 let activeAudio: HTMLAudioElement | null = null;
 let activeObjectUrl = "";
 type ClientAudioCache = { bytes: ArrayBuffer; contentType: string };
+type VoiceFetchResult = { clip: ClientAudioCache | null; errorMessage?: string };
 const clientAudioCache = new Map<string, ClientAudioCache>();
+const clientAudioInflight = new Map<string, Promise<VoiceFetchResult>>();
 const MAX_CLIENT_AUDIO_CACHE = 8;
 
 export type SpeakCallbacks = {
@@ -196,6 +284,65 @@ function stopAudioNodes(): void {
   if ("speechSynthesis" in window) window.speechSynthesis.cancel();
 }
 
+function touchClientAudioCache(cacheKey: string, clip: ClientAudioCache): ClientAudioCache {
+  clientAudioCache.delete(cacheKey);
+  clientAudioCache.set(cacheKey, clip);
+  return clip;
+}
+
+function storeClientAudio(cacheKey: string, clip: ClientAudioCache): ClientAudioCache {
+  clientAudioCache.set(cacheKey, clip);
+  while (clientAudioCache.size > MAX_CLIENT_AUDIO_CACHE) {
+    const oldest = clientAudioCache.keys().next().value as string | undefined;
+    if (!oldest) break;
+    clientAudioCache.delete(oldest);
+  }
+  return clip;
+}
+
+async function playHtmlAudio(
+  bytes: ArrayBuffer,
+  contentType: string,
+  generation: number,
+  start: () => void,
+  finish: () => void
+): Promise<boolean> {
+  if (generation !== speechGeneration) return true;
+  const url = URL.createObjectURL(new Blob([bytes], { type: contentType || "audio/wav" }));
+  const audio = new Audio(url);
+  activeAudio = audio;
+  activeObjectUrl = url;
+  audio.preload = "auto";
+  audio.onplaying = start;
+  audio.onended = finish;
+  audio.onerror = () => finish();
+  await audio.play();
+  start();
+  return true;
+}
+
+async function playWebAudioBuffer(
+  bytes: ArrayBuffer,
+  generation: number,
+  start: () => void,
+  finish: () => void
+): Promise<boolean> {
+  if (generation !== speechGeneration || !audioContext || audioContext.state !== "running") return false;
+  const buffer = await audioContext.decodeAudioData(bytes.slice(0));
+  if (generation !== speechGeneration) return true;
+  const source = audioContext.createBufferSource();
+  source.buffer = buffer;
+  source.connect(audioContext.destination);
+  source.onended = () => {
+    if (activeSource === source) activeSource = null;
+    if (generation === speechGeneration) finish();
+  };
+  activeSource = source;
+  source.start(0);
+  start();
+  return true;
+}
+
 async function playCloudAudio(
   bytes: ArrayBuffer,
   contentType: string,
@@ -204,37 +351,18 @@ async function playCloudAudio(
   finish: () => void
 ): Promise<boolean> {
   if (generation !== speechGeneration) return true;
+  await prepareVoicePlayback();
+
+  // Blob-backed HTML audio usually begins speaking faster than decoding the
+  // whole clip into a Web Audio buffer first, especially for bigger WAV clips.
   try {
-    await prepareVoicePlayback();
-    if (audioContext && audioContext.state === "running") {
-      const buffer = await audioContext.decodeAudioData(bytes.slice(0));
-      if (generation !== speechGeneration) return true;
-      const source = audioContext.createBufferSource();
-      source.buffer = buffer;
-      source.connect(audioContext.destination);
-      source.onended = () => {
-        if (activeSource === source) activeSource = null;
-        if (generation === speechGeneration) finish();
-      };
-      activeSource = source;
-      source.start(0);
-      start();
-      return true;
-    }
+    return await playHtmlAudio(bytes, contentType, generation, start, finish);
   } catch {
-    // Fall through to an HTMLAudioElement before using native TTS.
+    // Fall through to Web Audio before surfacing a playback failure.
   }
 
   try {
-    const url = URL.createObjectURL(new Blob([bytes], { type: contentType || "audio/wav" }));
-    const audio = new Audio(url);
-    activeAudio = audio;
-    activeObjectUrl = url;
-    audio.onended = finish;
-    audio.onerror = () => finish();
-    await audio.play();
-    start();
-    return true;
+    return await playWebAudioBuffer(bytes, generation, start, finish);
   } catch {
     return false;
   }
@@ -325,42 +453,18 @@ export async function speak(
     return;
   }
 
-  const cacheKey = `${voiceId}\0${text}`;
-  const cached = clientAudioCache.get(cacheKey);
-  if (cached) {
-    clientAudioCache.delete(cacheKey);
-    clientAudioCache.set(cacheKey, cached);
-    const played = await playCloudAudio(cached.bytes, cached.contentType, generation, start, finish);
-    if (!played) fail("Audio playback was blocked. Tap the mic once, then try again.");
-    return;
-  }
-
   let errorMessage = "The selected Shigun voice is temporarily unavailable. The answer remains available as text.";
   try {
     const controller = new AbortController();
     speechAbort = controller;
-    const response = await fetch("/api/voice", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ text, voiceId }),
-      signal: controller.signal,
-    });
+    const fetched = await fetchVoiceClip(text, voiceId, controller.signal);
     if (generation !== speechGeneration) return;
-    if (response.ok) {
-      const bytes = await response.arrayBuffer();
-      const contentType = response.headers.get("content-type") || "audio/wav";
-      clientAudioCache.set(cacheKey, { bytes, contentType });
-      while (clientAudioCache.size > MAX_CLIENT_AUDIO_CACHE) {
-        const oldest = clientAudioCache.keys().next().value as string | undefined;
-        if (!oldest) break;
-        clientAudioCache.delete(oldest);
-      }
-      const played = await playCloudAudio(bytes, contentType, generation, start, finish);
+    if (fetched.clip) {
+      const played = await playCloudAudio(fetched.clip.bytes, fetched.clip.contentType, generation, start, finish);
       if (played) return;
       errorMessage = "Audio playback was blocked. Tap the mic once, then try again.";
-    } else {
-      const payload = await response.json().catch(() => null) as { error?: string } | null;
-      if (payload?.error) errorMessage = payload.error;
+    } else if (fetched.errorMessage) {
+      errorMessage = fetched.errorMessage;
     }
   } catch {
     if (generation !== speechGeneration) return;
@@ -389,6 +493,7 @@ export function stopSpeaking(): void {
 let longSpeakToken = 0;
 
 const SENTENCE_ENDERS = new Set([".", "?", "!", "।", "॥", "。", "！", "？", "؟", "…"]);
+const CLAUSE_ENDERS = new Set([",", ";", ":", "—"]);
 
 function utf8Len(text: string): number {
   if (typeof TextEncoder !== "undefined") return new TextEncoder().encode(text).length;
@@ -403,29 +508,37 @@ function utf8Len(text: string): number {
  * together and a cut only happens when a chunk is genuinely too long — and
  * then at a real sentence boundary, never mid-word.
  */
-export function splitSpeechChunks(text: string, maxBytes = 4200): string[] {
+export function splitSpeechChunks(text: string, maxBytes = DEFAULT_SPEECH_CHUNK_BYTES): string[] {
   const chunks: string[] = [];
   let current = "";
   let lastBoundary = 0; // safe cut point (right after a sentence ender)
+  let lastClauseBoundary = 0; // softer cut point for unusually long sentences
 
   for (let i = 0; i < text.length; i++) {
     current += text[i];
     const next = text[i + 1] ?? " ";
     const ended = SENTENCE_ENDERS.has(text[i]) && (next === " " || next === "\n" || i === text.length - 1);
     if (ended) lastBoundary = current.length;
+    const clauseEnded = CLAUSE_ENDERS.has(text[i])
+      && (next === " " || next === "\n")
+      && utf8Len(current) >= Math.floor(maxBytes * 0.55);
+    if (clauseEnded) lastClauseBoundary = current.length;
 
     if (utf8Len(current) >= maxBytes) {
-      if (lastBoundary > 0) {
-        chunks.push(current.slice(0, lastBoundary).trim());
-        current = current.slice(lastBoundary);
+      const safeBoundary = lastBoundary || lastClauseBoundary;
+      if (safeBoundary > 0) {
+        chunks.push(current.slice(0, safeBoundary).trim());
+        current = current.slice(safeBoundary).trimStart();
         lastBoundary = 0;
+        lastClauseBoundary = 0;
       } else {
         // A single sentence longer than the cap: cut at the last word gap.
         const gap = current.lastIndexOf(" ");
         const cut = gap > 32 ? gap + 1 : current.length;
         chunks.push(current.slice(0, cut).trim());
-        current = current.slice(cut);
+        current = current.slice(cut).trimStart();
         lastBoundary = 0;
+        lastClauseBoundary = 0;
       }
     }
   }
@@ -433,32 +546,99 @@ export function splitSpeechChunks(text: string, maxBytes = 4200): string[] {
   return chunks;
 }
 
+function nextSpeechChunkSize(currentMaxBytes: number): number {
+  if (currentMaxBytes <= MIN_RETRY_CHUNK_BYTES) return currentMaxBytes;
+  return Math.max(MIN_RETRY_CHUNK_BYTES, Math.floor(currentMaxBytes * 0.62));
+}
+
+function shouldRetrySpeechChunk(
+  errorMessage: string,
+  voiceId: string,
+  chunkText: string,
+  currentMaxBytes: number
+): boolean {
+  if (voiceId === "device") return false;
+  if (/blocked|tap the mic|configured/i.test(errorMessage)) return false;
+  return currentMaxBytes > MIN_RETRY_CHUNK_BYTES && utf8Len(chunkText) > MIN_RETRY_CHUNK_BYTES;
+}
+
+function buildSpeechQueue(text: string): PendingSpeechChunk[] {
+  const normalized = text.trim();
+  if (!normalized) return [];
+
+  const queue: PendingSpeechChunk[] = [];
+  let remaining = normalized;
+  if (utf8Len(remaining) > DEFAULT_SPEECH_CHUNK_BYTES) {
+    const early = splitSpeechChunks(remaining, INITIAL_SPEECH_CHUNK_BYTES)[0] || "";
+    if (early && early.length < remaining.length) {
+      queue.push({ text: early, maxBytes: INITIAL_SPEECH_CHUNK_BYTES });
+      remaining = remaining.slice(early.length).trimStart();
+    }
+  }
+
+  for (const chunk of splitSpeechChunks(remaining, DEFAULT_SPEECH_CHUNK_BYTES)) {
+    queue.push({ text: chunk, maxBytes: DEFAULT_SPEECH_CHUNK_BYTES });
+  }
+  return queue;
+}
+
+async function fetchVoiceClip(
+  text: string,
+  voiceId: string,
+  signal?: AbortSignal
+): Promise<VoiceFetchResult> {
+  const cleaned = cleanForSpeech(text);
+  if (!cleaned) return { clip: null, errorMessage: "Text is required." };
+
+  const cacheKey = `${voiceId}\0${cleaned}`;
+  const cached = clientAudioCache.get(cacheKey);
+  if (cached) return { clip: touchClientAudioCache(cacheKey, cached) };
+
+  const existing = clientAudioInflight.get(cacheKey);
+  if (existing) return existing;
+
+  const request = (async (): Promise<VoiceFetchResult> => {
+    let errorMessage = "The selected Shigun voice is temporarily unavailable. The answer remains available as text.";
+    try {
+      const response = await fetch("/api/voice", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ text: cleaned, voiceId }),
+        signal,
+      });
+      if (response.ok) {
+        const bytes = await response.arrayBuffer();
+        const contentType = response.headers.get("content-type") || "audio/wav";
+        return { clip: storeClientAudio(cacheKey, { bytes, contentType }) };
+      }
+      const payload = await response.json().catch(() => null) as { error?: string } | null;
+      if (payload?.error) errorMessage = payload.error;
+    } catch {
+      // Fall through with the default message below.
+    }
+    return { clip: null, errorMessage };
+  })();
+
+  clientAudioInflight.set(cacheKey, request);
+  try {
+    return await request;
+  } finally {
+    if (clientAudioInflight.get(cacheKey) === request) clientAudioInflight.delete(cacheKey);
+  }
+}
+
 /** Fetch a chunk's audio into the client cache WITHOUT playing it, so the
  *  next chunk is ready before the current one finishes — removing the long
  *  pause that used to sit between parts of a spoken lesson. */
 async function prefetchVoice(text: string, voiceId: string): Promise<void> {
-  const cleaned = cleanForSpeech(text);
-  const cacheKey = `${voiceId}\0${cleaned}`;
-  if (clientAudioCache.has(cacheKey)) return;
   try {
-    const response = await fetch("/api/voice", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ text: cleaned, voiceId }),
-    });
-    if (!response.ok) return;
-    const bytes = await response.arrayBuffer();
-    const contentType = response.headers.get("content-type") || "audio/wav";
-    clientAudioCache.set(cacheKey, { bytes, contentType });
-    while (clientAudioCache.size > MAX_CLIENT_AUDIO_CACHE) {
-      const oldest = clientAudioCache.keys().next().value as string | undefined;
-      if (!oldest) break;
-      clientAudioCache.delete(oldest);
-    }
+    await fetchVoiceClip(text, voiceId);
   } catch {
     // Playback falls back to an on-demand fetch for this chunk.
   }
 }
+
+type PendingSpeechChunk = { text: string; maxBytes: number };
 
 export async function speakLong(
   markdown: string,
@@ -467,42 +647,59 @@ export async function speakLong(
 ): Promise<void> {
   const text = cleanForSpeech(markdown);
   if (!text) { callbacks.onEnd?.(); return; }
-  const chunks = splitSpeechChunks(text);
+  const queue: PendingSpeechChunk[] = buildSpeechQueue(text);
   const token = ++longSpeakToken;
   const isCurrent = () => token === longSpeakToken;
-  if (chunks.length <= 1) {
+  if (queue.length <= 1) {
     longSpeakToken++; // speak() path owns cancellation from here
     await speak(text, voiceId, callbacks);
     return;
   }
 
   let startedOnce = false;
-  let failed = false;
+  let completed = 0;
   const start = () => {
     if (startedOnce || !isCurrent()) return;
     startedOnce = true;
     callbacks.onStart?.();
   };
 
-  for (let index = 0; index < chunks.length; index++) {
+  for (let index = 0; index < queue.length;) {
     if (!isCurrent()) return; // the user stopped playback mid-answer
+    const current = queue[index];
     // Warm the next part while this one plays (cloud voices only). The
     // on-demand fetch in speak() then hits the cache and starts instantly,
     // so long lessons flow as one continuous narration instead of pausing
     // after every sentence.
-    if (voiceId !== "device" && index + 1 < chunks.length) {
-      void prefetchVoice(chunks[index + 1], voiceId);
+    if (voiceId !== "device") {
+      for (let offset = 0; offset < LONG_SPEECH_PRIME_COUNT; offset++) {
+        const upcoming = queue[index + offset];
+        if (!upcoming) break;
+        void prefetchVoice(upcoming.text, voiceId);
+      }
     }
     let settled = false;
+    let failed = false;
+    let errorMessage = "";
     await new Promise<void>((resolve) => {
-      speak(chunks[index], voiceId, {
+      void speak(current.text, voiceId, {
         onStart: start,
-        onEnd: () => { settled = true; resolve(); },
-        onError: (message) => { settled = true; failed = true; callbacks.onError?.(message); resolve(); },
+        onEnd: () => {
+          if (settled) return;
+          settled = true;
+          resolve();
+        },
+        onError: (message) => {
+          if (settled) return;
+          settled = true;
+          failed = true;
+          errorMessage = message;
+          resolve();
+        },
       });
       // Safety poll: a mid-chunk stop bumps the token without speak()'s
       // finish() firing, and no engine is hang-proof — resolve either way.
-      const softCap = Math.max(25000, (chunks[index].length / 11) * 1500);
+      const softCap = Math.max(25000, (current.text.length / 11) * 1500);
       const began = Date.now();
       const poll = window.setInterval(() => {
         if (settled || !isCurrent() || Date.now() - began > softCap) {
@@ -512,8 +709,25 @@ export async function speakLong(
       }, 150);
     });
     if (!isCurrent()) return;
-    callbacks.onProgress?.(index + 1, chunks.length);
-    if (failed) return; // surface the error once; text remains readable
+
+    if (failed && shouldRetrySpeechChunk(errorMessage, voiceId, current.text, current.maxBytes)) {
+      const nextMaxBytes = nextSpeechChunkSize(current.maxBytes);
+      const retryChunks = splitSpeechChunks(current.text, nextMaxBytes);
+      if (retryChunks.length > 1) {
+        queue.splice(index, 1, ...retryChunks.map((chunk) => ({ text: chunk, maxBytes: nextMaxBytes })));
+        callbacks.onProgress?.(completed, queue.length);
+        continue;
+      }
+    }
+
+    if (failed) {
+      callbacks.onError?.(errorMessage);
+      return; // surface the error once; text remains readable
+    }
+
+    completed++;
+    callbacks.onProgress?.(completed, queue.length);
+    index++;
   }
   if (isCurrent()) callbacks.onEnd?.();
 }
@@ -570,13 +784,20 @@ type ActiveRecognition = { id: number; stop: () => void };
 let activeRecognition: ActiveRecognition | null = null;
 let recognitionSequence = 0;
 
+type ListenOptions = {
+  lang?: string;
+  hints?: string[];
+};
+
 export async function listen(
   onInterim: (text: string) => void,
   onFinal: (final: ListenFinal) => void,
   onError: (error: string) => void,
-  lang = preferredSttLang()
+  options: string | ListenOptions = preferredSttLang()
 ): Promise<ListenHandle | null> {
   const values = window as unknown as Record<string, any>;
+  const resolved = typeof options === "string" ? { lang: options } : options;
+  const lang = resolved.lang || preferredSttLang();
   const SpeechRecognitionCtor = values.SpeechRecognition || values.webkitSpeechRecognition;
   if (!SpeechRecognitionCtor) {
     onError("Speech recognition is not supported in this browser.");
@@ -589,11 +810,12 @@ export async function listen(
   const id = ++recognitionSequence;
   const recognition = new SpeechRecognitionCtor();
   recognition.lang = lang;
+  applyRecognitionHints(recognition, values, resolved.hints || []);
   recognition.interimResults = true;
   // One mic tap represents one chat message. Continuous mode is the source
   // of cumulative duplicate result batches on Android Chrome/WebView.
   recognition.continuous = false;
-  recognition.maxAlternatives = 3;
+  recognition.maxAlternatives = 5;
 
   let finished = false;
   let started = false;

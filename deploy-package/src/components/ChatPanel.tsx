@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { mdToHtml, escapeHtml, type MessageRow } from "@/lib/client";
-import { IconChat, IconClose, IconSend, IconSpark } from "./icons";
+import { IconChat, IconClose, IconSend, IconSpark, IconVolume } from "./icons";
 import {
   VOICE_OPTIONS, voiceSupported, speakLong, stopSpeaking, listen, learnSttLang,
   prepareVoicePlayback, type ListenHandle,
@@ -25,7 +25,7 @@ const QUICKS = [
 const AUTO_SEND_CONFIDENCE = 0.72;
 
 export default function ChatPanel({
-  open, setOpen, messages, onSend, thinking, provider, learner,
+  open, setOpen, messages, onSend, thinking, provider, learner, speechHints = [],
 }: {
   open: boolean;
   setOpen: (v: boolean) => void;
@@ -34,6 +34,7 @@ export default function ChatPanel({
   thinking: boolean;
   provider?: string | null;
   learner?: { name: string; daysLeft: number; progressPct: number; streak: number; todayDone: number; todayTotal: number };
+  speechHints?: string[];
 }) {
   const [text, setText] = useState("");
   const voiceReplyArmed = useRef(false); // speak the next reply only after mic input
@@ -70,6 +71,23 @@ export default function ChatPanel({
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages.length, thinking, open]);
 
+  const speakReply = useCallback((content: string) => {
+    if (!support.tts || !content.trim()) return;
+    stopSpeaking();
+    setVoiceErr("");
+    setVoicePreparing(true);
+    setSpeaking(false);
+    setSpeakProgress(null);
+    void speakLong(content, voiceId, {
+      onStart: () => { setVoicePreparing(false); setSpeaking(true); },
+      onProgress: (done, total) => setSpeakProgress(total > 1 ? { done, total } : null),
+      onEnd: () => { setVoicePreparing(false); setSpeaking(false); setSpeakProgress(null); },
+      onError: (message) => setVoiceErr(message),
+    });
+  }, [support.tts, voiceId]);
+
+  const lastAssistant = [...messages].reverse().find((message) => message.role === "assistant" && message.id > 0) || null;
+
   // Seamless voice: if the user SPOKE their message, Shigun speaks back —
   // the FULL answer, chunk by chunk for long lessons.
   useEffect(() => {
@@ -78,18 +96,9 @@ export default function ChatPanel({
     if (last && last.role === "assistant" && last.id !== lastSpokenId.current && last.id > 0) {
       lastSpokenId.current = last.id;
       voiceReplyArmed.current = false;
-      setVoiceErr("");
-      setVoicePreparing(true);
-      setSpeaking(false);
-      setSpeakProgress(null);
-      void speakLong(last.content, voiceId, {
-        onStart: () => { setVoicePreparing(false); setSpeaking(true); },
-        onProgress: (done, total) => setSpeakProgress(total > 1 ? { done, total } : null),
-        onEnd: () => { setVoicePreparing(false); setSpeaking(false); setSpeakProgress(null); },
-        onError: (message) => setVoiceErr(message),
-      });
+      speakReply(last.content);
     }
-  }, [messages, voiceId, support.tts]);
+  }, [messages, speakReply, support.tts]);
 
   // Stop everything when the panel closes
   useEffect(() => {
@@ -182,7 +191,8 @@ export default function ChatPanel({
       (err) => {
         if (!isCurrent()) return;
         setListening(false); setMicWaking(false); listenRef.current = null; setVoiceErr(err);
-      }
+      },
+      { hints: speechHints }
     );
     if (!isCurrent()) { h?.stop(); return; }
     if (h) { listenRef.current = h; setMicWaking(false); setListening(true); }
@@ -219,19 +229,39 @@ export default function ChatPanel({
               </div>
             </div>
             {support.tts && (
-              <select
-                className="voice-select"
-                value={voiceId}
-                onChange={(e) => setVoiceId(e.target.value)}
-                aria-label="Shigun voice (female or male)"
-                title="Shigun's voice — replies adapt their grammar to the selected female or male voice"
-              >
-                {VOICE_OPTIONS.map((v) => (
-                  <option key={v.id} value={v.id}>
-                    {v.id === "device" ? v.label : `${v.label} ${v.gender === "male" ? "♂" : "♀"}`}
-                  </option>
-                ))}
-              </select>
+              <>
+                <button
+                  className={`voice-replay${speaking || voicePreparing ? " active" : ""}`}
+                  onClick={() => {
+                    if (speaking || voicePreparing) {
+                      stopSpeaking();
+                      setSpeaking(false);
+                      setVoicePreparing(false);
+                      setSpeakProgress(null);
+                      return;
+                    }
+                    if (lastAssistant) speakReply(lastAssistant.content);
+                  }}
+                  disabled={thinking || (!lastAssistant && !speaking && !voicePreparing)}
+                  aria-label={speaking || voicePreparing ? "Stop spoken reply" : "Read the latest reply aloud"}
+                  title={speaking || voicePreparing ? "Stop spoken reply" : "Read the latest reply aloud"}
+                >
+                  <IconVolume size={15} />
+                </button>
+                <select
+                  className="voice-select"
+                  value={voiceId}
+                  onChange={(e) => setVoiceId(e.target.value)}
+                  aria-label="Shigun voice (female or male)"
+                  title="Shigun's voice — replies adapt their grammar to the selected female or male voice"
+                >
+                  {VOICE_OPTIONS.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.id === "device" ? v.label : `${v.label} ${v.gender === "male" ? "♂" : "♀"}`}
+                    </option>
+                  ))}
+                </select>
+              </>
             )}
             <button className="ai-close" aria-label="Close chat" onClick={() => setOpen(false)}><IconClose size={17} /></button>
           </div>

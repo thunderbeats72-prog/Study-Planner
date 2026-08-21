@@ -408,6 +408,14 @@ export default function Home() {
   const todayDone = state.tasks.filter((x) => x.date === t && x.status === "done").length;
   const todayTotal = state.tasks.filter((x) => x.date === t).length;
   const allMsgs = [...state.messages, ...pendingMsgs];
+  const speechHints = Array.from(new Set([
+    "Shigun",
+    "Study Planner Pro",
+    state.user.courseName,
+    ...state.subjects.map((subject) => subject.name),
+    ...state.topics.slice(0, 18).map((topic) => topic.title),
+    ...state.tasks.slice(0, 18).map((task) => task.title),
+  ].map((hint) => hint.trim()).filter(Boolean))).slice(0, 36);
 
   // The full task title, untruncated — CSS wraps it cleanly instead of
   // slicing it in JS (fixes "Principles of Marketing: Introduction…").
@@ -566,7 +574,8 @@ export default function Home() {
 
       <ChatPanel open={chatOpen} setOpen={setChatOpen} messages={allMsgs} onSend={askTutor}
         thinking={thinking} provider={state.aiProvider}
-        learner={{ name: state.user.name, daysLeft: ctx.daysLeft, progressPct: ctx.progressPct, streak: state.user.streak, todayDone, todayTotal }} />
+        learner={{ name: state.user.name, daysLeft: ctx.daysLeft, progressPct: ctx.progressPct, streak: state.user.streak, todayDone, todayTotal }}
+        speechHints={speechHints} />
 
       <CommandPalette commands={commands} />
       <div className="cmdk-tip">Press ⌘K / Ctrl-K for commands</div>
