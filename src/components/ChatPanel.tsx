@@ -25,14 +25,13 @@ const QUICKS = [
 const AUTO_SEND_CONFIDENCE = 0.72;
 
 export default function ChatPanel({
-  open, setOpen, messages, onSend, thinking, provider, learner, speechHints = [],
+  open, setOpen, messages, onSend, thinking, learner, speechHints = [],
 }: {
   open: boolean;
   setOpen: (v: boolean) => void;
   messages: MessageRow[];
   onSend: (q: string, meta?: { voice?: boolean; voiceId?: string }) => void;
   thinking: boolean;
-  provider?: string | null;
   learner?: { name: string; daysLeft: number; progressPct: number; streak: number; todayDone: number; todayTotal: number };
   speechHints?: string[];
 }) {
@@ -233,12 +232,12 @@ export default function ChatPanel({
               <div className="ai-title">Shigun <span>AI Tutor</span></div>
               <div className="ai-status">
                 {micWaking ? "Preparing microphone"
-                  : listening ? "Listening — detecting language"
+                  : listening ? "Listening…"
                   : voicePreparing ? `Preparing ${selectedVoiceName}…`
                   : speaking
                     ? `${selectedVoiceName} speaking${speakProgress ? ` · part ${speakProgress.done}/${speakProgress.total}` : ""}`
                     : thinking ? "Working on your answer"
-                    : provider ? `${provider} connected` : "Hybrid engine online"}
+                    : "Online"}
               </div>
             </div>
             {support.tts && (
