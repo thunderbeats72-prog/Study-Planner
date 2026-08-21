@@ -62,11 +62,13 @@ then uses deterministic Chirp 3 HD Kore, Aoede, or Charon voices in the
 reply's language. Warm-server and client audio caches make repeated app
 confirmations immediate.
 
-`GEMINI_API_KEY` / `GOOGLE_API_KEY` remains a compatibility path using one
-pinned `SHIGUN_TTS_MODEL`. Named profiles never silently switch model or
-fall back to an unrelated operating-system voice; failures remain text-only.
-A native voice is available only through the explicit “Device fallback”
-option.
+`GEMINI_API_KEY` / `GOOGLE_API_KEY` remains a compatibility path. If a
+configured Gemini TTS model has been retired or is unavailable, Shigun tries
+an ordered compatible TTS model list immediately. If a studio request cannot
+start promptly, the answer continues in the closest available device voice
+instead of stopping on a “voice model unavailable” error; the chat shows a
+clear non-error notice. One failed long-answer part switches the remaining
+parts to that local voice, so every later part keeps flowing.
 
 v5 FIXES (this build)
 ---------------------
@@ -96,8 +98,9 @@ v5 FIXES (this build)
    Marathi, Punjabi and every language the tutor writes.
  - Long answers read in full and FLOW: replies are split only when they are
    genuinely too long for one TTS request (never after every "."), and the
-   next part is fetched while the current one plays, so a whole lesson reads
-   as one continuous narration with a subtle "part 2/5" indicator. Tapping
+   next three parts are warmed while the current one plays. A studio outage
+   switches the rest of that answer to local speech with no repeated timeout.
+   The header remembers a 1×, 1.15×, 1.3×, or 1.45× playback speed. Tapping
    the mic while Shigun speaks stops the voice instantly.
  - ML: the exam-readiness projection is now anchored to the minutes you
    ACTUALLY study per active day (trimmed mean over 28 days, shrunk

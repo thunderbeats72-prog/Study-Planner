@@ -7,8 +7,9 @@ import { mergeTranscriptSegments } from "./transcript";
 // - Recognition is single-utterance and overlap-deduplicated, which avoids
 //   cumulative WebKit/Android results being appended more than once.
 // - Replies use a pinned server voice (deterministic Chirp 3 HD when
-//   configured, otherwise one pinned Gemini model). Named profiles never
-//   switch silently to an unrelated operating-system voice.
+//   configured, otherwise a compatible Gemini TTS model). When cloud speech
+//   cannot start promptly, the closest available device voice continues the
+//   answer instead of leaving the learner with an unavailable-model error.
 // - Every listen/playback has a generation token. Late mobile callbacks from
 //   a cancelled session cannot restart audio or submit an old transcript.
 // ============================================================
@@ -23,6 +24,13 @@ export const VOICE_OPTIONS: VoiceOption[] = [
   { id: "m1", label: "Charon", gender: "male" },
   { id: "device", label: "Device", gender: "female" },
 ];
+
+export const SPEECH_RATE_OPTIONS = [
+  { value: 1, label: "1×" },
+  { value: 1.15, label: "1.15×" },
+  { value: 1.3, label: "1.3×" },
+  { value: 1.45, label: "1.45×" },
+] as const;
 
 /** Supported recognition languages: script ranges + BCP-47 tags. */
 export const LANGS: { code: string; bcp: string; range: RegExp }[] = [
@@ -46,7 +54,7 @@ export const LANGS: { code: string; bcp: string; range: RegExp }[] = [
 const MAX_SPOKEN_CHARS = 24000;
 const DEFAULT_SPEECH_CHUNK_BYTES = 4200;
 const INITIAL_SPEECH_CHUNK_BYTES = 2200;
-const LONG_SPEECH_PRIME_COUNT = 2;
+const LONG_SPEECH_PREFETCH_COUNT = 3;
 const MIN_RETRY_CHUNK_BYTES = 1400;
 const BASE_SPEECH_HINTS = [
   "Shigun",
@@ -106,7 +114,10 @@ function loadVoices(): Promise<SpeechSynthesisVoice[]> {
       return;
     }
     synth?.addEventListener?.("voiceschanged", finish, { once: true });
-    window.setTimeout(finish, 1200);
+    // A fallback should feel immediate. If a platform has not populated its
+    // voice list shortly after the gesture, SpeechSynthesis can still use the
+    // requested language/default voice without delaying the whole answer.
+    window.setTimeout(finish, 650);
   }).finally(() => { voicesPromise = null; });
   return voicesPromise!;
 }
@@ -247,13 +258,32 @@ type ClientAudioCache = { bytes: ArrayBuffer; contentType: string };
 type VoiceFetchResult = { clip: ClientAudioCache | null; errorMessage?: string };
 const clientAudioCache = new Map<string, ClientAudioCache>();
 const clientAudioInflight = new Map<string, Promise<VoiceFetchResult>>();
-const MAX_CLIENT_AUDIO_CACHE = 8;
+const MAX_CLIENT_AUDIO_CACHE = 12;
+const VOICE_FETCH_TIMEOUT_MS = 18000;
+const DEFAULT_PLAYBACK_RATE = 1.15;
+const MIN_PLAYBACK_RATE = 0.85;
+const MAX_PLAYBACK_RATE = 1.5;
 
 export type SpeakCallbacks = {
   onStart?: () => void;
   onEnd?: () => void;
+  /** Cloud audio is still loading/unavailable; delivery continues locally. */
+  onFallback?: (message: string) => void;
   onError?: (message: string) => void;
 };
+
+export type SpeechPlaybackOptions = {
+  /** Playback is client-side, so changing it never causes another TTS request. */
+  rate?: number;
+  /** Internal long-answer guard: after a cloud outage, continue locally. */
+  forceNative?: boolean;
+};
+
+function playbackRateFor(options: SpeechPlaybackOptions = {}): number {
+  const requested = Number(options.rate);
+  if (!Number.isFinite(requested)) return DEFAULT_PLAYBACK_RATE;
+  return Math.min(MAX_PLAYBACK_RATE, Math.max(MIN_PLAYBACK_RATE, requested));
+}
 
 /** Call from the mic's user gesture so iOS authorises later audio playback. */
 export async function prepareVoicePlayback(): Promise<void> {
@@ -305,7 +335,8 @@ async function playHtmlAudio(
   contentType: string,
   generation: number,
   start: () => void,
-  finish: () => void
+  finish: () => void,
+  playbackRate: number
 ): Promise<boolean> {
   if (generation !== speechGeneration) return true;
   const url = URL.createObjectURL(new Blob([bytes], { type: contentType || "audio/wav" }));
@@ -313,6 +344,9 @@ async function playHtmlAudio(
   activeAudio = audio;
   activeObjectUrl = url;
   audio.preload = "auto";
+  // Keep the answer concise without changing its pitch or requesting a second
+  // cloud rendering. HTMLAudio preserves pitch on modern browsers by default.
+  audio.playbackRate = playbackRate;
   audio.onplaying = start;
   audio.onended = finish;
   audio.onerror = () => finish();
@@ -325,13 +359,15 @@ async function playWebAudioBuffer(
   bytes: ArrayBuffer,
   generation: number,
   start: () => void,
-  finish: () => void
+  finish: () => void,
+  playbackRate: number
 ): Promise<boolean> {
   if (generation !== speechGeneration || !audioContext || audioContext.state !== "running") return false;
   const buffer = await audioContext.decodeAudioData(bytes.slice(0));
   if (generation !== speechGeneration) return true;
   const source = audioContext.createBufferSource();
   source.buffer = buffer;
+  source.playbackRate.value = playbackRate;
   source.connect(audioContext.destination);
   source.onended = () => {
     if (activeSource === source) activeSource = null;
@@ -348,7 +384,8 @@ async function playCloudAudio(
   contentType: string,
   generation: number,
   start: () => void,
-  finish: () => void
+  finish: () => void,
+  playbackRate: number
 ): Promise<boolean> {
   if (generation !== speechGeneration) return true;
   await prepareVoicePlayback();
@@ -356,13 +393,13 @@ async function playCloudAudio(
   // Blob-backed HTML audio usually begins speaking faster than decoding the
   // whole clip into a Web Audio buffer first, especially for bigger WAV clips.
   try {
-    return await playHtmlAudio(bytes, contentType, generation, start, finish);
+    return await playHtmlAudio(bytes, contentType, generation, start, finish, playbackRate);
   } catch {
     // Fall through to Web Audio before surfacing a playback failure.
   }
 
   try {
-    return await playWebAudioBuffer(bytes, generation, start, finish);
+    return await playWebAudioBuffer(bytes, generation, start, finish, playbackRate);
   } catch {
     return false;
   }
@@ -373,14 +410,12 @@ async function speakNative(
   voiceId: string,
   generation: number,
   start: () => void,
-  finish: () => void
-): Promise<void> {
-  if (!("speechSynthesis" in window) || generation !== speechGeneration) {
-    finish();
-    return;
-  }
+  finish: () => void,
+  playbackRate: number
+): Promise<boolean> {
+  if (!("speechSynthesis" in window) || generation !== speechGeneration) return false;
   await loadVoices();
-  if (generation !== speechGeneration) return;
+  if (generation !== speechGeneration) return false;
 
   const runs = splitLanguageRuns(text);
   let index = 0;
@@ -405,7 +440,7 @@ async function speakNative(
     const profile = voiceId === "m1"
       ? { rate: 0.97, pitch: 0.78 }
       : voiceId === "f2" ? { rate: 1.08, pitch: 1.12 } : { rate: 1, pitch: 1 };
-    utterance.rate = profile.rate * (run.lang === "en" ? 1.02 : 0.96);
+    utterance.rate = Math.min(1.8, profile.rate * (run.lang === "en" ? 1.04 : 1) * playbackRate);
     utterance.pitch = profile.pitch;
     utterance.onend = speakNext;
     utterance.onerror = speakNext;
@@ -413,14 +448,17 @@ async function speakNative(
     if (!playbackStarted) { playbackStarted = true; start(); }
   };
   speakNext();
+  return true;
 }
 
 export async function speak(
   markdown: string,
   voiceId: string,
-  callbacks: SpeakCallbacks = {}
+  callbacks: SpeakCallbacks = {},
+  options: SpeechPlaybackOptions = {}
 ): Promise<void> {
   const text = cleanForSpeech(markdown);
+  const playbackRate = playbackRateFor(options);
   const generation = ++speechGeneration;
   stopAudioNodes();
   let ended = false;
@@ -445,24 +483,55 @@ export async function speak(
     return;
   }
 
-  // A device voice is explicitly opt-in. Named Shigun profiles never fall
-  // back silently to SpeechSynthesis, because that is exactly what made Kore
-  // sound like a different person between commands and long answers.
-  if (voiceId === "device") {
-    await speakNative(text, "f1", generation, start, finish);
+  // A device voice can be selected directly. Named profiles use the studio
+  // voice first, then continue with the closest local voice if the service
+  // is unavailable rather than abandoning a spoken answer.
+  if (voiceId === "device" || options.forceNative) {
+    const nativeVoiceId = voiceId === "device" ? "f1" : voiceId;
+    if (await speakNative(text, nativeVoiceId, generation, start, finish, playbackRate)) return;
+    fail("Speech is not available in this browser. You can still read the answer here.");
     return;
   }
 
-  let errorMessage = "The selected Shigun voice is temporarily unavailable. The answer remains available as text.";
+  let errorMessage = "The selected Shigun voice is temporarily unavailable.";
   try {
     const controller = new AbortController();
     speechAbort = controller;
-    const fetched = await fetchVoiceClip(text, voiceId, controller.signal);
+    let timedOut = false;
+    const fetched = await new Promise<VoiceFetchResult>((resolve) => {
+      let settled = false;
+      const settle = (result: VoiceFetchResult) => {
+        if (settled) return;
+        settled = true;
+        window.clearTimeout(timeout);
+        resolve(result);
+      };
+      const timeout = window.setTimeout(() => {
+        timedOut = true;
+        controller.abort();
+        settle({ clip: null, errorMessage: "The studio voice is taking too long to respond." });
+      }, VOICE_FETCH_TIMEOUT_MS);
+      controller.signal.addEventListener("abort", () => {
+        if (!timedOut) settle({ clip: null });
+      }, { once: true });
+      void fetchVoiceClip(text, voiceId, controller.signal)
+        .then(settle)
+        .catch(() => settle({ clip: null }));
+    });
     if (generation !== speechGeneration) return;
     if (fetched.clip) {
-      const played = await playCloudAudio(fetched.clip.bytes, fetched.clip.contentType, generation, start, finish);
+      const played = await playCloudAudio(
+        fetched.clip.bytes,
+        fetched.clip.contentType,
+        generation,
+        start,
+        finish,
+        playbackRate
+      );
       if (played) return;
-      errorMessage = "Audio playback was blocked. Tap the mic once, then try again.";
+      errorMessage = "Cloud audio could not start on this device.";
+    } else if (timedOut) {
+      errorMessage = "The studio voice is taking too long to respond.";
     } else if (fetched.errorMessage) {
       errorMessage = fetched.errorMessage;
     }
@@ -472,7 +541,16 @@ export async function speak(
     if (speechAbort?.signal.aborted || generation === speechGeneration) speechAbort = null;
   }
 
-  fail(errorMessage);
+  // A voice outage must not turn a spoken lesson into an error-only state.
+  // Preserve the requested gender/language as closely as the browser permits
+  // and continue immediately with the local speech engine instead.
+  if (generation === speechGeneration
+    && await speakNative(text, voiceId, generation, start, finish, playbackRate)) {
+    callbacks.onFallback?.("Studio voice is reconnecting — continuing with your device voice.");
+    return;
+  }
+
+  fail(`${errorMessage} The answer remains available as text.`);
 }
 
 export function stopSpeaking(): void {
@@ -558,7 +636,7 @@ function shouldRetrySpeechChunk(
   currentMaxBytes: number
 ): boolean {
   if (voiceId === "device") return false;
-  if (/blocked|tap the mic|configured/i.test(errorMessage)) return false;
+  if (/blocked|tap the mic|configured|unavailable|taking too long|reconnecting|network|server/i.test(errorMessage)) return false;
   return currentMaxBytes > MIN_RETRY_CHUNK_BYTES && utf8Len(chunkText) > MIN_RETRY_CHUNK_BYTES;
 }
 
@@ -598,7 +676,7 @@ async function fetchVoiceClip(
   if (existing) return existing;
 
   const request = (async (): Promise<VoiceFetchResult> => {
-    let errorMessage = "The selected Shigun voice is temporarily unavailable. The answer remains available as text.";
+    let errorMessage = "The selected Shigun voice is temporarily unavailable.";
     try {
       const response = await fetch("/api/voice", {
         method: "POST",
@@ -643,7 +721,8 @@ type PendingSpeechChunk = { text: string; maxBytes: number };
 export async function speakLong(
   markdown: string,
   voiceId: string,
-  callbacks: SpeakCallbacks & { onProgress?: (done: number, total: number) => void } = {}
+  callbacks: SpeakCallbacks & { onProgress?: (done: number, total: number) => void } = {},
+  options: SpeechPlaybackOptions = {}
 ): Promise<void> {
   const text = cleanForSpeech(markdown);
   if (!text) { callbacks.onEnd?.(); return; }
@@ -652,12 +731,16 @@ export async function speakLong(
   const isCurrent = () => token === longSpeakToken;
   if (queue.length <= 1) {
     longSpeakToken++; // speak() path owns cancellation from here
-    await speak(text, voiceId, callbacks);
+    await speak(text, voiceId, callbacks, options);
     return;
   }
 
   let startedOnce = false;
   let completed = 0;
+  // If the studio provider fails once, do not make every remaining long-text
+  // part wait through the same timeout. The rest of this answer stays in the
+  // selected profile's closest device voice and keeps flowing.
+  let continueLocally = false;
   const start = () => {
     if (startedOnce || !isCurrent()) return;
     startedOnce = true;
@@ -671,8 +754,10 @@ export async function speakLong(
     // on-demand fetch in speak() then hits the cache and starts instantly,
     // so long lessons flow as one continuous narration instead of pausing
     // after every sentence.
-    if (voiceId !== "device") {
-      for (let offset = 0; offset < LONG_SPEECH_PRIME_COUNT; offset++) {
+    if (voiceId !== "device" && !continueLocally) {
+      // The current part owns the cancellable request. Prime only future
+      // parts, so stopping a slow first request can fall back immediately.
+      for (let offset = 1; offset <= LONG_SPEECH_PREFETCH_COUNT; offset++) {
         const upcoming = queue[index + offset];
         if (!upcoming) break;
         void prefetchVoice(upcoming.text, voiceId);
@@ -684,6 +769,10 @@ export async function speakLong(
     await new Promise<void>((resolve) => {
       void speak(current.text, voiceId, {
         onStart: start,
+        onFallback: (message) => {
+          continueLocally = true;
+          callbacks.onFallback?.(message);
+        },
         onEnd: () => {
           if (settled) return;
           settled = true;
@@ -696,7 +785,7 @@ export async function speakLong(
           errorMessage = message;
           resolve();
         },
-      });
+      }, { ...options, forceNative: options.forceNative || continueLocally });
       // Safety poll: a mid-chunk stop bumps the token without speak()'s
       // finish() firing, and no engine is hang-proof — resolve either way.
       const softCap = Math.max(25000, (current.text.length / 11) * 1500);
