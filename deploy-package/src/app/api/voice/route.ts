@@ -3,123 +3,123 @@ import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 90;
 
 type VoiceProfile = { name: string; direction: string; rate: number };
 const VOICES: Record<string, VoiceProfile> = {
   f1: {
     name: "Kore",
-    direction: "neutral Indian tutor delivery, warm but restrained, medium-low pitch, steady pace, crisp diction, and identical vocal identity for short commands and long explanations",
-    rate: 1.03,
+    direction: "studio-quality Indian tutor delivery, warm and precise, medium-low pitch, slightly slower than casual conversation, high intelligibility for names, numbers, acronyms, and mixed-language phrases, crisp diction, natural sentence stress, and identical vocal identity for short commands and long explanations",
+    rate: 0.99,
   },
   f2: {
     name: "Aoede",
-    direction: "neutral Indian tutor delivery, clear and lightly bright, steady pace, crisp diction, and identical vocal identity for short commands and long explanations",
-    rate: 1.04,
+    direction: "studio-quality Indian tutor delivery, clear and bright without sounding sharp, steady measured pace, high intelligibility for technical terms and the learner's exact wording, crisp diction, natural pauses, and identical vocal identity for short commands and long explanations",
+    rate: 1,
   },
   m1: {
     name: "Charon",
-    direction: "neutral Indian tutor delivery, grounded medium-low pitch, steady pace, crisp diction, and identical vocal identity for short commands and long explanations",
-    rate: 1.02,
+    direction: "studio-quality Indian tutor delivery, grounded medium-low pitch, steady measured pace, high intelligibility for names, numbers, acronyms, and mixed-language phrases, crisp diction, natural pauses, and identical vocal identity for short commands and long explanations",
+    rate: 0.98,
   },
 };
 
 // Language-specific voice directions for multilingual support
 const LANG_DIRECTIONS: Record<string, { direction: string; accent: string }> = {
   "hi-IN": {
-    direction: "warm Hindi tutor voice, medium-low pitch, steady pace, clear pronunciation of Hindi words and Sanskrit-derived terms",
+    direction: "warm Hindi tutor voice, medium-low pitch, steady pace, very clear pronunciation of Hindi words, Sanskrit-derived terms, and mixed English technical words",
     accent: "Hindi",
   },
   "bn-IN": {
-    direction: "warm Bengali tutor voice, medium pitch, steady pace, clear pronunciation of Bengali words",
+    direction: "warm Bengali tutor voice, medium pitch, steady pace, very clear pronunciation of Bengali words and borrowed English terms",
     accent: "Bengali",
   },
   "mr-IN": {
-    direction: "warm Marathi tutor voice, medium pitch, steady pace, clear pronunciation of Marathi words",
+    direction: "warm Marathi tutor voice, medium pitch, steady pace, very clear pronunciation of Marathi words and mixed English technical terms",
     accent: "Marathi",
   },
   "ta-IN": {
-    direction: "clear Tamil tutor voice, medium pitch, steady pace, crisp pronunciation of Tamil words",
+    direction: "clear Tamil tutor voice, medium pitch, steady pace, crisp pronunciation of Tamil words and borrowed English technical terms",
     accent: "Tamil",
   },
   "te-IN": {
-    direction: "clear Telugu tutor voice, medium pitch, steady pace, crisp pronunciation of Telugu words",
+    direction: "clear Telugu tutor voice, medium pitch, steady pace, crisp pronunciation of Telugu words and borrowed English technical terms",
     accent: "Telugu",
   },
   "kn-IN": {
-    direction: "clear Kannada tutor voice, medium pitch, steady pace, crisp pronunciation of Kannada words",
+    direction: "clear Kannada tutor voice, medium pitch, steady pace, crisp pronunciation of Kannada words and borrowed English technical terms",
     accent: "Kannada",
   },
   "ml-IN": {
-    direction: "clear Malayalam tutor voice, medium pitch, steady pace, crisp pronunciation of Malayalam words",
+    direction: "clear Malayalam tutor voice, medium pitch, steady pace, crisp pronunciation of Malayalam words and borrowed English technical terms",
     accent: "Malayalam",
   },
   "gu-IN": {
-    direction: "warm Gujarati tutor voice, medium pitch, steady pace, clear pronunciation of Gujarati words",
+    direction: "warm Gujarati tutor voice, medium pitch, steady pace, clear pronunciation of Gujarati words and mixed English technical terms",
     accent: "Gujarati",
   },
   "pa-IN": {
-    direction: "clear Punjabi tutor voice, medium pitch, steady pace, crisp pronunciation of Punjabi words",
+    direction: "clear Punjabi tutor voice, medium pitch, steady pace, crisp pronunciation of Punjabi words and mixed English technical terms",
     accent: "Punjabi",
   },
   "or-IN": {
-    direction: "clear Odia tutor voice, medium pitch, steady pace, crisp pronunciation of Odia words",
+    direction: "clear Odia tutor voice, medium pitch, steady pace, crisp pronunciation of Odia words and mixed English technical terms",
     accent: "Odia",
   },
   "ur-PK": {
-    direction: "clear Urdu tutor voice, medium pitch, steady pace, clear pronunciation of Urdu words",
+    direction: "clear Urdu tutor voice, medium pitch, steady pace, clear pronunciation of Urdu words and mixed English technical terms",
     accent: "Urdu",
   },
   "ar-XA": {
-    direction: "clear Arabic tutor voice, medium pitch, steady pace, crisp pronunciation of Arabic words",
+    direction: "clear Arabic tutor voice, medium pitch, steady pace, crisp pronunciation of Arabic words and foreign technical terms",
     accent: "Arabic",
   },
   "es-ES": {
-    direction: "clear Spanish tutor voice, medium pitch, steady pace, crisp pronunciation",
+    direction: "clear Spanish tutor voice, medium pitch, steady pace, crisp pronunciation of names, numbers, and technical terms",
     accent: "Spanish",
   },
   "fr-FR": {
-    direction: "clear French tutor voice, medium pitch, steady pace, crisp pronunciation",
+    direction: "clear French tutor voice, medium pitch, steady pace, crisp pronunciation of names, numbers, and technical terms",
     accent: "French",
   },
   "de-DE": {
-    direction: "clear German tutor voice, medium pitch, steady pace, crisp pronunciation",
+    direction: "clear German tutor voice, medium pitch, steady pace, crisp pronunciation of names, numbers, and technical terms",
     accent: "German",
   },
   "pt-BR": {
-    direction: "clear Portuguese tutor voice, medium pitch, steady pace, crisp pronunciation",
+    direction: "clear Portuguese tutor voice, medium pitch, steady pace, crisp pronunciation of names, numbers, and technical terms",
     accent: "Portuguese",
   },
   "it-IT": {
-    direction: "clear Italian tutor voice, medium pitch, steady pace, crisp pronunciation",
+    direction: "clear Italian tutor voice, medium pitch, steady pace, crisp pronunciation of names, numbers, and technical terms",
     accent: "Italian",
   },
   "ru-RU": {
-    direction: "clear Russian tutor voice, medium pitch, steady pace, crisp pronunciation",
+    direction: "clear Russian tutor voice, medium pitch, steady pace, crisp pronunciation of names, numbers, and technical terms",
     accent: "Russian",
   },
   "zh-CN": {
-    direction: "clear Mandarin Chinese tutor voice, medium pitch, steady pace, crisp pronunciation",
+    direction: "clear Mandarin Chinese tutor voice, medium pitch, steady pace, crisp pronunciation of names, numbers, and technical terms",
     accent: "Chinese",
   },
   "ja-JP": {
-    direction: "clear Japanese tutor voice, medium pitch, steady pace, crisp pronunciation",
+    direction: "clear Japanese tutor voice, medium pitch, steady pace, crisp pronunciation of names, numbers, and technical terms",
     accent: "Japanese",
   },
   "ko-KR": {
-    direction: "clear Korean tutor voice, medium pitch, steady pace, crisp pronunciation",
+    direction: "clear Korean tutor voice, medium pitch, steady pace, crisp pronunciation of names, numbers, and technical terms",
     accent: "Korean",
   },
   "th-TH": {
-    direction: "clear Thai tutor voice, medium pitch, steady pace, crisp pronunciation",
+    direction: "clear Thai tutor voice, medium pitch, steady pace, crisp pronunciation of names, numbers, and technical terms",
     accent: "Thai",
   },
   "id-ID": {
-    direction: "clear Indonesian tutor voice, medium pitch, steady pace, crisp pronunciation",
+    direction: "clear Indonesian tutor voice, medium pitch, steady pace, crisp pronunciation of names, numbers, and technical terms",
     accent: "Indonesian",
   },
   "tr-TR": {
-    direction: "clear Turkish tutor voice, medium pitch, steady pace, crisp pronunciation",
+    direction: "clear Turkish tutor voice, medium pitch, steady pace, crisp pronunciation of names, numbers, and technical terms",
     accent: "Turkish",
   },
 };
@@ -313,7 +313,8 @@ async function synthesiseGemini(
   const direction = langConfig
     ? `${profile.direction}. Speak with ${langConfig.direction} accent.`
     : profile.direction;
-  
+  const voicePrompt = `Locked voice ${profile.name}. Style: ${direction}. Speak clearly and consistently. Read the text after the divider exactly once. Do not add, omit, paraphrase, or repeat words.\n---\n${spokenText}`;
+
   const response = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
     {
@@ -321,9 +322,7 @@ async function synthesiseGemini(
       headers: { "content-type": "application/json", "x-goog-api-key": apiKey },
       body: JSON.stringify({
         contents: [{
-          parts: [{
-            text: `VOICE IDENTITY LOCK: Always use the same ${profile.name} identity. Delivery must be ${direction}. Do not change character, accent, pitch, speed, or emotion based on message length or whether the text is an app command. Read the text after the divider exactly once. Do not add, omit, paraphrase, or repeat words.\n---\n${spokenText}`,
-          }],
+          parts: [{ text: voicePrompt }],
         }],
         generationConfig: {
           responseModalities: ["AUDIO"],
