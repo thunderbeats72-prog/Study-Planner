@@ -128,7 +128,7 @@ export default function PlannerView({
           </div>
         )}
         {open && topic && (
-          <div className="glass-panel slide-in" style={{ padding: 16, margin: "0 0 10px 22px", borderLeft: `3px solid ${subj?.color || "var(--accent)"}` }}>
+          <div className="glass-panel slide-in planner-lesson-brief" style={{ borderLeft: `3px solid ${subj?.color || "var(--accent)"}` }}>
             <div className="lesson-brief-heading">
               Lesson brief · {topic.unit} · {topic.depth || "Core"}
             </div>
