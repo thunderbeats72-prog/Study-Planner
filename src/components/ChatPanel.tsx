@@ -3,7 +3,10 @@
 import React, { useEffect, useRef, useState } from "react";
 import { mdToHtml, escapeHtml, type MessageRow } from "@/lib/client";
 import { IconChat, IconClose, IconSend, IconSpark } from "./icons";
-import { VOICE_OPTIONS, voiceSupported, speak, stopSpeaking, listen, learnSttLang, type ListenHandle } from "@/lib/voice";
+import {
+  VOICE_OPTIONS, voiceSupported, speak, stopSpeaking, listen, learnSttLang,
+  prepareVoicePlayback, type ListenHandle,
+} from "@/lib/voice";
 
 const QUICKS = [
   "What should I study today?",
@@ -45,6 +48,17 @@ export default function ChatPanel({
   useEffect(() => { openRef.current = open; }, [open]);
   const support = typeof window !== "undefined" ? voiceSupported() : { stt: false, tts: false };
 
+  // Voice profile IDs map to fixed cloud voices, so persisting the ID keeps
+  // the same Shigun voice selected on every viewport on this device.
+  useEffect(() => {
+    const saved = localStorage.getItem("shigun-voice-id");
+    const timer = window.setTimeout(() => {
+      if (saved && VOICE_OPTIONS.some((voice) => voice.id === saved)) setVoiceId(saved);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+  useEffect(() => { localStorage.setItem("shigun-voice-id", voiceId); }, [voiceId]);
+
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages.length, thinking, open]);
@@ -63,11 +77,13 @@ export default function ChatPanel({
 
   // Stop everything when the panel closes
   useEffect(() => {
-    if (!open) {
-      listenSession.current++; // cancel any in-flight mic warm-up
-      stopSpeaking(); listenRef.current?.stop(); listenRef.current = null;
-      setListening(false); setSpeaking(false); setMicWaking(false);
-    }
+    if (open) return;
+    listenSession.current++; // cancel any in-flight mic warm-up
+    stopSpeaking(); listenRef.current?.stop(); listenRef.current = null;
+    const timer = window.setTimeout(() => {
+      if (!openRef.current) { setListening(false); setSpeaking(false); setMicWaking(false); }
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [open]);
 
   const send = (q?: string) => {
@@ -80,24 +96,35 @@ export default function ChatPanel({
 
   const toggleListen = async () => {
     setVoiceErr("");
-    if (listening || micWaking) {
-      // tap while active = stop & finalize what was heard
-      listenSession.current++; // invalidate any pending start
-      if (listening) { listenRef.current?.stop(); listenRef.current = null; setListening(false); }
+    if (listening) {
+      // Do not invalidate this session: stop() delivers the last interim/final
+      // transcript, including the words spoken just before the tap.
+      listenRef.current?.stop();
+      listenRef.current = null;
+      setListening(false);
+      return;
+    }
+    if (micWaking) {
+      listenSession.current++; // invalidate the pending permission/start call
       setMicWaking(false);
       return;
     }
+
+    // Resume Web Audio inside the tap gesture. The cloud reply can then play
+    // after recognition + network work even on iOS autoplay-restricted pages.
+    void prepareVoicePlayback();
     stopSpeaking(); setSpeaking(false);
     const token = ++listenSession.current;
     setMicWaking(true);            // instant feedback — button pulses immediately
     setVoiceHint("");
+    const isCurrent = () => token === listenSession.current && openRef.current;
     const h = await listen(
-      (interim) => { if (openRef.current) setText(interim); },
+      (interim) => { if (isCurrent()) setText(interim); },
       (final) => {
+        if (!isCurrent()) return; // cancelled, replaced, or closed session
         setListening(false);
         setMicWaking(false);
         listenRef.current = null;
-        if (!openRef.current) return; // panel was closed mid-listen — discard
         if (!final.text.trim()) {
           // manual stop with nothing captured = stay quiet; engine gave up = explain
           if (!final.cancelled) setVoiceErr("I didn't hear anything clearly — tap the mic and try once more.");
@@ -119,9 +146,12 @@ export default function ChatPanel({
             : "I heard you — check the text, then send or edit.");
         }
       },
-      (err) => { setListening(false); setMicWaking(false); listenRef.current = null; if (openRef.current) setVoiceErr(err); }
+      (err) => {
+        if (!isCurrent()) return;
+        setListening(false); setMicWaking(false); listenRef.current = null; setVoiceErr(err);
+      }
     );
-    if (token !== listenSession.current) { h?.stop(); return; } // cancelled/closed meanwhile
+    if (!isCurrent()) { h?.stop(); return; }
     if (h) { listenRef.current = h; setMicWaking(false); setListening(true); }
     else setMicWaking(false);
   };
