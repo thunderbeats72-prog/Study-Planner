@@ -25,9 +25,11 @@ WHAT'S FIXED IN THIS BUILD (v5)
     forms, a male voice uses masculine forms (Hindi, Urdu, Marathi,
     Punjabi, …).
  6. Long answers read as one continuous narration: replies are only split
-    when they exceed one TTS request, and the next part is prefetched
-    while the current one plays (no long pause after each "."). Tap the
-    mic anytime to stop the voice.
+    when they exceed one TTS request, and the next three parts are prefetched
+    while the current one plays (no long pause after each "."). If studio
+    speech fails once, the remaining parts continue locally without repeated
+    timeouts. Choose and persist 1×, 1.15×, 1.3×, or 1.45× playback speed;
+    tap the mic anytime to stop the voice.
  7. Readiness projection learns the minutes you actually study per day;
     peak-focus hours recency-weight your recent sessions.
  8. More database indexes on every hot query path.
@@ -97,9 +99,11 @@ VERIFIED
 
 NOTES
  - For the fastest and most consistent voice, enable Google Cloud
-   Text-to-Speech and set `GOOGLE_CLOUD_TTS_API_KEY` in Vercel. Gemini
-   remains a pinned-model compatibility path. Named voices never silently
-   switch to a different model or operating-system voice.
+   Text-to-Speech and set `GOOGLE_CLOUD_TTS_API_KEY` in Vercel. Gemini uses
+   an ordered compatibility list if a configured TTS model is retired. If a
+   studio provider cannot start promptly, Shigun shows a status notice and
+   continues in the closest available device voice rather than stopping the
+   learner on a model-unavailable error.
  - Voice recognition is browser-native (Web Speech API): works best in
    Chrome/Edge on desktop and Android. iOS Safari support depends on
    the OS version. Text chat always works everywhere.

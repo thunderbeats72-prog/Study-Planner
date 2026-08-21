@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { mdToHtml, escapeHtml, type MessageRow } from "@/lib/client";
 import { IconChat, IconClose, IconSend, IconSpark, IconVolume } from "./icons";
 import {
-  VOICE_OPTIONS, voiceSupported, speakLong, stopSpeaking, listen, learnSttLang,
+  VOICE_OPTIONS, SPEECH_RATE_OPTIONS, voiceSupported, speakLong, stopSpeaking, listen, learnSttLang,
   prepareVoicePlayback, type ListenHandle,
 } from "@/lib/voice";
 import { mergeTranscriptSegments } from "@/lib/transcript";
@@ -39,11 +39,13 @@ export default function ChatPanel({
   const [text, setText] = useState("");
   const voiceReplyArmed = useRef(false); // speak the next reply only after mic input
   const [voiceId, setVoiceId] = useState("f1");
+  const [speechRate, setSpeechRate] = useState(1.15);
   const [listening, setListening] = useState(false);
   const [micWaking, setMicWaking] = useState(false);
   const [voicePreparing, setVoicePreparing] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const [voiceErr, setVoiceErr] = useState("");
+  const [voiceNotice, setVoiceNotice] = useState("");
   const [voiceHint, setVoiceHint] = useState(""); // "review what I heard" prompt
   const [speakProgress, setSpeakProgress] = useState<{ done: number; total: number } | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
@@ -66,6 +68,14 @@ export default function ChatPanel({
     return () => window.clearTimeout(timer);
   }, []);
   useEffect(() => { localStorage.setItem("shigun-voice-id", voiceId); }, [voiceId]);
+  useEffect(() => {
+    const saved = Number(localStorage.getItem("shigun-speech-rate"));
+    const timer = window.setTimeout(() => {
+      if (SPEECH_RATE_OPTIONS.some((option) => option.value === saved)) setSpeechRate(saved);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+  useEffect(() => { localStorage.setItem("shigun-speech-rate", String(speechRate)); }, [speechRate]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -75,6 +85,7 @@ export default function ChatPanel({
     if (!support.tts || !content.trim()) return;
     stopSpeaking();
     setVoiceErr("");
+    setVoiceNotice("");
     setVoicePreparing(true);
     setSpeaking(false);
     setSpeakProgress(null);
@@ -82,9 +93,10 @@ export default function ChatPanel({
       onStart: () => { setVoicePreparing(false); setSpeaking(true); },
       onProgress: (done, total) => setSpeakProgress(total > 1 ? { done, total } : null),
       onEnd: () => { setVoicePreparing(false); setSpeaking(false); setSpeakProgress(null); },
+      onFallback: (message) => { setVoiceErr(""); setVoiceNotice(message); },
       onError: (message) => setVoiceErr(message),
-    });
-  }, [support.tts, voiceId]);
+    }, { rate: speechRate });
+  }, [speechRate, support.tts, voiceId]);
 
   const lastAssistant = [...messages].reverse().find((message) => message.role === "assistant" && message.id > 0) || null;
 
@@ -106,7 +118,7 @@ export default function ChatPanel({
     listenSession.current++; // cancel any in-flight mic warm-up
     stopSpeaking(); listenRef.current?.stop(); listenRef.current = null;
     const timer = window.setTimeout(() => {
-      if (!openRef.current) { setListening(false); setSpeaking(false); setVoicePreparing(false); setMicWaking(false); setSpeakProgress(null); }
+      if (!openRef.current) { setListening(false); setSpeaking(false); setVoicePreparing(false); setMicWaking(false); setSpeakProgress(null); setVoiceNotice(""); }
     }, 0);
     return () => window.clearTimeout(timer);
   }, [open]);
@@ -130,6 +142,7 @@ export default function ChatPanel({
 
   const toggleListen = async () => {
     setVoiceErr("");
+    setVoiceNotice("");
     // While Shigun is speaking, the mic button doubles as STOP — one tap
     // silences the answer instead of hunting for a control.
     if (speaking || voicePreparing) {
@@ -261,6 +274,17 @@ export default function ChatPanel({
                     </option>
                   ))}
                 </select>
+                <select
+                  className="voice-select voice-speed-select"
+                  value={speechRate}
+                  onChange={(e) => setSpeechRate(Number(e.target.value))}
+                  aria-label="Spoken answer speed"
+                  title="Spoken answer speed"
+                >
+                  {SPEECH_RATE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
               </>
             )}
             <button className="ai-close" aria-label="Close chat" onClick={() => setOpen(false)}><IconClose size={17} /></button>
@@ -319,6 +343,7 @@ export default function ChatPanel({
             </div>
           )}
           {voiceErr && <div className="voice-err" role="alert">{voiceErr}</div>}
+          {voiceNotice && <div className="voice-note" role="status">{voiceNotice}</div>}
           {voiceHint && <div className="voice-hint">{voiceHint}</div>}
 
           <div className="ai-quick">

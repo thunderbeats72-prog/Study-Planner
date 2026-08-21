@@ -156,6 +156,14 @@ const audioCache = voiceGlobal.__shigunVoiceCache ?? new Map<string, CachedAudio
 voiceGlobal.__shigunVoiceCache = audioCache;
 const CACHE_TTL_MS = 30 * 60 * 1000;
 const MAX_CACHE_ENTRIES = 12;
+const DEFAULT_GEMINI_TTS_MODELS = [
+  // Kept as an ordered compatibility list: API projects do not all expose a
+  // preview model on the same day. A missing model advances immediately to
+  // the next compatible TTS model instead of making the user wait on a 404.
+  "gemini-3.1-flash-tts-preview",
+  "gemini-2.5-flash-preview-tts",
+  "gemini-2.5-pro-preview-tts",
+];
 
 function geminiKey(): string {
   return process.env.GEMINI_API_KEY
@@ -300,13 +308,52 @@ async function synthesiseChirp(
   };
 }
 
+async function synthesiseCloudCompatible(
+  apiKey: string,
+  text: string,
+  language: string,
+  profile: VoiceProfile
+): Promise<CachedAudio | null> {
+  // A named Chirp voice may not be published for every locale. Let Google
+  // choose an available voice in the same locale and gender before asking the
+  // browser to take over; this keeps most voice outages entirely cloud-side.
+  const response = await fetch(
+    `https://texttospeech.googleapis.com/v1/text:synthesize?key=${encodeURIComponent(apiKey)}`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        input: { text: truncateUtf8(text, 5000) },
+        voice: {
+          languageCode: language,
+          ssmlGender: profile.name === "Charon" ? "MALE" : "FEMALE",
+        },
+        audioConfig: { audioEncoding: "MP3", speakingRate: profile.rate },
+      }),
+      signal: AbortSignal.timeout(12000),
+    }
+  );
+  if (!response.ok) return null;
+  const json = await response.json();
+  if (!json?.audioContent) return null;
+  return {
+    bytes: Buffer.from(String(json.audioContent), "base64"),
+    contentType: "audio/mpeg",
+    provider: "google-cloud-compatible",
+    voice: `${language};${profile.name === "Charon" ? "male" : "female"}`,
+    createdAt: Date.now(),
+  };
+}
+
+type GeminiSynthesis = { audio: CachedAudio | null; tryNextModel: boolean };
+
 async function synthesiseGemini(
   apiKey: string,
   text: string,
   language: string,
   profile: VoiceProfile,
   model: string
-): Promise<CachedAudio | null> {
+): Promise<GeminiSynthesis> {
   const spokenText = truncateUtf8(text, 5000);
   // Use language-specific direction if available, otherwise use default
   const langConfig = LANG_DIRECTIONS[language];
@@ -334,24 +381,58 @@ async function synthesiseGemini(
       signal: AbortSignal.timeout(25000),
     }
   );
-  if (!response.ok) return null;
+  // Model-not-found / unsupported-model responses are fast and safe to
+  // retry with the next explicit compatibility model. Rate limits and service
+  // failures are not retried here: the browser should continue locally now.
+  if (!response.ok) return { audio: null, tryNextModel: response.status === 400 || response.status === 404 };
   const audio = readGeminiAudio(await response.json());
-  if (!audio?.bytes.length) return null;
+  if (!audio?.bytes.length) return { audio: null, tryNextModel: true };
   const isWav = audio.bytes.subarray(0, 4).toString("ascii") === "RIFF";
   const wav = isWav ? audio.bytes : pcmToWav(audio.bytes, audio.sampleRate);
   return {
-    bytes: wav,
-    contentType: "audio/wav",
-    provider: "gemini-tts",
-    voice: `${profile.name};${model}`,
-    createdAt: Date.now(),
+    audio: {
+      bytes: wav,
+      contentType: "audio/wav",
+      provider: "gemini-tts",
+      voice: `${profile.name};${model}`,
+      createdAt: Date.now(),
+    },
+    tryNextModel: false,
   };
+}
+
+function geminiTtsModels(): string[] {
+  return [...new Set([
+    process.env.SHIGUN_TTS_MODEL,
+    process.env.GEMINI_TTS_MODEL,
+    ...DEFAULT_GEMINI_TTS_MODELS,
+  ].filter((model): model is string => Boolean(model?.trim())))];
+}
+
+async function synthesiseGeminiCompatible(
+  apiKey: string,
+  text: string,
+  language: string,
+  profile: VoiceProfile
+): Promise<CachedAudio | null> {
+  for (const model of geminiTtsModels()) {
+    try {
+      const result = await synthesiseGemini(apiKey, text, language, profile, model);
+      if (result.audio) return result.audio;
+      if (!result.tryNextModel) return null;
+    } catch {
+      // A network or service outage is not a reason to serially hold the
+      // lesson hostage while trying every model. The local voice takes over.
+      return null;
+    }
+  }
+  return null;
 }
 
 export async function GET() {
   return NextResponse.json({
     configured: !!(cloudTtsKey() || geminiKey()),
-    provider: cloudTtsKey() ? "google-chirp3-hd" : geminiKey() ? "gemini-tts" : null,
+    provider: cloudTtsKey() ? "google-cloud-tts" : geminiKey() ? "gemini-tts" : null,
   });
 }
 
@@ -369,40 +450,38 @@ export async function POST(req: Request) {
   const language = languageFor(text);
   const chirpKey = cloudTtsKey();
   const gemini = geminiKey();
-  const model = process.env.SHIGUN_TTS_MODEL || process.env.GEMINI_TTS_MODEL || "gemini-3.1-flash-tts-preview";
-  const providerId = chirpKey ? "google-chirp3-hd" : `gemini-tts:${model}`;
+  const providerId = chirpKey ? "google-cloud-tts" : `gemini-tts:${geminiTtsModels().join(",")}`;
   const key = cacheKey(providerId, profile.name, language, text);
   const cached = getCached(key);
   if (cached) return audioResponse(cached, "HIT");
 
   try {
-    // Chirp 3 HD is deterministic and low-latency, so it is the production
-    // path when its dedicated Cloud TTS key is configured. Gemini remains a
-    // pinned-model compatibility path; we never switch models mid-session.
-    // If a language has no native Chirp voice (fails), Gemini TTS — which
-    // follows written directions in any script — is tried before giving up.
+    // Chirp 3 HD is the fast, identity-stable first choice. If that exact
+    // named voice is unavailable for a locale, use Cloud TTS's compatible
+    // same-language/gender selection; Gemini is then the final cloud path.
     let audio: CachedAudio | null = null;
     if (chirpKey) {
       audio = await synthesiseChirp(chirpKey, text, language, profile);
+      if (!audio) audio = await synthesiseCloudCompatible(chirpKey, text, language, profile);
     }
     if (!audio && gemini) {
-      audio = await synthesiseGemini(gemini, text, language, profile, model);
+      audio = await synthesiseGeminiCompatible(gemini, text, language, profile);
     }
-    
+
     if (audio) {
       putCached(key, audio);
       return audioResponse(audio, "MISS");
     }
   } catch {
-    // Return text-only rather than silently changing to an unrelated device
-    // voice. A selected named profile must always retain its identity.
+    // The client immediately continues this answer with its closest device
+    // voice, rather than showing an opaque model/provider failure.
   }
 
   return NextResponse.json(
     {
       error: chirpKey || gemini
-        ? `${profile.name} is temporarily unavailable. Showing text instead.`
-        : "Cloud voice is not configured. Set GOOGLE_CLOUD_TTS_API_KEY or GEMINI_API_KEY.",
+        ? "Studio voice is temporarily unavailable. Continuing with the device voice."
+        : "Studio voice is not configured on this deployment. Continuing with the device voice.",
     },
     { status: chirpKey || gemini ? 502 : 503 }
   );
