@@ -13,6 +13,11 @@ import {
   type GeneratedTopic,
 } from "./curriculum";
 import { lookupKnowledge, teachFromKnowledge } from "./knowledge";
+import { detectLanguage, isMostlyEnglish } from "./language";
+
+function isMostlyEnglishQuery(q: string): boolean {
+  return isMostlyEnglish(q);
+}
 
 // Re-export the canonical topic shape so existing imports from "./ai" keep working.
 export type { GeneratedTopic, CurriculumSource } from "./curriculum";
@@ -735,7 +740,11 @@ export function commandReply(
   daysLeft?: number,
   voiceGender: "female" | "male" = "female"
 ): string {
-  const lang = SCRIPT_LANG_DETECT.find((entry) => entry.range.test(sourceText))?.code;
+  const detected = detectLanguage(sourceText);
+  const lang =
+    SCRIPT_LANG_DETECT.find((entry) => entry.range.test(sourceText))?.code
+    || (detected === "hi-IN" || detected === "mr-IN" || detected === "ne-NP" ? "hi" : undefined)
+    || (CONFIRMATIONS[detected.slice(0, 2)] ? detected.slice(0, 2) : undefined);
   const base =
     (lang && CONFIRMATIONS[lang]?.[action.type as keyof (typeof CONFIRMATIONS)["hi"]]) ||
     EN_CONFIRMATIONS[action.type] ||
@@ -796,6 +805,10 @@ export function parseCommand(q: string): TutorReply["action"] | undefined {
 }
 
 export function instantTutorReply(q: string, ctx: TutorContext): TutorReply | null {
+  // Non-English / Hinglish turns belong on the multilingual model path.
+  // An English canned answer after a Hindi question is what made language
+  // support feel broken.
+  if (!isMostlyEnglishQuery(q)) return null;
   const n = q.toLowerCase();
   if (/(what|which).*(today|now)|today'?s (plan|task|study|load)|what should i (study|do)/.test(n)) {
     const pending = ctx.today.filter((task) => task.status === "pending");
@@ -910,13 +923,13 @@ first-person verb endings and matching adjective agreement whenever you refer to
 yourself, so your grammar matches the voice the learner hears. Do not mention this
 rule in your reply — just speak with the correct forms.
 
-LANGUAGE: You are multilingual. Reply in the language/script the learner uses or explicitly
-requests, including Bengali/Bangla, Hindi, Marathi, Tamil, Telugu, Kannada, Malayalam,
-Gujarati, Punjabi, Odia, Urdu, Nepali, Arabic, Chinese, Japanese, Korean, Thai, Russian,
-Spanish, French, German, Portuguese, Italian, Indonesian, Turkish, and English. Never
-claim that you only support English or Hindi. If the learner writes an Indian language in
-Latin script, answer naturally in that language; use its native script when they
-explicitly ask whether you can speak it.
+LANGUAGE: You are multilingual. Reply in the SAME language/script the learner just used or
+explicitly requested, including Bengali/Bangla, Hindi, Marathi, Tamil, Telugu, Kannada,
+Malayalam, Gujarati, Punjabi, Odia, Urdu, Nepali, Arabic, Chinese, Japanese, Korean, Thai,
+Russian, Spanish, French, German, Portuguese, Italian, Indonesian, Turkish, Hinglish, and
+English. Never claim that you only support English or Hindi. If they write Hindi/Marathi
+in Latin script (Hinglish), answer in that mix; switch to native script when they ask
+whether you can speak it. Do not switch language mid-reply unless they ask you to.
 
 ANSWER DEPTH: match the depth to the request. Short factual questions get short answers.
 When the learner asks for an explanation, a lesson, or says anything like "in detail",

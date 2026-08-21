@@ -56,19 +56,15 @@ confirmation dialog in the UI.
 
 CONSISTENT SHIGUN VOICE
 -----------------------
-For the fastest and most identity-stable production voice, enable Google
-Cloud Text-to-Speech and set `GOOGLE_CLOUD_TTS_API_KEY` in Vercel. Shigun
-then uses deterministic Chirp 3 HD Kore, Aoede, or Charon voices in the
-reply's language. Warm-server and client audio caches make repeated app
-confirmations immediate.
+The selected persona (Kore, Aoede, or Charon) is locked for every language
+and every engine. Gemini prebuilt TTS is the first path because the same
+speaker reads Hindi, English, Tamil, and the rest. Chirp 3 HD uses that
+same persona name — never a random locale female/male stand-in. Device
+speech is a last resort and still pins one speaker instead of swapping
+voices when the script changes.
 
-`GEMINI_API_KEY` / `GOOGLE_API_KEY` remains a compatibility path. If a
-configured Gemini TTS model has been retired or is unavailable, Shigun tries
-an ordered compatible TTS model list immediately. If a studio request cannot
-start promptly, the answer continues in the closest available device voice
-instead of stopping on a “voice model unavailable” error; the chat shows a
-clear non-error notice. One failed long-answer part switches the remaining
-parts to that local voice, so every later part keeps flowing.
+Set `GEMINI_API_KEY` (and optionally `GOOGLE_CLOUD_TTS_API_KEY`) in Vercel.
+Studio timeouts retry the same locked voice before any native fallback.
 
 v5 FIXES (this build)
 ---------------------
