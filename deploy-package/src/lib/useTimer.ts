@@ -33,7 +33,9 @@ function beep(freq = 880) {
 export type ClockApi = {
   running: boolean;
   onBreak: boolean;
-  elapsed: number;          // seconds in the current session
+  /** True while a session is open (recording, paused, or on break). */
+  sessionActive: boolean;
+  elapsed: number;          // seconds in the current session (survives pause, clears on clock-out)
   sessionTotal: number;     // seconds accumulated today in this browser session
   subjectId: number | null;
   taskId: number | null;
@@ -41,6 +43,7 @@ export type ClockApi = {
   setTaskId: (v: number | null) => void;
   clockIn: (opts?: { subjectId?: number | null; taskId?: number | null }) => void;
   pause: () => void;
+  resume: () => void;
   takeBreak: () => void;
   endBreak: () => void;
   clockOut: () => void;
@@ -63,6 +66,11 @@ export function useStudyClock(
   const logRef = useRef(onLog);
   useEffect(() => { logRef.current = onLog; }, [onLog]);
   useEffect(() => { meta.current = { subjectId, taskId }; }, [subjectId, taskId]);
+
+  // Mirror of `elapsed` for stable reads inside callbacks (pause/resume math
+  // must see the freshest value even mid-render batch).
+  const elapsedRef = useRef(0);
+  useEffect(() => { elapsedRef.current = elapsed; }, [elapsed]);
 
   // tick from wall-clock so the count stays correct in background tabs.
   // Display shows total current-session time; DB logging flushes only the
@@ -122,6 +130,10 @@ export function useStudyClock(
   }, [running, flush]);
 
   const clockIn = useCallback((opts?: { subjectId?: number | null; taskId?: number | null }) => {
+    // Bank any unflushed partial minutes from a live/previous segment BEFORE
+    // starting the new one — re-tapping Start/Switch can never silently
+    // discard studied time anymore.
+    if (startedAt.current != null) flush(true);
     if (opts && "subjectId" in opts) setSubjectId(opts.subjectId ?? null);
     if (opts && "taskId" in opts) setTaskId(opts.taskId ?? null);
     if (opts) {
@@ -135,27 +147,40 @@ export function useStudyClock(
     setElapsed(0);
     setOnBreak(false);
     setRunning(true);
-  }, []);
-
-  const pause = useCallback(() => {
-    setRunning(false);
-    flush();
   }, [flush]);
 
-  const takeBreak = useCallback(() => {
+  // Pause FREEZES the visible timer (it no longer resets to 00:00). The
+  // partial minutes are banked to the server immediately, and resume
+  // continues the same visible session from where it stopped.
+  const pause = useCallback(() => {
     setRunning(false);
-    flush();
-    setOnBreak(true);
-    beep(660);
+    flush(true);
   }, [flush]);
 
   const endBreak = useCallback(() => {
     setOnBreak(false);
-    startedAt.current = Date.now();
-    lastFlushAt.current = startedAt.current;
-    setElapsed(0);
+    // Continue the SAME visible session — the timer picks up from where it
+    // froze instead of restarting from 00:00.
+    startedAt.current = Date.now() - elapsedRef.current * 1000;
+    lastFlushAt.current = Date.now();
     setRunning(true);
   }, []);
+
+  const takeBreak = useCallback(() => {
+    setRunning(false);
+    flush(true);
+    setOnBreak(true);
+    beep(660);
+  }, [flush]);
+
+  const resume = useCallback(() => {
+    if (onBreak) { endBreak(); return; }
+    // Only meaningful when a paused session exists (elapsed > 0).
+    if (elapsedRef.current <= 0 || startedAt.current == null) return;
+    startedAt.current = Date.now() - elapsedRef.current * 1000;
+    lastFlushAt.current = Date.now();
+    setRunning(true);
+  }, [onBreak, endBreak]);
 
   const clockOut = useCallback(() => {
     setRunning(false);
@@ -165,12 +190,17 @@ export function useStudyClock(
 
   const toggle = useCallback(() => {
     if (running) pause();
+    else if (onBreak || elapsedRef.current > 0) resume();
     else clockIn();
-  }, [running, pause, clockIn]);
+  }, [running, onBreak, pause, resume, clockIn]);
+
+  // A session is "open" while recording, paused, or on break — every
+  // surface (up-next card, task rows, tracker) shows Clock Out for it.
+  const sessionActive = running || onBreak || elapsed > 0;
 
   return {
-    running, onBreak, elapsed, sessionTotal, subjectId, taskId,
-    setSubjectId, setTaskId, clockIn, pause, takeBreak, endBreak, clockOut, toggle,
+    running, onBreak, sessionActive, elapsed, sessionTotal, subjectId, taskId,
+    setSubjectId, setTaskId, clockIn, pause, resume, takeBreak, endBreak, clockOut, toggle,
   };
 }
 

@@ -98,6 +98,9 @@ export const topics = pgTable(
   (t) => [
     index("topics_user_id_idx").on(t.userId),
     index("topics_subject_id_idx").on(t.subjectId),
+    // State loader orders a subject's topics by position — this composite
+    // serves the filter AND the sort from one index.
+    index("topics_subject_pos_idx").on(t.subjectId, t.position),
   ]
 );
 
@@ -123,6 +126,9 @@ export const tasks = pgTable(
     index("tasks_subject_id_idx").on(t.subjectId),
     index("tasks_topic_id_idx").on(t.topicId),
     index("tasks_user_date_idx").on(t.userId, t.date),
+    // The planner's default listing is "my tasks by date then position" —
+    // one composite index covers it end to end.
+    index("tasks_user_date_pos_idx").on(t.userId, t.date, t.position),
   ]
 );
 
@@ -170,7 +176,12 @@ export const messages = pgTable(
     content: text("content").notNull(),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
-  (t) => [index("messages_user_id_idx").on(t.userId)]
+  (t) => [
+    index("messages_user_id_idx").on(t.userId),
+    // Chat history is fetched ordered by id per user — composite keeps the
+    // hot path index-only as histories grow.
+    index("messages_user_id_id_idx").on(t.userId, t.id),
+  ]
 );
 
 export type User = typeof users.$inferSelect;

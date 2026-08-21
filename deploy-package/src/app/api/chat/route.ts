@@ -5,7 +5,7 @@ import { asc, eq } from "drizzle-orm";
 import { buildContext, fullState, getOrCreateUser, getSettings, keyFrom } from "@/lib/state";
 import {
   callLLM, localTutor, parseCommand, tutorSystemPrompt, activeProvider,
-  extractLlmAction, languageCapabilityReply, instantTutorReply,
+  extractLlmAction, languageCapabilityReply, instantTutorReply, commandReply,
 } from "@/lib/ai";
 import { regeneratePlan } from "@/lib/generate";
 import { mergeTranscriptSegments } from "@/lib/transcript";
@@ -77,25 +77,15 @@ export async function POST(req: Request) {
   if (languageReply) {
     finalText = languageReply;
   } else if (action) {
-    // A recognised in-app command: give a short, deterministic confirmation and
-    // let the app perform the action. No LLM/knowledge lookup needed.
+    // A recognised in-app command: give a short, deterministic confirmation
+    // (in the SAME language the learner spoke) and let the app perform the
+    // action. No LLM/knowledge lookup needed.
     if (action.type === "replan") {
       const st = await getSettings(user.id);
       await regeneratePlan(user.id, st, { fromToday: true });
       replanned = true;
     }
-    const confirmations: Record<string, string> = {
-      navigate: `Opening **${String(action.payload)}**.`,
-      startTimer: `Clocked in. Time is recording against today's task — one lesson, one focus.`,
-      stopTimer: `Clocked out. Your minutes are saved to today's task.`,
-      break: `Break started. Stand up, rest your eyes, hydrate. Say *"resume"* when you're back.`,
-      pause: `Timer paused. Say *"resume"* when you're ready to continue.`,
-      resume: `Back on the clock — picking up where you left off.`,
-      zen: `Zen mode on — just you and the timer.`,
-      replan: `Rebalancing your schedule now — unfinished lessons are being pushed forward and re-spread across your remaining **${ctx.daysLeft} days**, weakest subject kept first. Done in a moment.`,
-      theme: `Theme updated. Other styles: *obsidian*, *nebula*, *sunset*, *mint*, *lavender*.`,
-    };
-    finalText = confirmations[action.type] || "Done.";
+    finalText = commandReply(action, text, ctx.daysLeft);
   } else if (instantReply) {
     // Common plan/progress questions are answered from live app data without
     // paying a model round-trip, so they feel immediate and stay factual.
@@ -112,9 +102,9 @@ export async function POST(req: Request) {
       const systemPrompt = tutorSystemPrompt(ctx)
         + curriculumGrounding(text, state)
         + (source === "voice"
-          ? "\n\nVOICE TURN: Answer in 80-140 spoken words unless the learner explicitly asks for a detailed lesson. Lead with the answer; avoid long preambles and oversized lists."
+          ? "\n\nVOICE TURN: Keep the opening reply to 80-140 spoken words UNLESS the learner asked for detail, a lesson, or an explanation — then answer in full depth; the app speaks long answers in consecutive parts. Lead with the answer; avoid long preambles."
           : "");
-      reply = await callLLM(systemPrompt, [...history, { role: "user", content: text }], source === "voice" ? 700 : 1600);
+      reply = await callLLM(systemPrompt, [...history, { role: "user", content: text }], source === "voice" ? 1100 : 2400);
     }
     if (reply) {
       // The LLM may have emitted an [[action:...]] tag for requests the

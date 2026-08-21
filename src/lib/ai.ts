@@ -319,7 +319,7 @@ export async function aiGenerateTopics(
   });
 }
 
-const LANGUAGE_CAPABILITY_RE = /\b(speak|talk|chat|communicate|reply|respond|answer)\b/i;
+const LANGUAGE_CAPABILITY_RE = /\b(speak|talk|chat|communicate|reply|respond|answer|know|understand|handle)\b/i;
 
 /** Deterministic language-capability replies prevent the tutor from falsely
  * claiming it only supports English/Hindi. The cloud and local speech layers
@@ -352,6 +352,10 @@ export function languageCapabilityReply(query: string): string | null {
       reply: "ಹೌದು, ನಾನು ಕನ್ನಡದಲ್ಲಿ ಮಾತನಾಡಬಲ್ಲೆ. ನಿಮ್ಮ ಓದಿನಲ್ಲಿ ಹೇಗೆ ಸಹಾಯ ಮಾಡಲಿ?",
     },
     {
+      match: /\bmalayalam\b/i,
+      reply: "അതെ, ഞാൻ മലയാളത്തിൽ സംസാരിക്കാം. നിങ്ങളുടെ പഠനത്തിൽ എങ്ങനെ സഹായിക്കാം?",
+    },
+    {
       match: /\bgujarati\b/i,
       reply: "હા, હું ગુજરાતીમાં વાત કરી શકું છું. તમારા અભ્યાસમાં કેવી રીતે મદદ કરું?",
     },
@@ -360,8 +364,64 @@ export function languageCapabilityReply(query: string): string | null {
       reply: "ਹਾਂ, ਮੈਂ ਪੰਜਾਬੀ ਵਿੱਚ ਗੱਲ ਕਰ ਸਕਦਾ ਹਾਂ। ਤੁਹਾਡੀ ਪੜ੍ਹਾਈ ਵਿੱਚ ਕਿਵੇਂ ਮਦਦ ਕਰਾਂ?",
     },
     {
+      match: /\b(odia|oriya)\b/i,
+      reply: "ହଁ, ମୁଁ ଓଡ଼ିଆରେ କଥା ହିପାରିବି। ଆପଣଙ୍କ ଅଧ୍ୟୟନରେ ମୁଁ କିପରି ସାହାଯ୍ୟ କରିପାରିବି?",
+    },
+    {
+      match: /\burdu\b/i,
+      reply: "ہاں، میں اردو میں بات کر سکتا ہوں۔ میں آپ کی پڑھائی میں کیسے مدد کروں؟",
+    },
+    {
+      match: /\bnepali\b/i,
+      reply: "हो, म नेपालीमा कुरा गर्न सक्छु। तपाईंको पढाइमा कसरी मद्दत गर्न सक्छु?",
+    },
+    {
       match: /\barabic\b/i,
       reply: "نعم، يمكنني التحدث بالعربية. كيف أساعدك في دراستك؟",
+    },
+    {
+      match: /\bspanish|español\b/i,
+      reply: "Sí, puedo hablar en español. ¿Cómo puedo ayudarte con tus estudios?",
+    },
+    {
+      match: /\bfrench|français\b/i,
+      reply: "Oui, je peux parler en français. Comment puis-je vous aider dans vos études ?",
+    },
+    {
+      match: /\bgerman|deutsch\b/i,
+      reply: "Ja, ich kann auf Deutsch sprechen. Wie kann ich dir beim Lernen helfen?",
+    },
+    {
+      match: /\bportuguese|português\b/i,
+      reply: "Sim, posso falar em português. Como posso ajudar nos seus estudos?",
+    },
+    {
+      match: /\bitalian|italiano\b/i,
+      reply: "Sì, posso parlare in italiano. Come posso aiutarti con lo studio?",
+    },
+    {
+      match: /\brussian\b/i,
+      reply: "Да, я могу говорить по-русски. Чем я могу помочь в учёбе?",
+    },
+    {
+      match: /\b(chinese|mandarin)\b/i,
+      reply: "是的，我可以用中文交谈。需要我怎样帮助你学习？",
+    },
+    {
+      match: /\bjapanese\b/i,
+      reply: "はい、日本語で話せます。勉強のお手伝いをしましょうか？",
+    },
+    {
+      match: /\bkorean\b/i,
+      reply: "네, 한국어로 대화할 수 있어요. 공부를 어떻게 도와드릴까요?",
+    },
+    {
+      match: /\bindonesian|bahasa\b/i,
+      reply: "Ya, saya bisa berbicara dalam bahasa Indonesia. Bagaimana saya bisa membantu belajarmu?",
+    },
+    {
+      match: /\bturkish|türkçe\b/i,
+      reply: "Evet, Türkçe konuşabilirim. Derslerinde nasıl yardımcı olabilirim?",
     },
   ];
   return languages.find((language) => language.match.test(query))?.reply || null;
@@ -383,18 +443,290 @@ function percentQ(q: string): string | null {
   return `${m[1]}% of ${m[2]} = **${round(v)}**`;
 }
 
+/* ── Multilingual command vocabulary ───────────────────────────
+   Deterministic intent matching so voice commands work in the
+   learner's OWN language, not just English. Scripts are matched
+   literally; Hinglish (Latin-script Hindi) is included because
+   that is how most Indian learners actually speak to a mic. */
+const MULTI = {
+  resume: [
+    /(\bresume\b|continue (the )?(session|timer|studying))/i,
+    /\b(फिर (से )?शुरू|जारी (रखो|रखिए)|चालू रखो)/,
+    /(पुन्हा सुरू|सुरू ठेवा|चालू ठेवा)/, // Marathi
+    /(পুনরায় শুরু|আবার শুরু|চালিয়ে যাও)/, // Bengali
+    /(தொடர்|மீண்டும் தொடங்கு)/, // Tamil
+    /(కొనసాగించు|మళ్ళీ మొదలుపెట్టు)/, // Telugu
+    /(ಮುಂದುವರಿಸು|ಪುನಃ ಪ್ರಾರಂಭಿಸು)/, // Kannada
+    /(ચાલુ રાખો|ફરી શરૂ)/, // Gujarati
+    /(ਜਾਰੀ ਰੱਖੋ|ਮੁੜ ਸ਼ੁਰੂ)/, // Punjabi
+    /(جاری رکھو|دوبارہ شروع)/, // Urdu
+    /(استمر|أكمل)/, // Arabic
+    /\b(reprends?|continue)\b/i, // French
+    /\b(continúa|sigue|reanuda)\b/i, // Spanish
+    /\b(phir (se )?shuru|jaari raho|jari rakho|chaloo raho)\b/i, // Hinglish
+  ],
+  pause: [
+    /\bpause\b|\bhold (on|it)\b/i,
+    /(विराम|ठहर (जाओ|जाओ)|रुक जाओ थोड़ी देर)/,
+    /(বিরতি নাও|থামা যাক)/,
+    /(இடைநிறுத்தம்)/,
+    /(విరామం)/,
+    /(ವಿರಾಮ)/,
+    /(વિરામ)/,
+    /(ਵਿਰਾਮ)/,
+    /(وقفہ|مکمل روکو)/,
+    /\b(pause (karo|kar do)|ruko thoda|hold karo)\b/i, // Hinglish
+  ],
+  breakTime: [
+    /\b(take a break|break time|need a break|short break|give me a break|have a break)\b/i,
+    /(ब्रेक|आराम|विश्राम)/,
+    /(ब्रेक|विश्रांती)/, // Marathi
+    /(ব্রেক|বিশ্রাম|আরাম)/, // Bengali
+    /(இடைவேளை|ஓய்வு)/, // Tamil
+    /(విరామం తీసుకో|స్వల్ప విశ్రాంతి)/, // Telugu
+    /(ವಿರಾಮ ತೆಗೆದುಕೋ|ಸ್ವಲ್ಪ ಆರಾಮ)/, // Kannada
+    /(બ્રેક|આરામ)/, // Gujarati
+    /(ਬਰੇਕ|ਆਰਾਮ)/, // Punjabi
+    /(بریک|آرام)/, // Urdu
+    /(استراحة|استرح)/, // Arabic
+    /\b(break (lo|le|lena)|araam|rest lo|aaram)\b/i, // Hinglish
+  ],
+  stop: [
+    /\b(stop (the |my )?(timer|clock|session|study|studying)|clock ?out|end (the )?(session|study|timer)|session (khatam|over))\b/i,
+    /\b(stop|end|finish) (karo|kar do|karna|it)\b/i,
+    /\bi'?m done\b|\bfinished studying\b/i,
+    /(घंटी बंद|टाइमर बंद|घड़ी बंद|पढ़ाई बंद|बंद कर (दो|दें)|रोक (दो|दें)|बजना बंद)/,
+    /(घंटा बंद|अभ्यास बंद|थांबव)/, // Marathi
+    /(ঘড়ি বন্ধ|পড়া বন্ধ|থামাও|বন্ধ করো)/, // Bengali
+    /(கடிகாரம் நிறுத்து|நிறுத்து|படிப்பை நிறுத்து)/, // Tamil
+    /(గడియారం ఆపు|ఆపు|చదువు ఆపు)/, // Telugu
+    /(ಗಡಿಯಾರ ನಿಲ್ಲಿಸು|ನಿಲ್ಲಿಸು|ಓದು ನಿಲ್ಲಿಸು)/, // Kannada
+    /(ઘડિયાળ બંધ|રોકો|ભણવું બંધ)/, // Gujarati
+    /(ਘੜੀ ਬੰਦ|ਰੋਕੋ|ਪੜ੍ਹਾਈ ਬੰਦ)/, // Punjabi
+    /(گھی بند|بند کرو|روکو)/, // Urdu
+    /(أوقف|توقف عن)/, // Arabic
+    /\b(band (karo|kar do)|rok (do|do na)|rokko|rok lo|khatam karo|bas karo)\b/i, // Hinglish
+  ],
+  start: [
+    /\b(clock ?in|start (the )?(timer|clock|focus|session|studying|study)|begin (studying|session|focus)|let'?s study|i'?m ready to study)\b/i,
+    /(टाइमर (चालू|शुरू)|घड़ी (चालू|शुरू)|पढ़ाई (शुरू|चालू)|शुरू कर (दो|दें)|चालू कर (दो|दें))/,
+    /(टाइमर सुरू|अभ्यास सुरू|सुरू करा|चालू करा)/, // Marathi
+    /(টাইমার (চালু|শুরু)|পড়া (শুরু|চালু)|শুরু করো)/, // Bengali
+    /(கடிகாரம் (தொடங்கு|தொடக்கு)|படிப்பை தொடங்கு|தொடங்கு)/, // Tamil
+    /(గడియారం ప్రారంభించు|చదువు మొదలుపెట్టు|ప్రారంభించు)/, // Telugu
+    /(ಗಡಿಯಾರ ಪ್ರಾರಂಭಿಸು|ಓದು ಪ್ರಾರಂಭಿಸು|ಆರಂಭಿಸು)/, // Kannada
+    /(ટાઈમર શરૂ|ભણવું શરૂ|શરૂ કરો)/, // Gujarati
+    /(ਟਾਈਮਰ ਸ਼ੁਰੂ|ਪੜ੍ਹਾਈ ਸ਼ੁਰੂ|ਸ਼ੁਰੂ ਕਰੋ)/, // Punjabi
+    /(ٹائمر شروع|پڑھائی شروع|شروع کرو)/, // Urdu
+    /(ابدأ|ابدأ المؤقت|ابدأ الدراسة)/, // Arabic
+    /\b(shuru (karo|kar do)|start (karo|karna)|chalu (karo|kar do)|chalao|padhai shuru)\b/i, // Hinglish
+  ],
+  openPlanner: [
+    /(योजना|समय सारिणी|टाइमटेबल|शेड्यूल)( दिखाओ| खोलो| खोलें)?/,
+    /(সময়সূচি|পরিকল্পনা)( দেখাও| খোলো)?/,
+    /(திட்டம்|அட்டவணை)( காட்டு| திற)?/,
+    /(ప్లాన్|షెడ్యూల్)( చూపించు| తెరువు)?/,
+    /(ಯೋಜನೆ|ವೇಳಾಪಟ್ಟಿ)( ತೋರಿಸು| ತೆರೆ)?/,
+    /(યોજના|સમયપત્રક)( બતાવો| ખોલો)?/,
+    /(ਯੋਜਨਾ|ਸ਼ਡਿਊਲ)( ਵਿਖਾਓ| ਖੋਲ੍ਹੋ)?/,
+    /(منصوبہ|شیڈول)( دکھاؤ| کھولو)?/,
+    /\b(planner|schedule|timetable|my plan)( dikhao|kholo|khol do|dikhao na)?\b/i,
+    /\bplan (dikhao|kholo|khol do)\b/i,
+  ],
+  openOverview: [
+    /(डैशबोर्ड|ओवरव्यू|होम|मुख्य पृष्ठ)( दिखाओ| खोलो| पर जाओ)?/,
+    /(डॅशबोर्ड|ओव्हरव्ह्यू|मुख्यपृष्ठ)( दाखवा| उघडा)?/,
+    /(হোম|ড্যাশবোর্ড)( দেখাও| খোলো)?/,
+    /(முகப்பு|டாஷ்போர்டு)( காட்டு| திற)?/,
+    /(హోమ్|డాష్‌బోర్డ్)( చూపించు| తెరువు)?/,
+    /\b(dashboard|overview|home)( dikhao|kholo|chaloo)?\b/i,
+  ],
+};
+
+function matchesAny(text: string, patterns: RegExp[]): boolean {
+  return patterns.some((p) => p.test(text));
+}
+
+/* ── Localized command confirmations ────────────────────────────
+   When a voice command arrives in the learner's own language, the
+   acknowledgement answers in that same language — both on screen and
+   aloud (the TTS layer detects the script automatically). Falls back
+   to English for anything unmatched. */
+const SCRIPT_LANG_DETECT: { code: string; range: RegExp }[] = [
+  { code: "bn", range: /[\u0980-\u09FF]/ },
+  { code: "pa", range: /[\u0A00-\u0A7F]/ },
+  { code: "gu", range: /[\u0A80-\u0AFF]/ },
+  { code: "or", range: /[\u0B00-\u0B7F]/ },
+  { code: "ta", range: /[\u0B80-\u0BFF]/ },
+  { code: "te", range: /[\u0C00-\u0C7F]/ },
+  { code: "kn", range: /[\u0C80-\u0CFF]/ },
+  { code: "ml", range: /[\u0D00-\u0D7F]/ },
+  { code: "hi", range: /[\u0900-\u097F]/ }, // also Marathi/Nepali (shared script)
+  { code: "ar", range: /[\u0600-\u06FF]/ },  // also Urdu (shared script)
+];
+
+type ActionShape = { type: string; payload?: unknown };
+
+const CONFIRMATIONS: Record<string, Partial<Record<"startTimer" | "stopTimer" | "pause" | "resume" | "break" | "navigate" | "replan" | "zen" | "theme", string>>> = {
+  hi: {
+    startTimer: "घड़ी चालू — आपका अध्ययन समय दर्ज हो रहा है।",
+    stopTimer: "घड़ी बंद — आपके मिनट सुरक्षित हो गए। शाबाश!",
+    pause: "रोक दिया गया। तैयार हों तो कहें *\"जारी रखो\"*।",
+    resume: "फिर से चालू — पढ़ाई जारी रखें।",
+    break: "ब्रेक शुरू — पानी पिएँ, आँखों को आराम दें।",
+    navigate: "खोल रहा हूँ: {page}।",
+    replan: "आपका शेड्यूल फिर से संतुलित कर दिया गया है।",
+    zen: "ज़ेन मोड चालू।",
+    theme: "थीम बदल दी गई।",
+  },
+  bn: {
+    startTimer: "ঘড়ি চালু — আপনার পড়ার সময় রেকর্ড হচ্ছে।",
+    stopTimer: "ঘড়ি বন্ধ — আপনার মিনিট সেভ হয়ে গেছে। দারুণ!",
+    pause: "থামানো হলো। প্রস্তুত হলে বলুন *\"চালিয়ে যাও\"*।",
+    resume: "আবার চালু — পড়া চালিয়ে যান।",
+    break: "বিরতি শুরু — পানি খান, চোখকে বিশ্রাম দিন।",
+    navigate: "খুলছি: {page}।",
+    replan: "আপনার সময়সূচি নতুন করে সাজানো হয়েছে।",
+    zen: "জেন মোড চালু।",
+    theme: "থিম বদলে দেওয়া হয়েছে।",
+  },
+  ta: {
+    startTimer: "கடிகாரம் தொடங்கியது — உங்கள் படிப்பு நேரம் பதிவாகிறது.",
+    stopTimer: "கடிகாரம் நிறுத்தப்பட்டது — உங்கள் நிமிடங்கள் சேமிக்கப்பட்டன. நன்று!",
+    pause: "நிறுத்தப்பட்டது. தயாராக இருந்தால் *\"தொடர்\"* என்று சொல்லுங்கள்.",
+    resume: "மீண்டும் தொடங்கியது — படிப்பைத் தொடருங்கள்.",
+    break: "இடைவேளை — தண்ணீர் குடியுங்கள், கண்களுக்கு ஓய்வு தருங்கள்.",
+    navigate: "திறக்கிறேன்: {page}.",
+    replan: "உங்கள் அட்டவணை மீண்டும் சமநிலைப்படுத்தப்பட்டது.",
+    zen: "ஜென் பயன்முறை இயக்கப்பட்டது.",
+    theme: "தீம் மாற்றப்பட்டது.",
+  },
+  te: {
+    startTimer: "గడియారం ప్రారంభమైంది — మీ చదువు సమయం నమోదవుతోంది.",
+    stopTimer: "గడియారం ఆపబడింది — మీ నిమిషాలు సేవ్ చేయబడ్డాయి. బాగుంది!",
+    pause: "ఆపబడింది. సిద్ధంగా ఉంటే *\"కొనసాగించు\"* అనండి.",
+    resume: "మళ్ళీ ప్రారంభం — చదువు కొనసాగించండి.",
+    break: "విరామం — నీరు త్రాగండి, కళ్ళకు విశ్రాంతి ఇవ్వండి.",
+    navigate: "తెరుస్తున్నాను: {page}.",
+    replan: "మీ షెడ్యూల్ తిరిగి సర్దుబాటు చేయబడింది.",
+    zen: "జెన్ మోడ్ ఆన్.",
+    theme: "థీమ్ మార్చబడింది.",
+  },
+  kn: {
+    startTimer: "ಗಡಿಯಾರ ಪ್ರಾರಂಭವಾಗಿದೆ — ನಿಮ್ಮ ಓದಿನ ಸಮಯ ದಾಖಲಾಗುತ್ತಿದೆ.",
+    stopTimer: "ಗಡಿಯಾರ ನಿಂತಿದೆ — ನಿಮ್ಮ ನಿಮಿಷಗಳು ಉಳಿಸಲ್ಪಟ್ಟಿವೆ. ಸೂಪರ್!",
+    pause: "ನಿಂತಿದೆ. ಸಿದ್ಧರಾದಾಗ *\"ಮುಂದುವರಿಸು\"* ಎನ್ನಿ.",
+    resume: "ಪುನಃ ಪ್ರಾರಂಭ — ಓದನ್ನು ಮುಂದುವರಿಸಿ.",
+    break: "ವಿರಾಮ — ನೀರು ಕುಡಿಯಿರಿ, ಕಣ್ಣುಗಳಿಗೆ ವಿಶ್ರಾಂತಿ ನೀಡಿ.",
+    navigate: "ತೆರೆಯುತ್ತಿದ್ದೇನೆ: {page}.",
+    replan: "ನಿಮ್ಮ ವೇಳಾಪಟ್ಟಿ ಮರುಸಮತೋಲನಗೊಂಡಿದೆ.",
+    zen: "ಜೆನ್ ಮೋಡ್ ಆನ್.",
+    theme: "ಥೀಮ್ ಬದಲಾಗಿದೆ.",
+  },
+  ml: {
+    startTimer: "ഘടികാരം തുടങ്ങി — നിങ്ങളുടെ പഠന സമയം രേഖപ്പെടുത്തുന്നു.",
+    stopTimer: "ഘടികാരം നിർത്തി — നിങ്ങളുടെ മിനിറ്റുകൾ സേവ് ചെയ്തു. നന്നായി!",
+    pause: "നിർത്തി. തയ്യാറായാൽ *\"തുടരൂ\"* പറയൂ.",
+    resume: "വീണ്ടും തുടങ്ങി — പഠനം തുടരൂ.",
+    break: "ഇടവേള — വെള്ളം കുടിക്കൂ, കണ്ണുകൾക്ക് വിശ്രമം നൽകൂ.",
+    navigate: "തുറക്കുന്നു: {page}.",
+    replan: "നിങ്ങളുടെ ഷെഡ്യൂൾ വീണ്ടും ക്രമീകരിച്ചു.",
+    zen: "സെൻ മോഡ് ഓണാക്കി.",
+    theme: "തീം മാറ്റി.",
+  },
+  gu: {
+    startTimer: "ઘડિયાળ ચાલુ — તમારો અભ્યાસ સમય નોંધાઈ રહ્યો છે.",
+    stopTimer: "ઘડિયાળ બંધ — તમારા મિનિટ સેવ થઈ ગયા. શાબાશ!",
+    pause: "રોકાયું. તૈયાર હો તો કહો *\"ચાલુ રાખો\"*.",
+    resume: "ફરી ચાલુ — અભ્યાસ ચાલુ રાખો.",
+    break: "વિરામ — પાણી પીઓ, આંખોને આરામ આપો.",
+    navigate: "ખોલી રહ્યો છું: {page}.",
+    replan: "તમારું શેડ્યૂલ ફરીથી ગોઠવી દીધું છે.",
+    zen: "ઝેન મોડ ચાલુ.",
+    theme: "થીમ બદલાઈ ગઈ.",
+  },
+  pa: {
+    startTimer: "ਘੜੀ ਚਾਲੂ — ਤੁਹਾਡਾ ਪੜ੍ਹਾਈ ਸਮਾਂ ਦਰਜ ਹੋ ਰਿਹਾ ਹੈ।",
+    stopTimer: "ਘੜੀ ਬੰਦ — ਤੁਹਾਡੇ ਮਿੰਟ ਸੰਭਾਲ ਲਏ ਗਏ ਹਨ। ਸ਼ਾਬਾਸ਼!",
+    pause: "ਰੁਕ ਗਿਆ। ਤਿਆਰ ਹੋਵੋ ਤਾਂ ਕਹੋ *\"ਜਾਰੀ ਰੱਖੋ\"*।",
+    resume: "ਮੁੜ ਚਾਲੂ — ਪੜ੍ਹਾਈ ਜਾਰੀ ਰੱਖੋ।",
+    break: "ਬਰੇਕ — ਪਾਣੀ ਪਓ, ਅੱਖਾਂ ਨੂੰ ਆਰਾਮ ਦਿਓ।",
+    navigate: "ਖੋਲ੍ਹ ਰਿਹਾ ਹਾਂ: {page}.",
+    replan: "ਤੁਹਾਡਾ ਸ਼ਡਿਊਲ ਮੁੜ ਸੰਤੁਲਿਤ ਕਰ ਦਿੱਤਾ ਗਿਆ ਹੈ।",
+    zen: "ਜ਼ੈਨ ਮੋਡ ਚਾਲੂ।",
+    theme: "ਥੀਮ ਬਦਲ ਦਿੱਤੀ ਗਈ।",
+  },
+  or: {
+    startTimer: "ଘଡ଼ି ଚାଲୁ — ଆପଣଙ୍କ ଅଧ୍ୟୟନ ସମୟ ଲେଖା ହେଉଛି।",
+    stopTimer: "ଘଡ଼ି ବନ୍ଦ — ଆପଣଙ୍କ ମିନିଟ୍ ସଞ୍ଚୟ ହୋଇଗଲା। ବାହ୍!",
+    pause: "ବନ୍ଦ ହେଲା। ପ୍ରସ୍ତୁତ ହେଲେ କୁହନ୍ତୁ *\"ଜାରି ରଖ\"*।",
+    resume: "ପୁଣି ଚାଲୁ — ଅଧ୍ୟୟନ ଜାରି ରଖନ୍ତୁ।",
+    break: "ବିରାମ — ପାଣି ପିଅନ୍ତୁ, ଆଖିକୁ ବିଶ୍ରାମ ଦିଅନ୍ତୁ।",
+    navigate: "ଖୋଲୁଛି: {page}.",
+    replan: "ଆପଣଙ୍କ ସମୟସୂଚୀ ପୁଣି ସନ୍ତୁଳିତ ହୋଇଗଲା।",
+    zen: "ଜେନ୍ ମୋଡ୍ ଚାଲୁ।",
+    theme: "ଥିମ୍ ବଦଳିଗଲା।",
+  },
+  ar: {
+    startTimer: "بدأ المؤقت — يتم تسجيل وقت دراستك.",
+    stopTimer: "أُوقف المؤقت — تم حفظ دقائقك. أحسنت!",
+    pause: "متوقف مؤقتًا. عندما تكون مستعدًا قل *«استمر»*.",
+    resume: "استُؤنف — تابع الدراسة.",
+    break: "استراحة — اشرب الماء وأرِح عينيك.",
+    navigate: "أفتح: {page}.",
+    replan: "تمت إعادة موازنة جدولك الزمني.",
+    zen: "وضع التركيز مشغّل.",
+    theme: "تم تغيير المظهر.",
+  },
+};
+
+/** English fallbacks used when the spoken language has no translation. */
+const EN_CONFIRMATIONS: Record<string, string> = {
+  navigate: "Opening **{page}**.",
+  startTimer: "Clocked in. Time is recording against today's task — one lesson, one focus.",
+  stopTimer: "Clocked out. Your minutes are saved to today's task.",
+  break: "Break started. Stand up, rest your eyes, hydrate. Say *\"resume\"* when you're back.",
+  pause: "Timer paused. Say *\"resume\"* when you're ready to continue.",
+  resume: "Back on the clock — picking up where you left off.",
+  zen: "Zen mode on — just you and the timer.",
+  replan: "Rebalancing your schedule now — unfinished lessons are pushed forward across your remaining days.",
+  theme: "Theme updated.",
+};
+
+const PAGE_LABELS: Record<string, string> = {
+  planner: "Planner",
+  dashboard: "Overview",
+  subjects: "Subjects",
+  settings: "Settings",
+  focus: "Focus Studio",
+};
+
+export function commandReply(action: ActionShape, sourceText: string, daysLeft?: number): string {
+  const lang = SCRIPT_LANG_DETECT.find((entry) => entry.range.test(sourceText))?.code;
+  const template =
+    (lang && CONFIRMATIONS[lang]?.[action.type as keyof (typeof CONFIRMATIONS)["hi"]]) ||
+    EN_CONFIRMATIONS[action.type] ||
+    "Done.";
+  const page = PAGE_LABELS[String(action.payload)] || String(action.payload || "");
+  let reply = template.replace("{page}", page);
+  if (action.type === "replan" && daysLeft != null && !lang) {
+    reply += ` Weakest subject first, spread across your remaining **${daysLeft} days**.`;
+  }
+  return reply;
+}
+
 export function parseCommand(q: string): TutorReply["action"] | undefined {
   const n = q.toLowerCase().trim().replace(/[.!?]+$/, "");
 
   // ── Break / timer state transitions (checked BEFORE navigation so
   //    "resume", "end break", "pause" never get mis-routed) ──
-  if (/\b(resume|end (my |the )?break|back from (my |the )?break|break('?s)? over|continue (the )?(session|timer|studying))\b/.test(n)) return { type: "resume" };
-  if (/\b(pause (the )?(timer|clock|session)|pause\b|hold (the )?timer)\b/.test(n) && !/\bbreak\b/.test(n)) return { type: "pause" };
-  if (/\b(take a break|break time|need a break|short break|give me a break)\b/.test(n)) return { type: "break" };
+  if (matchesAny(n, MULTI.resume)) return { type: "resume" };
+  if (matchesAny(n, MULTI.pause) && !matchesAny(n, MULTI.breakTime)) return { type: "pause" };
+  if (matchesAny(n, MULTI.breakTime)) return { type: "break" };
 
   // ── Navigation ──
-  if (/\b(planner|schedule|my plan|timetable)\b/.test(n) && /\b(open|go|show|view|take me|see)\b/.test(n)) return { type: "navigate", payload: "planner" };
-  if (/\b(dashboard|overview|home|stats?)\b/.test(n) && /\b(open|go|show|view|take me|see)\b/.test(n)) return { type: "navigate", payload: "dashboard" };
+  if ((/\b(planner|schedule|my plan|timetable)\b/.test(n) || matchesAny(n, MULTI.openPlanner)) && /(\b(open|go|show|view|take me|see)\b|dikhao|kholo|दिखाओ|खोलो|दाखवा|उघडा|দেখাও|খোলো|காட்டு|చూపించు|ತೋರಿಸು|બતાવો|ਵਿਖਾਓ|دکھاؤ)/i.test(n)) return { type: "navigate", payload: "planner" };
+  if ((/\b(dashboard|overview|home|stats?)\b/.test(n) || matchesAny(n, MULTI.openOverview)) && /(\b(open|go|show|view|take me|see)\b|dikhao|kholo|दिखाओ|खोलो|দেখাও|খোলো|காட்டு)/i.test(n)) return { type: "navigate", payload: "dashboard" };
   if (/\b(subjects?|syllabus|topics?|lessons?)\b/.test(n) && /\b(open|go|show|view|manage|edit)\b/.test(n)) return { type: "navigate", payload: "subjects" };
   if (/\b(settings?|preferences?|options?|profile)\b/.test(n) && /\b(open|go|show|change|edit)\b/.test(n)) return { type: "navigate", payload: "settings" };
   if (/\b(focus( page| view| tab)?|pomodoro)\b/.test(n) && /\b(open|go|show|view|take me|see)\b/.test(n)) return { type: "navigate", payload: "focus" };
@@ -404,9 +736,10 @@ export function parseCommand(q: string): TutorReply["action"] | undefined {
   if (/^\/?(settings)$/.test(n)) return { type: "navigate", payload: "settings" };
   if (/^\/?(focus|pomodoro)$/.test(n)) return { type: "navigate", payload: "focus" };
 
-  // ── Clock ──
-  if (/\b(clock ?in|start (the )?(timer|clock|focus|session|studying|study)|begin (studying|session|focus)|let'?s study|i'?m ready to study)\b/.test(n)) return { type: "startTimer" };
-  if (/\b(clock ?out|stop (the )?(timer|clock|session)|end (the )?(session|study)|i'?m done|finished studying)\b/.test(n)) return { type: "stopTimer" };
+  // ── Clock (multilingual: stop is checked before start so a phrase
+  //    containing both words resolves to a safe end-of-session) ──
+  if (matchesAny(n, MULTI.stop)) return { type: "stopTimer" };
+  if (matchesAny(n, MULTI.start)) return { type: "startTimer" };
   if (/\b(zen|focus mode|full ?screen|distraction ?free|deep work mode)\b/.test(n)) return { type: "zen" };
   if (/\b(re-?plan|rebuild|regenerate|reschedule|re-?balance|redo my (plan|schedule)|fix my (plan|schedule)|update my plan)\b/.test(n)) return { type: "replan" };
 
@@ -523,10 +856,19 @@ Use at most one emoji per reply, and only when it genuinely helps; usually use n
 Never use hype ("CRUSHING IT!!!"), all-caps excitement, or emoji chains.
 
 LANGUAGE: You are multilingual. Reply in the language/script the learner uses or explicitly
-requests, including Bengali/Bangla, Hindi, Marathi, Tamil, Telugu, Kannada, Gujarati,
-Punjabi, Arabic, and English. Never claim that you only support English or Hindi. If the
-learner writes an Indian language in Latin script, answer naturally in that language;
-use its native script when they explicitly ask whether you can speak it.
+requests, including Bengali/Bangla, Hindi, Marathi, Tamil, Telugu, Kannada, Malayalam,
+Gujarati, Punjabi, Odia, Urdu, Nepali, Arabic, Chinese, Japanese, Korean, Thai, Russian,
+Spanish, French, German, Portuguese, Italian, Indonesian, Turkish, and English. Never
+claim that you only support English or Hindi. If the learner writes an Indian language in
+Latin script, answer naturally in that language; use its native script when they
+explicitly ask whether you can speak it.
+
+ANSWER DEPTH: match the depth to the request. Short factual questions get short answers.
+When the learner asks for an explanation, a lesson, or says anything like "in detail",
+"explain fully", "step by step", "in simple words", or the equivalent in their language,
+give a COMPLETE structured lesson: a one-line idea, numbered steps, one concrete worked
+example, common mistakes to avoid, and a short recap. Never truncate a lesson to stay
+brief — long answers are spoken aloud in full by the app, in consecutive parts.
 
 APP CONTROL — you CAN control this app. When the user asks you to perform an app action
 (in ANY language or phrasing), append ONE action tag on its own final line, then it will

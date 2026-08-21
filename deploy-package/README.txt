@@ -1,10 +1,36 @@
-DRAG & DROP DEPLOY PACKAGE — Study Planner Pro (v4 · Voice + Curriculum Build)
+DRAG & DROP DEPLOY PACKAGE — Study Planner Pro (v5 · Clock-Out + Multilingual Voice Build)
 ============================================================================
 
 This folder contains the complete, build-verified source of the app.
 Everything in here goes to the SAME location in your repository.
 
-WHAT'S FIXED IN THIS BUILD
+WHAT'S FIXED IN THIS BUILD (v5)
+ 1. Start → Clock Out in the SAME place: the "Up next" card and every
+    task row turn into a live "Clock out" control (with a running
+    timer) while that lesson is being timed. No more hunting for a stop
+    button after starting.
+ 2. Tapping Start again can never restart a running session — your
+    unlogged minutes are banked first. Switching lessons saves the open
+    minutes and continues on the new lesson.
+ 3. Pause freezes the visible timer (no more resetting to 00:00);
+    Resume continues the same session; the tracker bar has a proper
+    Paused state; the running clock shows in the browser tab title;
+    Zen mode has a Clock Out button.
+ 4. Voice commands work in Hindi, Marathi, Hinglish, Bengali, Tamil,
+    Telugu, Kannada, Malayalam, Gujarati, Punjabi, Odia, Urdu, Arabic,
+    French, Spanish — and confirmations answer in YOUR language, aloud.
+ 5. 🌐 mic language picker with 26 languages (Auto detects from speech;
+    a pinned choice is remembered).
+ 6. Long answers are spoken in full, part by part, with progress
+    ("part 2/5"). Tap the mic anytime to stop the voice.
+ 7. Readiness projection learns the minutes you actually study per day;
+    peak-focus hours recency-weight your recent sessions.
+ 8. More database indexes on every hot query path.
+ 9. Mobile: while recording, the tracker strip hides its info chips and
+    shows big Pause/Break/CLOCK OUT controls; the stats strip swipes
+    horizontally instead of stacking.
+
+WHAT WAS FIXED IN v4 (previous)
  1. Sidebar course name ("B.Com (Honours) (Marketing and Banking)")
     now wraps fully — never cut off.
  2. Tracker/header task title ("Principles of Marketing: Introduction

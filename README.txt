@@ -68,6 +68,43 @@ fall back to an unrelated operating-system voice; failures remain text-only.
 A native voice is available only through the explicit “Device fallback”
 option.
 
+v5 FIXES (this build)
+---------------------
+ - START NOW BECOMES CLOCK OUT, IN THE SAME PLACE. The "Up next" card on
+   the Overview shows a live timer with Pause/Resume and a red Clock Out
+   button while that lesson is being timed. Every task row (Overview +
+   Planner) does the same: "Clock in" becomes a pulsing red "Clock out"
+   for the running lesson, and "Switch" for other lessons (banking the
+   open minutes first). Re-tapping Start can never silently restart — or
+   eat unlogged minutes of — a running session anymore.
+ - Pause no longer resets the visible timer: the clock freezes, minutes
+   are banked, and Resume continues the same visible session. The
+   tracker bar gained a proper "Paused" state with Resume + Clock Out,
+   and hides its info chips while recording so the stop control owns the
+   row on phones.
+ - The running session also shows in the browser tab title (⏱ 12:34 ·
+   lesson name) and Zen mode now has a Clock Out button.
+ - Multilingual voice: the mic now understands start/stop/pause/resume/
+   break/navigation commands in Hindi, Marathi, Hinglish, Bengali, Tamil,
+   Telugu, Kannada, Malayalam, Gujarati, Punjabi, Odia, Urdu, Arabic,
+   French and Spanish — and CONFIRMS them in the same language, spoken
+   aloud. A 🌐 language picker (26 languages incl. Spanish, French,
+   German, Chinese, Japanese, Russian…) sits next to the voice picker;
+   Auto keeps detecting from your speech.
+ - Long answers read in full: spoken replies are split at sentence
+   boundaries (including । ॥ 。 ！ ؟) and played back-to-back, with a
+   "part 2/5" progress indicator. The tutor is told to give complete
+   structured lessons when you ask for detail. Tapping the mic while
+   Shigun speaks stops the voice instantly.
+ - ML: the exam-readiness projection is now anchored to the minutes you
+   ACTUALLY study per active day (trimmed mean over 28 days, shrunk
+   toward your target until 10 active days of evidence), and the
+   peak-focus model recency-weights sessions (30-day half-life) so it
+   follows your current habits, not last semester's.
+ - Database: composite indexes added for the hot paths (tasks by
+   user+date+position, topics by subject+position, chat history by
+   user+id).
+
 v4 FIXES (this build)
 ---------------------
  - Mobile voice transcripts use overlap-aware deduplication and

@@ -6,7 +6,7 @@ import { getOrCreateUser, getSettings, keyFrom } from "@/lib/state";
 import { todayStr, diffDays } from "@/lib/planner";
 import {
   learnPace, paceFor, learnWeekdays, learnTimeOfDay, skipRisk,
-  projectReadiness, retrievability,
+  projectReadiness, retrievability, learnEffectiveDailyMinutes,
 } from "@/lib/ml";
 
 export const dynamic = "force-dynamic";
@@ -71,9 +71,16 @@ export async function GET(req: Request) {
   const remainingMin = allTasks
     .filter((t) => t.status === "pending" && t.kind === "learn")
     .reduce((a, t) => a + t.plannedMinutes, 0);
+  // The projection is anchored to what the learner actually DOES, not just
+  // what their settings claim: observed minutes per active study day.
+  const effective = learnEffectiveDailyMinutes(
+    allSessions.map((s) => ({ date: s.date, minutes: s.minutes, mode: s.mode })),
+    today
+  );
   const readiness = projectReadiness(
     history, remainingMin, Math.round(st.dailyHours * 60),
-    Math.max(0, diffDays(today, st.examDate))
+    Math.max(0, diffDays(today, st.examDate)),
+    effective.activeDays > 0 ? { minutes: effective.minutes, activeDays: effective.activeDays } : undefined
   );
 
   // ── Memory health: FSRS recall probabilities across learned topics ──
@@ -141,6 +148,7 @@ export async function GET(req: Request) {
     focusSamples: focus.samples,
     tomorrowRisk: risk,
     readiness,
+    effectiveDailyMinutes: effective,
     memory: { strong, fading, atRisk, tracked: learned.length },
   });
 }
