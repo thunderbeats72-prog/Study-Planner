@@ -14,9 +14,14 @@ export type SubjectRow = {
   id: number; userId: number; name: string; color: string; difficulty: string;
   units: number; weight: number; position: number;
 };
+export type CurriculumSourceRow = {
+  title: string; publisher: string; type: "Official syllabus" | "Primary text" | "Reference";
+  url?: string; note?: string; section?: string;
+};
 export type TopicRow = {
   id: number; userId: number; subjectId: number; unit: string; title: string; summary: string;
-  objectives: string[]; difficulty: string; estMinutes: number; position: number;
+  objectives: string[]; prerequisites: string[]; keyConcepts: string[]; practice: string;
+  depth: string; sources: CurriculumSourceRow[]; difficulty: string; estMinutes: number; position: number;
   mastery: number; status: string;
 };
 export type TaskRow = {

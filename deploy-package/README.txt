@@ -1,5 +1,5 @@
-DRAG & DROP DEPLOY PACKAGE — Study Planner Pro (v3 · All-Fixes Build)
-======================================================================
+DRAG & DROP DEPLOY PACKAGE — Study Planner Pro (v4 · Voice + Curriculum Build)
+============================================================================
 
 This folder contains the complete, build-verified source of the app.
 Everything in here goes to the SAME location in your repository.
@@ -35,6 +35,18 @@ WHAT'S FIXED IN THIS BUILD
     scanning the whole history every minute.
 11. Responsive across everything: 320px phones → Galaxy S24 → tablets
     → desktops → 4K TVs, with safe-area and foldable support.
+12. Permanent mobile transcript fix: cumulative Android/WebKit result
+    batches are overlap-deduplicated and stale sessions cannot submit.
+13. One Shigun voice everywhere: replies use fixed Gemini TTS profiles
+    instead of unrelated phone/desktop operating-system voices.
+14. Advanced curricula: every lesson now carries prerequisites, depth,
+    key concepts, higher-order outcomes, applied practice, and curated
+    source details/links. Existing plans are enriched without a reset.
+15. Chat and replan actions are single-flight: double taps cannot add the
+    same turn twice or launch two competing schedule rebuilds.
+16. Shigun answers Bengali/Bangla and other supported-language requests
+    correctly; mobile chat now has live voice visuals, assistant avatars,
+    a cleaner composer, and a smoother full conversation sheet.
 
 DEPLOY STEPS (GitHub web — no git commands needed)
  1. In your repo, open "Add file" → "Upload files".
@@ -53,8 +65,13 @@ VERIFIED
  - The package mirrors src/ exactly — nothing else is needed.
 
 NOTES
+ - For the fastest and most consistent voice, enable Google Cloud
+   Text-to-Speech and set `GOOGLE_CLOUD_TTS_API_KEY` in Vercel. Gemini
+   remains a pinned-model compatibility path. Named voices never silently
+   switch to a different model or operating-system voice.
  - Voice recognition is browser-native (Web Speech API): works best in
    Chrome/Edge on desktop and Android. iOS Safari support depends on
    the OS version. Text chat always works everywhere.
- - If your Vercel DB already has the old tables, the new indexes are
-   created automatically by `drizzle-kit push` during the build.
+ - If your Vercel DB already has the old tables, the new indexes and
+   curriculum metadata columns are created automatically by
+   `drizzle-kit push` during the build.

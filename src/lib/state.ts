@@ -3,6 +3,7 @@ import { users, settings, subjects, topics, tasks, sessions, messages } from "@/
 import { and, eq, desc, asc, sql } from "drizzle-orm";
 import { addDays, diffDays, todayStr } from "./planner";
 import type { TutorContext } from "./ai";
+import { advancedTopicMetadata } from "./curriculum";
 
 export function keyFrom(req: Request): string {
   const h = req.headers.get("x-user-key");
@@ -47,7 +48,52 @@ export async function loadState(userId: number) {
 export async function fullState(userKey: string) {
   const user = await getOrCreateUser(userKey);
   const rest = await loadState(user.id);
-  return { user, ...rest };
+
+  // Existing plans created before advanced curriculum metadata was added get
+  // a deterministic, non-destructive response upgrade immediately. New plans
+  // persist these fields in PostgreSQL; old titles/mastery/timing stay intact.
+  const subjectById = new Map(rest.subjects.map((subject) => [subject.id, subject]));
+  const topicLists = new Map<number, typeof rest.topics>();
+  for (const topic of rest.topics) {
+    const list = topicLists.get(topic.subjectId) || [];
+    list.push(topic);
+    topicLists.set(topic.subjectId, list);
+  }
+  for (const list of topicLists.values()) list.sort((a, b) => a.position - b.position);
+
+  const enrichedTopics = rest.topics.map((topic) => {
+    const hasAdvancedData = !!(
+      topic.keyConcepts?.length && topic.prerequisites?.length
+      && topic.practice && topic.sources?.length
+    );
+    if (hasAdvancedData) return topic;
+    const subject = subjectById.get(topic.subjectId);
+    if (!subject) return topic;
+    const list = topicLists.get(topic.subjectId) || [topic];
+    const index = Math.max(0, list.findIndex((item) => item.id === topic.id));
+    const metadata = advancedTopicMetadata({
+      title: topic.title,
+      subjectName: subject.name,
+      index,
+      total: list.length,
+      difficulty: subject.difficulty,
+      level: user.level,
+      courseName: user.courseName,
+      previousTitle: list[index - 1]?.title,
+    });
+    return {
+      ...topic,
+      summary: topic.summary || metadata.summary,
+      objectives: topic.objectives?.length ? topic.objectives : metadata.objectives,
+      prerequisites: topic.prerequisites?.length ? topic.prerequisites : metadata.prerequisites,
+      keyConcepts: topic.keyConcepts?.length ? topic.keyConcepts : metadata.keyConcepts,
+      practice: topic.practice || metadata.practice,
+      depth: metadata.depth,
+      sources: topic.sources?.length ? topic.sources : metadata.sources,
+    };
+  });
+
+  return { user, ...rest, topics: enrichedTopics };
 }
 
 type St = Awaited<ReturnType<typeof fullState>>;
