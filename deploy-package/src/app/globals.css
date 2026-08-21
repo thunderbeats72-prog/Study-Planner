@@ -45,6 +45,9 @@ body.theme-sunset{--color-ai:#EE7118;--color-ai-soft:#FBEFE2;--ai-rgb:238,113,24
 
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{padding:0;margin:0}
+/* Real phones: block Android/Chrome text-size inflation from blowing up
+   nowrap labels and fixed-width controls (breaks layout at large font sizes). */
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 body{
   font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
   background:var(--app-bg);background-image:var(--bg-gradient);background-attachment:fixed;
@@ -353,6 +356,9 @@ body.theme-dark .tracker-bar,body.theme-obsidian .tracker-bar,body.theme-nebula 
   .ob-card{padding:24px 20px}
   .ai-panel{right:8px;left:8px;width:auto;bottom:calc(86px + env(safe-area-inset-bottom));height:min(70vh,540px)}
   .ai-fab{bottom:calc(86px + env(safe-area-inset-bottom));right:14px;width:50px;height:50px}
+  /* Touch devices: keep inputs at >=16px so iOS Safari never auto-zooms
+     into the field (which permanently breaks sheet layout). */
+  .ob-name-input,.ob-course-search,.ob-add-sub-input,.input-field,.ai-chat-input{font-size:16px}
   .cal-cell{min-height:62px;padding:5px}
   .timer-ring-wrap{width:220px;height:220px}
   .task-row{flex-wrap:wrap;align-items:center}
@@ -400,9 +406,10 @@ body.theme-dark .tracker-bar,body.theme-obsidian .tracker-bar,body.theme-nebula 
   .ob-add-sub-row{flex-direction:column}
   .ob-btn-row{flex-direction:column-reverse}
   .ob-btn{width:100%}
-  .ob-sub-row{display:grid;grid-template-columns:12px 1fr 58px;gap:8px}
-  .ob-sub-row select{grid-column:2 / 3}
-  .ob-sub-row .btn{grid-column:3 / 4;grid-row:2 / 3}
+  .ob-sub-row{display:grid;grid-template-columns:12px minmax(0,1fr) 64px;gap:8px}
+  .ob-sub-row input[type=number]{width:100%}
+  .ob-sub-row select{grid-column:2 / 3;width:100%;min-width:0}
+  .ob-sub-row .btn{grid-column:3 / 4;grid-row:2 / 3;justify-self:end}
 }
 @media(max-width:420px){
   .app-wrapper{padding-left:8px;padding-right:8px}
@@ -412,6 +419,13 @@ body.theme-dark .tracker-bar,body.theme-obsidian .tracker-bar,body.theme-nebula 
   .timer-ring-wrap{width:190px;height:190px}
   #t-digits{font-size:2.25rem}
   .zen .zen-digits{letter-spacing:-2px}
+
+  /* Narrow phones & enlarged system fonts: let long button labels wrap
+     instead of overflowing or being cut off. */
+  .btn{white-space:normal}
+  /* Wizard selects: tighten padding/font so long option labels fit. */
+  .ob-field input,.ob-field select{padding:11px 10px;font-size:.82rem}
+  .ob-field label{letter-spacing:.4px}
 }
 
 .task-row.active-clock{position:relative;border-color:rgba(34,197,94,.4);background:linear-gradient(135deg,var(--row-hover),rgba(34,197,94,.06))}
@@ -2353,7 +2367,7 @@ button,a,.nav-item,.vtab,.cal-cell,.chip,.task-row,.rate-btn,input,select{touch-
 @keyframes aiScrimIn{from{opacity:0}to{opacity:1}}
 .ai-avatar{width:36px!important;height:36px!important;min-width:36px;border-radius:12px!important}
 .ai-identity{flex:1;min-width:0}
-.ai-title{font-size:.91rem;font-weight:850;letter-spacing:-.2px;line-height:1.15;white-space:nowrap}
+.ai-title{font-size:.91rem;font-weight:850;letter-spacing:-.2px;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ai-title span{font-weight:650;color:var(--text-muted)}
 .ai-close{
   width:38px;height:38px;flex:0 0 38px;border-radius:12px;border:1px solid var(--glass-border);
@@ -2410,7 +2424,7 @@ button,a,.nav-item,.vtab,.cal-cell,.chip,.task-row,.rate-btn,input,select{touch-
   .ai-title{font-size:.86rem}
   .ai-status{font-size:.56rem;letter-spacing:.55px;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .ai-status::before{width:5px;height:5px;flex:0 0 5px}
-  .voice-select{width:100px;max-width:100px;height:38px;padding:5px 25px 5px 8px;font-size:.66rem;border-radius:11px}
+  .voice-select{width:100px;max-width:100px;height:38px;padding:5px 18px 5px 8px;font-size:.66rem;border-radius:11px}
   .ai-close{width:38px;height:38px;flex-basis:38px}
   .ai-msgs{
     flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;
