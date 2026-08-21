@@ -34,6 +34,10 @@ const LANG_DIRECTIONS: Record<string, { direction: string; accent: string }> = {
     direction: "warm Bengali tutor voice, medium pitch, steady pace, clear pronunciation of Bengali words",
     accent: "Bengali",
   },
+  "mr-IN": {
+    direction: "warm Marathi tutor voice, medium pitch, steady pace, clear pronunciation of Marathi words",
+    accent: "Marathi",
+  },
   "ta-IN": {
     direction: "clear Tamil tutor voice, medium pitch, steady pace, crisp pronunciation of Tamil words",
     accent: "Tamil",
@@ -46,6 +50,10 @@ const LANG_DIRECTIONS: Record<string, { direction: string; accent: string }> = {
     direction: "clear Kannada tutor voice, medium pitch, steady pace, crisp pronunciation of Kannada words",
     accent: "Kannada",
   },
+  "ml-IN": {
+    direction: "clear Malayalam tutor voice, medium pitch, steady pace, crisp pronunciation of Malayalam words",
+    accent: "Malayalam",
+  },
   "gu-IN": {
     direction: "warm Gujarati tutor voice, medium pitch, steady pace, clear pronunciation of Gujarati words",
     accent: "Gujarati",
@@ -54,9 +62,65 @@ const LANG_DIRECTIONS: Record<string, { direction: string; accent: string }> = {
     direction: "clear Punjabi tutor voice, medium pitch, steady pace, crisp pronunciation of Punjabi words",
     accent: "Punjabi",
   },
+  "or-IN": {
+    direction: "clear Odia tutor voice, medium pitch, steady pace, crisp pronunciation of Odia words",
+    accent: "Odia",
+  },
+  "ur-PK": {
+    direction: "clear Urdu tutor voice, medium pitch, steady pace, clear pronunciation of Urdu words",
+    accent: "Urdu",
+  },
   "ar-XA": {
     direction: "clear Arabic tutor voice, medium pitch, steady pace, crisp pronunciation of Arabic words",
     accent: "Arabic",
+  },
+  "es-ES": {
+    direction: "clear Spanish tutor voice, medium pitch, steady pace, crisp pronunciation",
+    accent: "Spanish",
+  },
+  "fr-FR": {
+    direction: "clear French tutor voice, medium pitch, steady pace, crisp pronunciation",
+    accent: "French",
+  },
+  "de-DE": {
+    direction: "clear German tutor voice, medium pitch, steady pace, crisp pronunciation",
+    accent: "German",
+  },
+  "pt-BR": {
+    direction: "clear Portuguese tutor voice, medium pitch, steady pace, crisp pronunciation",
+    accent: "Portuguese",
+  },
+  "it-IT": {
+    direction: "clear Italian tutor voice, medium pitch, steady pace, crisp pronunciation",
+    accent: "Italian",
+  },
+  "ru-RU": {
+    direction: "clear Russian tutor voice, medium pitch, steady pace, crisp pronunciation",
+    accent: "Russian",
+  },
+  "zh-CN": {
+    direction: "clear Mandarin Chinese tutor voice, medium pitch, steady pace, crisp pronunciation",
+    accent: "Chinese",
+  },
+  "ja-JP": {
+    direction: "clear Japanese tutor voice, medium pitch, steady pace, crisp pronunciation",
+    accent: "Japanese",
+  },
+  "ko-KR": {
+    direction: "clear Korean tutor voice, medium pitch, steady pace, crisp pronunciation",
+    accent: "Korean",
+  },
+  "th-TH": {
+    direction: "clear Thai tutor voice, medium pitch, steady pace, crisp pronunciation",
+    accent: "Thai",
+  },
+  "id-ID": {
+    direction: "clear Indonesian tutor voice, medium pitch, steady pace, crisp pronunciation",
+    accent: "Indonesian",
+  },
+  "tr-TR": {
+    direction: "clear Turkish tutor voice, medium pitch, steady pace, crisp pronunciation",
+    accent: "Turkish",
   },
 };
 
@@ -65,10 +129,18 @@ const SCRIPT_LANGUAGES: Array<{ tag: string; range: RegExp }> = [
   { tag: "bn-IN", range: /[\u0980-\u09FF]/g },
   { tag: "pa-IN", range: /[\u0A00-\u0A7F]/g },
   { tag: "gu-IN", range: /[\u0A80-\u0AFF]/g },
+  { tag: "or-IN", range: /[\u0B00-\u0B7F]/g },
   { tag: "ta-IN", range: /[\u0B80-\u0BFF]/g },
   { tag: "te-IN", range: /[\u0C00-\u0C7F]/g },
   { tag: "kn-IN", range: /[\u0C80-\u0CFF]/g },
+  { tag: "ml-IN", range: /[\u0D00-\u0D7F]/g },
+  { tag: "ru-RU", range: /[\u0400-\u04FF]/g },
+  { tag: "zh-CN", range: /[\u4E00-\u9FFF]/g },
+  { tag: "ja-JP", range: /[\u3040-\u30FF]/g },
+  { tag: "ko-KR", range: /[\uAC00-\uD7AF]/g },
+  { tag: "th-TH", range: /[\u0E00-\u0E7F]/g },
   { tag: "ar-XA", range: /[\u0600-\u06FF]/g },
+  { tag: "ur-PK", range: /[\u0600-\u06FF]/g },
 ];
 
 type CachedAudio = {
@@ -308,18 +380,13 @@ export async function POST(req: Request) {
     // Chirp 3 HD is deterministic and low-latency, so it is the production
     // path when its dedicated Cloud TTS key is configured. Gemini remains a
     // pinned-model compatibility path; we never switch models mid-session.
-    // For non-English text, prefer Chirp as it has native support for Indian languages.
-    let audio = null;
-    const isNonEnglish = language !== "en-IN" && SCRIPT_LANGUAGES.some(l => l.tag === language);
-    
-    if (isNonEnglish && chirpKey) {
-      // Use Chirp for Indian languages - it has native voice support
+    // If a language has no native Chirp voice (fails), Gemini TTS — which
+    // follows written directions in any script — is tried before giving up.
+    let audio: CachedAudio | null = null;
+    if (chirpKey) {
       audio = await synthesiseChirp(chirpKey, text, language, profile);
-    } else if (chirpKey) {
-      // Use Chirp for English
-      audio = await synthesiseChirp(chirpKey, text, language, profile);
-    } else if (gemini) {
-      // Fall back to Gemini
+    }
+    if (!audio && gemini) {
       audio = await synthesiseGemini(gemini, text, language, profile, model);
     }
     

@@ -4,18 +4,20 @@ import React, { useEffect, useRef, useState } from "react";
 import { mdToHtml, escapeHtml, type MessageRow } from "@/lib/client";
 import { IconChat, IconClose, IconSend, IconSpark } from "./icons";
 import {
-  VOICE_OPTIONS, voiceSupported, speak, stopSpeaking, listen, learnSttLang,
-  prepareVoicePlayback, type ListenHandle,
+  VOICE_OPTIONS, voiceSupported, speakLong, stopSpeaking, listen, learnSttLang,
+  prepareVoicePlayback, STT_LANGS, manualSttLang, setManualSttLang, type ListenHandle,
 } from "@/lib/voice";
 import { mergeTranscriptSegments } from "@/lib/transcript";
 
 const QUICKS = [
   "What should I study today?",
   "I'm behind — replan",
-  "Explain my weakest topic",
+  "Explain my weakest topic in detail",
   "How am I doing?",
   "Give me 5 practice questions",
   "Start timer",
+  "हिंदी में समझाओ",
+  "Explain in simple words",
 ];
 
 /** Below this confidence the transcript waits for review instead of
@@ -42,6 +44,8 @@ export default function ChatPanel({
   const [speaking, setSpeaking] = useState(false);
   const [voiceErr, setVoiceErr] = useState("");
   const [voiceHint, setVoiceHint] = useState(""); // "review what I heard" prompt
+  const [speakProgress, setSpeakProgress] = useState<{ done: number; total: number } | null>(null);
+  const [sttLang, setSttLang] = useState("auto"); // "auto" or a BCP-47 tag
   const endRef = useRef<HTMLDivElement>(null);
   const listenRef = useRef<ListenHandle | null>(null);
   const lastSpokenId = useRef<number>(0);
@@ -63,11 +67,25 @@ export default function ChatPanel({
   }, []);
   useEffect(() => { localStorage.setItem("shigun-voice-id", voiceId); }, [voiceId]);
 
+  // Pinned mic language survives reloads; "auto" detects from speech.
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSttLang(manualSttLang() || "auto"), 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+  const changeSttLang = (value: string) => {
+    setSttLang(value);
+    setManualSttLang(value);
+  };
+  const sttLangLabel = sttLang === "auto"
+    ? "Auto"
+    : STT_LANGS.find((l) => l.bcp === sttLang)?.label.split(" ").slice(-1)[0] || "Auto";
+
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages.length, thinking, open]);
 
-  // Seamless voice: if the user SPOKE their message, Shigun speaks back.
+  // Seamless voice: if the user SPOKE their message, Shigun speaks back —
+  // the FULL answer, chunk by chunk for long lessons.
   useEffect(() => {
     if (!voiceReplyArmed.current || !support.tts) return;
     const last = messages[messages.length - 1];
@@ -77,9 +95,11 @@ export default function ChatPanel({
       setVoiceErr("");
       setVoicePreparing(true);
       setSpeaking(false);
-      void speak(last.content, voiceId, {
+      setSpeakProgress(null);
+      void speakLong(last.content, voiceId, {
         onStart: () => { setVoicePreparing(false); setSpeaking(true); },
-        onEnd: () => { setVoicePreparing(false); setSpeaking(false); },
+        onProgress: (done, total) => setSpeakProgress(total > 1 ? { done, total } : null),
+        onEnd: () => { setVoicePreparing(false); setSpeaking(false); setSpeakProgress(null); },
         onError: (message) => setVoiceErr(message),
       });
     }
@@ -91,7 +111,7 @@ export default function ChatPanel({
     listenSession.current++; // cancel any in-flight mic warm-up
     stopSpeaking(); listenRef.current?.stop(); listenRef.current = null;
     const timer = window.setTimeout(() => {
-      if (!openRef.current) { setListening(false); setSpeaking(false); setVoicePreparing(false); setMicWaking(false); }
+      if (!openRef.current) { setListening(false); setSpeaking(false); setVoicePreparing(false); setMicWaking(false); setSpeakProgress(null); }
     }, 0);
     return () => window.clearTimeout(timer);
   }, [open]);
@@ -113,6 +133,15 @@ export default function ChatPanel({
 
   const toggleListen = async () => {
     setVoiceErr("");
+    // While Shigun is speaking, the mic button doubles as STOP — one tap
+    // silences the answer instead of hunting for a control.
+    if (speaking || voicePreparing) {
+      stopSpeaking();
+      setSpeaking(false);
+      setVoicePreparing(false);
+      setSpeakProgress(null);
+      return;
+    }
     if (listening) {
       // Do not invalidate this session: stop() delivers the last interim/final
       // transcript, including the words spoken just before the tap.
@@ -165,7 +194,10 @@ export default function ChatPanel({
       (err) => {
         if (!isCurrent()) return;
         setListening(false); setMicWaking(false); listenRef.current = null; setVoiceErr(err);
-      }
+      },
+      // A pinned language is applied instantly; Auto keeps learning from
+      // the script it just heard.
+      sttLang === "auto" ? undefined : sttLang
     );
     if (!isCurrent()) { h?.stop(); return; }
     if (h) { listenRef.current = h; setMicWaking(false); setListening(true); }
@@ -192,9 +224,27 @@ export default function ChatPanel({
             <div className="ai-identity">
               <div className="ai-title">Shigun <span>AI Tutor</span></div>
               <div className="ai-status">
-                {micWaking ? "Preparing microphone" : listening ? "Listening now" : voicePreparing ? `Preparing ${selectedVoiceName}…` : speaking ? `${selectedVoiceName} speaking` : thinking ? "Working on your answer" : provider ? `${provider} connected` : "Hybrid engine online"}
+                {micWaking ? "Preparing microphone"
+                  : listening ? `Listening${sttLang !== "auto" ? ` · ${sttLangLabel}` : ""}`
+                  : voicePreparing ? `Preparing ${selectedVoiceName}…`
+                  : speaking
+                    ? `${selectedVoiceName} speaking${speakProgress ? ` · part ${speakProgress.done}/${speakProgress.total}` : ""}`
+                    : thinking ? "Working on your answer"
+                    : provider ? `${provider} connected` : "Hybrid engine online"}
               </div>
             </div>
+            {support.stt && (
+              <select
+                className="lang-select"
+                value={sttLang}
+                onChange={(e) => changeSttLang(e.target.value)}
+                aria-label="Microphone language"
+                title="Which language the microphone listens for — Auto detects from your speech"
+              >
+                <option value="auto">🌐 Auto</option>
+                {STT_LANGS.map((l) => <option key={l.bcp} value={l.bcp}>{l.label}</option>)}
+              </select>
+            )}
             {support.tts && (
               <select
                 className="voice-select"
@@ -257,7 +307,7 @@ export default function ChatPanel({
           {(listening || micWaking) && (
             <div className="voice-live" role="status">
               <span className="voice-wave" aria-hidden="true"><i /><i /><i /><i /><i /></span>
-              <span><strong>{micWaking ? "Preparing your mic" : "Listening"}</strong>{text ? ` · ${text}` : " · Speak naturally"}</span>
+              <span><strong>{micWaking ? "Preparing your mic" : "Listening"}</strong>{text ? ` · ${text}` : sttLang !== "auto" ? ` · Speak in ${sttLangLabel}` : " · Speak naturally"}</span>
               <button onClick={() => void toggleListen()}>Finish</button>
             </div>
           )}
@@ -275,13 +325,15 @@ export default function ChatPanel({
                 className={`voice-btn${listening || micWaking ? " listening" : ""}${voicePreparing ? " preparing" : ""}${speaking ? " speaking" : ""}`}
                 onClick={() => void toggleListen()}
                 disabled={thinking}
-                aria-label={listening || micWaking ? "Stop listening" : "Speak to Shigun"}
-                title={listening || micWaking ? "Stop listening" : "Speak to Shigun"}
+                aria-label={listening || micWaking ? "Stop listening" : speaking || voicePreparing ? "Stop the voice" : "Speak to Shigun"}
+                title={listening || micWaking ? "Stop listening" : speaking || voicePreparing ? "Stop the voice" : `Speak to Shigun${sttLang !== "auto" ? ` (${sttLangLabel})` : ""}`}
               >
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
-                  <path d="M19 10v2a7 7 0 0 1-14 0v-2" /><line x1="12" x2="12" y1="19" y2="22" />
-                </svg>
+                {speaking || voicePreparing
+                  ? <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" stroke="none" /></svg>
+                  : <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                      <path d="M19 10v2a7 7 0 0 1-14 0v-2" /><line x1="12" x2="12" y1="19" y2="22" />
+                    </svg>}
               </button>
             )}
             <input className="input-field ai-chat-input" placeholder={listening || micWaking ? "Listening…" : "Message Shigun…"} value={text}

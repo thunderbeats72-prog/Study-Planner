@@ -6,12 +6,14 @@ import {
 } from "@/lib/client";
 import { IconSpark, IconClose } from "./icons";
 import TaskEditor, { type TaskPatch } from "./TaskEditor";
+import TaskClockButton from "./TaskClockButton";
 import { useBackClose } from "@/lib/useBackClose";
 
 type View = "list" | "calendar" | "kanban";
 
 export default function PlannerView({
-  state, onTaskStatus, onTaskUpdate, onSkipSubject, onFocusTask, activeTaskId, activeClockSeconds, onAskTutor, replanning, onReplan,
+  state, onTaskStatus, onTaskUpdate, onSkipSubject, onFocusTask, activeTaskId, activeClockSeconds,
+  clockSessionActive, onClockOut, onAskTutor, replanning, onReplan,
 }: {
   state: AppState;
   onTaskStatus: (id: number, status: string, rating?: number) => void;
@@ -20,6 +22,8 @@ export default function PlannerView({
   onFocusTask: (taskId: number) => void;
   activeTaskId?: number | null;
   activeClockSeconds?: number;
+  clockSessionActive?: boolean;
+  onClockOut: () => void;
   onAskTutor: (q: string) => void;
   replanning: boolean;
   onReplan: () => void;
@@ -93,7 +97,8 @@ export default function PlannerView({
             <button className="btn btn-xs btn-secondary" title="Skip all tasks for this subject today"
               onClick={() => onSkipSubject(subj.id, task.date)}>Skip subject</button>
           )}
-          <button className="btn btn-xs btn-secondary task-clock" onClick={() => onFocusTask(task.id)}>Clock in</button>
+          <TaskClockButton taskId={task.id} activeTaskId={activeTaskId} sessionActive={clockSessionActive}
+            onFocusTask={onFocusTask} onClockOut={onClockOut} />
           <button className="btn btn-xs btn-secondary task-more" aria-label="More actions"
             onClick={() => setMoreActionsId(moreActionsId === task.id ? null : task.id)}>⋯</button>
           <button className={`btn btn-xs task-primary ${task.status === "done" ? "btn-secondary" : "btn-primary"}`}

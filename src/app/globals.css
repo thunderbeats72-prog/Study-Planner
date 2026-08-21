@@ -1850,8 +1850,25 @@ body.mode-focused::before{animation:none;opacity:.4}
   height:30px;line-height:28px;flex-shrink:0;text-align:center;
 }
 .voice-select:focus{border-color:var(--color-ai)}
+/* Language picker: same geometry as the voice picker so the header
+   stays balanced on phones; both shrink on narrow screens. */
+.lang-select{
+  font-size:.7rem;font-weight:650;padding:0 6px;border-radius:var(--radius-sm);
+  border:1px solid var(--glass-border);background:var(--surface);color:var(--text-muted);
+  font-family:inherit;outline:none;max-width:108px;cursor:pointer;
+  height:30px;line-height:28px;flex-shrink:0;text-align:center;
+}
+.lang-select:focus{border-color:var(--color-ai)}
 .voice-err{padding:6px 14px;font-size:.74rem;color:var(--danger-accent);font-weight:600;background:var(--status-skipped-bg)}
-@media(max-width:640px){.voice-select{max-width:92px;font-size:.66rem}}
+@media(max-width:640px){
+  .voice-select{max-width:78px;font-size:.64rem}
+  .lang-select{max-width:84px;font-size:.64rem}
+  .ai-head{gap:6px}
+}
+@media(max-width:380px){
+  .voice-select{max-width:64px}
+  .lang-select{max-width:70px}
+}
 
 
 /* ═══════════════════════════════════════════════════════════════
@@ -2472,3 +2489,82 @@ button,a,.nav-item,.vtab,.cal-cell,.chip,.task-row,.rate-btn,input,select{touch-
 .ai-panel.is-preparing .ai-head::after{height:2px;background:linear-gradient(90deg,transparent,var(--color-ai),transparent);background-size:45% 100%;animation:aiThinkingSweep 1.1s ease-in-out infinite}
 @keyframes voicePrepareSpin{to{transform:rotate(360deg)}}
 @media(prefers-reduced-motion:reduce){.voice-btn.preparing svg,.ai-panel.is-preparing .ai-head::after{animation:none!important}}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   LIVE SESSION LAYER — "Start" becomes "Clock Out" in the same
+   place you started (up-next card + every task row), the clock
+   survives Pause, and the tracker bar always offers a way out.
+   Added for the clock-out visibility fix + mobile polish build.
+═══════════════════════════════════════════════════════════════ */
+
+/* ── Up-next card while THIS task is being timed ── */
+.up-next.live{border-left-color:var(--success-accent)}
+.up-next.live .up-next-glow{
+  background:radial-gradient(60% 120% at 0% 50%,rgba(34,197,94,.22),transparent 60%);
+}
+.up-next-live-chip{
+  font-size:.6rem;font-weight:800;padding:2px 8px;border-radius:99px;
+  color:var(--success-accent);background:rgba(34,197,94,.12);
+  text-transform:none;letter-spacing:.2px;
+}
+.up-next-actions{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0}
+.up-next-timer{font-size:1.15rem;font-weight:800;font-variant-numeric:tabular-nums;color:var(--success-accent)}
+.up-next.live .up-next-sub{color:var(--success-accent);font-weight:700}
+@media(max-width:640px){
+  .up-next.live{flex-wrap:wrap}
+  .up-next-actions{flex:1 1 100%;flex-direction:row;align-items:center;justify-content:space-between}
+  .up-next-timer{font-size:1.02rem}
+}
+
+/* ── Live dot on every red "Clock out" button ── */
+.clock-live-dot{
+  width:7px;height:7px;border-radius:50%;background:currentColor;display:inline-block;
+  margin-right:6px;vertical-align:1px;
+  animation:clockLivePulse 1.6s ease-in-out infinite;
+}
+@keyframes clockLivePulse{
+  0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(239,68,68,.45)}
+  60%{opacity:.55;box-shadow:0 0 0 5px rgba(239,68,68,0)}
+}
+/* The tracker-bar Clock Out breathes gently so it is impossible to miss */
+.act-out{animation:actOutBreath 2.6s ease-in-out infinite}
+@keyframes actOutBreath{
+  0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,0)}
+  50%{box-shadow:0 0 0 4px rgba(239,68,68,.18)}
+}
+@media(prefers-reduced-motion:reduce){
+  .clock-live-dot,.act-out,.up-next-live-chip{animation:none!important}
+}
+
+/* ── Tracker bar (mobile): recording = ONLY session controls ──
+   The chips ("3/5 today", "42d to exam") hide while a session is
+   open, so Pause / Break / Resume / CLOCK OUT own the row at
+   comfortable 34px touch height. */
+@media(max-width:640px){
+  body.focus-live .tracker-actions{flex-wrap:wrap;justify-content:flex-end;gap:6px}
+  body.focus-live .tracker-actions .chip{display:none}
+  body.focus-live .tracker-actions .btn-xs{
+    min-height:34px;padding:8px 13px;font-size:.7rem;font-weight:750;flex:0 1 auto;
+  }
+  body.focus-live .tracker-actions .act-out{flex:1 1 auto;min-height:36px}
+  body.focus-live .tracker-actions .tracker-zen{display:none}
+}
+
+/* ── Momentum strip: swipeable rail on phones instead of tall wrap ── */
+@media(max-width:640px){
+  .momentum-strip{
+    flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;
+    -webkit-overflow-scrolling:touch;margin-bottom:12px;
+    mask-image:linear-gradient(90deg,#000 88%,transparent);
+    -webkit-mask-image:linear-gradient(90deg,#000 88%,transparent);
+  }
+  .momentum-strip::-webkit-scrollbar{display:none}
+  .momentum-pill{flex-shrink:0;white-space:nowrap}
+}
+
+/* ── Comfortable task-row clock buttons on touch screens ── */
+@media(max-width:640px){
+  .task-row > .btn.task-clock{min-height:32px}
+  .task-row > .btn.task-clock.clock-live{font-weight:800}
+}

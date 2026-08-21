@@ -33,7 +33,48 @@ export const LANGS: { code: string; bcp: string; range: RegExp }[] = [
   { code: "kn", bcp: "kn-IN", range: /[\u0C80-\u0CFF]/ },
   { code: "gu", bcp: "gu-IN", range: /[\u0A80-\u0AFF]/ },
   { code: "pa", bcp: "pa-IN", range: /[\u0A00-\u0A7F]/ },
+  { code: "ml", bcp: "ml-IN", range: /[\u0D00-\u0D7F]/ },
+  { code: "or", bcp: "or-IN", range: /[\u0B00-\u0B7F]/ },
   { code: "ar", bcp: "ar-SA", range: /[\u0600-\u06FF]/ },
+  { code: "ru", bcp: "ru-RU", range: /[\u0400-\u04FF]/ },
+  { code: "zh", bcp: "zh-CN", range: /[\u4E00-\u9FFF]/ },
+  { code: "ja", bcp: "ja-JP", range: /[\u3040-\u30FF]/ },
+  { code: "ko", bcp: "ko-KR", range: /[\uAC00-\uD7AF]/ },
+  { code: "th", bcp: "th-TH", range: /[\u0E00-\u0E7F]/ },
+];
+
+/**
+ * Every language the mic dropdown can explicitly pick. Latin-script
+ * languages (Spanish, French, …) can't be auto-detected from the script,
+ * so the selector is the reliable path for them.
+ */
+export const STT_LANGS: { bcp: string; label: string }[] = [
+  { bcp: "en-IN", label: "English" },
+  { bcp: "hi-IN", label: "हिन्दी Hindi" },
+  { bcp: "bn-IN", label: "বাংলা Bengali" },
+  { bcp: "mr-IN", label: "मराठी Marathi" },
+  { bcp: "ta-IN", label: "தமிழ் Tamil" },
+  { bcp: "te-IN", label: "తెలుగు Telugu" },
+  { bcp: "kn-IN", label: "ಕನ್ನಡ Kannada" },
+  { bcp: "ml-IN", label: "മലയാളം Malayalam" },
+  { bcp: "gu-IN", label: "ગુજરાતી Gujarati" },
+  { bcp: "pa-IN", label: "ਪੰਜਾਬੀ Punjabi" },
+  { bcp: "or-IN", label: "ଓଡ଼ିଆ Odia" },
+  { bcp: "ur-PK", label: "اردو Urdu" },
+  { bcp: "ne-NP", label: "नेपाली Nepali" },
+  { bcp: "ar-SA", label: "العربية Arabic" },
+  { bcp: "es-ES", label: "Español" },
+  { bcp: "fr-FR", label: "Français" },
+  { bcp: "de-DE", label: "Deutsch" },
+  { bcp: "pt-BR", label: "Português" },
+  { bcp: "it-IT", label: "Italiano" },
+  { bcp: "ru-RU", label: "Русский" },
+  { bcp: "zh-CN", label: "中文 Chinese" },
+  { bcp: "ja-JP", label: "日本語 Japanese" },
+  { bcp: "ko-KR", label: "한국어 Korean" },
+  { bcp: "th-TH", label: "ไทย Thai" },
+  { bcp: "id-ID", label: "Indonesia" },
+  { bcp: "tr-TR", label: "Türkçe" },
 ];
 
 /** Native fallback preferences. Cloud TTS uses the fixed names above. */
@@ -110,7 +151,9 @@ function cleanForSpeech(markdown: string): string {
     .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
     .replace(/\s+/g, " ")
     .trim()
-    .slice(0, 5000);
+    // Long answers stay intact here; speakLong() splits them into
+    // voice-sized chunks so nothing is silently dropped mid-lesson.
+    .slice(0, 12000);
 }
 
 function wordLang(word: string): string {
@@ -364,7 +407,103 @@ export async function speak(
 
 export function stopSpeaking(): void {
   speechGeneration++;
+  longSpeakToken++;
   if (typeof window !== "undefined") stopAudioNodes();
+}
+
+/* ============================================================
+   LONG ANSWERS — full spoken delivery, chunk by chunk.
+   Cloud TTS synthesises ~5000 bytes per request; a detailed
+   lesson easily exceeds that. speakLong() splits the cleaned
+   text at sentence boundaries (including । ॥ 。！？ ؟ …) and
+   plays the chunks back-to-back as ONE continuous answer.
+   Stopping at any moment cancels the whole queue.
+============================================================ */
+
+let longSpeakToken = 0;
+
+export function splitSpeechChunks(text: string, maxChars = 880): string[] {
+  const endings = new Set([".", "?", "!", "।", "॥", "。", "！", "？", "؟", "…", ";", ":"]);
+  const chunks: string[] = [];
+  let current = "";
+  const push = (piece: string) => {
+    const trimmed = piece.trim();
+    if (trimmed) chunks.push(trimmed);
+  };
+  // Walk characters; break after a sentence ender followed by a space (or
+  // when the running chunk hits the size cap — never mid-word if avoidable).
+  let lastSpace = -1;
+  for (let i = 0; i < text.length; i++) {
+    current += text[i];
+    if (text[i] === " ") lastSpace = current.length - 1;
+    const nextChar = text[i + 1] ?? " ";
+    const boundary = endings.has(text[i]) && (nextChar === " " || i === text.length - 1);
+    if (boundary || current.length >= maxChars) {
+      if (!boundary && lastSpace > 40) {
+        // size cap hit mid-sentence → cut at the last space, rewind the rest
+        push(current.slice(0, lastSpace + 1));
+        current = current.slice(lastSpace + 1);
+        lastSpace = -1;
+      } else {
+        push(current);
+        current = "";
+        lastSpace = -1;
+      }
+    }
+  }
+  push(current);
+  return chunks;
+}
+
+export async function speakLong(
+  markdown: string,
+  voiceId: string,
+  callbacks: SpeakCallbacks & { onProgress?: (done: number, total: number) => void } = {}
+): Promise<void> {
+  const text = cleanForSpeech(markdown);
+  if (!text) { callbacks.onEnd?.(); return; }
+  const chunks = splitSpeechChunks(text);
+  const token = ++longSpeakToken;
+  const isCurrent = () => token === longSpeakToken;
+  if (chunks.length <= 1) {
+    longSpeakToken++; // speak() path owns cancellation from here
+    await speak(text, voiceId, callbacks);
+    return;
+  }
+
+  let startedOnce = false;
+  let failed = false;
+  const start = () => {
+    if (startedOnce || !isCurrent()) return;
+    startedOnce = true;
+    callbacks.onStart?.();
+  };
+
+  for (let index = 0; index < chunks.length; index++) {
+    if (!isCurrent()) return; // the user stopped playback mid-answer
+    let settled = false;
+    await new Promise<void>((resolve) => {
+      speak(chunks[index], voiceId, {
+        onStart: start,
+        onEnd: () => { settled = true; resolve(); },
+        onError: (message) => { settled = true; failed = true; callbacks.onError?.(message); resolve(); },
+      });
+      // Safety poll: a mid-chunk stop bumps the token without speak()'s
+      // finish() firing, and no engine is hang-proof — resolve either way.
+      const softCap = Math.max(25000, (chunks[index].length / 11) * 1500);
+      const began = Date.now();
+      const poll = window.setInterval(() => {
+        if (settled || !isCurrent() || Date.now() - began > softCap) {
+          window.clearInterval(poll);
+          resolve();
+        }
+      }, 150);
+    });
+    if (!isCurrent()) return;
+    callbacks.onProgress?.(index + 1, chunks.length);
+    if (failed) return; // surface the error once; text remains readable
+  }
+  if (isCurrent()) callbacks.onEnd?.();
 }
 
 /* ============================================================
@@ -379,13 +518,31 @@ export type ListenFinal = {
 };
 
 const LAST_LANG_KEY = "shigun-stt-lang";
+const MANUAL_LANG_KEY = "shigun-stt-manual-lang";
+
+/** The language the learner pinned in the mic menu, or null for Auto. */
+export function manualSttLang(): string | null {
+  if (typeof window === "undefined") return null;
+  const value = localStorage.getItem(MANUAL_LANG_KEY);
+  return value && value !== "auto" ? value : null;
+}
+
+export function setManualSttLang(bcp: string): void {
+  try {
+    localStorage.setItem(MANUAL_LANG_KEY, bcp || "auto");
+  } catch { /* private mode */ }
+}
 
 export function preferredSttLang(): string {
   if (typeof window === "undefined") return "en-IN";
-  return localStorage.getItem(LAST_LANG_KEY) || "en-IN";
+  // A pinned language always wins; Auto falls back to the last script
+  // the engine recognised in the learner's own speech.
+  return manualSttLang() || localStorage.getItem(LAST_LANG_KEY) || "en-IN";
 }
 
 export function learnSttLang(transcript: string): void {
+  // Never overwrite an explicit choice — the learner picked it on purpose.
+  if (manualSttLang()) return;
   for (const language of LANGS) {
     if (language.range.test(transcript)) {
       localStorage.setItem(LAST_LANG_KEY, language.bcp);

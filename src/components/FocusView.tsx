@@ -69,7 +69,7 @@ export default function FocusView({
           <div>
             <h3 style={{ fontSize: ".95rem", fontWeight: 800, margin: 0 }}>Study Clock — time tracking</h3>
             <div className="day-meta">
-              {clock.running ? "Recording your study time" : clock.onBreak ? "On a break — clock paused" : "Not clocked in"}
+              {clock.running ? "Recording your study time" : clock.onBreak ? "On a break — clock paused" : clock.sessionActive ? "Paused — resume or clock out" : "Not clocked in"}
               {" · "}{loggedTodayLabel} min logged today
             </div>
           </div>
@@ -102,13 +102,19 @@ export default function FocusView({
         </div>
 
         <div className="flex-row gap-sm" style={{ flexWrap: "wrap" }}>
-          {!clock.running && !clock.onBreak && (
+          {!clock.sessionActive && (
             <button className="btn btn-primary" onClick={() => clock.clockIn()}>Clock In</button>
           )}
           {clock.running && (
             <>
               <button className="btn btn-secondary" onClick={clock.pause}>Pause</button>
               <button className="btn btn-secondary" onClick={clock.takeBreak}>Take a Break</button>
+              <button className="btn btn-danger" onClick={clock.clockOut}>Clock Out</button>
+            </>
+          )}
+          {!clock.running && !clock.onBreak && clock.sessionActive && (
+            <>
+              <button className="btn btn-primary" onClick={clock.resume}>Resume</button>
               <button className="btn btn-danger" onClick={clock.clockOut}>Clock Out</button>
             </>
           )}

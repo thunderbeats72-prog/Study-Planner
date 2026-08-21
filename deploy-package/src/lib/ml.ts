@@ -319,23 +319,32 @@ export function skipRisk(f: DayPlanFeatures): number {
 // ── 7. Time-of-day focus profile ─────────────────────────────
 
 export type FocusProfile = {
-  /** 24 buckets of logged focus minutes. */
+  /** 24 buckets of logged focus minutes (recency-weighted). */
   byHour: number[];
   /** Best contiguous 2-hour window start (hour 0-23), or null. */
   peakHour: number | null;
   samples: number;
 };
 
+/** Half-life (days) for how quickly old study-hour habits stop counting. */
+const FOCUS_RECENCY_HALF_LIFE = 30;
+
 export function learnTimeOfDay(
-  sessions: { createdAt: Date | string; minutes: number; mode: string }[]
+  sessions: { createdAt: Date | string; minutes: number; mode: string }[],
+  todayStrForAge?: string
 ): FocusProfile {
   const byHour = new Array(24).fill(0);
   let samples = 0;
+  const now = todayStrForAge ? new Date(todayStrForAge + "T00:00:00").getTime() : Date.now();
   for (const s of sessions) {
     if (s.mode === "break" || s.minutes <= 0) continue;
     const dt = typeof s.createdAt === "string" ? new Date(s.createdAt) : s.createdAt;
     if (isNaN(dt.getTime())) continue;
-    byHour[dt.getHours()] += s.minutes;
+    // Recent sessions shape the profile; last month's routine slowly fades
+    // so the "peak focus" suggestion follows the learner's CURRENT habits.
+    const ageDays = Math.max(0, (now - dt.getTime()) / 86400000);
+    const weight = Math.pow(0.5, ageDays / FOCUS_RECENCY_HALF_LIFE);
+    byHour[dt.getHours()] += s.minutes * weight;
     samples++;
   }
   let peakHour: number | null = null;
@@ -401,13 +410,52 @@ export type ReadinessProjection = {
   likelyDays: number;       // P50
   pessimisticDays: number;  // P90
   samples: number;
+  /** Minutes/day the projection is actually built on (learned, not assumed). */
+  effectiveDailyMinutes: number;
 };
+
+/**
+ * The daily minutes this learner ACTUALLY studies (not their stated daily
+ * goal). Mean minutes per ACTIVE study day over the recent window — days
+ * they never opened the app don't dilute the estimate, because scheduling
+ * only ever gains capacity from days that happen at all.
+ */
+export function learnEffectiveDailyMinutes(
+  sessions: { date: string; minutes: number; mode: string }[],
+  todayStr: string,
+  windowDays = 28
+): { minutes: number; activeDays: number; samples: number } {
+  const perDay = new Map<string, number>();
+  for (const s of sessions) {
+    if (s.mode === "break" || s.minutes <= 0) continue;
+    perDay.set(s.date, (perDay.get(s.date) || 0) + s.minutes);
+  }
+  const cutoff = addDaysIso(todayStr, -windowDays);
+  const active: number[] = [];
+  for (const [date, minutes] of perDay) {
+    if (date < cutoff || date > todayStr) continue;
+    if (minutes >= 5) active.push(minutes);
+  }
+  if (!active.length) return { minutes: 0, activeDays: 0, samples: sessions.length };
+  active.sort((a, b) => a - b);
+  // Trim the wildest 10% (both ends) so one 9-hour binge or a 5-minute
+  // drive-by session can't swing the capacity estimate.
+  const trim = Math.floor(active.length * 0.1);
+  const core = active.slice(trim, active.length - trim || undefined);
+  const mean = core.reduce((a, b) => a + b, 0) / (core.length || 1);
+  return {
+    minutes: Math.round(mean * 10) / 10,
+    activeDays: active.length,
+    samples: sessions.length,
+  };
+}
 
 export function projectReadiness(
   history: TaskHistoryRow[],
   remainingPlannedMinutes: number,
   dailyBudgetMinutes: number,
-  daysLeft: number
+  daysLeft: number,
+  observed?: { minutes: number; activeDays: number }
 ): ReadinessProjection {
   const done = history.filter(
     (t) => t.status === "done" && t.plannedMinutes >= 10 && t.actualMinutes >= 5 &&
@@ -419,7 +467,18 @@ export function projectReadiness(
   const sd = n > 3
     ? Math.sqrt(ratios.reduce((a, r) => a + (r - mean) * (r - mean), 0) / (n - 1))
     : 0.25; // prior spread until evidence exists
-  const capacity = Math.max(20, dailyBudgetMinutes) * 0.78; // learn-capacity ratio
+  // Capacity starts from the assumption (78% of the stated budget is real
+  // study time) and shifts toward the learner's OBSERVED minutes as active
+  // study days accumulate — a 2h/day planner who really manages 47 minutes
+  // gets an honest projection built on 47, not on 120. Full trust after
+  // ~10 active days of evidence.
+  const assumed = Math.max(20, dailyBudgetMinutes) * 0.78;
+  const trust = observed && observed.minutes > 0
+    ? clamp(observed.activeDays / 10, 0.35, 1)
+    : 0;
+  const capacity = observed && observed.minutes > 0
+    ? Math.max(20, trust * observed.minutes + (1 - trust) * assumed)
+    : assumed;
   const days = (mul: number) =>
     Math.max(0, Math.ceil((remainingPlannedMinutes * mul) / capacity));
   const p10 = days(Math.max(0.5, mean - 1.282 * sd));
@@ -432,5 +491,6 @@ export function projectReadiness(
     likelyDays: p50,
     pessimisticDays: p90,
     samples: n,
+    effectiveDailyMinutes: Math.round(capacity),
   };
 }

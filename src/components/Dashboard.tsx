@@ -2,12 +2,15 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { api, addDays, dayDiff, mdToHtml, prettyLong, today, KIND_META, type AppState } from "@/lib/client";
+import { mmss } from "@/lib/useTimer";
 import { IconSpark } from "./icons";
 import TaskEditor, { type TaskPatch } from "./TaskEditor";
+import TaskClockButton from "./TaskClockButton";
 import Heatmap from "./Heatmap";
 
 export default function Dashboard({
-  state, onTaskStatus, onTaskUpdate, onSkipSubject, onFocusTask, activeTaskId, activeClockSeconds, replanning, onReplan,
+  state, onTaskStatus, onTaskUpdate, onSkipSubject, onFocusTask, activeTaskId, activeClockSeconds,
+  clockRunning, clockSessionActive, clockOnBreak, onClockOut, onPauseOrResume, replanning, onReplan,
 }: {
   state: AppState;
   onTaskStatus: (id: number, status: string, rating?: number) => void;
@@ -16,6 +19,11 @@ export default function Dashboard({
   onFocusTask: (taskId: number) => void;
   activeTaskId?: number | null;
   activeClockSeconds?: number;
+  clockRunning?: boolean;
+  clockSessionActive?: boolean;
+  clockOnBreak?: boolean;
+  onClockOut: () => void;
+  onPauseOrResume: () => void;
   replanning: boolean;
   onReplan: () => void;
 }) {
@@ -27,7 +35,8 @@ export default function Dashboard({
     weekdays: number[] | null;
     peakHour: number | null;
     tomorrowRisk: number;
-    readiness: { onTrack: boolean; loadPct: number; likelyDays: number; optimisticDays: number; pessimisticDays: number; samples: number };
+    readiness: { onTrack: boolean; loadPct: number; likelyDays: number; optimisticDays: number; pessimisticDays: number; samples: number; effectiveDailyMinutes?: number };
+    effectiveDailyMinutes?: { minutes: number; activeDays: number; samples: number };
     memory: { strong: number; fading: number; atRisk: number; tracked: number };
   } | null>(null);
   const [intelOpen, setIntelOpen] = useState(false);
@@ -125,23 +134,62 @@ export default function Dashboard({
         </button>
       </div>
 
-      {intel?.upNext && (
-        <div className="glass-panel up-next" onClick={() => onFocusTask(intel.upNext!.id)}>
-          <div className="up-next-glow" />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div className="intel-label" style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              Up next
-              {intel.focusSuggestion?.isNow && <span className="up-next-now">peak focus window</span>}
+      {intel?.upNext && (() => {
+        const next = intel.upNext!;
+        // LIVE: the ML-predicted task is the one being timed right now.
+        // The same card that started the session stops it — no hunting.
+        const live = !!clockSessionActive && activeTaskId === next.id;
+        return (
+          <div
+            className={`glass-panel up-next${live ? " live" : ""}`}
+            onClick={() => !live && onFocusTask(next.id)}
+            role={live ? "status" : undefined}
+          >
+            <div className="up-next-glow" />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="intel-label" style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                {live ? "Now recording" : "Up next"}
+                {live
+                  ? <span className="up-next-live-chip">● {clockRunning ? "clock running" : clockOnBreak ? "on break" : "paused"}</span>
+                  : intel.focusSuggestion?.isNow && <span className="up-next-now">peak focus window</span>}
+              </div>
+              <div className="up-next-title">{next.title}</div>
+              <div className="up-next-sub">
+                {live
+                  ? `${mmss(activeClockSeconds ?? 0)} this session · your minutes are being saved`
+                  : `${next.minutes} min · one tap to clock in`}
+              </div>
             </div>
-            <div className="up-next-title">{intel.upNext.title}</div>
-            <div className="up-next-sub">{intel.upNext.minutes} min · one tap to clock in</div>
+            {live ? (
+              <div className="up-next-actions">
+                <div className="mono up-next-timer" aria-label="Session time">{mmss(activeClockSeconds ?? 0)}</div>
+                <div className="flex-row gap-sm" style={{ justifyContent: "flex-end" }}>
+                  {!clockOnBreak && (
+                    <button className="btn btn-xs btn-secondary"
+                      onClick={(e) => { e.stopPropagation(); onPauseOrResume(); }}>
+                      {clockRunning ? "Pause" : "Resume"}
+                    </button>
+                  )}
+                  <button className="btn btn-sm btn-danger act-out"
+                    onClick={(e) => { e.stopPropagation(); onClockOut(); }}>
+                    Clock Out
+                  </button>
+                </div>
+              </div>
+            ) : clockSessionActive ? (
+              <button className="btn btn-primary" title="Save the current session and move to this lesson"
+                onClick={(e) => { e.stopPropagation(); onFocusTask(next.id); }}>
+                Switch
+              </button>
+            ) : (
+              <button className="btn btn-primary" aria-label="Start this task"
+                onClick={(e) => { e.stopPropagation(); onFocusTask(next.id); }}>
+                Start
+              </button>
+            )}
           </div>
-          <button className="btn btn-primary" aria-label="Start this task"
-            onClick={(e) => { e.stopPropagation(); onFocusTask(intel.upNext!.id); }}>
-            Start
-          </button>
-        </div>
-      )}
+        );
+      })()}
 
       <div className="momentum-strip">
         <span className="momentum-pill">This week <strong>{momentum.thisHrs}h</strong>
@@ -322,6 +370,12 @@ export default function Dashboard({
               <div className="intel-label" style={{ margin: "12px 0 4px" }}>Finish-time projection</div>
               <div style={{ fontSize: ".8rem", color: "var(--text-muted)" }}>
                 Best case ~{intel.readiness.optimisticDays}d · likely ~{intel.readiness.likelyDays}d · worst case ~{intel.readiness.pessimisticDays}d of study time remaining.
+                {intel.effectiveDailyMinutes && intel.effectiveDailyMinutes.activeDays >= 4 && (
+                  <>
+                    {" "}Based on the <strong>{Math.round(intel.effectiveDailyMinutes.minutes)} min/day</strong> you
+                    actually study ({intel.effectiveDailyMinutes.activeDays} active days), not just your target.
+                  </>
+                )}
               </div>
             </div>
           )}
@@ -372,7 +426,8 @@ export default function Dashboard({
               {subj && task.status !== "skipped" && (
                 <button className="btn btn-xs btn-secondary" onClick={() => onSkipSubject(subj.id, task.date)}>Skip subject</button>
               )}
-              <button className="btn btn-xs btn-secondary task-clock" onClick={() => onFocusTask(task.id)}>Clock in</button>
+              <TaskClockButton taskId={task.id} activeTaskId={activeTaskId} sessionActive={clockSessionActive}
+                onFocusTask={onFocusTask} onClockOut={onClockOut} />
               <button className="btn btn-xs btn-secondary task-more" aria-label="More actions"
                 onClick={() => setMoreActionsId(moreActionsId === task.id ? null : task.id)}>⋯</button>
               <button className={`btn btn-xs task-primary ${task.status === "done" ? "btn-secondary" : "btn-primary"}`}
