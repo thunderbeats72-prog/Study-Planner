@@ -1144,7 +1144,9 @@ export function advancedTopicMetadata({
     : phase > 0.66 ? "Hard" : phase < 0.3 ? "Easy" : "Medium";
   const depth: GeneratedTopic["depth"] = phase < 0.2
     ? "Foundation" : phase < 0.62 ? "Core" : phase < 0.86 ? "Advanced" : "Synthesis";
-  const baseMin = level === "nursery" ? 20 : level === "school" ? 45 : level === "phd" ? 85 : 60;
+  // Keep lesson estimates aligned with the onboarding capacity model. Depth
+  // comes from better outcomes/practice, not inflated seat time.
+  const baseMin = level === "nursery" ? 20 : level === "school" ? 40 : level === "phd" ? 70 : 50;
   const diffMul = difficulty === "Hard" ? 1.3 : difficulty === "Easy" ? 0.8 : 1;
   return {
     summary: buildSummary(title, subjectName, depth),

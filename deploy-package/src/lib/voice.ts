@@ -6,9 +6,9 @@ import { mergeTranscriptSegments } from "./transcript";
 // SHIGUN VOICE
 // - Recognition is single-utterance and overlap-deduplicated, which avoids
 //   cumulative WebKit/Android results being appended more than once.
-// - Replies prefer server-generated Gemini TTS. The same named voice is
-//   therefore used on desktop and mobile instead of each OS choosing a
-//   different local SpeechSynthesis voice.
+// - Replies use a pinned server voice (deterministic Chirp 3 HD when
+//   configured, otherwise one pinned Gemini model). Named profiles never
+//   switch silently to an unrelated operating-system voice.
 // - Every listen/playback has a generation token. Late mobile callbacks from
 //   a cancelled session cannot restart audio or submit an old transcript.
 // ============================================================
@@ -16,9 +16,10 @@ import { mergeTranscriptSegments } from "./transcript";
 export type VoiceOption = { id: string; label: string; gender: "female" | "male" };
 
 export const VOICE_OPTIONS: VoiceOption[] = [
-  { id: "f1", label: "Kore · calm", gender: "female" },
-  { id: "f2", label: "Aoede · bright", gender: "female" },
-  { id: "m1", label: "Charon · clear", gender: "male" },
+  { id: "f1", label: "Kore · steady", gender: "female" },
+  { id: "f2", label: "Aoede · clear", gender: "female" },
+  { id: "m1", label: "Charon · grounded", gender: "male" },
+  { id: "device", label: "Device fallback", gender: "female" },
 ];
 
 /** Supported recognition languages: script ranges + BCP-47 tags. */
@@ -107,7 +108,7 @@ function cleanForSpeech(markdown: string): string {
     .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
     .replace(/\s+/g, " ")
     .trim()
-    .slice(0, 1200);
+    .slice(0, 5000);
 }
 
 function wordLang(word: string): string {
@@ -145,6 +146,15 @@ let audioContext: AudioContext | null = null;
 let activeSource: AudioBufferSourceNode | null = null;
 let activeAudio: HTMLAudioElement | null = null;
 let activeObjectUrl = "";
+type ClientAudioCache = { bytes: ArrayBuffer; contentType: string };
+const clientAudioCache = new Map<string, ClientAudioCache>();
+const MAX_CLIENT_AUDIO_CACHE = 8;
+
+export type SpeakCallbacks = {
+  onStart?: () => void;
+  onEnd?: () => void;
+  onError?: (message: string) => void;
+};
 
 /** Call from the mic's user gesture so iOS authorises later audio playback. */
 export async function prepareVoicePlayback(): Promise<void> {
@@ -177,7 +187,9 @@ function stopAudioNodes(): void {
 
 async function playCloudAudio(
   bytes: ArrayBuffer,
+  contentType: string,
   generation: number,
+  start: () => void,
   finish: () => void
 ): Promise<boolean> {
   if (generation !== speechGeneration) return true;
@@ -195,6 +207,7 @@ async function playCloudAudio(
       };
       activeSource = source;
       source.start(0);
+      start();
       return true;
     }
   } catch {
@@ -202,13 +215,14 @@ async function playCloudAudio(
   }
 
   try {
-    const url = URL.createObjectURL(new Blob([bytes], { type: "audio/wav" }));
+    const url = URL.createObjectURL(new Blob([bytes], { type: contentType || "audio/wav" }));
     const audio = new Audio(url);
     activeAudio = audio;
     activeObjectUrl = url;
     audio.onended = finish;
     audio.onerror = () => finish();
     await audio.play();
+    start();
     return true;
   } catch {
     return false;
@@ -219,6 +233,7 @@ async function speakNative(
   text: string,
   voiceId: string,
   generation: number,
+  start: () => void,
   finish: () => void
 ): Promise<void> {
   if (!("speechSynthesis" in window) || generation !== speechGeneration) {
@@ -230,6 +245,7 @@ async function speakNative(
 
   const runs = splitLanguageRuns(text);
   let index = 0;
+  let playbackStarted = false;
   const speakNext = () => {
     // cancel() fires an error event on several mobile engines. The generation
     // check prevents that stale callback from advancing the old utterance.
@@ -255,6 +271,7 @@ async function speakNative(
     utterance.onend = speakNext;
     utterance.onerror = speakNext;
     window.speechSynthesis.speak(utterance);
+    if (!playbackStarted) { playbackStarted = true; start(); }
   };
   speakNext();
 }
@@ -262,25 +279,52 @@ async function speakNative(
 export async function speak(
   markdown: string,
   voiceId: string,
-  onEnd?: () => void
+  callbacks: SpeakCallbacks = {}
 ): Promise<void> {
   const text = cleanForSpeech(markdown);
   const generation = ++speechGeneration;
   stopAudioNodes();
   let ended = false;
+  let started = false;
+  const start = () => {
+    if (started || generation !== speechGeneration) return;
+    started = true;
+    callbacks.onStart?.();
+  };
   const finish = () => {
     if (ended || generation !== speechGeneration) return;
     ended = true;
-    onEnd?.();
+    callbacks.onEnd?.();
+  };
+  const fail = (message: string) => {
+    if (generation !== speechGeneration) return;
+    callbacks.onError?.(message);
+    finish();
   };
   if (!text) {
     finish();
     return;
   }
 
-  // A single generated WAV is platform-independent and does not suffer from
-  // SpeechSynthesis cancel/onerror loops. Native TTS is only an availability
-  // fallback when the deployment has no Gemini key or the request fails.
+  // A device voice is explicitly opt-in. Named Shigun profiles never fall
+  // back silently to SpeechSynthesis, because that is exactly what made Kore
+  // sound like a different person between commands and long answers.
+  if (voiceId === "device") {
+    await speakNative(text, "f1", generation, start, finish);
+    return;
+  }
+
+  const cacheKey = `${voiceId}\0${text}`;
+  const cached = clientAudioCache.get(cacheKey);
+  if (cached) {
+    clientAudioCache.delete(cacheKey);
+    clientAudioCache.set(cacheKey, cached);
+    const played = await playCloudAudio(cached.bytes, cached.contentType, generation, start, finish);
+    if (!played) fail("Audio playback was blocked. Tap the mic once, then try again.");
+    return;
+  }
+
+  let errorMessage = "The selected Shigun voice is temporarily unavailable. The answer remains available as text.";
   try {
     const controller = new AbortController();
     speechAbort = controller;
@@ -292,8 +336,20 @@ export async function speak(
     });
     if (generation !== speechGeneration) return;
     if (response.ok) {
-      const played = await playCloudAudio(await response.arrayBuffer(), generation, finish);
+      const bytes = await response.arrayBuffer();
+      const contentType = response.headers.get("content-type") || "audio/wav";
+      clientAudioCache.set(cacheKey, { bytes, contentType });
+      while (clientAudioCache.size > MAX_CLIENT_AUDIO_CACHE) {
+        const oldest = clientAudioCache.keys().next().value as string | undefined;
+        if (!oldest) break;
+        clientAudioCache.delete(oldest);
+      }
+      const played = await playCloudAudio(bytes, contentType, generation, start, finish);
       if (played) return;
+      errorMessage = "Audio playback was blocked. Tap the mic once, then try again.";
+    } else {
+      const payload = await response.json().catch(() => null) as { error?: string } | null;
+      if (payload?.error) errorMessage = payload.error;
     }
   } catch {
     if (generation !== speechGeneration) return;
@@ -301,7 +357,7 @@ export async function speak(
     if (speechAbort?.signal.aborted || generation === speechGeneration) speechAbort = null;
   }
 
-  await speakNative(text, voiceId, generation, finish);
+  fail(errorMessage);
 }
 
 export function stopSpeaking(): void {

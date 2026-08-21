@@ -56,12 +56,17 @@ confirmation dialog in the UI.
 
 CONSISTENT SHIGUN VOICE
 -----------------------
-Set `GEMINI_API_KEY` (preferred server-only name) or `GOOGLE_API_KEY` in
-Vercel. Shigun generates one fixed named cloud voice, delivered as WAV,
-so phones and desktops no longer select different operating-system
-voices. `SHIGUN_TTS_MODEL` is optional; the app defaults to the current
-Gemini TTS model and has a compatibility fallback. If cloud TTS is
-unavailable, a generation-guarded native voice remains as a fallback.
+For the fastest and most identity-stable production voice, enable Google
+Cloud Text-to-Speech and set `GOOGLE_CLOUD_TTS_API_KEY` in Vercel. Shigun
+then uses deterministic Chirp 3 HD Kore, Aoede, or Charon voices in the
+reply's language. Warm-server and client audio caches make repeated app
+confirmations immediate.
+
+`GEMINI_API_KEY` / `GOOGLE_API_KEY` remains a compatibility path using one
+pinned `SHIGUN_TTS_MODEL`. Named profiles never silently switch model or
+fall back to an unrelated operating-system voice; failures remain text-only.
+A native voice is available only through the explicit “Device fallback”
+option.
 
 v4 FIXES (this build)
 ---------------------
@@ -79,6 +84,25 @@ v4 FIXES (this build)
    filled to the canonical count if a provider stops early
  - Older saved plans receive advanced metadata without losing titles,
    mastery, completion history, or timing
+ - Duplicate chat submission and replan races are blocked synchronously;
+   a spoken message or rebalance action can execute only once at a time
+ - Shigun now answers language-capability requests deterministically in
+   Bengali, Hindi, Marathi, Tamil, Telugu, Kannada, Gujarati, Punjabi,
+   and Arabic instead of incorrectly claiming English/Hindi-only support
+ - Mobile chat is a header-anchored conversation sheet with a scrim,
+   activity states, assistant avatars, live voice waveform, improved
+   composer, horizontal prompts, and reduced-motion accessibility
+ - Voice identity is locked across short commands and long explanations;
+   synthesis preparation is shown separately from actual playback
+ - Common plan/progress questions bypass the LLM and answer instantly from
+   live data; cloud provider retries share one bounded 15-second budget
+ - Lesson questions inject the matching curriculum summary, concepts,
+   outcomes, practice task, and approved sources into the tutor context,
+   reducing generic answers and invented citations
+ - The scheduler no longer fills spare time with endless “Mastery Cycle”
+   cards: applied practice stays inside each lesson, extra practice cards are
+   reserved for practice/mock-heavy plans, and second recall cards target only
+   hard or explicitly weak material
 
 v3 FIXES
 --------

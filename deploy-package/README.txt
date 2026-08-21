@@ -42,6 +42,11 @@ WHAT'S FIXED IN THIS BUILD
 14. Advanced curricula: every lesson now carries prerequisites, depth,
     key concepts, higher-order outcomes, applied practice, and curated
     source details/links. Existing plans are enriched without a reset.
+15. Chat and replan actions are single-flight: double taps cannot add the
+    same turn twice or launch two competing schedule rebuilds.
+16. Shigun answers Bengali/Bangla and other supported-language requests
+    correctly; mobile chat now has live voice visuals, assistant avatars,
+    a cleaner composer, and a smoother full conversation sheet.
 
 DEPLOY STEPS (GitHub web — no git commands needed)
  1. In your repo, open "Add file" → "Upload files".
@@ -60,9 +65,10 @@ VERIFIED
  - The package mirrors src/ exactly — nothing else is needed.
 
 NOTES
- - Set `GEMINI_API_KEY` (preferred) or `GOOGLE_API_KEY` in Vercel for
-   the identical cloud-generated Shigun voice on every platform. The
-   app retains a guarded native fallback if cloud TTS is unavailable.
+ - For the fastest and most consistent voice, enable Google Cloud
+   Text-to-Speech and set `GOOGLE_CLOUD_TTS_API_KEY` in Vercel. Gemini
+   remains a pinned-model compatibility path. Named voices never silently
+   switch to a different model or operating-system voice.
  - Voice recognition is browser-native (Web Speech API): works best in
    Chrome/Edge on desktop and Android. iOS Safari support depends on
    the OS version. Text chat always works everywhere.

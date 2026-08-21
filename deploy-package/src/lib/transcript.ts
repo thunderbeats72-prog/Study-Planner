@@ -19,12 +19,14 @@ function sameTokens(a: string[], b: string[]): boolean {
 function collapseRecognizerEchoes(words: string[]): string[] {
   const out = [...words];
 
-  // A three-or-more identical-word run is an Android recognizer echo. Keep
-  // a deliberate double ("very very") intact.
+  // Adjacent duplicate words are overwhelmingly recognition echoes in a
+  // one-shot assistant command ("I I want", "are are are"). Collapse them
+  // all; this is deliberately stricter than prose editing because voice
+  // commands must never reach chat with duplicated prefixes.
   for (let i = 0; i < out.length;) {
     let end = i + 1;
     while (end < out.length && tokenKey(out[end]) === tokenKey(out[i])) end++;
-    if (end - i >= 3) out.splice(i + 1, end - i - 1);
+    if (end - i >= 2) out.splice(i + 1, end - i - 1);
     i++;
   }
 

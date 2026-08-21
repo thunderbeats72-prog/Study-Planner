@@ -132,7 +132,12 @@ export default function Onboarding({
 
   const totalUnits = subs.reduce((a, s) => a + (Number(s.units) || 0), 0);
   const availDays = Math.max(1, dayDiff(start, exam));
-  const estMinutes = totalUnits * 50;
+  // Capacity reflects the actual difficulty-weighted lesson engine instead of
+  // pretending every unit costs the same 50 minutes.
+  const estMinutes = subs.reduce((total, subject) => {
+    const perUnit = subject.difficulty === "Hard" ? 65 : subject.difficulty === "Easy" ? 40 : 50;
+    return total + (Number(subject.units) || 0) * perUnit;
+  }, 0);
   const capacity = availDays * hrs * 60 * 0.78;
   const feasible = capacity >= estMinutes;
   const projected = addDays(start, Math.min(availDays, Math.ceil(estMinutes / Math.max(1, hrs * 60 * 0.78))));

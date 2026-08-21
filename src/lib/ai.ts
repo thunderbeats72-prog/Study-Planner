@@ -54,24 +54,31 @@ export async function callLLM(
   messages: ChatMsg[],
   maxTokens = 2500
 ): Promise<string | null> {
-  const providers = ["gemini", "groq", "openrouter"];
+  const geminiKey = getSafeKey("GEMINI_API_KEY") || getSafeKey("GOOGLE_API_KEY")
+    || getSafeKey("NEXT_PUBLIC_GEMINI_API_KEY") || getSafeKey("NEXT_PUBLIC_GOOGLE_API_KEY");
+  const groqKey = getSafeKey("GROQ_API_KEY") || getSafeKey("NEXT_PUBLIC_GROQ_API_KEY");
+  const openrouterKey = getSafeKey("OPENROUTER_API_KEY") || getSafeKey("NEXT_PUBLIC_OPENROUTER_API_KEY");
+  const providers = [
+    geminiKey ? "gemini" : null,
+    groqKey ? "groq" : null,
+    openrouterKey ? "openrouter" : null,
+  ].filter(Boolean) as Array<"gemini" | "groq" | "openrouter">;
+  const deadline = Date.now() + 15000; // one bounded budget for the whole chain
 
   for (const provider of providers) {
+    const remaining = deadline - Date.now();
+    if (remaining < 500) break;
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), Math.min(8500, remaining));
+    let text: string | null = null;
+
     try {
-      const ctrl = new AbortController();
-      const timer = setTimeout(() => ctrl.abort(), 18000);
-      let text: string | null = null;
-
-      const geminiKey = getSafeKey("GEMINI_API_KEY") || getSafeKey("GOOGLE_API_KEY")
-        || getSafeKey("NEXT_PUBLIC_GEMINI_API_KEY") || getSafeKey("NEXT_PUBLIC_GOOGLE_API_KEY");
-      const groqKey = getSafeKey("GROQ_API_KEY") || getSafeKey("NEXT_PUBLIC_GROQ_API_KEY");
-      const openrouterKey = getSafeKey("OPENROUTER_API_KEY") || getSafeKey("NEXT_PUBLIC_OPENROUTER_API_KEY");
-      const geminiModel = getSafeKey("GEMINI_MODEL") || getSafeKey("NEXT_PUBLIC_GEMINI_MODEL") || "gemini-3.7-flash";
-
       if (provider === "gemini" && geminiKey) {
-        const geminiModels = [...new Set([geminiModel, "gemini-3.7-flash", "gemini-2.5-flash"])];
+        const configured = getSafeKey("GEMINI_MODEL") || getSafeKey("NEXT_PUBLIC_GEMINI_MODEL");
+        const geminiModels = [...new Set([configured, "gemini-3.7-flash", "gemini-2.5-flash"].filter(Boolean))] as string[];
         for (const model of geminiModels) {
-          const r = await fetch(
+          if (Date.now() >= deadline) break;
+          const response = await fetch(
             `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
             {
               method: "POST",
@@ -79,22 +86,23 @@ export async function callLLM(
               headers: { "content-type": "application/json", "x-goog-api-key": geminiKey },
               body: JSON.stringify({
                 systemInstruction: { parts: [{ text: system }] },
-                contents: messages.map((m) => ({
-                  role: m.role === "assistant" ? "model" : "user",
-                  parts: [{ text: m.content }],
+                contents: messages.map((message) => ({
+                  role: message.role === "assistant" ? "model" : "user",
+                  parts: [{ text: message.content }],
                 })),
                 generationConfig: { maxOutputTokens: maxTokens },
               }),
             }
           );
-          if (r.ok) {
-            const j = await r.json();
-            text = j?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text || "").join("") ?? null;
+          if (response.ok) {
+            const json = await response.json();
+            text = json?.candidates?.[0]?.content?.parts
+              ?.map((part: { text?: string }) => part.text || "").join("") ?? null;
             if (text) break;
           }
         }
       } else if (provider === "groq" && groqKey) {
-        const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
           method: "POST",
           signal: ctrl.signal,
           headers: { "content-type": "application/json", authorization: `Bearer ${groqKey}` },
@@ -104,12 +112,12 @@ export async function callLLM(
             messages: [{ role: "system", content: system }, ...messages],
           }),
         });
-        if (r.ok) {
-          const j = await r.json();
-          text = j?.choices?.[0]?.message?.content ?? null;
+        if (response.ok) {
+          const json = await response.json();
+          text = json?.choices?.[0]?.message?.content ?? null;
         }
       } else if (provider === "openrouter" && openrouterKey) {
-        const r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
           method: "POST",
           signal: ctrl.signal,
           headers: {
@@ -124,17 +132,18 @@ export async function callLLM(
             messages: [{ role: "system", content: system }, ...messages],
           }),
         });
-        if (r.ok) {
-          const j = await r.json();
-          text = j?.choices?.[0]?.message?.content ?? null;
+        if (response.ok) {
+          const json = await response.json();
+          text = json?.choices?.[0]?.message?.content ?? null;
         }
       }
-
+    } catch {
+      // Try the next configured provider within the shared deadline.
+    } finally {
       clearTimeout(timer);
-      if (text && text.trim()) return text.trim();
-    } catch (_) {
-      continue;
     }
+
+    if (text?.trim()) return text.trim();
   }
   return null;
 }
@@ -310,6 +319,54 @@ export async function aiGenerateTopics(
   });
 }
 
+const LANGUAGE_CAPABILITY_RE = /\b(speak|talk|chat|communicate|reply|respond|answer)\b/i;
+
+/** Deterministic language-capability replies prevent the tutor from falsely
+ * claiming it only supports English/Hindi. The cloud and local speech layers
+ * both support these scripts, so the response is immediately usable aloud. */
+export function languageCapabilityReply(query: string): string | null {
+  if (!LANGUAGE_CAPABILITY_RE.test(query)) return null;
+  const languages: Array<{ match: RegExp; reply: string }> = [
+    {
+      match: /\b(bangla|bengali)\b/i,
+      reply: "হ্যাঁ, আমি বাংলায় কথা বলতে পারি। আপনার পড়াশোনা নিয়ে কীভাবে সাহায্য করতে পারি?",
+    },
+    {
+      match: /\bhindi\b/i,
+      reply: "हाँ, मैं हिंदी में बात कर सकता हूँ। आपकी पढ़ाई में किस तरह मदद करूँ?",
+    },
+    {
+      match: /\bmarathi\b/i,
+      reply: "हो, मी मराठीत बोलू शकतो. तुमच्या अभ्यासात मी कशी मदत करू?",
+    },
+    {
+      match: /\btamil\b/i,
+      reply: "ஆம், நான் தமிழில் பேச முடியும். உங்கள் படிப்பில் எப்படி உதவலாம்?",
+    },
+    {
+      match: /\btelugu\b/i,
+      reply: "అవును, నేను తెలుగులో మాట్లాడగలను. మీ చదువులో ఎలా సహాయం చేయాలి?",
+    },
+    {
+      match: /\bkannada\b/i,
+      reply: "ಹೌದು, ನಾನು ಕನ್ನಡದಲ್ಲಿ ಮಾತನಾಡಬಲ್ಲೆ. ನಿಮ್ಮ ಓದಿನಲ್ಲಿ ಹೇಗೆ ಸಹಾಯ ಮಾಡಲಿ?",
+    },
+    {
+      match: /\bgujarati\b/i,
+      reply: "હા, હું ગુજરાતીમાં વાત કરી શકું છું. તમારા અભ્યાસમાં કેવી રીતે મદદ કરું?",
+    },
+    {
+      match: /\b(punjabi|panjabi)\b/i,
+      reply: "ਹਾਂ, ਮੈਂ ਪੰਜਾਬੀ ਵਿੱਚ ਗੱਲ ਕਰ ਸਕਦਾ ਹਾਂ। ਤੁਹਾਡੀ ਪੜ੍ਹਾਈ ਵਿੱਚ ਕਿਵੇਂ ਮਦਦ ਕਰਾਂ?",
+    },
+    {
+      match: /\barabic\b/i,
+      reply: "نعم، يمكنني التحدث بالعربية. كيف أساعدك في دراستك؟",
+    },
+  ];
+  return languages.find((language) => language.match.test(query))?.reply || null;
+}
+
 export type TutorContext = {
   name: string; courseName: string; level: string; examDate: string; daysLeft: number; dailyHours: number;
   subjects: { id: number; name: string; difficulty: string; done: number; total: number }[];
@@ -370,7 +427,41 @@ export function parseCommand(q: string): TutorReply["action"] | undefined {
   return undefined;
 }
 
-export async function localTutor(q: string, ctx: TutorContext): Promise<TutorReply> {
+export function instantTutorReply(q: string, ctx: TutorContext): TutorReply | null {
+  const n = q.toLowerCase();
+  if (/(what|which).*(today|now)|today'?s (plan|task|study|load)|what should i (study|do)/.test(n)) {
+    const pending = ctx.today.filter((task) => task.status === "pending");
+    if (!pending.length) return { text: "Nothing is pending for today. Use the extra time for active recall or a short mixed practice set." };
+    const list = pending.slice(0, 6).map((task, index) => `${index + 1}. **${task.title}** (${task.minutes} min)`).join("\n");
+    return { text: `Here is your priority order for today:\n\n${list}\n\nSay *“start timer”* when you are ready.` };
+  }
+  if (/how am i doing|my progress|progress report|performance/.test(n)) {
+    return {
+      text: `You are **${ctx.progressPct}%** through the syllabus with a **${ctx.streak}-day streak**. You studied **${ctx.hoursThisWeek} hours** this week and have **${ctx.overdue} overdue task${ctx.overdue === 1 ? "" : "s"}**. ${ctx.overdue ? "Clear the oldest overdue lesson first, then return to today's plan." : "Your schedule is current—protect the streak with today's highest-priority lesson."}`,
+    };
+  }
+  if (/weakest (topic|subject)|what.*weak|where.*struggl/.test(n)) {
+    const weakest = [...ctx.subjects]
+      .filter((subject) => subject.total > 0)
+      .sort((a, b) => (a.done / a.total) - (b.done / b.total))[0];
+    if (weakest) {
+      const pct = Math.round((weakest.done / weakest.total) * 100);
+      return { text: `Your lowest-completion subject is **${weakest.name}** at **${pct}%** (${weakest.done}/${weakest.total} lessons). Open Subjects and choose its first pending lesson; I can then teach it from first principles.` };
+    }
+  }
+  if (/i'?m behind|am i behind|catch up|overdue/.test(n)) {
+    return ctx.overdue
+      ? { text: `You have **${ctx.overdue} overdue task${ctx.overdue === 1 ? "" : "s"}**. Use **Rebalance schedule** once; it will move unfinished work forward without touching completed lessons.` }
+      : { text: "You have no overdue tasks. Stay with today's plan rather than adding extra work." };
+  }
+  return null;
+}
+
+export async function localTutor(
+  q: string,
+  ctx: TutorContext,
+  options: { skipCloud?: boolean } = {}
+): Promise<TutorReply> {
   const action = parseCommand(q);
   const n = q.toLowerCase();
 
@@ -391,17 +482,16 @@ export async function localTutor(q: string, ctx: TutorContext): Promise<TutorRep
     return { text: msgs[action.type] || "Done.", action };
   }
 
-  if (/(what|which).*(today|now)|today'?s (plan|task|study|load)|what should i (study|do)/.test(n)) {
-    if (!ctx.today.length) return { text: `Nothing scheduled for today.` };
-    const list = ctx.today.map((t, i) => `${i + 1}. **${t.title}** (${t.minutes} min)`).join("\n");
-    return { text: `Here is today's schedule:\n\n${list}\n\nSay *"start timer"* to begin.` };
-  }
+  const instant = instantTutorReply(q, ctx);
+  if (instant) return instant;
 
   const pct = percentQ(q);
   if (pct) return { text: pct };
 
-  const aiResponse = await callLLM(tutorSystemPrompt(ctx), [{ role: "user", content: q }], 800);
-  if (aiResponse) return { text: aiResponse };
+  if (!options.skipCloud) {
+    const aiResponse = await callLLM(tutorSystemPrompt(ctx), [{ role: "user", content: q }], 800);
+    if (aiResponse) return { text: aiResponse };
+  }
 
   const subjectHint = ctx.subjects.find((s) => n.includes(s.name.toLowerCase().split(" ")[0]))?.name;
   const knowledge = await lookupKnowledge(q);
@@ -431,6 +521,12 @@ Teach step-by-step using clear markdown formatting.
 Voice: intelligent, concise, supportive, confident — like a calm senior tutor.
 Use at most one emoji per reply, and only when it genuinely helps; usually use none.
 Never use hype ("CRUSHING IT!!!"), all-caps excitement, or emoji chains.
+
+LANGUAGE: You are multilingual. Reply in the language/script the learner uses or explicitly
+requests, including Bengali/Bangla, Hindi, Marathi, Tamil, Telugu, Kannada, Gujarati,
+Punjabi, Arabic, and English. Never claim that you only support English or Hindi. If the
+learner writes an Indian language in Latin script, answer naturally in that language;
+use its native script when they explicitly ask whether you can speak it.
 
 APP CONTROL — you CAN control this app. When the user asks you to perform an app action
 (in ANY language or phrasing), append ONE action tag on its own final line, then it will
