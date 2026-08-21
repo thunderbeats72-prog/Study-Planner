@@ -110,7 +110,7 @@ function cleanForSpeech(markdown: string): string {
     .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
     .replace(/\s+/g, " ")
     .trim()
-    .slice(0, 5000);
+    .slice(0, 4000);
 }
 
 function wordLang(word: string): string {
