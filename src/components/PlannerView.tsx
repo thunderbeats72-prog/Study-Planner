@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   addDays, dayDiff, fmtDate, KIND_META, parseDate, prettyDate, prettyLong, today, type AppState, type TaskRow,
 } from "@/lib/client";
-import { IconSpark, IconClose } from "./icons";
+import { IconSpark, IconClose, IconChevron } from "./icons";
 import TaskEditor, { type TaskPatch } from "./TaskEditor";
 import TaskClockButton from "./TaskClockButton";
 import { useBackClose } from "@/lib/useBackClose";
@@ -40,6 +40,20 @@ export default function PlannerView({
   });
   const t = today();
   useBackClose(!!openDay, () => setOpenDay(null));
+
+  // When a lesson brief opens, bring it into view. Inside the calendar's
+  // day sheet the brief expands *below* the tapped task, which is usually
+  // past the bottom edge of the sheet — without this, users tapped a task
+  // and saw empty space and assumed the lesson/brief was missing.
+  const briefRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (expanded == null) return;
+    const timer = window.setTimeout(() => {
+      const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+      briefRef.current?.scrollIntoView({ block: "nearest", behavior: reduce ? "auto" : "smooth" });
+    }, 80);
+    return () => window.clearTimeout(timer);
+  }, [expanded]);
 
   const filtered = useMemo(() => {
     let list = state.tasks;
@@ -81,8 +95,26 @@ export default function PlannerView({
         <div className={`task-row${task.status === "done" ? " done" : ""}${activeTaskId === task.id ? " active-clock" : ""}${moreActionsId === task.id ? " expanded-actions" : ""}`}>
           <div className="task-dot" style={{ background: subj?.color || meta.color }} />
           <div className="task-main" style={{ cursor: topic ? "pointer" : "default" }}
-            onClick={() => topic && setExpanded(open ? null : task.id)}>
-            <div className="task-title">{task.title}</div>
+            role={topic ? "button" : undefined}
+            tabIndex={topic ? 0 : undefined}
+            aria-expanded={topic ? open : undefined}
+            aria-label={topic ? `${open ? "Hide" : "Show"} lesson brief: ${task.title}` : undefined}
+            onClick={() => topic && setExpanded(open ? null : task.id)}
+            onKeyDown={(e) => {
+              if (topic && (e.key === "Enter" || e.key === " ")) {
+                e.preventDefault();
+                setExpanded(open ? null : task.id);
+              }
+            }}>
+            <div className="task-title">
+              {task.title}
+              {topic && (
+                <span className={`brief-chev${open ? " open" : ""}`} aria-hidden="true"
+                  title={open ? "Hide lesson brief" : "Show lesson brief"}>
+                  <IconChevron size={12} />
+                </span>
+              )}
+            </div>
             <div className="task-sub">
               <span className="chip chip-kind" style={{ marginRight: 6 }}>{meta.label}</span>
               {task.plannedMinutes} min
@@ -128,9 +160,16 @@ export default function PlannerView({
           </div>
         )}
         {open && topic && (
-          <div className="glass-panel slide-in planner-lesson-brief" style={{ borderLeft: `3px solid ${subj?.color || "var(--accent)"}` }}>
+          <div ref={briefRef} className="glass-panel slide-in planner-lesson-brief" style={{ borderLeft: `3px solid ${subj?.color || "var(--accent)"}` }}>
             <div className="lesson-brief-heading">
               Lesson brief · {topic.unit} · {topic.depth || "Core"}
+            </div>
+            <div className="lesson-brief-title">{topic.title}</div>
+            <div className="lesson-brief-meta">
+              {subj && <span className="chip chip-kind">{subj.name}</span>}
+              <span>{topic.difficulty} difficulty</span>
+              <span>~{topic.estMinutes} min lesson</span>
+              <span>Mastery {topic.mastery}%</span>
             </div>
             <div className="lesson-summary">{topic.summary}</div>
             {!!topic.prerequisites?.length && (
@@ -164,7 +203,6 @@ export default function PlannerView({
               </div>
             )}
             <div className="flex-row gap-sm" style={{ flexWrap: "wrap", marginTop: 12 }}>
-              <div className="chip chip-kind">Mastery {topic.mastery}%</div>
               <button className="btn btn-xs btn-primary" onClick={() => onAskTutor(`Explain "${topic.title}" from ${subj?.name || "my course"} step by step with an example. Address these outcomes: ${(topic.objectives || []).join("; ")}. Use the listed curriculum sources.`)}>
                 <IconSpark size={12} /> Teach me this
               </button>
