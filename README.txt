@@ -46,13 +46,66 @@ LOCAL DEVELOPMENT
 DATABASE
 --------
 `npm run build` runs `drizzle-kit push` first, so schema changes
-(including the new indexes) are applied automatically on deploy.
+(including advanced lesson metadata and source details) are applied
+automatically on deploy. Existing plans are enriched non-destructively
+when state is loaded; rebuilding is not required.
+
 Re-running the Setup Wizard performs a HARD RESET of course data
 (subjects, lessons, schedule, sessions, chat) — always behind a
 confirmation dialog in the UI.
 
-v3 FIXES (this build)
+CONSISTENT SHIGUN VOICE
+-----------------------
+For the fastest and most identity-stable production voice, enable Google
+Cloud Text-to-Speech and set `GOOGLE_CLOUD_TTS_API_KEY` in Vercel. Shigun
+then uses deterministic Chirp 3 HD Kore, Aoede, or Charon voices in the
+reply's language. Warm-server and client audio caches make repeated app
+confirmations immediate.
+
+`GEMINI_API_KEY` / `GOOGLE_API_KEY` remains a compatibility path using one
+pinned `SHIGUN_TTS_MODEL`. Named profiles never silently switch model or
+fall back to an unrelated operating-system voice; failures remain text-only.
+A native voice is available only through the explicit “Device fallback”
+option.
+
+v4 FIXES (this build)
 ---------------------
+ - Mobile voice transcripts use overlap-aware deduplication and
+   single-utterance recognition; cumulative Android/WebKit result
+   batches can no longer repeat words or submit stale sessions
+ - Shigun uses fixed Gemini voice profiles (Kore, Aoede, Charon) on
+   every platform, with Web Audio pre-authorized from the mic gesture
+ - Playback has cancellation generation guards, preventing cancelled
+   native utterances from restarting through late onerror callbacks
+ - Curriculum lessons now include prerequisites, key concepts, depth,
+   measurable higher-order outcomes, applied practice, and curated
+   official/primary/reference source details with links
+ - Verified catalog unit counts remain locked; cloud curricula are
+   filled to the canonical count if a provider stops early
+ - Older saved plans receive advanced metadata without losing titles,
+   mastery, completion history, or timing
+ - Duplicate chat submission and replan races are blocked synchronously;
+   a spoken message or rebalance action can execute only once at a time
+ - Shigun now answers language-capability requests deterministically in
+   Bengali, Hindi, Marathi, Tamil, Telugu, Kannada, Gujarati, Punjabi,
+   and Arabic instead of incorrectly claiming English/Hindi-only support
+ - Mobile chat is a header-anchored conversation sheet with a scrim,
+   activity states, assistant avatars, live voice waveform, improved
+   composer, horizontal prompts, and reduced-motion accessibility
+ - Voice identity is locked across short commands and long explanations;
+   synthesis preparation is shown separately from actual playback
+ - Common plan/progress questions bypass the LLM and answer instantly from
+   live data; cloud provider retries share one bounded 15-second budget
+ - Lesson questions inject the matching curriculum summary, concepts,
+   outcomes, practice task, and approved sources into the tutor context,
+   reducing generic answers and invented citations
+ - The scheduler no longer fills spare time with endless “Mastery Cycle”
+   cards: applied practice stays inside each lesson, extra practice cards are
+   reserved for practice/mock-heavy plans, and second recall cards target only
+   hard or explicitly weak material
+
+v3 FIXES
+--------
  - Full course name + tracker task title never truncate
  - 40px sidebar collapse toggle with smooth icon-rail animation
  - Mic pre-warm + watchdog + confidence-scored transcripts (review

@@ -307,8 +307,6 @@ export function buildPlan(
   };
 
   const subjById = new Map(subjects.map((s) => [s.id, s]));
-  const learned: PlanTopic[] = [];
-  let cyclePtr = 0;
   let scheduledCount = 0;
   let lastLearnDate: string | null = null;
   /** Learn-day index each subject last appeared on (for staleness scoring). */
@@ -460,7 +458,6 @@ export function buildPlan(
           scheduledCount++;
           lastLearnDate = date;
           todaysTopics.push(t);
-          learned.push(t);
 
           tasks.push({
             date, subjectId: s.id, topicId: t.id, kind: "learn",
@@ -470,43 +467,37 @@ export function buildPlan(
           });
 
           pushReview(d + 2, t, 1);
-          pushReview(d + 7, t, 2);
+          // A second dedicated card is reserved for genuinely high-risk
+          // material. Other topics are covered by weekly checkpoints and the
+          // final revision block instead of generating redundant busywork.
+          if (t.difficulty === "Hard" || t.subjectId === weakId) pushReview(d + 7, t, 2);
         }
       }
 
-      // ── 8d. Fill spare capacity with topic-linked practice ──
-
-      let guardFill = 0;
-      while (remaining >= 25 && guardFill < 5) {
-        let t: PlanTopic | undefined;
-        let label = "";
-        let detail = "";
-
-        if (todaysTopics[guardFill]) {
-          t = todaysTopics[guardFill];
-          label = "Apply";
-          detail =
-            "Immediate application of the lesson you just learned: 10–12 graded questions, easy → hard. Anything you hesitate on goes in the error log.";
-        } else if (learned.length) {
-          t = learned[cyclePtr % learned.length];
-          const cycle = 2 + Math.floor(cyclePtr / Math.max(1, learned.length));
-          cyclePtr++;
-          label = `Mastery Cycle ${cycle}`;
-          detail =
-            "Second-pass mastery: previous-year and advanced variations of this lesson. Work for speed and accuracy, not re-reading.";
-        } else {
-          break;
-        }
-
-        const sName = subjById.get(t.subjectId)?.name || "Study";
-        const mins = Math.min(remaining, 45);
-        remaining -= mins;
+      // ── 8d. Deliberate practice, not calendar-filling busywork ──
+      // The previous engine filled every spare minute with up to five
+      // "Mastery Cycle" tasks per day. A 76-lesson course could become 300+
+      // cards, hiding the actual curriculum. Spaced reviews already handle
+      // retrieval. The lesson brief already contains applied practice, so
+      // separate cards are created only when the learner explicitly chose a
+      // practice/mock-heavy plan, always tied to today's new lesson.
+      const practiceLimit = st.studyStyle === "practice" || st.planMode === "mock" ? 2 : 0;
+      const practiceTopics = todaysTopics.slice(0, practiceLimit);
+      for (const topic of practiceTopics) {
+        if (remaining < 25) break;
+        const subjectName = subjById.get(topic.subjectId)?.name || "Study";
+        const minutes = Math.min(remaining, st.studyStyle === "practice" ? 40 : 30);
+        remaining -= minutes;
         tasks.push({
-          date, subjectId: t.subjectId, topicId: t.id, kind: "practice",
-          title: `${label} — ${sName}: ${t.title}`,
-          detail, plannedMinutes: mins, position: pos++,
+          date,
+          subjectId: topic.subjectId,
+          topicId: topic.id,
+          kind: "practice",
+          title: `Apply — ${subjectName}: ${topic.title}`,
+          detail: "Immediate transfer practice: 6–10 graded questions, followed by a short error-log entry for every hesitation.",
+          plannedMinutes: minutes,
+          position: pos++,
         });
-        guardFill++;
       }
     }
 
@@ -552,7 +543,6 @@ export function buildPlan(
         posByDate.set(bestDate, p + 1);
         usedByDate.set(bestDate, bestUsed + mins);
         scheduledCount++;
-        learned.push(t);
         if (!lastLearnDate || bestDate > lastLearnDate) lastLearnDate = bestDate;
       }
     }
