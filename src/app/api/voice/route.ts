@@ -24,6 +24,42 @@ const VOICES: Record<string, VoiceProfile> = {
   },
 };
 
+// Language-specific voice directions for multilingual support
+const LANG_DIRECTIONS: Record<string, { direction: string; accent: string }> = {
+  "hi-IN": {
+    direction: "warm Hindi tutor voice, medium-low pitch, steady pace, clear pronunciation of Hindi words and Sanskrit-derived terms",
+    accent: "Hindi",
+  },
+  "bn-IN": {
+    direction: "warm Bengali tutor voice, medium pitch, steady pace, clear pronunciation of Bengali words",
+    accent: "Bengali",
+  },
+  "ta-IN": {
+    direction: "clear Tamil tutor voice, medium pitch, steady pace, crisp pronunciation of Tamil words",
+    accent: "Tamil",
+  },
+  "te-IN": {
+    direction: "clear Telugu tutor voice, medium pitch, steady pace, crisp pronunciation of Telugu words",
+    accent: "Telugu",
+  },
+  "kn-IN": {
+    direction: "clear Kannada tutor voice, medium pitch, steady pace, crisp pronunciation of Kannada words",
+    accent: "Kannada",
+  },
+  "gu-IN": {
+    direction: "warm Gujarati tutor voice, medium pitch, steady pace, clear pronunciation of Gujarati words",
+    accent: "Gujarati",
+  },
+  "pa-IN": {
+    direction: "clear Punjabi tutor voice, medium pitch, steady pace, crisp pronunciation of Punjabi words",
+    accent: "Punjabi",
+  },
+  "ar-XA": {
+    direction: "clear Arabic tutor voice, medium pitch, steady pace, crisp pronunciation of Arabic words",
+    accent: "Arabic",
+  },
+};
+
 const SCRIPT_LANGUAGES: Array<{ tag: string; range: RegExp }> = [
   { tag: "hi-IN", range: /[\u0900-\u097F]/g },
   { tag: "bn-IN", range: /[\u0980-\u09FF]/g },
@@ -200,6 +236,12 @@ async function synthesiseGemini(
   model: string
 ): Promise<CachedAudio | null> {
   const spokenText = truncateUtf8(text, 5000);
+  // Use language-specific direction if available, otherwise use default
+  const langConfig = LANG_DIRECTIONS[language];
+  const direction = langConfig
+    ? `${profile.direction}. Speak with ${langConfig.direction} accent.`
+    : profile.direction;
+  
   const response = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
     {
@@ -208,7 +250,7 @@ async function synthesiseGemini(
       body: JSON.stringify({
         contents: [{
           parts: [{
-            text: `VOICE IDENTITY LOCK: Always use the same ${profile.name} identity. Delivery must be ${profile.direction}. Do not change character, accent, pitch, speed, or emotion based on message length or whether the text is an app command. Read the text after the divider exactly once. Do not add, omit, paraphrase, or repeat words.\n---\n${spokenText}`,
+            text: `VOICE IDENTITY LOCK: Always use the same ${profile.name} identity. Delivery must be ${direction}. Do not change character, accent, pitch, speed, or emotion based on message length or whether the text is an app command. Read the text after the divider exactly once. Do not add, omit, paraphrase, or repeat words.\n---\n${spokenText}`,
           }],
         }],
         generationConfig: {
@@ -266,11 +308,21 @@ export async function POST(req: Request) {
     // Chirp 3 HD is deterministic and low-latency, so it is the production
     // path when its dedicated Cloud TTS key is configured. Gemini remains a
     // pinned-model compatibility path; we never switch models mid-session.
-    const audio = chirpKey
-      ? await synthesiseChirp(chirpKey, text, language, profile)
-      : gemini
-        ? await synthesiseGemini(gemini, text, language, profile, model)
-        : null;
+    // For non-English text, prefer Chirp as it has native support for Indian languages.
+    let audio = null;
+    const isNonEnglish = language !== "en-IN" && SCRIPT_LANGUAGES.some(l => l.tag === language);
+    
+    if (isNonEnglish && chirpKey) {
+      // Use Chirp for Indian languages - it has native voice support
+      audio = await synthesiseChirp(chirpKey, text, language, profile);
+    } else if (chirpKey) {
+      // Use Chirp for English
+      audio = await synthesiseChirp(chirpKey, text, language, profile);
+    } else if (gemini) {
+      // Fall back to Gemini
+      audio = await synthesiseGemini(gemini, text, language, profile, model);
+    }
+    
     if (audio) {
       putCached(key, audio);
       return audioResponse(audio, "MISS");
