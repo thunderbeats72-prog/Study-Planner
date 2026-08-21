@@ -323,21 +323,32 @@ const LANGUAGE_CAPABILITY_RE = /\b(speak|talk|chat|communicate|reply|respond|ans
 
 /** Deterministic language-capability replies prevent the tutor from falsely
  * claiming it only supports English/Hindi. The cloud and local speech layers
- * both support these scripts, so the response is immediately usable aloud. */
-export function languageCapabilityReply(query: string): string | null {
+ * both support these scripts, so the response is immediately usable aloud.
+ * Gendered languages return feminine/masculine forms to match the voice. */
+type CapabilityReply = string | { female: string; male: string };
+export function languageCapabilityReply(
+  query: string,
+  voiceGender: "female" | "male" = "female"
+): string | null {
   if (!LANGUAGE_CAPABILITY_RE.test(query)) return null;
-  const languages: Array<{ match: RegExp; reply: string }> = [
+  const languages: Array<{ match: RegExp; reply: CapabilityReply }> = [
     {
       match: /\b(bangla|bengali)\b/i,
       reply: "হ্যাঁ, আমি বাংলায় কথা বলতে পারি। আপনার পড়াশোনা নিয়ে কীভাবে সাহায্য করতে পারি?",
     },
     {
       match: /\bhindi\b/i,
-      reply: "हाँ, मैं हिंदी में बात कर सकता हूँ। आपकी पढ़ाई में किस तरह मदद करूँ?",
+      reply: {
+        female: "हाँ, मैं हिंदी में बात कर सकती हूँ। आपकी पढ़ाई में किस तरह मदद करूँ?",
+        male: "हाँ, मैं हिंदी में बात कर सकता हूँ। आपकी पढ़ाई में किस तरह मदद करूँ?",
+      },
     },
     {
       match: /\bmarathi\b/i,
-      reply: "हो, मी मराठीत बोलू शकतो. तुमच्या अभ्यासात मी कशी मदत करू?",
+      reply: {
+        female: "हो, मी मराठीत बोलू शकते. तुमच्या अभ्यासात मी कशी मदत करू?",
+        male: "हो, मी मराठीत बोलू शकतो. तुमच्या अभ्यासात मी कशी मदत करू?",
+      },
     },
     {
       match: /\btamil\b/i,
@@ -361,7 +372,10 @@ export function languageCapabilityReply(query: string): string | null {
     },
     {
       match: /\b(punjabi|panjabi)\b/i,
-      reply: "ਹਾਂ, ਮੈਂ ਪੰਜਾਬੀ ਵਿੱਚ ਗੱਲ ਕਰ ਸਕਦਾ ਹਾਂ। ਤੁਹਾਡੀ ਪੜ੍ਹਾਈ ਵਿੱਚ ਕਿਵੇਂ ਮਦਦ ਕਰਾਂ?",
+      reply: {
+        female: "ਹਾਂ, ਮੈਂ ਪੰਜਾਬੀ ਵਿੱਚ ਗੱਲ ਕਰ ਸਕਦੀ ਹਾਂ। ਤੁਹਾਡੀ ਪੜ੍ਹਾਈ ਵਿੱਚ ਕਿਵੇਂ ਮਦਦ ਕਰਾਂ?",
+        male: "ਹਾਂ, ਮੈਂ ਪੰਜਾਬੀ ਵਿੱਚ ਗੱਲ ਕਰ ਸਕਦਾ ਹਾਂ। ਤੁਹਾਡੀ ਪੜ੍ਹਾਈ ਵਿੱਚ ਕਿਵੇਂ ਮਦਦ ਕਰਾਂ?",
+      },
     },
     {
       match: /\b(odia|oriya)\b/i,
@@ -369,7 +383,10 @@ export function languageCapabilityReply(query: string): string | null {
     },
     {
       match: /\burdu\b/i,
-      reply: "ہاں، میں اردو میں بات کر سکتا ہوں۔ میں آپ کی پڑھائی میں کیسے مدد کروں؟",
+      reply: {
+        female: "ہاں، میں اردو میں بات کر سکتی ہوں۔ میں آپ کی پڑھائی میں کیسے مدد کروں؟",
+        male: "ہاں، میں اردو میں بات کر سکتا ہوں۔ میں آپ کی پڑھائی میں کیسے مدد کروں؟",
+      },
     },
     {
       match: /\bnepali\b/i,
@@ -424,7 +441,9 @@ export function languageCapabilityReply(query: string): string | null {
       reply: "Evet, Türkçe konuşabilirim. Derslerinde nasıl yardımcı olabilirim?",
     },
   ];
-  return languages.find((language) => language.match.test(query))?.reply || null;
+  const hit = languages.find((language) => language.match.test(query));
+  if (!hit) return null;
+  return typeof hit.reply === "string" ? hit.reply : hit.reply[voiceGender];
 }
 
 export type TutorContext = {
@@ -701,12 +720,28 @@ const PAGE_LABELS: Record<string, string> = {
   focus: "Focus Studio",
 };
 
-export function commandReply(action: ActionShape, sourceText: string, daysLeft?: number): string {
+/** Feminine variants of the few command confirmations that self-reference
+ *  with gendered first-person forms. The masculine forms live in
+ *  CONFIRMATIONS and are the default for a male voice. */
+const FEMALE_CONFIRMATIONS: Record<string, Partial<Record<string, string>>> = {
+  hi: { navigate: "खोल रही हूँ: {page}।" },
+  gu: { navigate: "ખોલી રહી છું: {page}." },
+  pa: { navigate: "ਖੋਲ੍ਹ ਰਹੀ ਹਾਂ: {page}." },
+};
+
+export function commandReply(
+  action: ActionShape,
+  sourceText: string,
+  daysLeft?: number,
+  voiceGender: "female" | "male" = "female"
+): string {
   const lang = SCRIPT_LANG_DETECT.find((entry) => entry.range.test(sourceText))?.code;
-  const template =
+  const base =
     (lang && CONFIRMATIONS[lang]?.[action.type as keyof (typeof CONFIRMATIONS)["hi"]]) ||
     EN_CONFIRMATIONS[action.type] ||
     "Done.";
+  const template =
+    (voiceGender === "female" && lang && FEMALE_CONFIRMATIONS[lang]?.[action.type]) || base;
   const page = PAGE_LABELS[String(action.payload)] || String(action.payload || "");
   let reply = template.replace("{page}", page);
   if (action.type === "replan" && daysLeft != null && !lang) {
@@ -793,7 +828,7 @@ export function instantTutorReply(q: string, ctx: TutorContext): TutorReply | nu
 export async function localTutor(
   q: string,
   ctx: TutorContext,
-  options: { skipCloud?: boolean } = {}
+  options: { skipCloud?: boolean; voiceGender?: "female" | "male" } = {}
 ): Promise<TutorReply> {
   const action = parseCommand(q);
   const n = q.toLowerCase();
@@ -822,7 +857,11 @@ export async function localTutor(
   if (pct) return { text: pct };
 
   if (!options.skipCloud) {
-    const aiResponse = await callLLM(tutorSystemPrompt(ctx), [{ role: "user", content: q }], 800);
+    const aiResponse = await callLLM(
+      tutorSystemPrompt(ctx, { voiceGender: options.voiceGender }),
+      [{ role: "user", content: q }],
+      800
+    );
     if (aiResponse) return { text: aiResponse };
   }
 
@@ -833,7 +872,16 @@ export async function localTutor(
   return { text: `Ask me to explain any concept from your subjects or say *"what should I study today?"*` };
 }
 
-export function tutorSystemPrompt(ctx: TutorContext): string {
+/** Maps a selected voice profile id to its spoken grammatical gender. */
+export function voiceGenderFor(voiceId: string): "female" | "male" {
+  return voiceId === "m1" ? "male" : "female";
+}
+
+export function tutorSystemPrompt(
+  ctx: TutorContext,
+  options: { voiceGender?: "female" | "male" } = {}
+): string {
+  const gender = options.voiceGender || "female";
   const now = new Date();
   const dateStr = now.toLocaleDateString("en-IN", {
     weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: "Asia/Kolkata",
@@ -854,6 +902,13 @@ Teach step-by-step using clear markdown formatting.
 Voice: intelligent, concise, supportive, confident — like a calm senior tutor.
 Use at most one emoji per reply, and only when it genuinely helps; usually use none.
 Never use hype ("CRUSHING IT!!!"), all-caps excitement, or emoji chains.
+
+VOICE GENDER: You are speaking with a ${gender} voice. In languages with grammatical
+gender (Hindi, Urdu, Marathi, Bengali, Gujarati, Punjabi, Nepali, Arabic, Spanish,
+French, and others), always use ${gender === "female" ? "feminine" : "masculine"}
+first-person verb endings and matching adjective agreement whenever you refer to
+yourself, so your grammar matches the voice the learner hears. Do not mention this
+rule in your reply — just speak with the correct forms.
 
 LANGUAGE: You are multilingual. Reply in the language/script the learner uses or explicitly
 requests, including Bengali/Bangla, Hindi, Marathi, Tamil, Telugu, Kannada, Malayalam,

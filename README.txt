@@ -84,18 +84,21 @@ v5 FIXES (this build)
    row on phones.
  - The running session also shows in the browser tab title (⏱ 12:34 ·
    lesson name) and Zen mode now has a Clock Out button.
- - Multilingual voice: the mic now understands start/stop/pause/resume/
-   break/navigation commands in Hindi, Marathi, Hinglish, Bengali, Tamil,
-   Telugu, Kannada, Malayalam, Gujarati, Punjabi, Odia, Urdu, Arabic,
-   French and Spanish — and CONFIRMS them in the same language, spoken
-   aloud. A 🌐 language picker (26 languages incl. Spanish, French,
-   German, Chinese, Japanese, Russian…) sits next to the voice picker;
-   Auto keeps detecting from your speech.
- - Long answers read in full: spoken replies are split at sentence
-   boundaries (including । ॥ 。 ！ ؟) and played back-to-back, with a
-   "part 2/5" progress indicator. The tutor is told to give complete
-   structured lessons when you ask for detail. Tapping the mic while
-   Shigun speaks stops the voice instantly.
+ - Multilingual voice: the mic understands start/stop/pause/resume/break/
+   navigation commands in Hindi, Marathi, Hinglish, Bengali, Tamil, Telugu,
+   Kannada, Malayalam, Gujarati, Punjabi, Odia, Urdu, Arabic, French and
+   Spanish — and CONFIRMS them in the same language, spoken aloud. There is
+   NO language picker: Shigun assesses the language from your speech itself
+   and answers in that same language automatically.
+ - Voice-aware grammar: replies follow the selected voice. Pick a female
+   voice and Shigun uses feminine forms ("कर सकती हूँ"); pick the male
+   voice and it uses masculine forms ("कर सकता हूँ") — in Hindi, Urdu,
+   Marathi, Punjabi and every language the tutor writes.
+ - Long answers read in full and FLOW: replies are split only when they are
+   genuinely too long for one TTS request (never after every "."), and the
+   next part is fetched while the current one plays, so a whole lesson reads
+   as one continuous narration with a subtle "part 2/5" indicator. Tapping
+   the mic while Shigun speaks stops the voice instantly.
  - ML: the exam-readiness projection is now anchored to the minutes you
    ACTUALLY study per active day (trimmed mean over 28 days, shrunk
    toward your target until 10 active days of evidence), and the

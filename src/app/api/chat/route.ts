@@ -6,6 +6,7 @@ import { buildContext, fullState, getOrCreateUser, getSettings, keyFrom } from "
 import {
   callLLM, localTutor, parseCommand, tutorSystemPrompt, activeProvider,
   extractLlmAction, languageCapabilityReply, instantTutorReply, commandReply,
+  voiceGenderFor,
 } from "@/lib/ai";
 import { regeneratePlan } from "@/lib/generate";
 import { mergeTranscriptSegments } from "@/lib/transcript";
@@ -56,8 +57,10 @@ function curriculumGrounding(question: string, state: GroundingState): string {
 export async function POST(req: Request) {
   const key = keyFrom(req);
   const user = await getOrCreateUser(key);
-  const { message, source } = (await req.json()) as { message: string; source?: "voice" | "text" };
+  const { message, source, voiceId } = (await req.json()) as { message: string; source?: "voice" | "text"; voiceId?: string };
   const rawText = (message || "").trim();
+  // The reply's grammar (gender/verb agreement) follows the selected voice.
+  const voiceGender = voiceGenderFor(voiceId || "f1");
   // Apply strict echo cleanup only to microphone messages. Typed prose is
   // preserved exactly, including intentional repetition.
   const text = source === "voice" ? mergeTranscriptSegments([rawText]) : rawText;
@@ -66,7 +69,7 @@ export async function POST(req: Request) {
   const state = await fullState(key);
   const ctx = buildContext(state);
   let action = parseCommand(text);
-  const languageReply = languageCapabilityReply(text);
+  const languageReply = languageCapabilityReply(text, voiceGender);
   const instantReply = action ? null : instantTutorReply(text, ctx);
 
   await db.insert(messages).values({ userId: user.id, role: "user", content: text });
@@ -85,7 +88,7 @@ export async function POST(req: Request) {
       await regeneratePlan(user.id, st, { fromToday: true });
       replanned = true;
     }
-    finalText = commandReply(action, text, ctx.daysLeft);
+    finalText = commandReply(action, text, ctx.daysLeft, voiceGender);
   } else if (instantReply) {
     // Common plan/progress questions are answered from live app data without
     // paying a model round-trip, so they feel immediate and stay factual.
@@ -99,7 +102,7 @@ export async function POST(req: Request) {
         role: m.role === "assistant" ? ("assistant" as const) : ("user" as const),
         content: m.content,
       }));
-      const systemPrompt = tutorSystemPrompt(ctx)
+      const systemPrompt = tutorSystemPrompt(ctx, { voiceGender })
         + curriculumGrounding(text, state)
         + (source === "voice"
           ? "\n\nVOICE TURN: Keep the opening reply to 80-140 spoken words UNLESS the learner asked for detail, a lesson, or an explanation — then answer in full depth; the app speaks long answers in consecutive parts. Lead with the answer; avoid long preambles."
@@ -123,7 +126,7 @@ export async function POST(req: Request) {
     } else {
       // Do not call the same cloud chain a second time after a provider
       // timeout/failure; the local knowledge path should answer immediately.
-      const local = await localTutor(text, ctx, { skipCloud: cloudAttempted });
+      const local = await localTutor(text, ctx, { skipCloud: cloudAttempted, voiceGender });
       finalText = local.text;
       if (local.action) action = local.action;
     }

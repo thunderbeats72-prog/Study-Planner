@@ -19,10 +19,15 @@ WHAT'S FIXED IN THIS BUILD (v5)
  4. Voice commands work in Hindi, Marathi, Hinglish, Bengali, Tamil,
     Telugu, Kannada, Malayalam, Gujarati, Punjabi, Odia, Urdu, Arabic,
     French, Spanish — and confirmations answer in YOUR language, aloud.
- 5. 🌐 mic language picker with 26 languages (Auto detects from speech;
-    a pinned choice is remembered).
- 6. Long answers are spoken in full, part by part, with progress
-    ("part 2/5"). Tap the mic anytime to stop the voice.
+ 5. No language picker needed: Shigun assesses your language from your
+    speech and answers in the same language automatically. Replies also
+    match the selected voice's grammar — a female voice uses feminine
+    forms, a male voice uses masculine forms (Hindi, Urdu, Marathi,
+    Punjabi, …).
+ 6. Long answers read as one continuous narration: replies are only split
+    when they exceed one TTS request, and the next part is prefetched
+    while the current one plays (no long pause after each "."). Tap the
+    mic anytime to stop the voice.
  7. Readiness projection learns the minutes you actually study per day;
     peak-focus hours recency-weight your recent sessions.
  8. More database indexes on every hot query path.

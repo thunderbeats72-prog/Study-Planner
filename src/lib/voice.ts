@@ -43,40 +43,6 @@ export const LANGS: { code: string; bcp: string; range: RegExp }[] = [
   { code: "th", bcp: "th-TH", range: /[\u0E00-\u0E7F]/ },
 ];
 
-/**
- * Every language the mic dropdown can explicitly pick. Latin-script
- * languages (Spanish, French, …) can't be auto-detected from the script,
- * so the selector is the reliable path for them.
- */
-export const STT_LANGS: { bcp: string; label: string }[] = [
-  { bcp: "en-IN", label: "English" },
-  { bcp: "hi-IN", label: "हिन्दी Hindi" },
-  { bcp: "bn-IN", label: "বাংলা Bengali" },
-  { bcp: "mr-IN", label: "मराठी Marathi" },
-  { bcp: "ta-IN", label: "தமிழ் Tamil" },
-  { bcp: "te-IN", label: "తెలుగు Telugu" },
-  { bcp: "kn-IN", label: "ಕನ್ನಡ Kannada" },
-  { bcp: "ml-IN", label: "മലയാളം Malayalam" },
-  { bcp: "gu-IN", label: "ગુજરાતી Gujarati" },
-  { bcp: "pa-IN", label: "ਪੰਜਾਬੀ Punjabi" },
-  { bcp: "or-IN", label: "ଓଡ଼ିଆ Odia" },
-  { bcp: "ur-PK", label: "اردو Urdu" },
-  { bcp: "ne-NP", label: "नेपाली Nepali" },
-  { bcp: "ar-SA", label: "العربية Arabic" },
-  { bcp: "es-ES", label: "Español" },
-  { bcp: "fr-FR", label: "Français" },
-  { bcp: "de-DE", label: "Deutsch" },
-  { bcp: "pt-BR", label: "Português" },
-  { bcp: "it-IT", label: "Italiano" },
-  { bcp: "ru-RU", label: "Русский" },
-  { bcp: "zh-CN", label: "中文 Chinese" },
-  { bcp: "ja-JP", label: "日本語 Japanese" },
-  { bcp: "ko-KR", label: "한국어 Korean" },
-  { bcp: "th-TH", label: "ไทย Thai" },
-  { bcp: "id-ID", label: "Indonesia" },
-  { bcp: "tr-TR", label: "Türkçe" },
-];
-
 /** Native fallback preferences. Cloud TTS uses the fixed names above. */
 const VOICE_PREFS: Record<string, Record<string, string[]>> = {
   en: {
@@ -412,47 +378,86 @@ export function stopSpeaking(): void {
 }
 
 /* ============================================================
-   LONG ANSWERS — full spoken delivery, chunk by chunk.
+   LONG ANSWERS — full spoken delivery, flowing like one turn.
    Cloud TTS synthesises ~5000 bytes per request; a detailed
-   lesson easily exceeds that. speakLong() splits the cleaned
-   text at sentence boundaries (including । ॥ 。！？ ؟ …) and
-   plays the chunks back-to-back as ONE continuous answer.
+   lesson easily exceeds that. speakLong() splits into the fewest
+   chunks that fit, prefetches the next chunk while the current
+   one plays, and chains them with no fetch gap in between.
    Stopping at any moment cancels the whole queue.
 ============================================================ */
 
 let longSpeakToken = 0;
 
-export function splitSpeechChunks(text: string, maxChars = 880): string[] {
-  const endings = new Set([".", "?", "!", "।", "॥", "。", "！", "？", "؟", "…", ";", ":"]);
+const SENTENCE_ENDERS = new Set([".", "?", "!", "।", "॥", "。", "！", "？", "؟", "…"]);
+
+function utf8Len(text: string): number {
+  if (typeof TextEncoder !== "undefined") return new TextEncoder().encode(text).length;
+  // Conservative fallback for multi-byte scripts (UTF-8 ≤ 3 bytes/char).
+  return text.length * 3;
+}
+
+/**
+ * Split a long answer into the FEWEST chunks that stay under the cloud
+ * TTS byte limit (~5000 bytes per request). Breaking at every "." made the
+ * tutor pause unnaturally between sentences; now periods inside a chunk flow
+ * together and a cut only happens when a chunk is genuinely too long — and
+ * then at a real sentence boundary, never mid-word.
+ */
+export function splitSpeechChunks(text: string, maxBytes = 4200): string[] {
   const chunks: string[] = [];
   let current = "";
-  const push = (piece: string) => {
-    const trimmed = piece.trim();
-    if (trimmed) chunks.push(trimmed);
-  };
-  // Walk characters; break after a sentence ender followed by a space (or
-  // when the running chunk hits the size cap — never mid-word if avoidable).
-  let lastSpace = -1;
+  let lastBoundary = 0; // safe cut point (right after a sentence ender)
+
   for (let i = 0; i < text.length; i++) {
     current += text[i];
-    if (text[i] === " ") lastSpace = current.length - 1;
-    const nextChar = text[i + 1] ?? " ";
-    const boundary = endings.has(text[i]) && (nextChar === " " || i === text.length - 1);
-    if (boundary || current.length >= maxChars) {
-      if (!boundary && lastSpace > 40) {
-        // size cap hit mid-sentence → cut at the last space, rewind the rest
-        push(current.slice(0, lastSpace + 1));
-        current = current.slice(lastSpace + 1);
-        lastSpace = -1;
+    const next = text[i + 1] ?? " ";
+    const ended = SENTENCE_ENDERS.has(text[i]) && (next === " " || next === "\n" || i === text.length - 1);
+    if (ended) lastBoundary = current.length;
+
+    if (utf8Len(current) >= maxBytes) {
+      if (lastBoundary > 0) {
+        chunks.push(current.slice(0, lastBoundary).trim());
+        current = current.slice(lastBoundary);
+        lastBoundary = 0;
       } else {
-        push(current);
-        current = "";
-        lastSpace = -1;
+        // A single sentence longer than the cap: cut at the last word gap.
+        const gap = current.lastIndexOf(" ");
+        const cut = gap > 32 ? gap + 1 : current.length;
+        chunks.push(current.slice(0, cut).trim());
+        current = current.slice(cut);
+        lastBoundary = 0;
       }
     }
   }
-  push(current);
+  if (current.trim()) chunks.push(current.trim());
   return chunks;
+}
+
+/** Fetch a chunk's audio into the client cache WITHOUT playing it, so the
+ *  next chunk is ready before the current one finishes — removing the long
+ *  pause that used to sit between parts of a spoken lesson. */
+async function prefetchVoice(text: string, voiceId: string): Promise<void> {
+  const cleaned = cleanForSpeech(text);
+  const cacheKey = `${voiceId}\0${cleaned}`;
+  if (clientAudioCache.has(cacheKey)) return;
+  try {
+    const response = await fetch("/api/voice", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ text: cleaned, voiceId }),
+    });
+    if (!response.ok) return;
+    const bytes = await response.arrayBuffer();
+    const contentType = response.headers.get("content-type") || "audio/wav";
+    clientAudioCache.set(cacheKey, { bytes, contentType });
+    while (clientAudioCache.size > MAX_CLIENT_AUDIO_CACHE) {
+      const oldest = clientAudioCache.keys().next().value as string | undefined;
+      if (!oldest) break;
+      clientAudioCache.delete(oldest);
+    }
+  } catch {
+    // Playback falls back to an on-demand fetch for this chunk.
+  }
 }
 
 export async function speakLong(
@@ -481,6 +486,13 @@ export async function speakLong(
 
   for (let index = 0; index < chunks.length; index++) {
     if (!isCurrent()) return; // the user stopped playback mid-answer
+    // Warm the next part while this one plays (cloud voices only). The
+    // on-demand fetch in speak() then hits the cache and starts instantly,
+    // so long lessons flow as one continuous narration instead of pausing
+    // after every sentence.
+    if (voiceId !== "device" && index + 1 < chunks.length) {
+      void prefetchVoice(chunks[index + 1], voiceId);
+    }
     let settled = false;
     await new Promise<void>((resolve) => {
       speak(chunks[index], voiceId, {
@@ -518,31 +530,18 @@ export type ListenFinal = {
 };
 
 const LAST_LANG_KEY = "shigun-stt-lang";
-const MANUAL_LANG_KEY = "shigun-stt-manual-lang";
 
-/** The language the learner pinned in the mic menu, or null for Auto. */
-export function manualSttLang(): string | null {
-  if (typeof window === "undefined") return null;
-  const value = localStorage.getItem(MANUAL_LANG_KEY);
-  return value && value !== "auto" ? value : null;
-}
-
-export function setManualSttLang(bcp: string): void {
-  try {
-    localStorage.setItem(MANUAL_LANG_KEY, bcp || "auto");
-  } catch { /* private mode */ }
-}
-
+/** The recognition language. Shigun assesses the language itself: it starts
+ *  from the last script the learner spoke and keeps learning as they talk —
+ *  there is no manual picker to get wrong. */
 export function preferredSttLang(): string {
   if (typeof window === "undefined") return "en-IN";
-  // A pinned language always wins; Auto falls back to the last script
-  // the engine recognised in the learner's own speech.
-  return manualSttLang() || localStorage.getItem(LAST_LANG_KEY) || "en-IN";
+  return localStorage.getItem(LAST_LANG_KEY) || "en-IN";
 }
 
+/** Learn the language from the learner's own speech so the NEXT listen
+ *  already tunes recognition (and the reply script) to match. */
 export function learnSttLang(transcript: string): void {
-  // Never overwrite an explicit choice — the learner picked it on purpose.
-  if (manualSttLang()) return;
   for (const language of LANGS) {
     if (language.range.test(transcript)) {
       localStorage.setItem(LAST_LANG_KEY, language.bcp);

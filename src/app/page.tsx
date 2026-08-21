@@ -314,7 +314,7 @@ export default function Home() {
   };
 
   const askTutor = useCallback(
-    async (q: string, meta?: { voice?: boolean }) => {
+    async (q: string, meta?: { voice?: boolean; voiceId?: string }) => {
       const message = q.trim();
       setChatOpen(true);
       // Disable duplicate taps synchronously; waiting for `thinking` to render
@@ -331,7 +331,7 @@ export default function Home() {
           "/api/chat",
           {
             method: "POST",
-            body: JSON.stringify({ message, source: meta?.voice ? "voice" : "text" }),
+            body: JSON.stringify({ message, source: meta?.voice ? "voice" : "text", voiceId: meta?.voiceId || "f1" }),
           }
         );
         setState(r.state);
