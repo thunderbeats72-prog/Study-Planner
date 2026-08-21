@@ -25,21 +25,24 @@ export default function CommandPalette({ commands }: { commands: Command[] }) {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
-        setOpen((v) => !v);
+        if (open) {
+          setOpen(false);
+        } else {
+          // Reset for a fresh session when opening (event handler, not effect).
+          setQuery("");
+          setActive(0);
+          setOpen(true);
+        }
       } else if (e.key === "Escape") {
         setOpen(false);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [open]);
 
   useEffect(() => {
-    if (open) {
-      setQuery("");
-      setActive(0);
-      setTimeout(() => inputRef.current?.focus(), 40);
-    }
+    if (open) setTimeout(() => inputRef.current?.focus(), 40);
   }, [open]);
 
   const filtered = useMemo(() => {
@@ -50,9 +53,8 @@ export default function CommandPalette({ commands }: { commands: Command[] }) {
     );
   }, [query, commands]);
 
-  useEffect(() => {
-    if (active >= filtered.length) setActive(0);
-  }, [filtered.length, active]);
+  // Clamp the highlight during render instead of correcting it in an effect.
+  const safeActive = filtered.length ? Math.min(active, filtered.length - 1) : 0;
 
   if (!open) return null;
 
@@ -75,13 +77,13 @@ export default function CommandPalette({ commands }: { commands: Command[] }) {
             className="cmdk-input"
             placeholder="Type a command or search… (Esc to close)"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => { setQuery(e.target.value); setActive(0); }}
             onKeyDown={(e) => {
               if (e.key === "ArrowDown") { e.preventDefault(); setActive((a) => Math.min(filtered.length - 1, a + 1)); }
               else if (e.key === "ArrowUp") { e.preventDefault(); setActive((a) => Math.max(0, a - 1)); }
               else if (e.key === "Enter") {
                 e.preventDefault();
-                const c = filtered[active];
+                const c = filtered[safeActive];
                 if (c) { c.run(); setOpen(false); }
               }
             }}
@@ -98,7 +100,7 @@ export default function CommandPalette({ commands }: { commands: Command[] }) {
                 return (
                   <button
                     key={c.id}
-                    className={`cmdk-item${idx === active ? " active" : ""}`}
+                    className={`cmdk-item${idx === safeActive ? " active" : ""}`}
                     onMouseEnter={() => setActive(idx)}
                     onClick={() => { c.run(); setOpen(false); }}
                   >

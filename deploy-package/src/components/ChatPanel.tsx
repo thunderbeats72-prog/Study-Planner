@@ -61,12 +61,16 @@ export default function ChatPanel({
     }
   }, [messages, voiceId, support.tts]);
 
-  // Stop everything when the panel closes
+  // Stop everything when the panel closes. This stays imperative (no
+  // setState in the effect): the listen/speak finalize callbacks below
+  // reset the UI flags, and the token check in toggleListen covers a mic
+  // warm-up that was still in flight.
   useEffect(() => {
     if (!open) {
       listenSession.current++; // cancel any in-flight mic warm-up
-      stopSpeaking(); listenRef.current?.stop(); listenRef.current = null;
-      setListening(false); setSpeaking(false); setMicWaking(false);
+      stopSpeaking();
+      listenRef.current?.stop();
+      listenRef.current = null;
     }
   }, [open]);
 
@@ -121,7 +125,13 @@ export default function ChatPanel({
       },
       (err) => { setListening(false); setMicWaking(false); listenRef.current = null; if (openRef.current) setVoiceErr(err); }
     );
-    if (token !== listenSession.current) { h?.stop(); return; } // cancelled/closed meanwhile
+    if (token !== listenSession.current) {
+      // Cancelled, or the panel closed while the mic was warming up.
+      h?.stop();
+      setListening(false);
+      setMicWaking(false);
+      return;
+    }
     if (h) { listenRef.current = h; setMicWaking(false); setListening(true); }
     else setMicWaking(false);
   };
@@ -138,7 +148,7 @@ export default function ChatPanel({
           <div className="ai-head">
             <div className="brand-logo-icon" style={{ width: 32, height: 32 }}><IconSpark size={16} /></div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: ".9rem", fontWeight: 800 }}>SHIGUN AI Tutor</div>
+              <div className="ai-title">SHIGUN AI Tutor</div>
               <div className="ai-status">
                 {micWaking ? "waking mic…" : listening ? "listening…" : speaking ? "speaking…" : provider ? `${provider} connected` : "hybrid engine online"}
               </div>

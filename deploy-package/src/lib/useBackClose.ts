@@ -14,7 +14,9 @@ import { useEffect, useRef } from "react";
  */
 export function useBackClose(open: boolean, onClose: () => void) {
   const closeRef = useRef(onClose);
-  closeRef.current = onClose;
+  useEffect(() => {
+    closeRef.current = onClose;
+  }, [onClose]);
   const armedRef = useRef(false);
 
   useEffect(() => {

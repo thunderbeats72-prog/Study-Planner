@@ -93,14 +93,34 @@ export function voiceSupported(): { stt: boolean; tts: boolean } {
   return { stt: !!SR, tts: "speechSynthesis" in window };
 }
 
+/** Convert markdown-ish tutor text into something that reads naturally
+ *  aloud: strip markup, expand common abbreviations/symbols, and keep
+ *  sentence punctuation so the engine pauses where a human would. */
 function cleanForSpeech(md: string): string {
-  return md
+  let s = md
     .replace(/\[\[action:[^\]]*\]\]/g, "")
-    .replace(/[*_#`>]+/g, "")
     .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/```[\s\S]*?```/g, "")
+    .replace(/[*_#`>~]/g, "")
+    .replace(/^\s*[-–—]{3,}\s*$/gm, "")
+    .replace(/^\s*[-•*]\s+/gm, "Next point, ")
+    .replace(/^\s*\d+[.)]\s+/gm, "")
+    .replace(/\be\.g\./gi, "for example")
+    .replace(/\bi\.e\./gi, "that is")
+    .replace(/\betc\./gi, "etcetera")
+    .replace(/\bvs\./gi, "versus")
+    .replace(/[→⇒]/g, ", so ")
+    .replace(/%/g, " percent")
+    .replace(/&/g, " and ")
+    .replace(/\b\+\b/g, " plus ")
+    .replace(/["“”‘’]/g, "")
+    .replace(/[–—]/g, ", ")
     .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 800);
+    .trim();
+  // Read numeric durations the way a tutor would say them.
+  s = s.replace(/(\d+(?:\.\d+)?)\s*(?:min|mins)\b/gi, "$1 minutes");
+  s = s.replace(/(\d+(?:\.\d+)?)\s*(?:hr|hrs)\b/gi, "$1 hours");
+  return s;
 }
 
 /** Detect the language of a word by script range; Latin defaults to en. */
@@ -130,42 +150,125 @@ function bcpFor(code: string): string {
   return LANGS.find((l) => l.code === code)?.bcp || "en-IN";
 }
 
+/** Split into sentence-sized pieces (punctuation kept) so the engine can
+ *  pause naturally, then group them into chunks small enough for a browser
+ *  to speak each one completely — the fix for long answers being cut off. */
+const MAX_UTTERANCE = 180;
+
+function splitSentences(text: string): string[] {
+  const clean = text.replace(/\s+/g, " ").trim();
+  if (!clean) return [];
+  const parts = clean.split(/([.!?…])\s+/);
+  const out: string[] = [];
+  for (let i = 0; i < parts.length; i += 2) {
+    const sentence = (parts[i] + (parts[i + 1] || "")).trim();
+    if (sentence) out.push(sentence);
+  }
+  return out.length ? out : [clean];
+}
+
+function chunkForSpeech(text: string, max = MAX_UTTERANCE): string[] {
+  const sentences = splitSentences(text);
+  const chunks: string[] = [];
+  let cur = "";
+  const push = (piece: string) => {
+    const p = piece.trim();
+    if (!p) return;
+    if (cur && (cur.length + p.length + 2) > max) {
+      chunks.push(cur.trim());
+      cur = p;
+    } else {
+      cur = cur ? `${cur} ${p}` : p;
+    }
+  };
+  for (const s of sentences) {
+    if (s.length > max) {
+      if (cur.trim()) { chunks.push(cur.trim()); cur = ""; }
+      const subs = s.split(/,\s*/);
+      for (let i = 0; i < subs.length; i++) {
+        push(i === subs.length - 1 ? subs[i] : `${subs[i]},`);
+      }
+    } else {
+      push(s);
+    }
+  }
+  if (cur.trim()) chunks.push(cur.trim());
+  return chunks.length ? chunks : [text.trim()];
+}
+
+// Speech-session bookkeeping so `stopSpeaking` can cleanly end a reply.
+let speakToken = 0;
+let activeFinish: (() => void) | null = null;
+
 export async function speak(
   text: string,
   voiceId: string,
   onEnd?: () => void
 ): Promise<void> {
   if (!("speechSynthesis" in window)) { onEnd?.(); return; }
+  const token = ++speakToken;
   await loadVoices();
+  if (token !== speakToken) { onEnd?.(); return; } // cancelled while voices loaded
   window.speechSynthesis.cancel();
+  await new Promise((r) => setTimeout(r, 30));     // let Chrome settle after cancel
 
-  const runs = splitLanguageRuns(cleanForSpeech(text));
-  if (!runs.length) { onEnd?.(); return; }
+  type Piece = { text: string; lang: string };
+  const queue: Piece[] = [];
+  for (const chunk of chunkForSpeech(cleanForSpeech(text))) {
+    for (const run of splitLanguageRuns(chunk)) queue.push({ text: run.text, lang: run.lang });
+  }
+  if (!queue.length) { onEnd?.(); return; }
+
+  const profile =
+    voiceId === "m1" ? { rate: 0.96, pitch: 0.78 }   // Male: deeper, measured
+    : voiceId === "f2" ? { rate: 1.06, pitch: 1.1 }  // Female 2: brighter, quicker
+    : { rate: 1.0, pitch: 1.0 };                     // Female 1: natural baseline
 
   let idx = 0;
+  let done = false;
+  const finish = () => {
+    if (done) return;
+    done = true;
+    if (activeFinish === finish) activeFinish = null;
+    onEnd?.();
+  };
+  activeFinish = finish;
+
   const speakNext = () => {
-    if (idx >= runs.length) { onEnd?.(); return; }
-    const run = runs[idx++];
-    const utter = new SpeechSynthesisUtterance(run.text);
-    const v = pickVoice(voiceId, run.lang);
+    if (done) return;
+    if (token !== speakToken) { finish(); return; }
+    if (idx >= queue.length) { finish(); return; }
+    const piece = queue[idx++];
+    // Gentle per-sentence variation so a long reply never drones.
+    const wave = Math.sin(idx * 1.7) * 0.02;
+    const utter = new SpeechSynthesisUtterance(piece.text);
+    const v = pickVoice(voiceId, piece.lang);
     if (v) { utter.voice = v; utter.lang = v.lang; }
-    else utter.lang = bcpFor(run.lang);
-    const profile = voiceId === "m1"
-      ? { rate: 0.97, pitch: 0.78 }   // Male: deeper, measured
-      : voiceId === "f2"
-        ? { rate: 1.08, pitch: 1.12 } // Female 2: brighter, quicker
-        : { rate: 1.0, pitch: 1.0 };  // Female 1: natural baseline
-    utter.rate = profile.rate * (run.lang === "en" ? 1.02 : 0.96);
-    utter.pitch = profile.pitch;
-    utter.onend = speakNext;
-    utter.onerror = speakNext;
+    else utter.lang = bcpFor(piece.lang);
+    utter.rate = Math.min(1.25, Math.max(0.75, profile.rate * (piece.lang === "en" ? 1.02 : 0.96) + wave));
+    utter.pitch = Math.min(1.4, Math.max(0.5, profile.pitch + wave / 2));
+    utter.volume = 1;
+    // A natural breath between sentences; shorter inside a long one.
+    const gap = /[.!?…]\s*$/.test(piece.text) ? 150 : 70;
+    let advanced = false;
+    const advance = () => {
+      if (advanced) return;
+      advanced = true;
+      setTimeout(speakNext, gap);
+    };
+    utter.onend = advance;
+    utter.onerror = advance;
     window.speechSynthesis.speak(utter);
   };
   speakNext();
 }
 
 export function stopSpeaking(): void {
+  speakToken++;
   if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+  const cb = activeFinish;
+  activeFinish = null;
+  if (cb) cb();
 }
 
 /* ============================================================
