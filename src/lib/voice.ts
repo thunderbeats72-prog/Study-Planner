@@ -2,24 +2,34 @@
 
 import { detectLanguage, shortLang } from "./language";
 import { mergeTranscriptSegments } from "./transcript";
+import {
+  EDGE_VOICES,
+  synthesiseEdgeSpeech,
+} from "./edgeTts";
 
 // ============================================================
-// SHIGUN VOICE
+// SHIGUN VOICE — keyless neural speech, one speaker everywhere
+// - DEFAULT ENGINE: Microsoft Edge multilingual neural (NO API key):
+//   Ava (f1) · Emma (f2) · Andrew (m1). The same neural person speaks
+//   every language (Hindi, Hinglish, English, Tamil, …) — only the
+//   SSML xml:lang changes, never the voice name.
+// - Order: /api/voice (Edge, optional Gemini/Chirp when keys exist) →
+//   direct browser connection to the same Edge service (for networks
+//   the server cannot reach) → pinned device speechSynthesis, LAST
+//   resort only, same speaker for every language.
 // - Recognition is single-utterance and overlap-deduplicated.
-// - The selected persona (Kore / Aoede / Charon) is locked for Gemini TTS,
-//   Chirp 3 HD, and the last-resort device engine. Language never swaps the
-//   speaker — only the words.
 // - Every listen/playback has a generation token so late mobile callbacks
 //   cannot restart audio or submit an old transcript.
 // ============================================================
 
 export type VoiceOption = { id: string; label: string; gender: "female" | "male"; hint: string };
 
-export const VOICE_OPTIONS: VoiceOption[] = [
-  { id: "f1", label: "Kore", gender: "female", hint: "Warm human tutor" },
-  { id: "f2", label: "Aoede", gender: "female", hint: "Bright clear tutor" },
-  { id: "m1", label: "Charon", gender: "male", hint: "Grounded tutor" },
-];
+export const VOICE_OPTIONS: VoiceOption[] = Object.values(EDGE_VOICES).map((voice) => ({
+  id: voice.id as string,
+  label: voice.label,
+  gender: voice.gender,
+  hint: voice.hint,
+}));
 
 export function resolveVoiceId(id: string | null | undefined): string {
   if (id && VOICE_OPTIONS.some((voice) => voice.id === id)) return id;
@@ -64,11 +74,13 @@ const BASE_SPEECH_HINTS = [
   "Explain in simple words",
 ];
 
-/** Pinned last-resort device voices. Same speaker for every language. */
+/** Pinned last-resort device voices. Same speaker for every language —
+ *  the neural Edge voices above are the normal path; this robotic
+ *  device fallback only speaks when every neural route is down. */
 const PINNED_NATIVE: Record<string, string[]> = {
-  f1: ["Google UK English Female", "Microsoft Sonia", "Samantha", "Google US English", "Karen", "Victoria", "female"],
-  f2: ["Google US English", "Microsoft Aria", "Samantha", "Victoria", "Karen", "female"],
-  m1: ["Google UK English Male", "Microsoft Ryan", "Daniel", "Alex", "Google US English", "male"],
+  f1: ["Ava Online", "Microsoft Ava", "Google UK English Female", "Microsoft Sonia", "Samantha", "Google US English", "Karen", "Victoria", "female"],
+  f2: ["Emma Online", "Microsoft Emma", "Google US English", "Microsoft Aria", "Samantha", "Victoria", "Karen", "female"],
+  m1: ["Andrew Online", "Microsoft Andrew", "Google UK English Male", "Microsoft Ryan", "Daniel", "Alex", "Google US English", "male"],
 };
 
 let cachedVoices: SpeechSynthesisVoice[] = [];
@@ -430,7 +442,7 @@ export async function speak(
     return;
   }
 
-  let errorMessage = "The selected Shigun voice is temporarily unavailable.";
+  let errorMessage = "The selected neural voice is temporarily unavailable.";
   const requestClip = async (): Promise<VoiceFetchResult> => {
     const controller = new AbortController();
     speechAbort = controller;
@@ -446,7 +458,7 @@ export async function speak(
       const timeout = window.setTimeout(() => {
         timedOut = true;
         controller.abort();
-        settle({ clip: null, errorMessage: "The studio voice is taking too long to respond." });
+        settle({ clip: null, errorMessage: "The neural voice is taking too long to respond." });
       }, VOICE_FETCH_TIMEOUT_MS);
       controller.signal.addEventListener("abort", () => {
         if (!timedOut) settle({ clip: null });
@@ -472,7 +484,7 @@ export async function speak(
         playbackRate
       );
       if (played) return;
-      errorMessage = "Cloud audio could not start on this device.";
+      errorMessage = "Neural audio could not start on this device.";
     } else if (fetched.errorMessage) {
       errorMessage = fetched.errorMessage;
     }
@@ -485,7 +497,7 @@ export async function speak(
   // Last resort only: same pinned persona, never a language-swapped speaker.
   if (generation === speechGeneration
     && await speakNative(text, personaId, generation, start, finish, playbackRate)) {
-    callbacks.onFallback?.(`${VOICE_OPTIONS.find((v) => v.id === personaId)?.label || "Kore"} is still speaking — studio is reconnecting.`);
+    callbacks.onFallback?.(`${VOICE_OPTIONS.find((v) => v.id === personaId)?.label || "Ava"} is still speaking — the neural voice is reconnecting.`);
     return;
   }
 
@@ -500,7 +512,7 @@ export function stopSpeaking(): void {
 
 /* ============================================================
    LONG ANSWERS — full spoken delivery, flowing like one turn.
-   Cloud TTS synthesises ~5000 bytes per request; a detailed
+   Neural TTS synthesises ~5000 bytes per request; a detailed
    lesson easily exceeds that. speakLong() splits into the fewest
    chunks that fit, prefetches the next chunk while the current
    one plays, and chains them with no fetch gap in between.
@@ -615,7 +627,7 @@ async function fetchVoiceClip(
   if (existing) return existing;
 
   const request = (async (): Promise<VoiceFetchResult> => {
-    let errorMessage = "The selected Shigun voice is temporarily unavailable.";
+    let errorMessage = "The selected neural voice is temporarily unavailable.";
     try {
       const response = await fetch("/api/voice", {
         method: "POST",
@@ -625,14 +637,23 @@ async function fetchVoiceClip(
       });
       if (response.ok) {
         const bytes = await response.arrayBuffer();
-        const contentType = response.headers.get("content-type") || "audio/wav";
+        const contentType = response.headers.get("content-type") || "audio/mpeg";
         return { clip: storeClientAudio(cacheKey, { bytes, contentType }) };
       }
       const payload = await response.json().catch(() => null) as { error?: string } | null;
       if (payload?.error) errorMessage = payload.error;
     } catch {
-      // Fall through with the default message below.
+      // Server unreachable — the direct browser connection below may
+      // still reach the keyless Edge neural service on its own.
     }
+
+    // Server route could not deliver (restricted server network, service
+    // hiccup). Connect DIRECTLY from the learner's browser to the same
+    // keyless Microsoft Edge neural service — still Ava / Emma / Andrew,
+    // still no API key, still the same person in every language.
+    const direct = await synthesizeEdgeDirect(cleaned, voiceId);
+    if (direct) return { clip: storeClientAudio(cacheKey, direct) };
+
     return { clip: null, errorMessage };
   })();
 
@@ -641,6 +662,47 @@ async function fetchVoiceClip(
     return await request;
   } finally {
     if (clientAudioInflight.get(cacheKey) === request) clientAudioInflight.delete(cacheKey);
+  }
+}
+
+/* Browser-direct Edge synthesis state. After a failure, wait out the
+   backoff before burning another connection attempt mid-conversation. */
+let edgeDirectDownUntil = 0;
+const EDGE_DIRECT_BACKOFF_MS = 120_000;
+const edgeDirectInflight = new Set<string>();
+
+async function synthesizeEdgeDirect(cleaned: string, voiceId: string): Promise<ClientAudioCache | null> {
+  if (typeof window === "undefined" || typeof WebSocket === "undefined") return null;
+  if (!globalThis.crypto?.subtle) return null; // needs a secure context
+  if (Date.now() < edgeDirectDownUntil) return null;
+  const dedupe = `${voiceId}\0${cleaned}`;
+  if (edgeDirectInflight.has(dedupe)) return null;
+
+  edgeDirectInflight.add(dedupe);
+  try {
+    const result = await synthesiseEdgeSpeech({
+      text: cleaned,
+      voiceId,
+      language: detectLanguage(cleaned),
+      timeoutMs: 9_000,
+    });
+    if ("bytes" in result && result.bytes.length) {
+      edgeDirectDownUntil = 0;
+      return {
+        bytes: result.bytes.buffer.slice(
+          result.bytes.byteOffset,
+          result.bytes.byteOffset + result.bytes.byteLength
+        ) as ArrayBuffer,
+        contentType: "audio/mpeg",
+      };
+    }
+    edgeDirectDownUntil = Date.now() + EDGE_DIRECT_BACKOFF_MS;
+    return null;
+  } catch {
+    edgeDirectDownUntil = Date.now() + EDGE_DIRECT_BACKOFF_MS;
+    return null;
+  } finally {
+    edgeDirectInflight.delete(dedupe);
   }
 }
 
@@ -677,8 +739,8 @@ export async function speakLong(
   let startedOnce = false;
   let completed = 0;
   const personaId = resolveVoiceId(voiceId);
-  // Stay on the studio persona. Native is only used after two cloud misses
-  // in a row so a single timeout cannot swap Kore for the device speaker.
+  // Stay on the neural persona. Native is only used after two cloud misses
+  // in a row so a single timeout cannot swap Ava for the device speaker.
   let cloudMisses = 0;
   let continueLocally = false;
   const start = () => {
