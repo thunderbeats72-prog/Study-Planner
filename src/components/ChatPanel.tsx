@@ -13,11 +13,6 @@ const QUICKS = [
   "What should I study today?",
   "I'm behind — replan",
   "Explain my weakest topic in detail",
-  "How am I doing?",
-  "Give me 5 practice questions",
-  "Start timer",
-  "हिंदी में समझाओ",
-  "Explain in simple words",
 ];
 
 /** Below this confidence the transcript waits for review instead of
@@ -45,6 +40,7 @@ export default function ChatPanel({
   const [micWaking, setMicWaking] = useState(false);
   const [voicePreparing, setVoicePreparing] = useState(false);
   const [speaking, setSpeaking] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [voiceErr, setVoiceErr] = useState("");
   const [voiceNotice, setVoiceNotice] = useState("");
   const [voiceHint, setVoiceHint] = useState(""); // "review what I heard" prompt
@@ -278,11 +274,23 @@ export default function ChatPanel({
                       : provider ? `${provider} configured · local fallback ready` : "Local tutor ready"}
                 </div>
               </div>
-              <button className="ai-close" aria-label="Close chat" onClick={() => setOpen(false)}><IconClose size={17} /></button>
+              <div style={{ display: "flex", gap: "0.5rem" }}>
+                <button 
+                  className="ai-close" 
+                  aria-label="Toggle settings" 
+                  onClick={() => setShowSettings(!showSettings)}
+                  title="Voice Settings"
+                  style={{ background: "transparent", border: "none", cursor: "pointer", opacity: 0.6 }}
+                >
+                  ⚙️
+                </button>
+                <button className="ai-close" aria-label="Close chat" onClick={() => setOpen(false)}><IconClose size={17} /></button>
+              </div>
             </div>
 
-            <div className="ai-toolbar">
-              <div className="ai-toolbar-group" title="Speech Input Language">
+            {showSettings && (
+              <div className="ai-toolbar" style={{ borderTop: "1px solid var(--border)", paddingTop: "0.5rem", marginTop: "0.5rem" }}>
+                <div className="ai-toolbar-group" title="Speech Input Language">
                 <span className="ai-toolbar-label">Input</span>
                 <select
                   className="voice-select stt-select"
@@ -348,6 +356,7 @@ export default function ChatPanel({
                 </>
               )}
             </div>
+            )}
           </div>
 
           <div className="ai-msgs">

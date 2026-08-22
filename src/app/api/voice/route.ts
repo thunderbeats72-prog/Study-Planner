@@ -474,7 +474,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Voice text is too long for one part." }, { status: 413 });
   }
   const profile = VOICES[String(body.voiceId || "f1")] || VOICES.f1;
-  const language = languageFor(text);
+  const language = "en-IN";
   const chirpKey = cloudTtsKey();
   const gemini = geminiKey();
   const providerId = chirpKey ? "google-cloud-tts" : `gemini-tts:${geminiTtsModels().join(",")}`;
