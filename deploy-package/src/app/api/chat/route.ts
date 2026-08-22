@@ -18,7 +18,7 @@ export const maxDuration = 120;
 
 type GroundingState = Awaited<ReturnType<typeof fullState>>;
 
-function localCurriculumReply(question: string, state: GroundingState): string | null {
+export function localCurriculumReply(question: string, state: GroundingState): string | null {
   const normalized = question.toLocaleLowerCase();
   const tokens = new Set(normalized.split(/[^\p{L}\p{N}]+/u).filter((token) => token.length >= 3));
   const doneTopicIds = new Set(state.tasks
@@ -51,7 +51,14 @@ function localCurriculumReply(question: string, state: GroundingState): string |
 
   const asksPractice = /practice|questions?|quiz|test me|problems?|अभ्यास|प्रश्न/i.test(question);
   const asksTeaching = /explain|teach|lesson|understand|what is|how does|in detail|simple words|समझा|बताओ/i.test(question);
-  if ((!selected || selected.score < 2) && (asksPractice || asksTeaching)) {
+  // The plan-lesson fallback may ONLY run for questions that are actually
+  // about the learner's own curriculum ("today's lesson", "my weakest topic",
+  // "give me practice questions"). A generic "what is X?" with no lesson
+  // overlap must never be answered with a random lesson from the plan —
+  // that produced wrong, unrelated replies (e.g. "what is the capital of
+  // France?" answered with the current study card).
+  const aboutOwnCurriculum = /(today|current|next|this|my|that|lesson|topic|subject|weakest|kamzor|practice|अभ्यास|आज|पाठ|विषय|सबक|कमज़ोर|कमजोर|आजचा|இன்றைய|నేటి|ಇಂದಿನ|ഇന്നത്തെ|આજનો|ਅੱਜ ਦਾ|ଆଜିର|आजको)/i.test(question);
+  if ((!selected || selected.score < 2) && (asksPractice || asksTeaching) && aboutOwnCurriculum) {
     const todayTask = state.tasks.find((task) => task.status === "pending" && task.topicId);
     const topic = state.topics.find((item) => item.id === todayTask?.topicId)
       || state.topics.find((item) => item.status !== "done")
@@ -163,6 +170,22 @@ export async function POST(req: Request) {
   const voiceId = typeof body.voiceId === "string" && ["f1", "f2", "m1", "device"].includes(body.voiceId)
     ? body.voiceId
     : "f1";
+
+  try {
+    return await handleChat(req, { source, voiceId, message: rawText });
+  } catch (error) {
+    // The user message may already be persisted — returning a clear, retryable
+    // JSON error is far better than a raw 500 page with no explanation.
+    console.error("Chat route failed:", error instanceof Error ? error.message : error);
+    return NextResponse.json(
+      { error: "Shigun hit a temporary problem. Please try again in a moment.", code: "TUTOR_UNAVAILABLE" },
+      { status: 503 }
+    );
+  }
+}
+
+async function handleChat(req: Request, opts: { source: "voice" | "text"; voiceId: string; message: string }) {
+  const { source, voiceId, message: rawText } = opts;
   const key = keyFrom(req);
   const user = await getOrCreateUser(key);
   // The reply's grammar (gender/verb agreement) follows the selected voice.
@@ -299,8 +322,16 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE(req: Request) {
-  const key = keyFrom(req);
-  const user = await getOrCreateUser(key);
-  await db.delete(messages).where(eq(messages.userId, user.id));
-  return NextResponse.json({ ok: true });
+  try {
+    const key = keyFrom(req);
+    const user = await getOrCreateUser(key);
+    await db.delete(messages).where(eq(messages.userId, user.id));
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    console.error("Chat clear failed:", error instanceof Error ? error.message : error);
+    return NextResponse.json(
+      { error: "Could not clear the chat right now. Please try again shortly.", code: "CHAT_CLEAR_FAILED" },
+      { status: 503 }
+    );
+  }
 }

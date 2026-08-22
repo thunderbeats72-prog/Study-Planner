@@ -93,6 +93,61 @@ const VOICE_PREFS: Record<string, Record<string, string[]>> = {
     f2: ["Microsoft Kalpana", "Google हिन्दी", "hi-IN"],
     m1: ["Microsoft Hemant", "Google हिन्दी", "hi-IN"],
   },
+  mr: {
+    f1: ["Google मराठी", "Microsoft Aarohi", "mr-IN"],
+    f2: ["Microsoft Aarohi", "Google मराठी", "mr-IN"],
+    m1: ["Microsoft Manohar", "Google मराठी", "mr-IN"],
+  },
+  bn: {
+    f1: ["Google বাংলা", "Microsoft Bhaswati", "bn-IN"],
+    f2: ["Microsoft Bhaswati", "Google বাংলা", "bn-IN"],
+    m1: ["Microsoft Basabdutta", "Google বাংলা", "bn-IN"],
+  },
+  ta: {
+    f1: ["Google தமிழ்", "Microsoft Valluvar", "ta-IN"],
+    f2: ["Microsoft Valluvar", "Google தமிழ்", "ta-IN"],
+    m1: ["Microsoft Kabilan", "Google தமிழ்", "ta-IN"],
+  },
+  te: {
+    f1: ["Google తెలుగు", "Microsoft Shruti", "te-IN"],
+    f2: ["Microsoft Shruti", "Google తెలుగు", "te-IN"],
+    m1: ["Microsoft Mohan", "Google తెలుగు", "te-IN"],
+  },
+  kn: {
+    f1: ["Google ಕನ್ನಡ", "Microsoft Asha", "kn-IN"],
+    f2: ["Microsoft Asha", "Google ಕನ್ನಡ", "kn-IN"],
+    m1: ["Microsoft Gagan", "Google ಕನ್ನಡ", "kn-IN"],
+  },
+  ml: {
+    f1: ["Google മലയാളം", "Microsoft Sobhana", "ml-IN"],
+    f2: ["Microsoft Sobhana", "Google മലയാളം", "ml-IN"],
+    m1: ["Microsoft Midhun", "Google മലയാളം", "ml-IN"],
+  },
+  gu: {
+    f1: ["Google ગુજરાતી", "Microsoft Nisha", "gu-IN"],
+    f2: ["Microsoft Nisha", "Google ગુજરાતી", "gu-IN"],
+    m1: ["Microsoft Dharmik", "Google ગુજરાતી", "gu-IN"],
+  },
+  pa: {
+    f1: ["Google ਪੰਜਾਬੀ", "Microsoft Aastha", "pa-IN"],
+    f2: ["Microsoft Aastha", "Google ਪੰਜਾਬੀ", "pa-IN"],
+    m1: ["Microsoft Aastha", "Google ਪੰਜਾਬੀ", "pa-IN"],
+  },
+  or: {
+    f1: ["Google ଓଡ଼ିଆ", "Microsoft Ananya", "or-IN"],
+    f2: ["Microsoft Ananya", "Google ଓଡ଼ିଆ", "or-IN"],
+    m1: ["Microsoft Ananya", "Google ଓଡ଼ିଆ", "or-IN"],
+  },
+  ur: {
+    f1: ["Google اردو", "Microsoft Salman", "ur-PK"],
+    f2: ["Microsoft Salman", "Google اردو", "ur-PK"],
+    m1: ["Microsoft Salman", "Google اردو", "ur-PK"],
+  },
+  ar: {
+    f1: ["Google العربية", "Microsoft Naayf", "ar-SA"],
+    f2: ["Microsoft Naayf", "Google العربية", "ar-SA"],
+    m1: ["Microsoft Naayf", "Google العربية", "ar-SA"],
+  },
 };
 
 let cachedVoices: SpeechSynthesisVoice[] = [];
