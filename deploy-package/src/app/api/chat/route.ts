@@ -97,6 +97,7 @@ export async function POST(req: Request) {
 
   let finalText: string;
   let replanned = false;
+  let usedCloud = false;
 
   if (languageReply) {
     finalText = languageReply;
@@ -136,6 +137,7 @@ export async function POST(req: Request) {
       // The LLM may have emitted an [[action:...]] tag for requests the
       // regex parser didn't recognise (unusual phrasing, other languages).
       // Strip the tag from the visible reply and execute the action.
+      usedCloud = true;
       const extracted = extractLlmAction(reply);
       finalText = extracted.text || "Done.";
       if (extracted.action) {
@@ -168,9 +170,9 @@ export async function POST(req: Request) {
     action: action || null,
     state: { ...fresh, messages: freshMsgs, context: buildContext(fresh) },
     replanned,
-    provider: activeProvider(),
-    source: activeProvider() ? "cloud" : "local",
-    aiError: llmError(),
+    provider: usedCloud ? activeProvider() : null,
+    source: usedCloud ? "cloud" : "local",
+    aiError: usedCloud ? null : llmError(),
   });
 }
 

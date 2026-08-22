@@ -213,6 +213,22 @@ async function callClaude(
   return null;
 }
 
+/** OpenRouter model candidates in preference order. The configured model is
+ *  tried first, then well-known `:free` models. Free endpoints run with the
+ *  same API key even when the account has no paid credits, so an "HTTP 402
+ *  insufficient credits" response no longer kills the whole chat path. */
+function openrouterModels(): string[] {
+  const configured = getSafeKey("OPENROUTER_MODEL") || getSafeKey("NEXT_PUBLIC_OPENROUTER_MODEL");
+  const candidates = [
+    configured,
+    "meta-llama/llama-3.1-8b-instruct:free",
+    "google/gemma-2-9b-it:free",
+    "meta-llama/llama-3.3-70b-instruct:free",
+    "openai/gpt-4o-mini",
+  ].filter((model): model is string => Boolean(model?.trim()));
+  return [...new Set(candidates)];
+}
+
 export async function callLLM(
   system: string,
   messages: ChatMsg[],
@@ -306,33 +322,38 @@ export async function callLLM(
           recordLlmError(`OpenAI: HTTP ${response.status} ${err.slice(0, 160)}`);
         }
       } else if (provider === "openrouter" && openrouterKey) {
-        const remaining = deadline - Date.now();
-        if (remaining < 800) break;
-        const response = await fetchText("https://openrouter.ai/api/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            authorization: `Bearer ${openrouterKey}`,
-            "HTTP-Referer": "https://studyplanner.netlify.app",
-            "X-Title": "Study Planner Pro",
-          },
-          body: JSON.stringify({
-            model: "openai/gpt-4o-mini",
-            max_tokens: maxTokens,
-            messages: [{ role: "system", content: system }, ...messages],
-          }),
-        }, Math.min(12000, remaining)).catch((error) => {
-          recordLlmError(`OpenRouter: ${error instanceof Error ? error.message : "network error"}`);
-          return null;
-        });
-        if (!response) continue;
-        if (response.ok) {
-          const json = await response.json().catch(() => null);
-          const text = json?.choices?.[0]?.message?.content ?? null;
-          if (text?.trim()) return text.trim();
-        } else {
-          const err = await response.text().catch(() => "");
-          recordLlmError(`OpenRouter: HTTP ${response.status} ${err.slice(0, 160)}`);
+        for (const model of openrouterModels()) {
+          const remaining = deadline - Date.now();
+          if (remaining < 800) break;
+          const response = await fetchText("https://openrouter.ai/api/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+              authorization: `Bearer ${openrouterKey}`,
+              "HTTP-Referer": "https://studyplanner.netlify.app",
+              "X-Title": "Study Planner Pro",
+            },
+            body: JSON.stringify({
+              model,
+              max_tokens: maxTokens,
+              messages: [{ role: "system", content: system }, ...messages],
+            }),
+          }, Math.min(12000, remaining)).catch((error) => {
+            recordLlmError(`OpenRouter ${model}: ${error instanceof Error ? error.message : "network error"}`);
+            return null;
+          });
+          if (!response) continue;
+          if (response.ok) {
+            const json = await response.json().catch(() => null);
+            const text = json?.choices?.[0]?.message?.content ?? null;
+            if (text?.trim()) return text.trim();
+          } else {
+            const err = await response.text().catch(() => "");
+            recordLlmError(`OpenRouter ${model}: HTTP ${response.status} ${err.slice(0, 160)}`);
+            // Paid models commonly return 402/429 when the account is out of
+            // credits. Keep trying the free candidates instead of giving up.
+            continue;
+          }
         }
       }
     } catch (error) {
