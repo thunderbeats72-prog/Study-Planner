@@ -326,6 +326,13 @@ export async function aiGenerateTopics(
 
 const LANGUAGE_CAPABILITY_RE = /\b(speak|talk|chat|communicate|reply|respond|answer|know|understand|handle)\b/i;
 
+/** A language word followed by a subject/domain noun is usually not a
+ *  language-capability question. "French Revolution", "Spanish history",
+ *  "Hindi literature" and "Bengali grammar" must go to the normal tutor,
+ *  not to the canned "I can speak French/Spanish/Hindi…" reply. */
+const LANGUAGE_TOPIC_PHRASE_RE =
+  /\b(bangla|bengali|hindi|marathi|tamil|telugu|kannada|malayalam|gujarati|punjabi|panjabi|odia|oriya|urdu|nepali|arabic|spanish|español|french|français|german|deutsch|portuguese|português|italian|italiano|russian|chinese|mandarin|japanese|korean|indonesian|bahasa|turkish|türkçe)\s+(revolution|revolutions|literature|history|grammar|course|exam|exams|class|classes|lesson|lessons|subject|subjects|syllabus|chapter|chapters|unit|units|paper|papers|test|tests|question|questions|poetry|fiction|novel|writing|vocabulary|cuisine|food|culture|war|empire|film|films|cinema|movie|movies|music|dance|actor|actress|people|country|civilisation|civilization|speaker|speakers|teacher|teachers|student|students|translation|transcript|literature)\b/i;
+
 /** Deterministic language-capability replies prevent the tutor from falsely
  * claiming it only supports English/Hindi. The cloud and local speech layers
  * both support these scripts, so the response is immediately usable aloud.
@@ -336,6 +343,7 @@ export function languageCapabilityReply(
   voiceGender: "female" | "male" = "female"
 ): string | null {
   if (!LANGUAGE_CAPABILITY_RE.test(query)) return null;
+  if (LANGUAGE_TOPIC_PHRASE_RE.test(query)) return null;
   const languages: Array<{ match: RegExp; reply: CapabilityReply }> = [
     {
       match: /\b(bangla|bengali)\b/i,
@@ -532,7 +540,7 @@ const MULTI = {
     /\b(band (karo|kar do)|rok (do|do na)|rokko|rok lo|khatam karo|bas karo)\b/i, // Hinglish
   ],
   start: [
-    /\b(clock ?in|start (the )?(timer|clock|focus|session|studying|study)|begin (studying|session|focus)|let'?s study|i'?m ready to study)\b/i,
+    /\b(clock ?in|start (the |my )?(timer|clock|focus|session|studying|study)|begin (the |my )?(timer|clock|focus|session|studying|study)|let'?s (start|study)|i'?m ready to study|start studying now|can you start (the )?study)\b/i,
     /(टाइमर (चालू|शुरू)|घड़ी (चालू|शुरू)|पढ़ाई (शुरू|चालू)|शुरू कर (दो|दें)|चालू कर (दो|दें))/,
     /(टाइमर सुरू|अभ्यास सुरू|सुरू करा|चालू करा)/, // Marathi
     /(টাইমার (চালু|শুরু)|পড়া (শুরু|চালু)|শুরু করো)/, // Bengali
@@ -759,8 +767,21 @@ export function commandReply(
   return reply;
 }
 
+/** Questions that ask "how/what/why" are not in-app commands. Without this
+ *  guard "How do I start studying?", "What is light?", or "Explain dark matter"
+ *  were hijacked by the timer/theme parsers and answered as if the user tapped
+ *  a button. Real commands (e.g. "start the timer", "dark mode please") still
+ *  pass through. */
+const HELP_QUESTION_RE =
+  /\b(how (do|does|can|could|would|should|to)|how'?s|why (do|does|is|are|would)|when (do|does|is|are)|what (is|are|does|do|was|were)|what'?s|explain|define|definition|meaning|difference (between|in)|should i|do i|can you explain|tell me about|help me understand|i want to know|how should i)\b/i;
+
+function looksLikeHelpQuestion(n: string): boolean {
+  return HELP_QUESTION_RE.test(n);
+}
+
 export function parseCommand(q: string): TutorReply["action"] | undefined {
   const n = q.toLowerCase().trim().replace(/[.!?]+$/, "");
+  if (looksLikeHelpQuestion(n)) return undefined;
 
   // ── Break / timer state transitions (checked BEFORE navigation so
   //    "resume", "end break", "pause" never get mis-routed) ──
@@ -787,7 +808,15 @@ export function parseCommand(q: string): TutorReply["action"] | undefined {
   if (/\b(zen|focus mode|full ?screen|distraction ?free|deep work mode)\b/.test(n)) return { type: "zen" };
   if (/\b(re-?plan|rebuild|regenerate|reschedule|re-?balance|redo my (plan|schedule)|fix my (plan|schedule)|update my plan)\b/.test(n)) return { type: "replan" };
 
-  if (n.includes("theme") || /\b(midnight|dark|obsidian|nebula|emerald|sunset|mint|silver|lavender|samsung|light|black)\b/.test(n)) {
+  // Theme commands must be explicit. "dark", "light", "black", etc. are also
+  // ordinary study words ("dark matter", "light waves", "black body"), so a
+  // theme word alone is never enough — it needs a mode/theme phrase or a
+  // theme-change action word.
+  const themeColor = /\b(midnight|dark|obsidian|nebula|emerald|sunset|mint|silver|lavender|samsung|light|black|white)\b/;
+  const themeSurface = /\b(theme|mode|background|appearance|wallpaper|skin)\b/;
+  const themeAction = /\b(set|change|switch|apply|turn|use|make|activate|try|choose|select|prefer|give|want|enable|disable|put|go)\b/;
+  const themePhrase = /(^|\s)(midnight|dark|obsidian|nebula|emerald|sunset|mint|silver|lavender|samsung|light|black|white)\s+(mode|theme|background|appearance|wallpaper|skin)/;
+  if (themePhrase.test(n) || (n.includes("theme") && themeColor.test(n) && themeAction.test(n)) || (themeSurface.test(n) && themeColor.test(n) && themeAction.test(n))) {
     // Payloads are the raw THEME IDS stored in settings.theme — the UI
     // applies them as `theme-${id}`, so never prefix "theme-" here.
     if (/(midnight|dark|black)/.test(n)) return { type: "theme", payload: "dark" };

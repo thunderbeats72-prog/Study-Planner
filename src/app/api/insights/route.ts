@@ -18,12 +18,38 @@ export async function GET(req: Request) {
   const totalToday = s.tasks.filter((t) => t.date === today).length;
 
   if (activeProvider()) {
+    const todayTasks = s.tasks.filter((t) => t.date === today);
+    const pendingToday = todayTasks
+      .filter((t) => t.status === "pending")
+      .slice(0, 5)
+      .map((t) => `"${t.title}" (${t.plannedMinutes} min)`)
+      .join(", ");
+    const overdueTitles = s.tasks
+      .filter((t) => t.status === "pending" && t.date < today)
+      .slice(0, 5)
+      .map((t) => `"${t.title}"`)
+      .join(", ");
+    const weakestPct = weakest?.total ? Math.round((weakest.done / weakest.total) * 100) : 0;
+    const dataLine = [
+      `Learner: ${ctx.name}`,
+      `Course: ${ctx.courseName}`,
+      `${ctx.daysLeft} days to exam`,
+      `progress ${ctx.progressPct}%`,
+      `streak ${ctx.streak} days`,
+      `${ctx.hoursThisWeek}h this week vs ${ctx.dailyHours * 7}h target`,
+      `${overdue} overdue task(s)`,
+      `weakest subject: ${weakest?.name || "none"} at ${weakestPct}%`,
+      `today ${doneToday}/${totalToday} tasks done`,
+      pendingToday ? `pending today: ${pendingToday}` : "no pending tasks today",
+      overdueTitles ? `overdue: ${overdueTitles}` : "",
+    ].filter(Boolean).join(". ");
+
     const txt = await callLLM(
-      "You are SHIGUN, a study coach. Reply with 3 short punchy coaching bullets (max 22 words each) in markdown. No preamble.",
+      "You are SHIGUN, a study coach. Reply with 3 short punchy coaching bullets (max 22 words each) in markdown. No preamble. Base every bullet ONLY on the exact learner data below; name the actual course, subject, or task. Never invent data and never give generic advice that ignores this learner.",
       [
         {
           role: "user",
-          content: `Learner ${ctx.name}, course ${ctx.courseName}, ${ctx.daysLeft} days to exam, progress ${ctx.progressPct}%, streak ${ctx.streak}, ${ctx.hoursThisWeek}h this week vs ${ctx.dailyHours * 7}h target, ${overdue} overdue tasks, weakest subject ${weakest?.name}. Today ${doneToday}/${totalToday} tasks done. Give 3 specific coaching bullets.`,
+          content: `${dataLine}. Give 3 specific coaching bullets.`,
         },
       ],
       400
