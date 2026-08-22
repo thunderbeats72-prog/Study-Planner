@@ -69,6 +69,10 @@ const LANG_DIRECTIONS: Record<string, { direction: string; accent: string }> = {
     direction: "clear Odia tutor voice, medium pitch, steady pace, crisp pronunciation of Odia words and mixed English technical terms",
     accent: "Odia",
   },
+  "ne-NP": {
+    direction: "warm Nepali tutor voice, medium pitch, steady pace, clear pronunciation of Nepali words and mixed English technical terms",
+    accent: "Nepali",
+  },
   "ur-PK": {
     direction: "clear Urdu tutor voice, medium pitch, steady pace, clear pronunciation of Urdu words and mixed English technical terms",
     accent: "Urdu",
@@ -375,7 +379,13 @@ async function synthesiseGemini(
 
   const response = await fetch(endpoint, {
     method: "POST",
-    headers: { "content-type": "application/json", "x-goog-api-key": apiKey },
+    headers: {
+      "content-type": "application/json",
+      "x-goog-api-key": apiKey,
+      // The Interactions API negotiates breaking changes through this header;
+      // the current TTS examples are pinned to the 2026-05-20 revision.
+      ...(usesInteractionsApi ? { "Api-Revision": "2026-05-20" } : {}),
+    },
     body: JSON.stringify(body),
     signal: boundedSignal(signal, 9_000),
   });

@@ -51,6 +51,14 @@ async function runTests() {
   check(typeof mrReply === "string" && mrReply.includes("मराठीत"), "Marathi capability query (male)");
   const taReply = languageCapabilityReply("Can you talk in Tamil?", "female");
   check(typeof taReply === "string" && taReply.includes("தமிழில்"), "Tamil capability query");
+  const thReply = languageCapabilityReply("Can you speak Thai?", "female");
+  check(typeof thReply === "string" && thReply.includes("ภาษาไทย"), "Thai capability query");
+  const enReply = languageCapabilityReply("Do you know English?", "female");
+  check(typeof enReply === "string" && enReply.includes("English"), "English capability query");
+  const hiScriptReply = languageCapabilityReply("क्या तुम हिंदी बोल सकती हो?", "female");
+  check(typeof hiScriptReply === "string" && hiScriptReply.includes("हिंदी"), "Hindi-script capability query (no Latin trigger word)");
+  const bnScriptReply = languageCapabilityReply("আপনি কি বাংলায় কথা বলতে পারেন?", "female");
+  check(typeof bnScriptReply === "string" && bnScriptReply.includes("বাংলা"), "Bengali-script capability query (no Latin trigger word)");
   check(parseCommand("start timer")?.type === "startTimer", "Command: start timer");
   check(parseCommand("pause")?.type === "pause", "Command: pause");
   check(parseCommand("stop timer")?.type === "stopTimer", "Command: stop timer");
@@ -58,6 +66,71 @@ async function runTests() {
   check(parseCommand("go to planner")?.type === "navigate", "Command: navigate planner");
   check(parseCommand("change theme to dark")?.type === "theme", "Command: dark theme");
   check(parseCommand("what is supply and demand") === undefined, "Study question is not hijacked as a command");
+  check(parseCommand("planner")?.type === "navigate" && parseCommand("planner")?.payload === "planner", "Bare page name navigates");
+  check(parseCommand("dark theme")?.type === "theme", "Bare theme command works");
+  check(parseCommand("please resume")?.type === "resume", "Please + resume works");
+  check(parseCommand("can you open the planner?")?.type === "navigate", "Polite navigation question works");
+
+  console.log("\n--- 2b. Questions must never execute state-changing actions ---");
+  check(parseCommand("what is deep work mode?") === undefined, "Question about zen is not a command");
+  check(parseCommand("how do I replan?") === undefined, "Question about replan is not a command");
+  check(parseCommand("should I replan?") === undefined, "Should-I-replan is not a command");
+  check(parseCommand("what is the dark theme?") === undefined, "Question about theme is not a command");
+  check(parseCommand("how do I stop the timer?") === undefined, "Question about stop is not a command");
+  check(parseCommand("when should I start the timer?") === undefined, "Question about start is not a command");
+  check(parseCommand("should I pause?") === undefined, "Question about pause is not a command");
+  check(parseCommand("explain how the timer works") === undefined, "How-to question is not a command");
+  check(parseCommand("what are my weak points?") === undefined, "Weak-points question is not a command");
+
+  console.log("\n--- 2c. Local curriculum replies must stay on-topic ---");
+  {
+    // The chat route needs DATABASE_URL only at import time (the pool is lazy);
+    // no query runs in this test.
+    const oldDbUrl = process.env.DATABASE_URL;
+    process.env.DATABASE_URL = "postgres://test:test@localhost:5432/test";
+    const { localCurriculumReply } = await import("../src/app/api/chat/route");
+    if (oldDbUrl === undefined) delete process.env.DATABASE_URL; else process.env.DATABASE_URL = oldDbUrl;
+    const state = {
+      subjects: [
+        { id: 1, name: "Biology" },
+        { id: 2, name: "Physics" },
+      ],
+      topics: [
+        {
+          id: 10, subjectId: 1, unit: "Unit 1", title: "Photosynthesis Process",
+          summary: "Plants convert light energy into chemical energy.",
+          objectives: ["Describe the light-dependent reactions."],
+          prerequisites: [], keyConcepts: ["chlorophyll", "ATP"], practice: "Label a chloroplast.",
+          depth: "Core", sources: [], difficulty: "Medium", estMinutes: 60, position: 0,
+          mastery: 0, status: "pending",
+        },
+        {
+          id: 11, subjectId: 2, unit: "Unit 2", title: "Newton Laws Motion",
+          summary: "Forces and acceleration.",
+          objectives: ["Apply F=ma."], prerequisites: [], keyConcepts: ["inertia", "momentum"],
+          practice: "Solve a friction problem.", depth: "Core", sources: [],
+          difficulty: "Hard", estMinutes: 75, position: 0, mastery: 0, status: "pending",
+        },
+      ],
+      tasks: [
+        { id: 1, date: "2026-08-22", subjectId: 1, topicId: 10, kind: "learn", title: "Photosynthesis Process",
+          detail: "", plannedMinutes: 60, actualMinutes: 0, status: "pending", position: 0 },
+      ],
+    } as unknown as Parameters<typeof localCurriculumReply>[1];
+    check(localCurriculumReply("what is the capital of France?", state) === null,
+      "Off-topic question never answered with a random plan lesson");
+    check(localCurriculumReply("tell me about the French revolution", state) === null,
+      "Unrelated history question never answered with a plan lesson");
+    const practice = localCurriculumReply("give me 5 practice questions", state);
+    check(typeof practice === "string" && practice.includes("Photosynthesis Process"),
+      "Practice request uses the current curriculum lesson");
+    const weakest = localCurriculumReply("explain my weakest topic", state);
+    check(typeof weakest === "string" && weakest.includes("###"),
+      "Weakest-topic request uses the curriculum lesson");
+    const onTopic = localCurriculumReply("explain the photosynthesis process in detail", state);
+    check(typeof onTopic === "string" && onTopic.includes("Photosynthesis Process"),
+      "On-topic lesson question answered from the curriculum");
+  }
 
   console.log("\n--- 3. Safe LLM Action Handling ---");
   const extracted = extractLlmAction("Here is your plan. [[action:navigate:planner]]");

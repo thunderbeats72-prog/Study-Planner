@@ -485,6 +485,11 @@ export async function aiGenerateTopics(
 }
 
 const LANGUAGE_CAPABILITY_RE = /\b(speak|talk|chat|communicate|reply|respond|answer|know|understand|handle)\b/i;
+/** "Can you speak X?" also arrives in the learner's own script. The Latin
+ *  regex above misses Devanagari/Arabic/Bengali phrasing entirely, which
+ *  previously let a Hindi learner's capability question fall through to a
+ *  generic English reply on keyless deployments. */
+const CAPABILITY_SCRIPT_RE = /(बोल|बात कर|भाषा|বলতে|ভাষা|பேச|முடியும்|మాట్లాడ|చేయగల|ಮಾತನಾಡ|സംസാരിക്ക|બોલી|ਗੱਲ ਕਰ|говор|말할|話せる|能說|能说|会说|會說|bisa berbicara|konuşabilir|parler|hablar|falare|sprechen|parlare)/;
 
 /** Deterministic language-capability replies prevent the tutor from falsely
  * claiming it only supports English/Hindi. The cloud and local speech layers
@@ -495,74 +500,78 @@ export function languageCapabilityReply(
   query: string,
   voiceGender: "female" | "male" = "female"
 ): string | null {
-  if (!LANGUAGE_CAPABILITY_RE.test(query)) return null;
+  if (!LANGUAGE_CAPABILITY_RE.test(query) && !CAPABILITY_SCRIPT_RE.test(query)) return null;
   const languages: Array<{ match: RegExp; reply: CapabilityReply }> = [
     {
-      match: /\b(bangla|bengali)\b/i,
+      match: /\b(bangla|bengali)\b|বাংলা/i,
       reply: "হ্যাঁ, আমি বাংলায় কথা বলতে পারি। আপনার পড়াশোনা নিয়ে কীভাবে সাহায্য করতে পারি?",
     },
     {
-      match: /\bhindi\b/i,
+      match: /\benglish\b|अंग्रेज़ी|इंग्लिश|ইংরেজি|ஆங்கிலம்|ఆంగ్లం|ಆಂಗ್ಲ|ഇംഗ്ലീഷ്|અંગ્રેજી|ਅੰਗਰੇਜ਼ੀ|ଇଂରାଜୀ|انگریزی|الإنجليزية|ingles/i,
+      reply: "Yes, I can speak English. How can I help with your studies?",
+    },
+    {
+      match: /\bhindi\b|हिंदी|हिन्दी/i,
       reply: {
         female: "हाँ, मैं हिंदी में बात कर सकती हूँ। आपकी पढ़ाई में किस तरह मदद करूँ?",
         male: "हाँ, मैं हिंदी में बात कर सकता हूँ। आपकी पढ़ाई में किस तरह मदद करूँ?",
       },
     },
     {
-      match: /\bmarathi\b/i,
+      match: /\bmarathi\b|मराठी/i,
       reply: {
         female: "हो, मी मराठीत बोलू शकते. तुमच्या अभ्यासात मी कशी मदत करू?",
         male: "हो, मी मराठीत बोलू शकतो. तुमच्या अभ्यासात मी कशी मदत करू?",
       },
     },
     {
-      match: /\btamil\b/i,
+      match: /\btamil\b|தமிழ்/i,
       reply: "ஆம், நான் தமிழில் பேச முடியும். உங்கள் படிப்பில் எப்படி உதவலாம்?",
     },
     {
-      match: /\btelugu\b/i,
+      match: /\btelugu\b|తెలుగు/i,
       reply: "అవును, నేను తెలుగులో మాట్లాడగలను. మీ చదువులో ఎలా సహాయం చేయాలి?",
     },
     {
-      match: /\bkannada\b/i,
+      match: /\bkannada\b|ಕನ್ನಡ/i,
       reply: "ಹೌದು, ನಾನು ಕನ್ನಡದಲ್ಲಿ ಮಾತನಾಡಬಲ್ಲೆ. ನಿಮ್ಮ ಓದಿನಲ್ಲಿ ಹೇಗೆ ಸಹಾಯ ಮಾಡಲಿ?",
     },
     {
-      match: /\bmalayalam\b/i,
+      match: /\bmalayalam\b|മലയാളം/i,
       reply: "അതെ, ഞാൻ മലയാളത്തിൽ സംസാരിക്കാം. നിങ്ങളുടെ പഠനത്തിൽ എങ്ങനെ സഹായിക്കാം?",
     },
     {
-      match: /\bgujarati\b/i,
+      match: /\bgujarati\b|ગુજરાતી/i,
       reply: "હા, હું ગુજરાતીમાં વાત કરી શકું છું. તમારા અભ્યાસમાં કેવી રીતે મદદ કરું?",
     },
     {
-      match: /\b(punjabi|panjabi)\b/i,
+      match: /\b(punjabi|panjabi)\b|ਪੰਜਾਬੀ/i,
       reply: {
         female: "ਹਾਂ, ਮੈਂ ਪੰਜਾਬੀ ਵਿੱਚ ਗੱਲ ਕਰ ਸਕਦੀ ਹਾਂ। ਤੁਹਾਡੀ ਪੜ੍ਹਾਈ ਵਿੱਚ ਕਿਵੇਂ ਮਦਦ ਕਰਾਂ?",
         male: "ਹਾਂ, ਮੈਂ ਪੰਜਾਬੀ ਵਿੱਚ ਗੱਲ ਕਰ ਸਕਦਾ ਹਾਂ। ਤੁਹਾਡੀ ਪੜ੍ਹਾਈ ਵਿੱਚ ਕਿਵੇਂ ਮਦਦ ਕਰਾਂ?",
       },
     },
     {
-      match: /\b(odia|oriya)\b/i,
+      match: /\b(odia|oriya)\b|ଓଡ଼ିଆ|ଓଡିଆ/i,
       reply: "ହଁ, ମୁଁ ଓଡ଼ିଆରେ କଥା ହିପାରିବି। ଆପଣଙ୍କ ଅଧ୍ୟୟନରେ ମୁଁ କିପରି ସାହାଯ୍ୟ କରିପାରିବି?",
     },
     {
-      match: /\burdu\b/i,
+      match: /\burdu\b|اردو/i,
       reply: {
         female: "ہاں، میں اردو میں بات کر سکتی ہوں۔ میں آپ کی پڑھائی میں کیسے مدد کروں؟",
         male: "ہاں، میں اردو میں بات کر سکتا ہوں۔ میں آپ کی پڑھائی میں کیسے مدد کروں؟",
       },
     },
     {
-      match: /\bnepali\b/i,
+      match: /\bnepali\b|नेपाली/i,
       reply: "हो, म नेपालीमा कुरा गर्न सक्छु। तपाईंको पढाइमा कसरी मद्दत गर्न सक्छु?",
     },
     {
-      match: /\barabic\b/i,
+      match: /\barabic\b|العربية|عربي/i,
       reply: "نعم، يمكنني التحدث بالعربية. كيف أساعدك في دراستك؟",
     },
     {
-      match: /\bspanish|español\b/i,
+      match: /\bspanish\b|\bespañol\b/i,
       reply: "Sí, puedo hablar en español. ¿Cómo puedo ayudarte con tus estudios?",
     },
     {
@@ -582,20 +591,24 @@ export function languageCapabilityReply(
       reply: "Sì, posso parlare in italiano. Come posso aiutarti con lo studio?",
     },
     {
-      match: /\brussian\b/i,
+      match: /\brussian\b|русский|по-русски/i,
       reply: "Да, я могу говорить по-русски. Чем я могу помочь в учёбе?",
     },
     {
-      match: /\b(chinese|mandarin)\b/i,
+      match: /\b(chinese|mandarin)\b|中文|汉语|普通话/i,
       reply: "是的，我可以用中文交谈。需要我怎样帮助你学习？",
     },
     {
-      match: /\bjapanese\b/i,
+      match: /\bjapanese\b|日本語/i,
       reply: "はい、日本語で話せます。勉強のお手伝いをしましょうか？",
     },
     {
-      match: /\bkorean\b/i,
+      match: /\bkorean\b|한국어/i,
       reply: "네, 한국어로 대화할 수 있어요. 공부를 어떻게 도와드릴까요?",
+    },
+    {
+      match: /\bthai\b|ไทย|ภาษาไทย/i,
+      reply: "ได้ครับ ผมพูดภาษาไทยได้ จะช่วยเรื่องการเรียนของคุณได้อย่างไรบ้าง?",
     },
     {
       match: /\bindonesian|bahasa\b/i,
@@ -915,8 +928,41 @@ export function commandReply(
   return reply;
 }
 
+/** Imperative sentence openers. A message that starts with one of these is a
+ *  command even when it otherwise looks like a question ("please stop").
+ *  Phrases like "can you", "how do I", and "should I" are NOT included, so
+ *  questions about the app keep being answered instead of executing state
+ *  changes the learner only asked about. */
+const IMPERATIVE_OPENERS = /^(please\s+)?(start|begin|stop|end|pause|resume|continue|open|go\s*to|show\s*me|take\s*me\s*to|switch|change|set|turn|put|clock\s*(in|out)|break|take\s+a\s+break|replan|rebalance|zen)\b/i;
+
+const QUESTION_OPENERS = /^(what|which|who|whom|whose|when|where|why|how|can|could|do|does|did|is|are|am|will|would|shall|should|may|might|must)\b/i;
+const QUESTION_PHRASE = /(how\s+(to|do|can|would)|what\s+(is|are|does|do|about)|why\s+(do|does|is|are)|should\s+i|can\s+you|tell\s+me\s+(about|how|what)|explain\s+(to\s+me\s+)?(how|what|why|the)|what\s+is|what\s+are)/i;
+const QUESTION_OPENERS_I18N = /^(क्या|कैसे|कब|कौन|किस|कहाँ|কী|কিভাবে|কখন|என்ன|எப்படி|ఏమిటి|ఎలా|ಹೇಗೆ|എന്ത്|શું|કેવી|ਕੀ|ਕਿਵੇਂ|کیا|کیسے|كيف|ماذا|هل|怎么|为什么|どんな|どう|무엇|어떻게)/;
+
+/** Does the message read like a question rather than a command? */
+function looksLikeQuestion(q: string): boolean {
+  const t = q.trim();
+  if (/[?؟？]\s*$/.test(t)) return true;
+  if (QUESTION_OPENERS.test(t) || QUESTION_OPENERS_I18N.test(t)) return true;
+  return QUESTION_PHRASE.test(t);
+}
+
 export function parseCommand(q: string): TutorReply["action"] | undefined {
   const n = q.toLowerCase().trim().replace(/[.!?]+$/, "");
+  const isQuestion = looksLikeQuestion(q);
+  const imperative = IMPERATIVE_OPENERS.test(q.trim());
+
+  if (isQuestion && !imperative) {
+    // A question is a question, not a command. "how do I replan?", "should I
+    // stop the timer?" and "what is the dark theme?" must be ANSWERED, never
+    // executed — the regex layer previously hijacked them into destructive
+    // app actions (an unintended replan/theme/timer change). The only
+    // exception is harmless navigation clearly asked for ("can you open the
+    // planner?"), which falls through to the navigation rules below.
+    const harmlessNavAsk = /\b(open|go\s*to|show\s*me|take\s*me\s*to|switch\s*to)\b.*\b(planner|schedule|timetable|dashboard|overview|home|subjects|syllabus|settings|focus|pomodoro)\b/.test(n)
+      && !/how\s+to/.test(n);
+    if (!harmlessNavAsk) return undefined;
+  }
 
   // ── Break / timer state transitions (checked BEFORE navigation so
   //    "resume", "end break", "pause" never get mis-routed) ──
@@ -930,6 +976,14 @@ export function parseCommand(q: string): TutorReply["action"] | undefined {
   if (/\b(subjects?|syllabus|topics?|lessons?)\b/.test(n) && /\b(open|go|show|view|manage|edit)\b/.test(n)) return { type: "navigate", payload: "subjects" };
   if (/\b(settings?|preferences?|options?|profile)\b/.test(n) && /\b(open|go|show|change|edit)\b/.test(n)) return { type: "navigate", payload: "settings" };
   if (/\b(focus( page| view| tab)?|pomodoro)\b/.test(n) && /\b(open|go|show|view|take me|see)\b/.test(n)) return { type: "navigate", payload: "focus" };
+  // Bare page names are valid voice/typed commands too ("planner", "home").
+  // Full-message anchors keep a sentence like "the planner looks good" from
+  // being misread as navigation.
+  if (/^(planner|schedule|timetable|my plan)$/.test(n)) return { type: "navigate", payload: "planner" };
+  if (/^(dashboard|overview|home)$/.test(n)) return { type: "navigate", payload: "dashboard" };
+  if (/^(subjects|syllabus|topics|lessons)$/.test(n)) return { type: "navigate", payload: "subjects" };
+  if (/^(settings|preferences|profile)$/.test(n)) return { type: "navigate", payload: "settings" };
+  if (/^(focus|pomodoro)$/.test(n)) return { type: "navigate", payload: "focus" };
   if (/^\/?(planner|schedule)$/.test(n)) return { type: "navigate", payload: "planner" };
   if (/^\/?(dashboard|overview)$/.test(n)) return { type: "navigate", payload: "dashboard" };
   if (/^\/?(subjects|syllabus)$/.test(n)) return { type: "navigate", payload: "subjects" };
@@ -1022,7 +1076,7 @@ export async function localTutor(
   const pct = percentQ(q);
   if (pct) return { text: pct };
 
-  if (!options.skipCloud) {
+  if (!options.skipCloud && activeProvider()) {
     const aiResponse = await callLLM(
       tutorSystemPrompt(ctx, { voiceGender: options.voiceGender }),
       [{ role: "user", content: q }],
@@ -1035,7 +1089,15 @@ export async function localTutor(
   const knowledge = await lookupKnowledge(q);
   if (knowledge) return { text: teachFromKnowledge(knowledge, q, ctx.level, subjectHint) };
 
-  return { text: `Ask me to explain any concept from your subjects or say *"what should I study today?"*` };
+  // Be honest about WHY the answer is limited. A deployment without an AI key
+  // (or with a provider outage) previously got an unexplained generic line,
+  // which read as "the AI is broken".
+  const cloudConfigured = !!activeProvider();
+  return {
+    text: cloudConfigured
+      ? `I couldn't find that in your study plan or my reference library just now (the cloud tutor was unreachable). Try rephrasing, ask *"what should I study today?"*, or say *"explain [any topic from your subjects]"*.`
+      : `I'm in local mode because no cloud AI key is configured on this deployment. I can still answer from your study plan and my reference library — try *"what should I study today?"*, *"give me practice questions"*, or ask me to explain any topic from your subjects. Adding a GEMINI_API_KEY or GROQ_API_KEY in your environment unlocks full tutoring.`,
+  };
 }
 
 /** Maps a selected voice profile id to its spoken grammatical gender. */

@@ -88,6 +88,40 @@ instead of stopping on a “voice model unavailable” error; the chat shows a
 clear non-error notice. One failed long-answer part switches the remaining
 parts to that local voice, so every later part keeps flowing.
 
+v6 FIXES (this build)
+---------------------
+ - QUESTIONS ARE NEVER MISTAKEN FOR COMMANDS. "how do I replan?", "should I
+   replan?", "what is the dark theme?", "how do I stop the timer?" and other
+   questions were being EXECUTED by the regex command layer (an unintended
+   replan, theme change, or timer stop) instead of answered. The command
+   parser now recognises question phrasing in English and Indic scripts and
+   only executes clear imperative commands ("start timer", "open planner").
+   "Can you open the planner?" still navigates — it is harmless and explicit.
+ - OFF-TOPIC QUESTIONS NO LONGER GET RANDOM LESSONS. "what is the capital of
+   France?" used to be answered with whatever lesson was next in the plan.
+   The curriculum fallback now only answers when the question is genuinely
+   about the learner's own plan ("today's lesson", "give me practice
+   questions", "explain my weakest topic"); everything else goes to the
+   Wikipedia-backed tutor or the cloud model.
+ - "CAN YOU SPEAK X?" WORKS IN YOUR OWN SCRIPT. A Hindi learner asking
+   "क्या तुम हिंदी बोल सकती हो?" (or Bengali, Urdu, Marathi, ...) now gets
+   the deterministic same-language capability reply instead of falling
+   through to English. Thai and English capability replies were added.
+ - BARE PAGE NAMES NAVIGATE. Saying "planner", "home", "subjects" alone now
+   opens that page; previously only slash-prefixed forms worked.
+ - CLEAR "LOCAL MODE" MESSAGES. When no AI key is configured (or the cloud
+   tutor is down), the tutor now explains exactly that and lists what it CAN
+   still do, instead of an unexplained generic line.
+ - THE APP BUILDS AND BOOTS WITHOUT DATABASE_URL. A missing DATABASE_URL no
+   longer crashes `next build` or every API route at import time: the app
+   loads, /api/health reports "database: unavailable", and routes return a
+   clear 503 JSON with setup guidance until the variable is added.
+ - VOICE QUALITY FALLBACKS: Nepali was missing from the TTS language
+   directions; the Gemini TTS Interactions request now sends the current
+   Api-Revision header; native device-voice preferences were added for
+   Marathi, Bengali, Tamil, Telugu, Kannada, Malayalam, Gujarati, Punjabi,
+   Odia, Urdu and Arabic so the offline fallback picks a matching voice.
+
 v5 FIXES (this build)
 ---------------------
  - START NOW BECOMES CLOCK OUT, IN THE SAME PLACE. The "Up next" card on
