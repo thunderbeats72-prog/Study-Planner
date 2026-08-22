@@ -20,17 +20,37 @@ export type { GeneratedTopic, CurriculumSource } from "./curriculum";
 
 /* ============================================================
    SERVER-SIDE PROVIDER CONFIGURATION
+   ─ Gemini → Groq → Grok (xAI) → OpenRouter ─
+   Design goals (v8 connectivity hardening):
+   • Every provider has a MODEL FALLBACK CHAIN, because providers
+     retire model IDs constantly (Groq shut down llama-3.3-70b-
+     versatile & llama-3.1-8b-instant on 2026-08-16, which silently
+     killed every deployment pinned to them).
+   • STICKY SUCCESS: the last (provider, model) that answered is
+     tried first on the next request, so a working leg answers in
+     one hop instead of re-walking dead model IDs every time.
+   • ONE bounded retry for transient (network / 5xx) failures;
+     auth / rate-limit / safety failures move to the next provider
+     immediately — no serial retry noise.
+   • Secrets are quote/whitespace stripped (a stray quote from a
+     dashboard paste used to look exactly like an invalid key).
+   • probeProviders() powers /api/ai-status so connectivity is
+     diagnosable from the app itself: Settings → AI Connectivity.
 ============================================================ */
 function envValue(...names: string[]): string | null {
   for (const name of names) {
-    const value = typeof process !== "undefined" ? process.env?.[name]?.trim() : "";
-    if (value) return value;
+    const raw = typeof process !== "undefined" ? process.env?.[name] : "";
+    if (raw) {
+      // Strip padding, quotes and backticks that dashboard pastes often add.
+      const value = raw.replace(/^[\s"'`]+|[\s"'`]+$/g, "");
+      if (value) return value;
+    }
   }
   return null;
 }
 
 type ChatMsg = { role: "user" | "assistant"; content: string };
-type ProviderId = "gemini" | "groq" | "openrouter";
+type ProviderId = "gemini" | "groq" | "grok" | "openrouter";
 export type LlmAttempt = {
   provider: ProviderId;
   model: string;
@@ -43,6 +63,17 @@ export type LlmResult = {
   model: string | null;
   attempts: LlmAttempt[];
 };
+export type ProviderProbe = {
+  id: ProviderId;
+  label: string;
+  configured: boolean;
+  ok: boolean;
+  model: string | null;
+  status: number | null;
+  latencyMs: number;
+  error: LlmAttempt["error"] | null;
+  detail: string;
+};
 
 type LlmHealth = {
   checkedAt: string | null;
@@ -51,23 +82,179 @@ type LlmHealth = {
   model: string | null;
   attempts: LlmAttempt[];
 };
-type AiGlobal = typeof globalThis & { __studyPlannerLlmHealth?: LlmHealth };
+type AiGlobal = typeof globalThis & {
+  __studyPlannerLlmHealth?: LlmHealth;
+  __studyPlannerPreferred?: { provider: ProviderId; model: string };
+};
 const aiGlobal = globalThis as AiGlobal;
 
-function providerKeys() {
-  // NEXT_PUBLIC_* names remain a compatibility path for existing installs,
-  // but deployments should use the server-only names documented in .env.example.
-  return {
-    gemini: envValue("GEMINI_API_KEY", "GOOGLE_API_KEY", "NEXT_PUBLIC_GEMINI_API_KEY", "NEXT_PUBLIC_GOOGLE_API_KEY"),
-    groq: envValue("GROQ_API_KEY", "NEXT_PUBLIC_GROQ_API_KEY"),
-    openrouter: envValue("OPENROUTER_API_KEY", "NEXT_PUBLIC_OPENROUTER_API_KEY"),
-  };
+/* ── Provider catalogue ───────────────────────────────────────
+   Each entry owns its own fallback model chain. IDs are ordered
+   cheap-and-current first; a retired ID just costs one fast 404
+   before the chain moves on. */
+type ProviderSpec = {
+  id: ProviderId;
+  label: string;
+  keyEnv: () => string | null;
+  modelEnv: string;
+  models: string[];
+  request: (
+    model: string,
+    key: string,
+    system: string,
+    messages: ChatMsg[],
+    maxTokens: number,
+    temperature: number
+  ) => { url: string; init: RequestInit };
+  extract: (json: any) => { text: string | null; blocked: boolean };
+};
+
+function openAiCompatRequest(url: string, headers: Record<string, string>) {
+  return (model: string, _key: string, system: string, messages: ChatMsg[], maxTokens: number, temperature: number) => ({
+    url,
+    init: {
+      method: "POST",
+      headers: { "content-type": "application/json", ...headers },
+      body: JSON.stringify({
+        model,
+        max_tokens: maxTokens,
+        temperature,
+        messages: [{ role: "system", content: system }, ...messages],
+      }),
+    },
+  });
+}
+
+function openAiCompatExtract(json: any): { text: string | null; blocked: boolean } {
+  const message = json?.choices?.[0]?.message;
+  if (message?.refusal) return { text: null, blocked: true };
+  const text = typeof message?.content === "string" ? message.content : null;
+  return { text: text && text.trim() ? text : null, blocked: false };
+}
+
+const PROVIDERS: Record<ProviderId, ProviderSpec> = {
+  gemini: {
+    id: "gemini",
+    label: "Gemini",
+    keyEnv: () => envValue("GEMINI_API_KEY", "GOOGLE_API_KEY", "NEXT_PUBLIC_GEMINI_API_KEY", "NEXT_PUBLIC_GOOGLE_API_KEY"),
+    modelEnv: "GEMINI_MODEL",
+    // "-latest" aliases keep serving after individual versions retire.
+    models: ["gemini-flash-latest", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"],
+    request: (model, key, system, messages, maxTokens, temperature) => ({
+      url: `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
+      init: {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-goog-api-key": key },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: system }] },
+          contents: messages.map((message) => ({
+            role: message.role === "assistant" ? "model" : "user",
+            parts: [{ text: message.content }],
+          })),
+          generationConfig: { maxOutputTokens: maxTokens, temperature },
+        }),
+      },
+    }),
+    extract: (json) => {
+      const candidate = json?.candidates?.[0];
+      const finish = String(candidate?.finishReason || "").toUpperCase();
+      const blocked = Boolean(json?.promptFeedback?.blockReason)
+        || ["SAFETY", "BLOCKLIST", "PROHIBITED_CONTENT", "RECITATION"].includes(finish);
+      const text = candidate?.content?.parts
+        ?.map((part: { text?: string }) => part.text || "").join("") ?? null;
+      return { text: text && text.trim() ? text : null, blocked };
+    },
+  },
+  groq: {
+    id: "groq",
+    label: "Groq",
+    keyEnv: () => envValue("GROQ_API_KEY", "NEXT_PUBLIC_GROQ_API_KEY"),
+    modelEnv: "GROQ_MODEL",
+    // llama-3.3-70b-versatile & llama-3.1-8b-instant were retired
+    // 2026-08-16; gpt-oss-120b is Groq's recommended replacement.
+    models: ["openai/gpt-oss-120b", "qwen/qwen3.6-27b", "openai/gpt-oss-20b", "llama-3.3-70b-versatile"],
+    request: openAiCompatRequest("https://api.groq.com/openai/v1/chat/completions", {}),
+    extract: openAiCompatExtract,
+  },
+  grok: {
+    id: "grok",
+    label: "Grok",
+    keyEnv: () => envValue("XAI_API_KEY", "GROK_API_KEY", "NEXT_PUBLIC_XAI_API_KEY", "NEXT_PUBLIC_GROK_API_KEY"),
+    modelEnv: "GROK_MODEL",
+    models: ["grok-4-fast-non-reasoning", "grok-4-1-fast-non-reasoning", "grok-3-mini"],
+    request: openAiCompatRequest("https://api.x.ai/v1/chat/completions", {}),
+    extract: openAiCompatExtract,
+  },
+  openrouter: {
+    id: "openrouter",
+    label: "OpenRouter",
+    keyEnv: () => envValue("OPENROUTER_API_KEY", "NEXT_PUBLIC_OPENROUTER_API_KEY"),
+    modelEnv: "OPENROUTER_MODEL",
+    // The old "openrouter/free" slug was never a valid model ID and could
+    // 400 the whole request; ":free" variants are the real fallbacks.
+    models: ["openai/gpt-4o-mini", "google/gemini-2.0-flash", "openai/gpt-oss-120b:free"],
+    request: (model, key, system, messages, maxTokens, temperature) => ({
+      url: "https://openrouter.ai/api/v1/chat/completions",
+      init: {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${key}`,
+          "HTTP-Referer": envValue("APP_URL", "NEXT_PUBLIC_APP_URL") || "https://studyplanner.app",
+          "X-Title": "Study Planner Pro",
+        },
+        body: JSON.stringify({
+          model,
+          max_tokens: maxTokens,
+          temperature,
+          messages: [{ role: "system", content: system }, ...messages],
+        }),
+      },
+    }),
+    extract: (json) => {
+      const done = openAiCompatExtract(json);
+      if (done.text) return done;
+      // OpenRouter reports provider-side errors inside a 200 on routed
+      // fallbacks sometimes — surface them as provider errors.
+      return done;
+    },
+  },
+};
+
+const DEFAULT_PROVIDER_ORDER: ProviderId[] = ["gemini", "groq", "grok", "openrouter"];
+
+function providerKeys(): Record<ProviderId, string | null> {
+  const keys = {} as Record<ProviderId, string | null>;
+  for (const id of DEFAULT_PROVIDER_ORDER) keys[id] = PROVIDERS[id].keyEnv();
+  return keys;
+}
+
+/** Operator override, e.g. AI_PROVIDER_ORDER=openrouter,gemini. */
+function requestedProviderOrder(): ProviderId[] {
+  const raw = envValue("AI_PROVIDER_ORDER", "NEXT_PUBLIC_AI_PROVIDER_ORDER");
+  if (!raw) return DEFAULT_PROVIDER_ORDER;
+  const wanted = raw
+    .split(/[,;\s]+/)
+    .map((token) => token.trim().toLowerCase())
+    .map((token) => DEFAULT_PROVIDER_ORDER.find((id) => id === token || PROVIDERS[id].label.toLowerCase() === token))
+    .filter((id): id is ProviderId => Boolean(id));
+  return wanted.length ? [...new Set(wanted)] : DEFAULT_PROVIDER_ORDER;
+}
+
+function configuredProviderIds(): ProviderId[] {
+  const keys = providerKeys();
+  const order = requestedProviderOrder().filter((id) => keys[id]);
+  // Anything configured but missing from a partial custom order is still
+  // appended, so a typo can never silently disable a working provider.
+  for (const id of DEFAULT_PROVIDER_ORDER) if (keys[id] && !order.includes(id)) order.push(id);
+  // Sticky provider answers first: the last leg that actually worked.
+  const sticky = aiGlobal.__studyPlannerPreferred?.provider;
+  if (sticky && keys[sticky]) return [sticky, ...order.filter((id) => id !== sticky)];
+  return order;
 }
 
 export function configuredProviders(): string[] {
-  const keys = providerKeys();
-  return [keys.gemini && "Gemini", keys.groq && "Groq", keys.openrouter && "OpenRouter"]
-    .filter((provider): provider is string => Boolean(provider));
+  return configuredProviderIds().map((id) => PROVIDERS[id].label);
 }
 
 export function activeProvider(): string | null {
@@ -84,6 +271,20 @@ export function llmHealthSnapshot(): LlmHealth {
   };
 }
 
+function modelsFor(id: ProviderId): string[] {
+  const spec = PROVIDERS[id];
+  const configured = envValue(spec.modelEnv);
+  const sticky = aiGlobal.__studyPlannerPreferred?.provider === id
+    ? aiGlobal.__studyPlannerPreferred?.model
+    : null;
+  const chain = [
+    ...(configured ? [configured] : []),
+    ...(sticky && sticky !== configured ? [sticky] : []),
+    ...spec.models,
+  ];
+  return [...new Set(chain.filter(Boolean))];
+}
+
 function boundedMessages(messages: ChatMsg[]): ChatMsg[] {
   return messages
     .slice(-16)
@@ -95,10 +296,10 @@ function boundedMessages(messages: ChatMsg[]): ChatMsg[] {
 }
 
 function classifyProviderError(status: number | null, detail: string): LlmAttempt["error"] {
-  if (status === 401 || status === 403 || /api.?key|unauthori|permission/i.test(detail)) return "auth";
-  if (status === 429 || /rate.?limit|quota|resource exhausted/i.test(detail)) return "rate_limit";
-  if (status === 404 || /model.*(not found|unsupported|unavailable)|not found.*model/i.test(detail)) return "model";
-  if (/safety|blocked|moderation/i.test(detail)) return "blocked";
+  if (status === 401 || status === 403 || /api.?key|unauthori|permission|invalid.*credential/i.test(detail)) return "auth";
+  if (status === 429 || /rate.?limit|quota|resource exhausted|too many requests/i.test(detail)) return "rate_limit";
+  if (status === 404 || /model.*(not found|unsupported|unavailable|decommission|deprecat)|not found.*model|does not exist/i.test(detail)) return "model";
+  if (/safety|blocked|moderation|refus/i.test(detail)) return "blocked";
   return status && status >= 400 ? "provider" : "network";
 }
 
@@ -113,7 +314,7 @@ async function requestJson(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), Math.max(200, Math.min(attemptBudgetMs, remaining)));
   try {
-    const response = await fetch(url, { ...init, signal: controller.signal });
+    const response = await fetch(url, { ...init, signal: controller.signal, cache: "no-store" });
     const raw = await response.text();
     let json: any = null;
     try { json = raw ? JSON.parse(raw) : null; } catch { /* retain raw detail */ }
@@ -124,8 +325,14 @@ async function requestJson(
   }
 }
 
+function llmDeadline(): number {
+  const configured = Number(envValue("AI_TIMEOUT_MS", "NEXT_PUBLIC_AI_TIMEOUT_MS"));
+  const budget = Number.isFinite(configured) && configured > 0 ? configured : 24_000;
+  return Date.now() + Math.max(8_000, Math.min(55_000, budget));
+}
+
 /* ============================================================
-   LLM CALLER — Gemini → Groq → OpenRouter, one bounded budget
+   LLM CALLER — one bounded budget across the provider chain
 ============================================================ */
 export type LlmCallOptions = { temperature?: number };
 
@@ -136,13 +343,9 @@ export async function callLLMDetailed(
   options: LlmCallOptions = {}
 ): Promise<LlmResult> {
   const keys = providerKeys();
-  const providers = [
-    keys.gemini ? "gemini" : null,
-    keys.groq ? "groq" : null,
-    keys.openrouter ? "openrouter" : null,
-  ].filter((provider): provider is ProviderId => Boolean(provider));
+  const providers = configuredProviderIds();
   const attempts: LlmAttempt[] = [];
-  const deadline = Date.now() + 18_000;
+  const deadline = llmDeadline();
   const safeSystem = String(system || "").slice(0, 48_000);
   const safeMessages = boundedMessages(messages);
   const safeMaxTokens = Math.max(64, Math.min(8_192, Math.round(Number(maxTokens) || 2_500)));
@@ -150,13 +353,9 @@ export async function callLLMDetailed(
     ? Math.max(0, Math.min(1.4, Number(options.temperature)))
     : 0.45;
 
-  const success = (text: unknown, provider: ProviderId, model: string): LlmResult | null => {
-    const clean = typeof text === "string" ? text.trim() : "";
-    if (!clean) {
-      attempts.push({ provider, model, status: 200, error: "empty" });
-      return null;
-    }
-    const result = { text: clean, provider, model, attempts: [...attempts] };
+  const success = (text: string, provider: ProviderId, model: string): LlmResult => {
+    const result = { text, provider, model, attempts: [...attempts] };
+    aiGlobal.__studyPlannerPreferred = { provider, model };
     aiGlobal.__studyPlannerLlmHealth = {
       checkedAt: new Date().toISOString(), ok: true, provider, model, attempts: [...attempts],
     };
@@ -165,138 +364,53 @@ export async function callLLMDetailed(
 
   for (const provider of providers) {
     if (deadline - Date.now() < 300) break;
-    try {
-      if (provider === "gemini" && keys.gemini) {
-        const configured = envValue("GEMINI_MODEL", "NEXT_PUBLIC_GEMINI_MODEL");
-        // Prefer the operator's model, then currently-serving Flash IDs. A
-        // retired "3.x" name must not block the working 2.5 / 2.0 / 1.5 chain.
-        const models = [...new Set([
-          configured,
-          "gemini-2.5-flash",
-          "gemini-2.0-flash",
-          "gemini-flash-latest",
-          "gemini-1.5-flash",
-          "gemini-3.7-flash",
-          "gemini-3.5-flash-lite",
-        ].filter(Boolean))] as string[];
-        for (const model of models) {
-          if (deadline - Date.now() < 300) break;
-          try {
-            const { response, json, detail } = await requestJson(
-              `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
-              {
-                method: "POST",
-                headers: { "content-type": "application/json", "x-goog-api-key": keys.gemini },
-                body: JSON.stringify({
-                  systemInstruction: { parts: [{ text: safeSystem }] },
-                  contents: safeMessages.map((message) => ({
-                    role: message.role === "assistant" ? "model" : "user",
-                    parts: [{ text: message.content }],
-                  })),
-                  generationConfig: { maxOutputTokens: safeMaxTokens, temperature },
-                }),
-              },
-              deadline,
-              8_000
-            );
-            if (response.ok) {
-              const text = json?.candidates?.[0]?.content?.parts
-                ?.map((part: { text?: string }) => part.text || "").join("");
-              const done = success(text, provider, model);
-              if (done) return done;
-              continue;
-            }
-            const error = classifyProviderError(response.status, detail);
-            attempts.push({ provider, model, status: response.status, error });
-            // Only a genuinely missing/unsupported model should try the next
-            // Gemini model. Invalid keys, quota failures, and bad prompts must
-            // not create a noisy serial retry loop.
-            if (error !== "model") break;
-          } catch (error) {
-            const timedOut = error instanceof DOMException && error.name === "AbortError";
-            attempts.push({
-              provider,
-              model,
-              status: null,
-              error: timedOut ? "timeout" : "network",
-            });
-            // A single timed-out / retired model must not skip the rest of
-            // the Gemini list — the next ID often still answers.
-            if (!timedOut) break;
-          }
-        }
-      } else if (provider === "groq" && keys.groq) {
-        const model = envValue("GROQ_MODEL") || "llama-3.3-70b-versatile";
+    const spec = PROVIDERS[provider];
+    const key = keys[provider];
+    if (!key) continue;
+
+    for (const model of modelsFor(provider)) {
+      if (deadline - Date.now() < 300) break;
+      let retried = false;
+      let abandonProvider = false;
+      for (;;) {
+        if (deadline - Date.now() < 300) break;
         try {
-          const { response, json, detail } = await requestJson(
-            "https://api.groq.com/openai/v1/chat/completions",
-            {
-              method: "POST",
-              headers: { "content-type": "application/json", authorization: `Bearer ${keys.groq}` },
-              body: JSON.stringify({
-                model,
-                max_tokens: safeMaxTokens,
-                temperature,
-                messages: [{ role: "system", content: safeSystem }, ...safeMessages],
-              }),
-            },
-            deadline,
-            7_000
-          );
+          const { url, init } = spec.request(model, key, safeSystem, safeMessages, safeMaxTokens, temperature);
+          const { response, json, detail } = await requestJson(url, init, deadline, 9_000);
           if (response.ok) {
-            const done = success(json?.choices?.[0]?.message?.content, provider, model);
-            if (done) return done;
-          } else {
-            attempts.push({ provider, model, status: response.status, error: classifyProviderError(response.status, detail) });
+            const { text, blocked } = spec.extract(json);
+            if (text) return success(text, provider, model);
+            attempts.push({ provider, model, status: 200, error: blocked ? "blocked" : "empty" });
+            // An empty completion may be model-specific — try the next model.
+            break;
           }
-        } catch (error) {
-          attempts.push({
-            provider, model, status: null,
-            error: error instanceof DOMException && error.name === "AbortError" ? "timeout" : "network",
-          });
-        }
-      } else if (provider === "openrouter" && keys.openrouter) {
-        const model = envValue("OPENROUTER_MODEL") || "openai/gpt-4o-mini";
-        try {
-          const enableFreeFallback = envValue("OPENROUTER_ENABLE_FREE_FALLBACK") !== "false";
-          const { response, json, detail } = await requestJson(
-            "https://openrouter.ai/api/v1/chat/completions",
-            {
-              method: "POST",
-              headers: {
-                "content-type": "application/json",
-                authorization: `Bearer ${keys.openrouter}`,
-                "HTTP-Referer": envValue("APP_URL", "NEXT_PUBLIC_APP_URL") || "https://studyplanner.app",
-                "X-Title": "Study Planner Pro",
-              },
-              body: JSON.stringify({
-                ...(enableFreeFallback ? { models: [model, "openrouter/free"] } : { model }),
-                max_tokens: safeMaxTokens,
-                temperature: 0.35,
-                messages: [{ role: "system", content: safeSystem }, ...safeMessages],
-              }),
-            },
-            deadline,
-            7_000
-          );
-          if (response.ok) {
-            const actualModel = String(json?.model || model);
-            const done = success(json?.choices?.[0]?.message?.content, provider, actualModel);
-            if (done) return done;
-          } else {
-            attempts.push({ provider, model, status: response.status, error: classifyProviderError(response.status, detail) });
+          const error = classifyProviderError(response.status, detail);
+          attempts.push({ provider, model, status: response.status, error });
+          if (error === "auth") {
+            // A rejected key invalidates this provider (and its sticky slot):
+            // every other model would fail identically, so do not loop them.
+            if (aiGlobal.__studyPlannerPreferred?.provider === provider) delete aiGlobal.__studyPlannerPreferred;
+            abandonProvider = true;
+            break;
           }
+          if (error === "model") break; // walk to the next model ID
+          if ((error === "network" || (error === "provider" && response.status >= 500)) && !retried) {
+            retried = true; // one fast retry for transient failures
+            continue;
+          }
+          abandonProvider = true; // rate_limit / blocked / bad request → next provider
+          break;
         } catch (error) {
-          attempts.push({
-            provider, model, status: null,
-            error: error instanceof DOMException && error.name === "AbortError" ? "timeout" : "network",
-          });
+          const timedOut = error instanceof DOMException && error.name === "AbortError";
+          attempts.push({ provider, model, status: null, error: timedOut ? "timeout" : "network" });
+          if (!timedOut && !retried) { retried = true; continue; }
+          // A slow model must not block the chain — next model. A hard network
+          // failure affects this provider's whole host — next provider.
+          abandonProvider = !timedOut;
+          break;
         }
       }
-    } catch {
-      // A malformed provider response must never prevent the next configured
-      // provider or the deterministic local tutor from taking over.
-      attempts.push({ provider, model: "unknown", status: null, error: "provider" });
+      if (abandonProvider) break;
     }
   }
 
@@ -314,6 +428,62 @@ export async function callLLM(
   options: LlmCallOptions = {}
 ): Promise<string | null> {
   return (await callLLMDetailed(system, messages, maxTokens, options)).text;
+}
+
+/* ============================================================
+   CONNECTIVITY PROBE — powers /api/ai-status & Settings → AI
+   Connectivity. One tiny real request per configured provider:
+   the ONLY way to know whether the deployed keys actually work.
+============================================================ */
+export async function probeProviders(): Promise<ProviderProbe[]> {
+  const keys = providerKeys();
+  const ids = DEFAULT_PROVIDER_ORDER;
+
+  return Promise.all(ids.map(async (id): Promise<ProviderProbe> => {
+    const spec = PROVIDERS[id];
+    const key = keys[id];
+    const base: ProviderProbe = {
+      id, label: spec.label, configured: !!key, ok: false,
+      model: null, status: null, latencyMs: 0, error: null, detail: "",
+    };
+    if (!key) return { ...base, detail: "Not configured — add the API key in your deployment environment." };
+
+    const deadline = Date.now() + 12_000;
+    let last: ProviderProbe = { ...base, detail: "No probe could be attempted." };
+    for (const model of modelsFor(id).slice(0, 3)) {
+      if (deadline - Date.now() < 400) break;
+      const started = Date.now();
+      try {
+        const { url, init } = spec.request(
+          model, key, "You are a connectivity health probe.",
+          [{ role: "user", content: "Reply with the single word: OK" }], 16, 0
+        );
+        const { response, json, detail } = await requestJson(url, init, deadline, 8_000);
+        const latencyMs = Date.now() - started;
+        const { text, blocked } = spec.extract(json);
+        if (response.ok && text) {
+          if (id === (aiGlobal.__studyPlannerPreferred?.provider ?? id)) {
+            aiGlobal.__studyPlannerPreferred = { provider: id, model };
+          }
+          return { ...base, ok: true, model, status: 200, latencyMs, detail: `Answered in ${latencyMs} ms.` };
+        }
+        const error: ProviderProbe["error"] = response.ok ? (blocked ? "blocked" : "empty") : classifyProviderError(response.status, detail);
+        last = {
+          ...base, model, status: response.status, latencyMs, error,
+          detail: (detail || `Provider returned no content (${error}).`).slice(0, 220),
+        };
+        if (error === "auth" || error === "rate_limit") return last;
+      } catch (error) {
+        const timedOut = error instanceof DOMException && error.name === "AbortError";
+        last = {
+          ...base, model, latencyMs: Date.now() - started,
+          error: timedOut ? "timeout" : "network",
+          detail: timedOut ? "Probe timed out — the provider did not answer in 8 s." : "Network error reaching the provider from this deployment.",
+        };
+      }
+    }
+    return last;
+  }));
 }
 
 function extractJson<T>(raw: string): T | null {
@@ -1377,8 +1547,8 @@ export async function localTutor(
   const cloudConfigured = !!activeProvider();
   return {
     text: cloudConfigured
-      ? `I couldn't find that in your study plan or my reference library just now (the cloud tutor was unreachable). Try rephrasing, ask *"what should I study today?"*, or say *"explain [any topic from your subjects]"*.`
-      : `I'm in local mode because no cloud AI key is configured on this deployment. I can still answer from your study plan and my reference library — try *"what should I study today?"*, *"give me practice questions"*, or ask me to explain any topic from your subjects. Adding a GEMINI_API_KEY or GROQ_API_KEY in your environment unlocks full tutoring.`,
+      ? `I couldn't find that in your study plan or my reference library just now (the cloud tutor was unreachable). Run **Settings → AI Connectivity** to see exactly which provider failed and why — then try rephrasing, ask *"what should I study today?"*, or say *"explain [any topic from your subjects]"*.`
+      : `I'm in local mode because no cloud AI key is configured on this deployment. I can still answer from your study plan and my reference library — try *"what should I study today?"*, *"give me practice questions"*, or ask me to explain any topic from your subjects. Adding a GEMINI_API_KEY, GROQ_API_KEY, XAI_API_KEY (Grok) or OPENROUTER_API_KEY in your environment unlocks full tutoring.`,
   };
 }
 

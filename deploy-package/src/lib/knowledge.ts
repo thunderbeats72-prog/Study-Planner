@@ -9,7 +9,7 @@ import { detectLanguage, LANGS } from "./language";
 
 const UA = "StudyPlannerPro/1.0 (educational study planner)";
 
-async function jget<T>(url: string, ms = 3500): Promise<T | null> {
+async function jget<T>(url: string, ms = 4500): Promise<T | null> {
   try {
     const response = await fetch(url, {
       signal: AbortSignal.timeout(ms),
@@ -29,6 +29,10 @@ const STOP = new Set([
   "did", "can", "you", "please", "give", "why", "when", "which", "with", "that", "this", "it",
   "i", "my", "concept", "topic", "meaning", "means", "simple", "words", "short", "notes",
   "difference", "between", "help", "understand", "understanding", "study", "learn", "teach",
+  // conversational fillers that pollute keyword probes ("how is it going to
+  // solve", "what is the possible solution …") without carrying topic meaning
+  "possible", "possibly", "solve", "solving", "solved", "going", "gonna", "want", "wants",
+  "know", "knew", "think", "thinking", "really", "actually", "just", "like", "some", "any",
   // Hindi / Marathi / Nepali (Devanagari)
   "क्या", "है", "हैं", "और", "में", "का", "की", "के", "को", "से", "पर", "यह", "वह", "कैसे", "कब",
   "कौन", "किस", "बताओ", "बताइए", "समझाओ", "समझाइए", "करो", "करें", "मतलब", "अर्थ", "के बारे में",
@@ -117,52 +121,100 @@ async function searchAndExtract(lang: string, term: string): Promise<Knowledge |
   const search = await jget<WikiSearch>(
     `https://${host}/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(
       term
-    )}&srlimit=4&format=json&origin=*`
+    )}&srlimit=5&format=json&origin=*`
   );
   const hits = search?.query?.search || [];
   if (!hits.length) return null;
 
-  const best = hits[0];
-  const ex = await jget<WikiExtract>(
-    `https://${host}/w/api.php?action=query&prop=extracts&explaintext=1&exintro=0&exchars=2400&pageids=${best.pageid}&format=json&origin=*`
-  );
-  let extract = "";
-  const pages = ex?.query?.pages;
-  if (pages) {
-    const first = Object.values(pages)[0];
-    extract = (first?.extract || "").trim();
-  }
-  if (!extract) {
-    const sum = await jget<WikiSummary>(
-      `https://${host}/api/rest_v1/page/summary/${encodeURIComponent(best.title.replace(/ /g, "_"))}`
+  // A phrased question ("define the ukraine and russia conflict …") can rank
+  // a disambiguation or loosely-related page first. Walk the top hits and
+  // keep the first that yields a real, substantive extract.
+  const related: string[] = [];
+  for (const hit of hits) {
+    if (related.length < 3 && hit.title !== hits[0].title) related.push(hit.title);
+    const ex = await jget<WikiExtract>(
+      `https://${host}/w/api.php?action=query&prop=extracts&explaintext=1&exintro=0&exchars=2400&pageids=${hit.pageid}&format=json&origin=*`
     );
-    extract = (sum?.extract || "").trim();
-  }
-  if (!extract || extract.length < 60) return null;
+    let extract = "";
+    const pages = ex?.query?.pages;
+    if (pages) {
+      const first = Object.values(pages)[0];
+      extract = (first?.extract || "").trim();
+    }
+    if (!extract) {
+      const sum = await jget<WikiSummary>(
+        `https://${host}/api/rest_v1/page/summary/${encodeURIComponent(hit.title.replace(/ /g, "_"))}`
+      );
+      extract = (sum?.extract || "").trim();
+      // Disambiguation pages link everywhere but teach nothing.
+      if (sum?.type === "disambiguation") extract = "";
+    }
+    if (/^(may|can) refer to:?\s*$/im.test(extract.slice(0, 80))) extract = "";
+    if (!extract || extract.length < 60) continue;
 
-  return {
-    title: best.title,
-    extract,
-    url: `https://${host}/wiki/${encodeURIComponent(best.title.replace(/ /g, "_"))}`,
-    related: hits.slice(1, 4).map((h) => h.title),
-    lang,
-  };
+    return {
+      title: hit.title,
+      extract,
+      url: `https://${host}/wiki/${encodeURIComponent(hit.title.replace(/ /g, "_"))}`,
+      related: related.filter((title) => title !== hit.title).slice(0, 3),
+      lang,
+    };
+  }
+  return null;
+}
+
+/** True when the encyclopedia hit is actually about the asked topic, not a
+ *  loosely related article that happened to share one common word. */
+export function isRelevantKnowledge(k: Knowledge, question: string): boolean {
+  const term = searchTerms(question).toLowerCase();
+  if (!term) return false;
+  const title = k.title.toLowerCase();
+  const extract = k.extract.toLowerCase();
+  const words = term.split(/\s+/).filter((word) => word.length >= 3);
+  if (!words.length) {
+    return title.includes(term) || extract.slice(0, 400).includes(term);
+  }
+  if (words.length === 1) {
+    return title.includes(words[0]) || extract.slice(0, 600).includes(words[0]);
+  }
+  const hits = words.filter((word) => title.includes(word) || extract.slice(0, 800).includes(word));
+  return hits.length >= Math.min(2, words.length);
 }
 
 /** Search Wikipedia (in the question's language, falling back to English)
- *  and return a rich extract for the best matching article. */
+ *  and return a rich extract for the best matching article.
+ *  MULTI-PROBE: a spoken question ("please define the ukraine and russia
+ *  conflict how it is going to solve") produces a long keyword soup that
+ *  often has zero direct search hits. Progressive shorter probes — the full
+ *  term, then its leading keywords — find the real article instead of
+ *  returning nothing. */
 export async function lookupKnowledge(question: string): Promise<Knowledge | null> {
   const term = searchTerms(question);
   if (!term) return null;
 
   const lang = wikiLangFor(question);
-  const found = await searchAndExtract(lang, term);
-  if (found) return found;
+  const words = term.split(" ").filter((word) => word.length > 1);
+  const probes = [...new Set([
+    term,
+    words.slice(0, 5).join(" "),
+    words.slice(0, 3).join(" "),
+    words.slice(0, 2).join(" "),
+  ].filter((probe) => probe.length > 1))];
+
+  for (const probe of probes) {
+    const found = await searchAndExtract(lang, probe);
+    if (found && isRelevantKnowledge(found, probe)) return found;
+  }
 
   // Some technical topics only exist (or are far richer) on the English wiki.
   // A non-English learner still gets a useful, correctly structured lesson —
   // the bilingual lesson headers below stay in their language.
-  return lang === "en" ? null : searchAndExtract("en", term);
+  if (lang === "en") return null;
+  for (const probe of probes) {
+    const english = await searchAndExtract("en", probe);
+    if (english && isRelevantKnowledge(english, probe)) return english;
+  }
+  return null;
 }
 
 function sentences(text: string): string[] {

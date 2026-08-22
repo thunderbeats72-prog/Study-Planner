@@ -49,11 +49,24 @@ LOCAL DEVELOPMENT
 
 AI CONFIGURATION & DIAGNOSTICS
 ------------------------------
-Use GEMINI_API_KEY, GROQ_API_KEY, and/or OPENROUTER_API_KEY. Never put a secret
-in a NEXT_PUBLIC_* variable. Providers fail over inside one bounded request;
-if all are unavailable, saved curriculum metadata and the local knowledge tutor
-answer instead of leaving chat spinning. GET /api/health reports database status,
-configured provider names, and the last sanitised provider result — never keys.
+Use GEMINI_API_KEY, GROQ_API_KEY, XAI_API_KEY (Grok) and/or OPENROUTER_API_KEY.
+Never put a secret in a NEXT_PUBLIC_* variable. Providers fail over inside one
+bounded request — Gemini → Groq → Grok → OpenRouter — and each provider now has
+a MODEL FALLBACK CHAIN, because model IDs retire (Groq shut down
+llama-3.3-70b-versatile and llama-3.1-8b-instant on 2026-08-16, which silently
+killed deployments pinned to them; the default is now openai/gpt-oss-120b).
+The last provider/model that answered is remembered and tried first.
+GET  /api/health   — database status + configured provider names + last result.
+GET  /api/ai-status — same snapshot, cache-free.
+POST /api/ai-status — LIVE probe: one tiny real request to every configured
+                     provider, reporting ok / latency / HTTP status / reason
+                     (rejected key, retired model, rate limit, timeout, network
+                     block). The same test is available in-app under
+                     Settings → AI Connectivity → “Run connectivity test”.
+The chat header also shows which providers are live. If every cloud fails, the
+local Wikipedia-backed tutor (now with progressive multi-probe search) answers
+instead of an apology, and the toast explains exactly which provider failed why.
+Optional tuning: AI_TIMEOUT_MS (default 24000) and AI_PROVIDER_ORDER.
 Gemini 3.1 TTS uses Google's current Interactions API and automatically falls
 back to the device voice under a shared timeout.
 
@@ -87,6 +100,38 @@ start promptly, the answer continues in the closest available device voice
 instead of stopping on a “voice model unavailable” error; the chat shows a
 clear non-error notice. One failed long-answer part switches the remaining
 parts to that local voice, so every later part keeps flowing.
+
+v8 FIXES (this build)
+---------------------
+ - GROQ CONNECTIVITY RESTORED. Groq retired llama-3.3-70b-versatile and
+   llama-3.1-8b-instant on 2026-08-16; the app was pinned to them, so every
+   Groq call died with "model not found" and chat fell to the unreachable-
+   cloud message. Groq now defaults to openai/gpt-oss-120b with automatic
+   fallbacks (qwen/qwen3.6-27b, gpt-oss-20b).
+ - EVERY PROVIDER HAS A MODEL FALLBACK CHAIN + sticky success (the last
+   working provider/model is retried first), one bounded retry for transient
+   network/5xx errors, and quote-stripped env keys (a pasted `"key"` used to
+   look exactly like an invalid key).
+ - GROK (xAI) IS NOW A FIRST-CLASS PROVIDER via XAI_API_KEY alongside Gemini,
+   Groq and OpenRouter. The invalid OpenRouter "openrouter/free" slug (which
+   could 400 the whole request) was replaced with real fallback models.
+ - CONNECTIVITY IS DIAGNOSABLE FROM THE APP: POST /api/ai-status probes every
+   configured provider live (latency, HTTP status, reason), and Settings →
+   AI Connectivity shows it with a one-tap test. Chat degraded toasts now say
+   WHICH provider failed and WHY instead of a generic timeout line.
+ - KEYLESS ANSWERS UPGRADED: the Wikipedia tutor uses progressive multi-probe
+   search (full question → leading keywords), skips disambiguation pages, and
+   strips conversational filler, so questions like "define the ukraine and
+   russia conflict and how it will solve" now return a real structured lesson
+   even with zero AI keys.
+ - DEPLOY-PACKAGE RESYNCED: the drag-and-drop deploy folder had drifted from
+   src/ (missing voice pieces, older chat/health/AI files) — deploying it
+   shipped stale behaviour. It is now a byte-exact mirror of src/.
+ - UI/UX (all devices): roomier desktop chat panel (480px, near-full height),
+   near-full-screen phone sheet with landscape mode, auto-growing composer
+   with Shift+Enter, copy-answer buttons, live provider status chip in the
+   chat header, keyboard focus rings everywhere, fluid page titles, stronger
+   contrast mode, comfier mobile dock targets, and full-bleed toasts.
 
 v7 FIXES (this build)
 ---------------------
