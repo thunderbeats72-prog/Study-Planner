@@ -10,9 +10,8 @@ export const maxDuration = 30;
  *        the last real tutor request did. Never returns keys.
  * POST — live connectivity probe: one tiny real request to EVERY configured
  *        provider, with per-provider status, latency and a sanitised reason.
- *        This is the "look into the connectivity of Gemini / Groq / Grok /
- *        OpenRouter" endpoint — it distinguishes a rejected key, a retired
- *        model, a rate limit, a timeout and a network block from each other.
+ *        Distinguishes a rejected key, a retired model, a rate limit,
+ *        a timeout and a network block from each other.
  */
 export async function GET() {
   const providers = configuredProviders();

@@ -261,16 +261,16 @@ async function runTests() {
   console.log("\n--- 4. Provider Failover ---");
   const originalFetch = globalThis.fetch;
   const oldGemini = process.env.GEMINI_API_KEY;
-  const oldGroq = process.env.GROQ_API_KEY;
-  const oldOpenRouter = process.env.OPENROUTER_API_KEY;
+  const oldCerebras = process.env.CEREBRAS_API_KEY;
+  const oldMistral = process.env.MISTRAL_API_KEY;
   process.env.GEMINI_API_KEY = "test-gemini";
-  process.env.GROQ_API_KEY = "test-groq";
-  delete process.env.OPENROUTER_API_KEY;
+  process.env.CEREBRAS_API_KEY = "test-cerebras";
+  delete process.env.MISTRAL_API_KEY;
   const called: string[] = [];
   globalThis.fetch = (async (input: string | URL | Request) => {
     const url = String(input);
     called.push(url);
-    if (url.includes("generativelanguage")) {
+    if (url.includes("cerebras")) {
       return new Response(JSON.stringify({ error: { message: "API key rejected" } }), {
         status: 403, headers: { "content-type": "application/json" },
       });
@@ -280,24 +280,24 @@ async function runTests() {
     });
   }) as typeof fetch;
   const failover = await callLLMDetailed("Tutor", [{ role: "user", content: "Explain demand" }], 200);
-  check(failover.text === "Fallback answer" && failover.provider === "groq", "Rejected Gemini key falls through to Groq");
-  check(called.filter((url) => url.includes("generativelanguage")).length === 1, "Auth failure does not loop through Gemini models");
+  check(failover.text === "Fallback answer" && failover.provider === "gemini", "Rejected Cerebras key falls through to Gemini");
+  check(called.filter((url) => url.includes("cerebras")).length === 1, "Auth failure does not loop through Cerebras models");
   globalThis.fetch = originalFetch;
   if (oldGemini === undefined) delete process.env.GEMINI_API_KEY; else process.env.GEMINI_API_KEY = oldGemini;
-  if (oldGroq === undefined) delete process.env.GROQ_API_KEY; else process.env.GROQ_API_KEY = oldGroq;
-  if (oldOpenRouter === undefined) delete process.env.OPENROUTER_API_KEY; else process.env.OPENROUTER_API_KEY = oldOpenRouter;
+  if (oldCerebras === undefined) delete process.env.CEREBRAS_API_KEY; else process.env.CEREBRAS_API_KEY = oldCerebras;
+  if (oldMistral === undefined) delete process.env.MISTRAL_API_KEY; else process.env.MISTRAL_API_KEY = oldMistral;
 
-  console.log("\n--- 4b. v8 Provider Chain: retired models, sticky success, probe ---");
+  console.log("\n--- 4b. v9 Provider Chain: retired models, sticky success, probe ---");
   {
     const originalFetch = globalThis.fetch;
     const oldGemini = process.env.GEMINI_API_KEY;
-    const oldGroq = process.env.GROQ_API_KEY;
-    const oldXai = process.env.XAI_API_KEY;
-    const oldOpenRouter = process.env.OPENROUTER_API_KEY;
+    const oldCerebras = process.env.CEREBRAS_API_KEY;
+    const oldMistral = process.env.MISTRAL_API_KEY;
+    const oldSambanova = process.env.SAMBANOVA_API_KEY;
     delete process.env.GEMINI_API_KEY;
-    process.env.GROQ_API_KEY = "test-groq";
-    delete process.env.XAI_API_KEY;
-    delete process.env.OPENROUTER_API_KEY;
+    delete process.env.MISTRAL_API_KEY;
+    delete process.env.SAMBANOVA_API_KEY;
+    process.env.CEREBRAS_API_KEY = "test-cerebras";
     const stickyGlobal = globalThis as { __studyPlannerPreferred?: { provider: string; model: string } };
     delete stickyGlobal.__studyPlannerPreferred;
 
@@ -306,9 +306,8 @@ async function runTests() {
       const url = String(input);
       const model = String(JSON.parse(String(init?.body || "{}")).model || "");
       calls.push({ url, model });
-      // Simulate the 2026-08-16 Groq retirement: the old default model ID
-      // is gone, but the replacement models still answer.
-      if (model === "openai/gpt-oss-120b" && calls.filter((c) => c.model === "openai/gpt-oss-120b").length === 1) {
+      // Simulate a retired Cerebras model: first call 404s, second model answers.
+      if (model === "llama-3.3-70b" && calls.filter((c) => c.model === "llama-3.3-70b").length === 1) {
         return new Response(JSON.stringify({ error: { message: "model not found: decommissioned" } }), {
           status: 404, headers: { "content-type": "application/json" },
         });
@@ -319,29 +318,29 @@ async function runTests() {
     }) as typeof fetch;
 
     const first = await callLLMDetailed("Tutor", [{ role: "user", content: "explain demand" }], 200);
-    check(first.text === "Chain answer" && first.provider === "groq",
-      "Retired Groq model falls through the chain to a live replacement");
-    check(first.model && first.model !== "openai/gpt-oss-120b",
+    check(first.text === "Chain answer" && first.provider === "cerebras",
+      "Retired Cerebras model falls through the chain to a live replacement");
+    check(first.model && first.model !== "llama-3.3-70b",
       "Fallback picked a replacement model, not the retired ID");
 
     const second = await callLLMDetailed("Tutor", [{ role: "user", content: "explain supply" }], 200);
-    check(second.provider === "groq" && second.model === first.model && second.text === "Chain answer",
+    check(second.provider === "cerebras" && second.model === first.model && second.text === "Chain answer",
       "Sticky success reuses the provider+model that answered");
     check(calls[calls.length - 1].model === first.model,
       "Second call goes straight to the sticky model");
 
     const probes = await probeProviders();
-    check(Array.isArray(probes) && probes.some((probe) => probe.label === "Groq" && probe.ok),
+    check(Array.isArray(probes) && probes.some((probe) => probe.label === "Cerebras" && probe.ok),
       "Connectivity probe verifies the live provider end-to-end");
-    check(probes.every((probe) => !JSON.stringify(probe).includes("test-groq")),
+    check(probes.every((probe) => !JSON.stringify(probe).includes("test-cerebras")),
       "Probe results never leak the API key");
 
     globalThis.fetch = originalFetch;
     delete stickyGlobal.__studyPlannerPreferred;
     if (oldGemini === undefined) delete process.env.GEMINI_API_KEY; else process.env.GEMINI_API_KEY = oldGemini;
-    if (oldGroq === undefined) delete process.env.GROQ_API_KEY; else process.env.GROQ_API_KEY = oldGroq;
-    if (oldXai === undefined) delete process.env.XAI_API_KEY; else process.env.XAI_API_KEY = oldXai;
-    if (oldOpenRouter === undefined) delete process.env.OPENROUTER_API_KEY; else process.env.OPENROUTER_API_KEY = oldOpenRouter;
+    if (oldCerebras === undefined) delete process.env.CEREBRAS_API_KEY; else process.env.CEREBRAS_API_KEY = oldCerebras;
+    if (oldMistral === undefined) delete process.env.MISTRAL_API_KEY; else process.env.MISTRAL_API_KEY = oldMistral;
+    if (oldSambanova === undefined) delete process.env.SAMBANOVA_API_KEY; else process.env.SAMBANOVA_API_KEY = oldSambanova;
   }
 
   console.log("\n--- 5. Study Clock Accounting ---");

@@ -1,37 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
-import { api, ApiError, THEMES, type AppState } from "@/lib/client";
-import { IconSignal, IconSpark } from "./icons";
-
-type Probe = {
-  id: string;
-  label: string;
-  configured: boolean;
-  ok: boolean;
-  model: string | null;
-  status: number | null;
-  latencyMs: number;
-  error: string | null;
-  detail: string;
-};
-
-const PROVIDER_ENV: Record<string, string> = {
-  gemini: "GEMINI_API_KEY",
-  groq: "GROQ_API_KEY",
-  grok: "XAI_API_KEY",
-  openrouter: "OPENROUTER_API_KEY",
-};
-
-const FRIENDLY_ERROR: Record<string, string> = {
-  auth: "API key rejected — check the key value in your deployment env",
-  rate_limit: "Rate-limited / quota exhausted right now",
-  model: "Model ID unavailable — a fallback model will be tried",
-  timeout: "Provider did not answer in time",
-  network: "This deployment cannot reach the provider (network/egress block?)",
-  blocked: "Provider refused the probe request",
-  empty: "Provider returned an empty response",
-};
+import { THEMES, type AppState } from "@/lib/client";
+import { IconSpark } from "./icons";
 
 export default function SettingsView({
   state, onPatch, onRestart, busy,
@@ -50,139 +21,105 @@ export default function SettingsView({
   });
   const set = (k: string, v: unknown) => setLocal((p) => ({ ...p, [k]: v }));
 
-  const [probing, setProbing] = useState(false);
-  const [probes, setProbes] = useState<Probe[] | null>(null);
-  const [probeNote, setProbeNote] = useState<string | null>(null);
-
-  const runProbe = async () => {
-    if (probing) return;
-    setProbing(true);
-    setProbeNote(null);
-    try {
-      const result = await api<{ ok: boolean; probes: Probe[] }>("/api/ai-status", {
-        method: "POST",
-        timeoutMs: 30_000,
-      });
-      setProbes(result.probes);
-      setProbeNote(
-        result.ok
-          ? "At least one provider answered — cloud tutoring is working."
-          : "No provider answered. Add or fix a key in your deployment environment, redeploy, and test again."
-      );
-    } catch (error) {
-      setProbeNote(error instanceof ApiError ? error.message : "The test could not run. Check your connection and retry.");
-    } finally {
-      setProbing(false);
-    }
-  };
-
-  const allProbes: Probe[] = probes && probes.length
-    ? probes
-    : (["gemini", "groq", "grok", "openrouter"] as const).map((id) => ({
-        id,
-        label: id === "gemini" ? "Gemini" : id === "groq" ? "Groq" : id === "grok" ? "Grok" : "OpenRouter",
-        configured: false, ok: false, model: null, status: null, latencyMs: 0, error: null,
-        detail: `Not tested yet — expected env: ${PROVIDER_ENV[id]}`,
-      }));
+  // Derive a clean status label — never expose which AI provider is active.
+  const engineStatus = state.aiProvider ? "Active" : "Local mode";
 
   return (
     <div className="fade-in">
       <div className="page-header">
         <div>
           <h1 className="page-title">Settings</h1>
-          <p className="page-subtitle">Tune the engine, the timer and the look. Saving the engine section re-plans instantly.</p>
+          <p className="page-subtitle">Tune your schedule, timer, and appearance.</p>
         </div>
       </div>
 
       <div className="grid-fit-300">
+        {/* ── Left column: Schedule Engine ── */}
         <div className="glass-panel tilt-card" style={{ padding: 22 }}>
           <h3 style={{ fontSize: ".95rem", fontWeight: 800, margin: "0 0 16px" }}>Schedule Engine</h3>
+
           <div className="mb-md"><label className="lbl">Your Name</label>
             <input className="input-field" value={local.name} onChange={(e) => set("name", e.target.value)} /></div>
+
           <div className="mb-md"><label className="lbl">Start Date</label>
             <input type="date" className="input-field" value={local.startDate} onChange={(e) => set("startDate", e.target.value)} /></div>
+
           <div className="mb-md"><label className="lbl">Target / Exam Date</label>
             <input type="date" className="input-field" value={local.examDate} onChange={(e) => set("examDate", e.target.value)} /></div>
+
           <div className="mb-md"><label className="lbl">Daily Target Hours</label>
-            <input type="number" min={1} max={14} className="input-field" value={local.dailyHours} onChange={(e) => set("dailyHours", Number(e.target.value))} /></div>
+            <input type="number" min={1} max={14} className="input-field" value={local.dailyHours}
+              onChange={(e) => set("dailyHours", Number(e.target.value))} /></div>
+
           <div className="mb-md"><label className="lbl">Subjects per Day</label>
             <select className="input-field" value={local.subjectsPerDay} onChange={(e) => set("subjectsPerDay", Number(e.target.value))}>
-              {[1,2,3,4,5,6].map((n) => <option key={n} value={n}>{n}/day</option>)}
+              {[1, 2, 3, 4, 5, 6].map((n) => <option key={n} value={n}>{n}/day</option>)}
             </select></div>
+
           <div className="mb-md"><label className="lbl">Study Days</label>
             <select className="input-field" value={local.studyDays} onChange={(e) => set("studyDays", e.target.value)}>
-              <option value="all">All 7 days</option><option value="6days">6 days (Sun off)</option><option value="weekdays">Weekdays only</option>
+              <option value="all">All 7 days</option>
+              <option value="6days">6 days (Sun off)</option>
+              <option value="weekdays">Weekdays only</option>
             </select></div>
+
           <div className="mb-md"><label className="lbl">Buffer Days</label>
-            <input type="number" min={0} max={30} className="input-field" value={local.bufferDays} onChange={(e) => set("bufferDays", Number(e.target.value))} /></div>
+            <input type="number" min={0} max={30} className="input-field" value={local.bufferDays}
+              onChange={(e) => set("bufferDays", Number(e.target.value))} /></div>
+
           <div className="mb-md"><label className="lbl">Plan Mode</label>
             <select className="input-field" value={local.planMode} onChange={(e) => set("planMode", e.target.value)}>
-              <option value="syllabus">Syllabus</option><option value="revision">Revision</option><option value="mock">Mock-heavy</option>
+              <option value="syllabus">Syllabus</option>
+              <option value="revision">Revision</option>
+              <option value="mock">Mock-heavy</option>
             </select></div>
+
           <div className="mb-md"><label className="lbl">Study Style</label>
             <select className="input-field" value={local.studyStyle} onChange={(e) => set("studyStyle", e.target.value)}>
-              <option value="balanced">Balanced</option><option value="theory">Theory heavy</option><option value="practice">Practice heavy</option>
+              <option value="balanced">Balanced</option>
+              <option value="theory">Theory heavy</option>
+              <option value="practice">Practice heavy</option>
             </select></div>
+
           <div className="mb-md"><label className="lbl">Weakest Subject</label>
             <select className="input-field" value={local.weakSubject} onChange={(e) => set("weakSubject", e.target.value)}>
               <option value="none">None</option>
               {state.subjects.map((x) => <option key={x.id} value={String(x.id)}>{x.name}</option>)}
             </select></div>
+
           <div className="mb-md"><label className="lbl">Revision Block (weeks)</label>
             <select className="input-field" value={local.revisionWeeks} onChange={(e) => set("revisionWeeks", Number(e.target.value))}>
-              <option value={0}>None</option><option value={1}>1 week</option><option value={2}>2 weeks</option><option value={3}>3 weeks</option>
+              <option value={0}>None</option>
+              <option value={1}>1 week</option>
+              <option value={2}>2 weeks</option>
+              <option value={3}>3 weeks</option>
             </select></div>
+
           <button className="btn btn-primary w-full" disabled={busy} onClick={() => onPatch(local, true)}>
-            <IconSpark size={14} />{busy ? "Rebuilding…" : "Save & Re-plan with AI"}
+            <IconSpark size={14} />{busy ? "Rebuilding…" : "Save & Re-plan"}
           </button>
         </div>
 
+        {/* ── Right column ── */}
         <div className="flex-col gap-md">
-          <div className="glass-panel tilt-card" style={{ padding: 22 }}>
-            <h3 style={{ fontSize: ".95rem", fontWeight: 800, margin: "0 0 4px" }}>AI Connectivity</h3>
-            <p style={{ fontSize: ".76rem", color: "var(--text-muted)", margin: "0 0 12px", lineHeight: 1.5 }}>
-              Live test of every configured provider (Gemini, Groq, Grok, OpenRouter) from this deployment.
-              Active chain: <strong>{state.aiProvider || "local engine only"}</strong>.
-            </p>
-            <div className="ai-diag" role="status" aria-live="polite">
-              {allProbes.map((probe) => {
-                const tone = probes
-                  ? probe.ok ? "ok" : probe.configured ? "bad" : "idle"
-                  : "idle";
-                return (
-                  <div key={probe.id} className="ai-diag-row">
-                    <span className={`ai-diag-dot ${tone}`} aria-hidden="true" />
-                    <span className="ai-diag-name">{probe.label}</span>
-                    <span className="ai-diag-meta">
-                      {probe.ok && `OK · ${probe.model || "model"}${probe.latencyMs ? ` · ${probe.latencyMs} ms` : ""}`}
-                      {!probe.ok && probes && probe.error && (FRIENDLY_ERROR[probe.error] || probe.error)}
-                      {!probe.ok && probes && !probe.error && probe.detail}
-                      {!probes && probe.detail}
-                      {probes && !probe.ok && probe.error && probe.detail ? ` — ${probe.detail.slice(0, 120)}` : ""}
-                    </span>
-                    <span className="ai-diag-lat">{PROVIDER_ENV[probe.id]}</span>
-                  </div>
-                );
-              })}
-            </div>
-            {probeNote && (
-              <p className={`ai-diag-note ${probes?.some((probe) => probe.ok) ? "ok" : "bad"}`}>{probeNote}</p>
-            )}
-            <button className="btn btn-secondary w-full mt-md" onClick={() => void runProbe()} disabled={probing}>
-              <IconSignal size={13} />{probing ? "Testing providers…" : "Run connectivity test"}
-            </button>
-          </div>
 
+          {/* Appearance */}
           <div className="glass-panel tilt-card" style={{ padding: 22 }}>
             <h3 style={{ fontSize: ".95rem", fontWeight: 800, margin: "0 0 16px" }}>Appearance</h3>
             <div className="grid-2" style={{ gap: 9 }}>
               {THEMES.map((th) => (
-                <button key={th.id} className={`btn ${s.theme === th.id ? "btn-primary" : "btn-secondary"}`}
-                  onClick={() => onPatch({ theme: th.id })}>{th.label}</button>
+                <button
+                  key={th.id}
+                  className={`btn ${s.theme === th.id ? "btn-primary" : "btn-secondary"}`}
+                  onClick={() => onPatch({ theme: th.id })}
+                >
+                  {th.label}
+                </button>
               ))}
             </div>
           </div>
 
+          {/* Timer */}
           <div className="glass-panel tilt-card" style={{ padding: 22 }}>
             <h3 style={{ fontSize: ".95rem", fontWeight: 800, margin: "0 0 16px" }}>Timer</h3>
             <div className="mb-md"><label className="lbl">Focus length (min)</label>
@@ -196,16 +133,20 @@ export default function SettingsView({
                 onBlur={(e) => onPatch({ longBreak: Number(e.target.value) })} /></div>
           </div>
 
+          {/* Engine Status — clean, no provider names */}
           <div className="glass-panel tilt-card" style={{ padding: 22 }}>
-            <h3 style={{ fontSize: ".95rem", fontWeight: 800, margin: "0 0 10px" }}>Engine Status</h3>
-            <div style={{ fontSize: ".82rem", color: "var(--text-muted)", lineHeight: 1.7, fontWeight: 600 }}>
-              <div>AI provider: <strong>{state.aiProvider || "SHIGUN local engine"}</strong></div>
+            <h3 style={{ fontSize: ".95rem", fontWeight: 800, margin: "0 0 12px" }}>Engine Status</h3>
+            <div style={{ fontSize: ".82rem", color: "var(--text-muted)", lineHeight: 1.8, fontWeight: 600 }}>
+              <div>Shigun AI: <strong style={{ color: state.aiProvider ? "var(--success-accent)" : "var(--text-main)" }}>{engineStatus}</strong></div>
               <div>Lessons generated: <strong>{state.topics.length}</strong></div>
               <div>Scheduled tasks: <strong>{state.tasks.length}</strong></div>
               <div>Sessions logged: <strong>{state.sessions.length}</strong></div>
             </div>
-            <button className="btn btn-secondary w-full mt-md" onClick={onRestart}>Re-run 7-step Setup Wizard</button>
+            <button className="btn btn-secondary w-full mt-md" onClick={onRestart}>
+              Re-run Setup Wizard
+            </button>
           </div>
+
         </div>
       </div>
     </div>
