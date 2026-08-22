@@ -47,6 +47,7 @@ export function activeProvider(): string | null {
   if (getSafeKey("GEMINI_API_KEY") || getSafeKey("GOOGLE_API_KEY")
     || getSafeKey("NEXT_PUBLIC_GEMINI_API_KEY") || getSafeKey("NEXT_PUBLIC_GOOGLE_API_KEY")) return "AI Cloud";
   if (getSafeKey("GROQ_API_KEY") || getSafeKey("NEXT_PUBLIC_GROQ_API_KEY")) return "Groq";
+  if (getSafeKey("OPENAI_API_KEY") || getSafeKey("NEXT_PUBLIC_OPENAI_API_KEY")) return "OpenAI";
   if (getSafeKey("OPENROUTER_API_KEY") || getSafeKey("NEXT_PUBLIC_OPENROUTER_API_KEY")) return "OpenRouter";
   return null;
 }
@@ -85,6 +86,8 @@ function geminiModels(): string[] {
     configured,
     "gemini-2.5-flash",
     "gemini-2.0-flash",
+    "gemini-1.5-flash",
+    "gemini-1.5-pro",
     "gemini-flash-latest",
     "gemini-2.5-pro",
     "gemini-2.5-flash-lite",
@@ -159,12 +162,14 @@ export async function callLLM(
   const geminiKey = getSafeKey("GEMINI_API_KEY") || getSafeKey("GOOGLE_API_KEY")
     || getSafeKey("NEXT_PUBLIC_GEMINI_API_KEY") || getSafeKey("NEXT_PUBLIC_GOOGLE_API_KEY");
   const groqKey = getSafeKey("GROQ_API_KEY") || getSafeKey("NEXT_PUBLIC_GROQ_API_KEY");
+  const openaiKey = getSafeKey("OPENAI_API_KEY") || getSafeKey("NEXT_PUBLIC_OPENAI_API_KEY");
   const openrouterKey = getSafeKey("OPENROUTER_API_KEY") || getSafeKey("NEXT_PUBLIC_OPENROUTER_API_KEY");
   const providers = [
     geminiKey ? "gemini" : null,
     groqKey ? "groq" : null,
+    openaiKey ? "openai" : null,
     openrouterKey ? "openrouter" : null,
-  ].filter(Boolean) as Array<"gemini" | "groq" | "openrouter">;
+  ].filter(Boolean) as Array<"gemini" | "groq" | "openai" | "openrouter">;
 
   if (!providers.length) {
     recordLlmError("no cloud AI key configured");
@@ -205,6 +210,30 @@ export async function callLLM(
         } else {
           const err = await response.text().catch(() => "");
           recordLlmError(`Groq: HTTP ${response.status} ${err.slice(0, 160)}`);
+        }
+      } else if (provider === "openai" && openaiKey) {
+        const remaining = deadline - Date.now();
+        if (remaining < 800) break;
+        const response = await fetchText("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: { "content-type": "application/json", authorization: `Bearer ${openaiKey}` },
+          body: JSON.stringify({
+            model: "gpt-4o-mini",
+            max_tokens: maxTokens,
+            messages: [{ role: "system", content: system }, ...messages],
+          }),
+        }, Math.min(12000, remaining)).catch((error) => {
+          recordLlmError(`OpenAI: ${error instanceof Error ? error.message : "network error"}`);
+          return null;
+        });
+        if (!response) continue;
+        if (response.ok) {
+          const json = await response.json().catch(() => null);
+          const text = json?.choices?.[0]?.message?.content ?? null;
+          if (text?.trim()) return text.trim();
+        } else {
+          const err = await response.text().catch(() => "");
+          recordLlmError(`OpenAI: HTTP ${response.status} ${err.slice(0, 160)}`);
         }
       } else if (provider === "openrouter" && openrouterKey) {
         const remaining = deadline - Date.now();
@@ -1025,10 +1054,10 @@ export async function localTutor(
     if (knowledge) return { text: teachFromKnowledge(knowledge, q, ctx.level, subjectHint) };
   }
 
-  if (/^(hi|hello|hey|good (morning|afternoon|evening))/i.test(q.trim())) {
+  if (/^(hi|hello|hey|good (morning|afternoon|evening))\b/i.test(q.trim())) {
     return { text: "Hello! I can help with study planning, explanations, writing, calculations, ideas, and everyday questions. What would you like to explore?" };
   }
-  if (/(thanks|thank you)/i.test(q)) return { text: "You’re welcome. What would you like to do next?" };
+  if (/\b(thanks|thank you)\b/i.test(q)) return { text: "You’re welcome. What would you like to do next?" };
   return { text: openEndedFallback(q) };
 }
 
