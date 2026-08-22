@@ -6,12 +6,10 @@ import { buildContext, dateFrom, fullState, getOrCreateUser, getSettings, keyFro
 import {
   callLLMDetailed, localTutor, parseCommand, tutorSystemPrompt, activeProvider,
   extractLlmAction, languageCapabilityReply, instantTutorReply, commandReply,
-  voiceGenderFor,
 } from "@/lib/ai";
 import { checkRateLimit } from "@/lib/rateLimit";
 import { readJsonObject, validationPayload } from "@/lib/validation";
 import { regeneratePlan } from "@/lib/generate";
-import { mergeTranscriptSegments } from "@/lib/transcript";
 import { appendChatTurn } from "@/lib/chatTurn";
 
 export const dynamic = "force-dynamic";
@@ -167,23 +165,17 @@ export async function POST(req: Request) {
   if (rawText.length > 8_000) {
     return NextResponse.json({ error: "Message is too long (maximum 8,000 characters).", code: "MESSAGE_TOO_LONG" }, { status: 413 });
   }
-  const source = body.source === "voice" ? "voice" as const : "text" as const;
-  const voiceId = typeof body.voiceId === "string" && ["f1", "f2", "m1", "device"].includes(body.voiceId)
-    ? body.voiceId
-    : "f1";
-
   try {
-    return await handleChat(req, { source, voiceId, message: rawText });
+    return await handleChat(req, { message: rawText });
   } catch (error) {
     console.error("Chat route handleChat failed, using local tutor fallback:", error instanceof Error ? error.message : error);
     const key = keyFrom(req);
     const localDate = dateFrom(req);
     const fallbackState = defaultFallbackState(key);
     const ctx = buildContext(fallbackState, localDate);
-    const voiceGender = voiceGenderFor(voiceId);
-    const text = source === "voice" ? mergeTranscriptSegments([rawText]) : rawText;
+    const text = rawText;
     const action = parseCommand(text);
-    const languageReply = languageCapabilityReply(text, voiceGender);
+    const languageReply = languageCapabilityReply(text);
     const instantReply = action ? null : instantTutorReply(text, ctx);
 
     let finalText = "";
@@ -191,11 +183,11 @@ export async function POST(req: Request) {
       if (languageReply) {
         finalText = languageReply;
       } else if (action) {
-        finalText = commandReply(action, text, ctx.daysLeft, voiceGender);
+        finalText = commandReply(action, text, ctx.daysLeft);
       } else if (instantReply) {
         finalText = instantReply.text;
       } else {
-        const local = await localTutor(text, ctx, { skipCloud: true, voiceGender });
+        const local = await localTutor(text, ctx, { skipCloud: true });
         finalText = local.text;
       }
     } catch (inner) {
@@ -221,17 +213,16 @@ export async function POST(req: Request) {
   }
 }
 
-async function handleChat(req: Request, opts: { source: "voice" | "text"; voiceId: string; message: string }) {
-  const { source, voiceId, message: rawText } = opts;
+async function handleChat(req: Request, opts: { message: string }) {
+  const { message: rawText } = opts;
   const key = keyFrom(req);
-  const voiceGender = voiceGenderFor(voiceId);
-  const text = source === "voice" ? mergeTranscriptSegments([rawText]) : rawText;
+  const text = rawText;
 
   const state = await fullState(key);
   const localDate = dateFrom(req);
   const ctx = buildContext(state, localDate);
   let action = parseCommand(text);
-  const languageReply = languageCapabilityReply(text, voiceGender);
+  const languageReply = languageCapabilityReply(text);
   const instantReply = action ? null : instantTutorReply(text, ctx);
 
   if (state.user.id > 0) {
@@ -263,7 +254,7 @@ async function handleChat(req: Request, opts: { source: "voice" | "text"; voiceI
         console.warn("DB replan skip:", e instanceof Error ? e.message : e);
       }
     }
-    finalText = commandReply(action, text, ctx.daysLeft, voiceGender);
+    finalText = commandReply(action, text, ctx.daysLeft);
   } else if (instantReply) {
     finalText = instantReply.text;
   } else {
@@ -274,15 +265,13 @@ async function handleChat(req: Request, opts: { source: "voice" | "text"; voiceI
         role: m.role === "assistant" ? ("assistant" as const) : ("user" as const),
         content: m.content,
       }));
-      const systemPrompt = tutorSystemPrompt(ctx, { voiceGender })
+      const systemPrompt = tutorSystemPrompt(ctx)
         + curriculumGrounding(text, state)
-        + (source === "voice"
-          ? "\n\nVOICE TURN: Keep the opening reply to 80-140 spoken words UNLESS the learner asked for detail, a lesson, or an explanation — then answer in full depth; the app speaks long answers in consecutive parts. Lead with the answer; avoid long preambles."
-          : "\n\nTEXT TURN: Provide a rich, highly prominent, well-structured response using markdown headings, bold text, and bullet points. Give a detailed, actionable, and comprehensive answer that stands out visually.");
+        + "\n\nTEXT TURN: Provide a rich, well-structured response using markdown headings, bold text, and bullet points. Give a detailed, actionable, and comprehensive answer.";
       const result = await callLLMDetailed(
         systemPrompt,
         [...history, { role: "user", content: text }],
-        source === "voice" ? 1100 : 2400
+        2400
       );
       reply = result.text;
       if (result.text && result.provider) {
@@ -322,7 +311,7 @@ async function handleChat(req: Request, opts: { source: "voice" | "text"; voiceI
         finalText = grounded;
       } else {
         try {
-          const local = await localTutor(text, ctx, { skipCloud: cloudAttempted, voiceGender });
+          const local = await localTutor(text, ctx, { skipCloud: cloudAttempted });
           finalText = local.text;
           if (local.action) action = local.action;
         } catch (error) {

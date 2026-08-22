@@ -17,13 +17,6 @@ export async function GET() {
         configuredProviders: providers,
         lastRequest: llm,
       },
-      voice: {
-        cloudConfigured: Boolean(
-          process.env.GOOGLE_CLOUD_TTS_API_KEY
-          || process.env.GEMINI_API_KEY
-          || process.env.GOOGLE_API_KEY
-        ),
-      },
       checkedAt: new Date().toISOString(),
     }, { headers: { "cache-control": "no-store" } });
   } catch {
