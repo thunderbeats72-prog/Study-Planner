@@ -1,6 +1,7 @@
 "use client";
 
 import { mergeTranscriptSegments } from "./transcript";
+import { userKey } from "./client";
 
 // ============================================================
 // SHIGUN VOICE
@@ -150,9 +151,15 @@ export function voiceSupported(): { stt: boolean; tts: boolean } {
   return { stt: !!recognition, tts: "Audio" in window || "speechSynthesis" in window };
 }
 
-function cleanForSpeech(markdown: string): string {
+export function cleanForSpeech(markdown: string): string {
   return markdown
     .replace(/\[\[action:[^\]]*\]\]/g, "")
+    .replace(/^\s*#{1,6}\s+(.+?)\s*$/gm, "$1.")
+    .replace(/^\s*\d+[.)]\s+/gm, "")
+    .replace(/^\s*[-*•]\s+/gm, "")
+    .replace(/^\s*\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)+\|?\s*$/gm, "")
+    .replace(/^\s*\|(.+)\|\s*$/gm, (_row, cells: string) =>
+      cells.split("|").map((cell) => cell.trim()).filter(Boolean).join(", "))
     .replace(/[*_#`>]+/g, "")
     .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
     .replace(/\s+/g, " ")
@@ -587,40 +594,49 @@ function utf8Len(text: string): number {
  * then at a real sentence boundary, never mid-word.
  */
 export function splitSpeechChunks(text: string, maxBytes = DEFAULT_SPEECH_CHUNK_BYTES): string[] {
+  const byteLimit = Math.max(64, Math.floor(maxBytes));
   const chunks: string[] = [];
-  let current = "";
-  let lastBoundary = 0; // safe cut point (right after a sentence ender)
-  let lastClauseBoundary = 0; // softer cut point for unusually long sentences
+  let remaining = text.trim();
 
-  for (let i = 0; i < text.length; i++) {
-    current += text[i];
-    const next = text[i + 1] ?? " ";
-    const ended = SENTENCE_ENDERS.has(text[i]) && (next === " " || next === "\n" || i === text.length - 1);
-    if (ended) lastBoundary = current.length;
-    const clauseEnded = CLAUSE_ENDERS.has(text[i])
-      && (next === " " || next === "\n")
-      && utf8Len(current) >= Math.floor(maxBytes * 0.55);
-    if (clauseEnded) lastClauseBoundary = current.length;
-
-    if (utf8Len(current) >= maxBytes) {
-      const safeBoundary = lastBoundary || lastClauseBoundary;
-      if (safeBoundary > 0) {
-        chunks.push(current.slice(0, safeBoundary).trim());
-        current = current.slice(safeBoundary).trimStart();
-        lastBoundary = 0;
-        lastClauseBoundary = 0;
-      } else {
-        // A single sentence longer than the cap: cut at the last word gap.
-        const gap = current.lastIndexOf(" ");
-        const cut = gap > 32 ? gap + 1 : current.length;
-        chunks.push(current.slice(0, cut).trim());
-        current = current.slice(cut).trimStart();
-        lastBoundary = 0;
-        lastClauseBoundary = 0;
-      }
+  const maxPrefixLength = (value: string): number => {
+    let low = 0;
+    let high = value.length;
+    while (low < high) {
+      const middle = Math.ceil((low + high) / 2);
+      if (utf8Len(value.slice(0, middle)) <= byteLimit) low = middle;
+      else high = middle - 1;
     }
+    // Do not split a UTF-16 surrogate pair (emoji/non-BMP character).
+    if (low > 0 && low < value.length
+      && /[\uD800-\uDBFF]/.test(value[low - 1])
+      && /[\uDC00-\uDFFF]/.test(value[low])) return low - 1;
+    return low;
+  };
+
+  while (remaining && utf8Len(remaining) > byteLimit) {
+    const prefixLength = maxPrefixLength(remaining);
+    const prefix = remaining.slice(0, Math.max(1, prefixLength));
+    const minimumNaturalCut = Math.floor(prefix.length * 0.45);
+    let sentenceCut = -1;
+    let clauseCut = -1;
+    for (let index = minimumNaturalCut; index < prefix.length; index++) {
+      const next = prefix[index + 1] ?? " ";
+      if ((next === " " || next === "\n") && SENTENCE_ENDERS.has(prefix[index])) sentenceCut = index + 1;
+      else if ((next === " " || next === "\n") && CLAUSE_ENDERS.has(prefix[index])) clauseCut = index + 1;
+    }
+    const wordCut = prefix.lastIndexOf(" ") + 1;
+    const cut = sentenceCut > 0
+      ? sentenceCut
+      : clauseCut > 0
+        ? clauseCut
+        : wordCut > 32
+          ? wordCut
+          : prefix.length;
+    const chunk = remaining.slice(0, cut).trim();
+    if (chunk) chunks.push(chunk);
+    remaining = remaining.slice(cut).trimStart();
   }
-  if (current.trim()) chunks.push(current.trim());
+  if (remaining) chunks.push(remaining);
   return chunks;
 }
 
@@ -680,7 +696,7 @@ async function fetchVoiceClip(
     try {
       const response = await fetch("/api/voice", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", "x-user-key": userKey() },
         body: JSON.stringify({ text: cleaned, voiceId }),
         signal,
       });

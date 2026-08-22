@@ -1,9 +1,12 @@
 import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
+import { detectLanguage } from "@/lib/language";
+import { checkRateLimit } from "@/lib/rateLimit";
+import { readJsonObject, validationPayload } from "@/lib/validation";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-export const maxDuration = 90;
+export const maxDuration = 30;
 
 type VoiceProfile = { name: string; direction: string; rate: number };
 const VOICES: Record<string, VoiceProfile> = {
@@ -124,25 +127,6 @@ const LANG_DIRECTIONS: Record<string, { direction: string; accent: string }> = {
   },
 };
 
-const SCRIPT_LANGUAGES: Array<{ tag: string; range: RegExp }> = [
-  { tag: "hi-IN", range: /[\u0900-\u097F]/g },
-  { tag: "bn-IN", range: /[\u0980-\u09FF]/g },
-  { tag: "pa-IN", range: /[\u0A00-\u0A7F]/g },
-  { tag: "gu-IN", range: /[\u0A80-\u0AFF]/g },
-  { tag: "or-IN", range: /[\u0B00-\u0B7F]/g },
-  { tag: "ta-IN", range: /[\u0B80-\u0BFF]/g },
-  { tag: "te-IN", range: /[\u0C00-\u0C7F]/g },
-  { tag: "kn-IN", range: /[\u0C80-\u0CFF]/g },
-  { tag: "ml-IN", range: /[\u0D00-\u0D7F]/g },
-  { tag: "ru-RU", range: /[\u0400-\u04FF]/g },
-  { tag: "zh-CN", range: /[\u4E00-\u9FFF]/g },
-  { tag: "ja-JP", range: /[\u3040-\u30FF]/g },
-  { tag: "ko-KR", range: /[\uAC00-\uD7AF]/g },
-  { tag: "th-TH", range: /[\u0E00-\u0E7F]/g },
-  { tag: "ar-XA", range: /[\u0600-\u06FF]/g },
-  { tag: "ur-PK", range: /[\u0600-\u06FF]/g },
-];
-
 type CachedAudio = {
   bytes: Buffer;
   contentType: "audio/mpeg" | "audio/wav";
@@ -178,12 +162,7 @@ function cloudTtsKey(): string {
 }
 
 function languageFor(text: string): string {
-  let best = { tag: "en-IN", count: 0 };
-  for (const language of SCRIPT_LANGUAGES) {
-    const count = text.match(language.range)?.length || 0;
-    if (count > best.count) best = { tag: language.tag, count };
-  }
-  return best.tag;
+  return detectLanguage(text);
 }
 
 function truncateUtf8(text: string, maxBytes: number): string {
@@ -223,13 +202,25 @@ function pcmToWav(pcm: Buffer, sampleRate = 24000): Buffer {
 }
 
 function readGeminiAudio(json: any): { bytes: Buffer; sampleRate: number } | null {
+  // Current Interactions API response (snake_case REST shape).
+  const interactionAudio = json?.output_audio || json?.outputAudio;
+  if (interactionAudio?.data) {
+    const rate = Number(String(interactionAudio.mime_type || interactionAudio.mimeType || "").match(/rate=(\d+)/i)?.[1]) || 24000;
+    return { bytes: Buffer.from(String(interactionAudio.data), "base64"), sampleRate: rate };
+  }
+
+  // Compatibility shape returned by Gemini 2.5 generateContent TTS models.
   const inline = json?.candidates?.[0]?.content?.parts?.find(
-    (part: any) => part?.inlineData?.data
+    (part: { inlineData?: { data?: string } }) => part?.inlineData?.data
   )?.inlineData;
   if (!inline?.data) return null;
   const bytes = Buffer.from(String(inline.data), "base64");
   const rate = Number(String(inline.mimeType || "").match(/rate=(\d+)/i)?.[1]) || 24000;
   return { bytes, sampleRate: rate };
+}
+
+function boundedSignal(parent: AbortSignal, timeoutMs: number): AbortSignal {
+  return AbortSignal.any([parent, AbortSignal.timeout(timeoutMs)]);
 }
 
 function cacheKey(provider: string, voice: string, language: string, text: string): string {
@@ -280,7 +271,8 @@ async function synthesiseChirp(
   apiKey: string,
   text: string,
   language: string,
-  profile: VoiceProfile
+  profile: VoiceProfile,
+  signal: AbortSignal
 ): Promise<CachedAudio | null> {
   const voiceName = `${language}-Chirp3-HD-${profile.name}`;
   const response = await fetch(
@@ -293,7 +285,7 @@ async function synthesiseChirp(
         voice: { languageCode: language, name: voiceName },
         audioConfig: { audioEncoding: "MP3", speakingRate: profile.rate },
       }),
-      signal: AbortSignal.timeout(15000),
+      signal: boundedSignal(signal, 6_000),
     }
   );
   if (!response.ok) return null;
@@ -312,7 +304,8 @@ async function synthesiseCloudCompatible(
   apiKey: string,
   text: string,
   language: string,
-  profile: VoiceProfile
+  profile: VoiceProfile,
+  signal: AbortSignal
 ): Promise<CachedAudio | null> {
   // A named Chirp voice may not be published for every locale. Let Google
   // choose an available voice in the same locale and gender before asking the
@@ -330,7 +323,7 @@ async function synthesiseCloudCompatible(
         },
         audioConfig: { audioEncoding: "MP3", speakingRate: profile.rate },
       }),
-      signal: AbortSignal.timeout(12000),
+      signal: boundedSignal(signal, 5_000),
     }
   );
   if (!response.ok) return null;
@@ -352,39 +345,49 @@ async function synthesiseGemini(
   text: string,
   language: string,
   profile: VoiceProfile,
-  model: string
+  model: string,
+  signal: AbortSignal
 ): Promise<GeminiSynthesis> {
   const spokenText = truncateUtf8(text, 5000);
-  // Use language-specific direction if available, otherwise use default
   const langConfig = LANG_DIRECTIONS[language];
   const direction = langConfig
-    ? `${profile.direction}. Speak with ${langConfig.direction} accent.`
+    ? `${profile.direction}. ${langConfig.direction}.`
     : profile.direction;
-  const voicePrompt = `Locked voice ${profile.name}. Style: ${direction}. Speak clearly and consistently. Read the text after the divider exactly once. Do not add, omit, paraphrase, or repeat words.\n---\n${spokenText}`;
-
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
-    {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-goog-api-key": apiKey },
-      body: JSON.stringify({
-        contents: [{
-          parts: [{ text: voicePrompt }],
-        }],
+  const voicePrompt = `Style: ${direction} Speak clearly and consistently. Read the text after the divider exactly once. Do not add, omit, paraphrase, or repeat words.\n---\n${spokenText}`;
+  const usesInteractionsApi = /^gemini-3\./.test(model);
+  const endpoint = usesInteractionsApi
+    ? "https://generativelanguage.googleapis.com/v1beta/interactions"
+    : `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
+  const body = usesInteractionsApi
+    ? {
+        model,
+        input: voicePrompt,
+        response_format: { type: "audio" },
+        generation_config: { speech_config: [{ voice: profile.name }] },
+      }
+    : {
+        contents: [{ parts: [{ text: voicePrompt }] }],
         generationConfig: {
           responseModalities: ["AUDIO"],
-          speechConfig: {
-            voiceConfig: { prebuiltVoiceConfig: { voiceName: profile.name } },
-          },
+          speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: profile.name } } },
         },
-      }),
-      signal: AbortSignal.timeout(25000),
-    }
-  );
+      };
+
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-goog-api-key": apiKey },
+    body: JSON.stringify(body),
+    signal: boundedSignal(signal, 9_000),
+  });
   // Model-not-found / unsupported-model responses are fast and safe to
-  // retry with the next explicit compatibility model. Rate limits and service
-  // failures are not retried here: the browser should continue locally now.
-  if (!response.ok) return { audio: null, tryNextModel: response.status === 400 || response.status === 404 };
+  // retry with the next explicit compatibility model. Auth, quota, and
+  // service failures fall back locally instead of creating a retry loop.
+  if (!response.ok) {
+    const detail = await response.text().catch(() => "");
+    const modelError = response.status === 404
+      || (response.status === 400 && /model.*(not found|unsupported|unavailable)/i.test(detail));
+    return { audio: null, tryNextModel: modelError };
+  }
   const audio = readGeminiAudio(await response.json());
   if (!audio?.bytes.length) return { audio: null, tryNextModel: true };
   const isWav = audio.bytes.subarray(0, 4).toString("ascii") === "RIFF";
@@ -413,11 +416,13 @@ async function synthesiseGeminiCompatible(
   apiKey: string,
   text: string,
   language: string,
-  profile: VoiceProfile
+  profile: VoiceProfile,
+  signal: AbortSignal
 ): Promise<CachedAudio | null> {
   for (const model of geminiTtsModels()) {
+    if (signal.aborted) return null;
     try {
-      const result = await synthesiseGemini(apiKey, text, language, profile, model);
+      const result = await synthesiseGemini(apiKey, text, language, profile, model, signal);
       if (result.audio) return result.audio;
       if (!result.tryNextModel) return null;
     } catch {
@@ -437,15 +442,27 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  let body: { text?: unknown; voiceId?: unknown };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
+  const limit = checkRateLimit(req, "voice", 36, 60_000);
+  if (!limit.allowed) {
+    return NextResponse.json(
+      { error: "Too many voice requests. Continuing with the device voice.", code: "RATE_LIMITED" },
+      { status: 429, headers: { "retry-after": String(limit.retryAfterSeconds) } }
+    );
   }
 
-  const text = String(body.text || "").replace(/\s+/g, " ").trim().slice(0, 5000);
+  let body: Record<string, unknown>;
+  try { body = await readJsonObject(req, 24_000); }
+  catch (error) {
+    const payload = validationPayload(error);
+    return NextResponse.json({ error: payload.error, code: payload.code }, { status: payload.status });
+  }
+
+  if (typeof body.text !== "string") return NextResponse.json({ error: "Text is required." }, { status: 400 });
+  const text = body.text.replace(/\0/g, "").replace(/\s+/g, " ").trim();
   if (!text) return NextResponse.json({ error: "Text is required." }, { status: 400 });
+  if (Buffer.byteLength(text, "utf8") > 5_000) {
+    return NextResponse.json({ error: "Voice text is too long for one part." }, { status: 413 });
+  }
   const profile = VOICES[String(body.voiceId || "f1")] || VOICES.f1;
   const language = languageFor(text);
   const chirpKey = cloudTtsKey();
@@ -455,17 +472,25 @@ export async function POST(req: Request) {
   const cached = getCached(key);
   if (cached) return audioResponse(cached, "HIT");
 
+  const requestController = new AbortController();
+  const abortRequest = () => requestController.abort();
+  if (req.signal.aborted) abortRequest();
+  else req.signal.addEventListener("abort", abortRequest, { once: true });
+  const deadline = setTimeout(abortRequest, 13_000);
+
   try {
     // Chirp 3 HD is the fast, identity-stable first choice. If that exact
     // named voice is unavailable for a locale, use Cloud TTS's compatible
     // same-language/gender selection; Gemini is then the final cloud path.
     let audio: CachedAudio | null = null;
     if (chirpKey) {
-      audio = await synthesiseChirp(chirpKey, text, language, profile);
-      if (!audio) audio = await synthesiseCloudCompatible(chirpKey, text, language, profile);
+      audio = await synthesiseChirp(chirpKey, text, language, profile, requestController.signal);
+      if (!audio && !requestController.signal.aborted) {
+        audio = await synthesiseCloudCompatible(chirpKey, text, language, profile, requestController.signal);
+      }
     }
-    if (!audio && gemini) {
-      audio = await synthesiseGeminiCompatible(gemini, text, language, profile);
+    if (!audio && gemini && !requestController.signal.aborted) {
+      audio = await synthesiseGeminiCompatible(gemini, text, language, profile, requestController.signal);
     }
 
     if (audio) {
@@ -475,6 +500,9 @@ export async function POST(req: Request) {
   } catch {
     // The client immediately continues this answer with its closest device
     // voice, rather than showing an opaque model/provider failure.
+  } finally {
+    clearTimeout(deadline);
+    req.signal.removeEventListener("abort", abortRequest);
   }
 
   return NextResponse.json(

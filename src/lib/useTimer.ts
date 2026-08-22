@@ -55,85 +55,102 @@ export function useStudyClock(
 ): ClockApi {
   const [running, setRunning] = useState(false);
   const [onBreak, setOnBreak] = useState(false);
+  const [sessionOpen, setSessionOpen] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [sessionTotal, setSessionTotal] = useState(0);
   const [subjectId, setSubjectId] = useState<number | null>(null);
   const [taskId, setTaskId] = useState<number | null>(null);
 
-  const startedAt = useRef<number | null>(null);
-  const lastFlushAt = useRef<number | null>(null);
+  // Display time and billable/logged time are deliberately separate. The old
+  // clock reused one wall-clock timestamp for both, which meant clocking out
+  // after a pause accidentally counted the entire pause/break as study time.
+  const accumulatedActiveMs = useRef(0);
+  const segmentStartedAt = useRef<number | null>(null);
+  const lastUnloggedAt = useRef<number | null>(null);
+  const pendingLogMs = useRef(0);
+  const runningRef = useRef(false);
+  const sessionOpenRef = useRef(false);
   const meta = useRef({ subjectId: null as number | null, taskId: null as number | null });
   const logRef = useRef(onLog);
+
   useEffect(() => { logRef.current = onLog; }, [onLog]);
   useEffect(() => { meta.current = { subjectId, taskId }; }, [subjectId, taskId]);
 
-  // Mirror of `elapsed` for stable reads inside callbacks (pause/resume math
-  // must see the freshest value even mid-render batch).
-  const elapsedRef = useRef(0);
-  useEffect(() => { elapsedRef.current = elapsed; }, [elapsed]);
-
-  // tick from wall-clock so the count stays correct in background tabs.
-  // Display shows total current-session time; DB logging flushes only the
-  // newly elapsed minutes, so the visible timer never resets at 01:00.
-  useEffect(() => {
-    if (!running) return;
-    const id = setInterval(() => {
-      if (startedAt.current == null) return;
-      const now = Date.now();
-      const displaySecs = Math.floor((now - startedAt.current) / 1000);
-      setElapsed(displaySecs);
-
-      const flushBase = lastFlushAt.current ?? startedAt.current;
-      const newSecs = Math.floor((now - flushBase) / 1000);
-      if (newSecs >= 60) {
-        const mins = Math.floor(newSecs / 60);
-        logRef.current(mins, meta.current.subjectId, meta.current.taskId, "clock");
-        // advance exactly by the minutes we logged — no drift accrues
-        lastFlushAt.current = flushBase + mins * 60000;
-        setSessionTotal((v) => v + mins * 60);
-      }
-    }, 1000);
-    return () => clearInterval(id);
-  }, [running]);
-
-  const flush = useCallback((keepAlive = false) => {
-    const now = Date.now();
-    const base = lastFlushAt.current ?? startedAt.current;
-    const secs = base ? Math.floor((now - base) / 1000) : 0;
-    // two-decimal fractional minutes: 13m30s → exactly 13.5 logged
-    const mins = Math.round((secs / 60) * 100) / 100;
-    if (!keepAlive) {
-      startedAt.current = null;
-      lastFlushAt.current = null;
-      setElapsed(0);
-    } else {
-      // background-tab safeguard: bank the elapsed time but keep the
-      // session alive so the visible timer doesn't reset
-      lastFlushAt.current = now;
-    }
-    if (secs >= 10) {
-      setSessionTotal((v) => v + secs);
-      logRef.current(mins, meta.current.subjectId, meta.current.taskId, "clock");
-    }
+  const changeRunning = useCallback((value: boolean) => {
+    runningRef.current = value;
+    setRunning(value);
+  }, []);
+  const changeBreak = useCallback((value: boolean) => {
+    setOnBreak(value);
+  }, []);
+  const changeSessionOpen = useCallback((value: boolean) => {
+    sessionOpenRef.current = value;
+    setSessionOpen(value);
   }, []);
 
-  // Mobile/tab-suspend safety net: when the tab hides, bank whatever has
-  // elapsed since the last flush. Browsers throttle or kill timers in
-  // hidden tabs — this guarantees 13.5 minutes studied logs as 13.5.
+  const emitPending = useCallback((fullMinutesOnly: boolean) => {
+    const available = pendingLogMs.current;
+    const emitMs = fullMinutesOnly
+      ? Math.floor(available / 60_000) * 60_000
+      : available >= 1_000 ? available : 0;
+    if (emitMs <= 0) return;
+    pendingLogMs.current = Math.max(0, available - emitMs);
+    const minutes = Math.round((emitMs / 60_000) * 100) / 100;
+    setSessionTotal((value) => value + Math.round(emitMs / 1000));
+    logRef.current(minutes, meta.current.subjectId, meta.current.taskId, "clock");
+  }, []);
+
+  /** Bank only an ACTIVE segment. Paused/break wall time never enters here. */
+  const bankActiveSegment = useCallback((now = Date.now()) => {
+    if (segmentStartedAt.current != null) {
+      accumulatedActiveMs.current += Math.max(0, now - segmentStartedAt.current);
+      segmentStartedAt.current = null;
+    }
+    if (lastUnloggedAt.current != null) {
+      pendingLogMs.current += Math.max(0, now - lastUnloggedAt.current);
+      lastUnloggedAt.current = null;
+    }
+    setElapsed(Math.floor(accumulatedActiveMs.current / 1000));
+  }, []);
+
+  // Tick from wall-clock so active time remains accurate in throttled tabs.
   useEffect(() => {
     if (!running) return;
-    const onVis = () => {
-      if (document.visibilityState === "hidden") flush(true);
+    const id = window.setInterval(() => {
+      if (segmentStartedAt.current == null) return;
+      const now = Date.now();
+      setElapsed(Math.floor((accumulatedActiveMs.current + now - segmentStartedAt.current) / 1000));
+
+      if (lastUnloggedAt.current != null) {
+        pendingLogMs.current += Math.max(0, now - lastUnloggedAt.current);
+        lastUnloggedAt.current = now;
+        emitPending(true);
+      }
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [running, emitPending]);
+
+  // Bank active time before a mobile browser suspends JavaScript. The segment
+  // remains running, so elapsed display continues correctly when it wakes.
+  useEffect(() => {
+    if (!running) return;
+    const onVisibility = () => {
+      if (document.visibilityState !== "hidden" || lastUnloggedAt.current == null) return;
+      const now = Date.now();
+      pendingLogMs.current += Math.max(0, now - lastUnloggedAt.current);
+      lastUnloggedAt.current = now;
+      emitPending(false);
     };
-    document.addEventListener("visibilitychange", onVis);
-    return () => document.removeEventListener("visibilitychange", onVis);
-  }, [running, flush]);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, [running, emitPending]);
 
   const clockIn = useCallback((opts?: { subjectId?: number | null; taskId?: number | null }) => {
-    // Bank any unflushed partial minutes from a live/previous segment BEFORE
-    // starting the new one — re-tapping Start/Switch can never silently
-    // discard studied time anymore.
-    if (startedAt.current != null) flush(true);
+    // Switching lessons closes only the old ACTIVE segment. If the old session
+    // was paused/on-break, none of that idle wall time is logged.
+    if (runningRef.current) bankActiveSegment();
+    emitPending(false);
+
     if (opts && "subjectId" in opts) setSubjectId(opts.subjectId ?? null);
     if (opts && "taskId" in opts) setTaskId(opts.taskId ?? null);
     if (opts) {
@@ -142,64 +159,72 @@ export function useStudyClock(
         taskId: opts.taskId !== undefined ? opts.taskId : meta.current.taskId,
       };
     }
-    startedAt.current = Date.now();
-    lastFlushAt.current = startedAt.current;
+
+    accumulatedActiveMs.current = 0;
+    pendingLogMs.current = 0;
+    const now = Date.now();
+    segmentStartedAt.current = now;
+    lastUnloggedAt.current = now;
     setElapsed(0);
-    setOnBreak(false);
-    setRunning(true);
-  }, [flush]);
+    changeBreak(false);
+    changeSessionOpen(true);
+    changeRunning(true);
+  }, [bankActiveSegment, changeBreak, changeRunning, changeSessionOpen, emitPending]);
 
-  // Pause FREEZES the visible timer (it no longer resets to 00:00). The
-  // partial minutes are banked to the server immediately, and resume
-  // continues the same visible session from where it stopped.
   const pause = useCallback(() => {
-    setRunning(false);
-    flush(true);
-  }, [flush]);
-
-  const endBreak = useCallback(() => {
-    setOnBreak(false);
-    // Continue the SAME visible session — the timer picks up from where it
-    // froze instead of restarting from 00:00.
-    startedAt.current = Date.now() - elapsedRef.current * 1000;
-    lastFlushAt.current = Date.now();
-    setRunning(true);
-  }, []);
-
-  const takeBreak = useCallback(() => {
-    setRunning(false);
-    flush(true);
-    setOnBreak(true);
-    beep(660);
-  }, [flush]);
+    if (!runningRef.current) return;
+    bankActiveSegment();
+    emitPending(false);
+    changeRunning(false);
+  }, [bankActiveSegment, changeRunning, emitPending]);
 
   const resume = useCallback(() => {
-    if (onBreak) { endBreak(); return; }
-    // Only meaningful when a paused session exists (elapsed > 0).
-    if (elapsedRef.current <= 0 || startedAt.current == null) return;
-    startedAt.current = Date.now() - elapsedRef.current * 1000;
-    lastFlushAt.current = Date.now();
-    setRunning(true);
-  }, [onBreak, endBreak]);
+    if (!sessionOpenRef.current || runningRef.current) return;
+    const now = Date.now();
+    segmentStartedAt.current = now;
+    lastUnloggedAt.current = now;
+    changeBreak(false);
+    changeRunning(true);
+  }, [changeBreak, changeRunning]);
+
+  const takeBreak = useCallback(() => {
+    if (!sessionOpenRef.current) return;
+    if (runningRef.current) {
+      bankActiveSegment();
+      emitPending(false);
+    }
+    changeRunning(false);
+    changeBreak(true);
+    beep(660);
+  }, [bankActiveSegment, changeBreak, changeRunning, emitPending]);
+
+  const endBreak = useCallback(() => {
+    if (!sessionOpenRef.current) return;
+    resume();
+  }, [resume]);
 
   const clockOut = useCallback(() => {
-    setRunning(false);
-    setOnBreak(false);
-    flush();
-  }, [flush]);
+    if (!sessionOpenRef.current) return;
+    if (runningRef.current) bankActiveSegment();
+    emitPending(false);
+    changeRunning(false);
+    changeBreak(false);
+    changeSessionOpen(false);
+    accumulatedActiveMs.current = 0;
+    segmentStartedAt.current = null;
+    lastUnloggedAt.current = null;
+    pendingLogMs.current = 0;
+    setElapsed(0);
+  }, [bankActiveSegment, changeBreak, changeRunning, changeSessionOpen, emitPending]);
 
   const toggle = useCallback(() => {
-    if (running) pause();
-    else if (onBreak || elapsedRef.current > 0) resume();
+    if (runningRef.current) pause();
+    else if (sessionOpenRef.current) resume();
     else clockIn();
-  }, [running, onBreak, pause, resume, clockIn]);
-
-  // A session is "open" while recording, paused, or on break — every
-  // surface (up-next card, task rows, tracker) shows Clock Out for it.
-  const sessionActive = running || onBreak || elapsed > 0;
+  }, [clockIn, pause, resume]);
 
   return {
-    running, onBreak, sessionActive, elapsed, sessionTotal, subjectId, taskId,
+    running, onBreak, sessionActive: sessionOpen, elapsed, sessionTotal, subjectId, taskId,
     setSubjectId, setTaskId, clockIn, pause, resume, takeBreak, endBreak, clockOut, toggle,
   };
 }

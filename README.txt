@@ -38,10 +38,28 @@ reopen the tab) so the new CSS/JS is picked up.
 
 LOCAL DEVELOPMENT
 -----------------
+  cp .env.example .env.local
+  # Fill DATABASE_URL and at least one server-side AI key.
   npm install
-  DATABASE_URL=postgres://... npm run dev     # or `npm run build`
-  npx tsc --noEmit                            # type check
-  npm run lint                                # eslint
+  npm run dev
+
+  npm run check       # strict TypeScript + zero-warning lint + 34+ tests
+  npm run build       # applies the Drizzle schema, then builds Next.js
+  npm run build:app   # app-only production build (does not touch a database)
+
+AI CONFIGURATION & DIAGNOSTICS
+------------------------------
+Use GEMINI_API_KEY, GROQ_API_KEY, and/or OPENROUTER_API_KEY. Never put a secret
+in a NEXT_PUBLIC_* variable. Providers fail over inside one bounded request;
+if all are unavailable, saved curriculum metadata and the local knowledge tutor
+answer instead of leaving chat spinning. GET /api/health reports database status,
+configured provider names, and the last sanitised provider result — never keys.
+Gemini 3.1 TTS uses Google's current Interactions API and automatically falls
+back to the device voice under a shared timeout.
+
+Course-search telemetry is now OFF by default for privacy. It can be enabled
+explicitly with ENABLE_COURSE_TELEMETRY=true; its report requires a bearer token
+from COURSE_REPORT_TOKEN.
 
 DATABASE
 --------

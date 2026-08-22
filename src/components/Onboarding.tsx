@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { api, addDays, today, dayDiff, prettyLong, type AppState } from "@/lib/client";
+import { countStudyDays, projectCompletionDate } from "@/lib/planner";
 import { IconCheck } from "./icons";
 
 type Level = { id: string; label: string; sub: string };
@@ -27,6 +28,7 @@ export default function Onboarding({
   const [levelCourses, setLevelCourses] = useState<Record<string, string[]>>({});
   const [courses, setCourses] = useState<CourseMeta[]>([]);
   const [provider, setProvider] = useState<string | null>(null);
+  const lastAssessmentRef = useRef("");
   const [search, setSearch] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -64,7 +66,7 @@ export default function Onboarding({
       "/api/courses"
     ).then((d) => {
       setLevels(d.levels); setLevelCourses(d.levelCourses); setCourses(d.courses); setProvider(d.aiProvider);
-    }).catch(() => {});
+    }).catch(() => setErr("Could not load the course catalog. Check the connection, then refresh and try again."));
   }, []);
 
   const courseById = useMemo(() => new Map(courses.map((c) => [c.id, c])), [courses]);
@@ -117,10 +119,12 @@ export default function Onboarding({
       const r = await api<{ subjects: SeedSubject[]; source: string; sources: CurriculumSource[] }>("/api/course-suggest", {
         method: "POST",
         body: JSON.stringify({ courseName: assessmentText, level }),
+        timeoutMs: 30_000,
       });
       setSubs(r.subjects.map((x) => ({ ...x })));
       setSuggestSource(r.source);
       setSuggestSources(r.sources || []);
+      lastAssessmentRef.current = `${level}\0${assessmentText}`;
       setStep(4);
     } catch {
       setErr("Could not build the subject list. Add your subjects manually below.");
@@ -131,7 +135,7 @@ export default function Onboarding({
   };
 
   const totalUnits = subs.reduce((a, s) => a + (Number(s.units) || 0), 0);
-  const availDays = Math.max(1, dayDiff(start, exam));
+  const availDays = Math.max(1, countStudyDays(start, exam, sdays));
   // Capacity reflects the actual difficulty-weighted lesson engine instead of
   // pretending every unit costs the same 50 minutes.
   const estMinutes = subs.reduce((total, subject) => {
@@ -140,7 +144,10 @@ export default function Onboarding({
   }, 0);
   const capacity = availDays * hrs * 60 * 0.78;
   const feasible = capacity >= estMinutes;
-  const projected = addDays(start, Math.min(availDays, Math.ceil(estMinutes / Math.max(1, hrs * 60 * 0.78))));
+  // Use the scheduler's canonical study-day-aware projection. The old wizard
+  // added raw calendar days and could promise a date the generated plan did
+  // not match when weekends were disabled.
+  const projected = projectCompletionDate(start, Math.max(1, estMinutes), hrs, sdays);
 
   const next = async () => {
     setErr("");
@@ -153,17 +160,23 @@ export default function Onboarding({
     // institution/specialisation/board actually influence the syllabus.
     if (step === 4) {
       const title = course === "custom" ? customName : (courseById.get(course)?.name || customName);
-      if (title.trim()) {
+      const assessmentText = buildAssessmentText(title, goalText);
+      const assessmentKey = `${level}\0${assessmentText}`;
+      // Search-to-details used to submit the exact same expensive AI request
+      // twice. Reassess only when the learner actually changed details.
+      if (title.trim() && lastAssessmentRef.current !== assessmentKey) {
         setSuggesting(true);
         try {
           const r = await api<{ subjects: SeedSubject[]; source: string; sources: CurriculumSource[] }>("/api/course-suggest", {
             method: "POST",
-            body: JSON.stringify({ courseName: buildAssessmentText(title, goalText), level }),
+            body: JSON.stringify({ courseName: assessmentText, level }),
+            timeoutMs: 30_000,
           });
           if (r.subjects?.length) {
             setSubs(r.subjects.map((x) => ({ ...x })));
             setSuggestSource(r.source);
             setSuggestSources(r.sources || []);
+            lastAssessmentRef.current = assessmentKey;
           }
         } catch { /* keep whatever we have */ } finally { setSuggesting(false); }
       }
@@ -200,7 +213,11 @@ export default function Onboarding({
         studyDays: sdays, bufferDays: buffer, planMode, studyStyle: style,
         weakSubject: weak, revisionWeeks: Number(revision),
       };
-      const s = await api<AppState>("/api/onboard", { method: "POST", body: JSON.stringify(payload) });
+      const s = await api<AppState>("/api/onboard", {
+        method: "POST",
+        body: JSON.stringify(payload),
+        timeoutMs: 115_000,
+      });
       onDone(s);
     } catch {
       setErr("Something went wrong while generating your plan. Please try again.");
@@ -231,7 +248,7 @@ export default function Onboarding({
             <input className="ob-name-input" autoFocus value={name} placeholder="e.g. Rakshit"
               onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && next()} />
             <div className="ob-hint">
-              {provider ? `SHIGUN engine online — connected to ${provider}.` : "SHIGUN hybrid engine online — curriculum synthesis runs locally, no API key needed."}
+              {provider ? `SHIGUN is configured for ${provider}, with an automatic local fallback.` : "Local curriculum engine ready. Add a server-side AI key for full cloud-generated lessons."}
             </div>
           </>
         )}
