@@ -338,11 +338,8 @@ export async function GET() {
     configured: true, // the keyless Edge neural engine is ALWAYS configured
     keyless: true,
     provider: "edge-multilingual-neural",
-    optionalKeyProviders: {
-      geminiTts: !!geminiKey(),
-      chirp3Hd: !!cloudTtsKey(),
-    },
-    voiceLock: "edge-multilingual-persona",
+    optionalKeyProviders: { geminiTts: false, chirp3Hd: false },
+    voiceLock: "edge-multilingual-persona-only",
     voices: ["Ava", "Emma", "Andrew"],
   });
 }
@@ -360,9 +357,9 @@ export async function POST(req: Request) {
   const requested = String(body.voiceId || "f1");
   const persona = resolveEdgeVoice(requested);
   const language = detectLanguage(text);
-  const chirpKey = cloudTtsKey();
-  const gemini = geminiKey();
-  const providerId = `edge:${persona.id}:${gemini ? "+gemini" : ""}${chirpKey ? "+chirp" : ""}`;
+  // A voice selection is an identity lock, not a preference. Do not switch to
+  // Gemini or Chirp on an Edge outage: those providers have different people.
+  const providerId = `edge:${persona.id}`;
   const key = cacheKey(providerId, persona.name, language, text);
   const cached = getCached(key);
   if (cached) return audioResponse(cached, "HIT");
@@ -379,25 +376,12 @@ export async function POST(req: Request) {
         return audioResponse(audio, "MISS");
       }
     } catch {
-      // fall through to optional keyed engines / client fallback
+      // client will try the same selected Edge persona directly
     }
   }
 
-  // 2) OPTIONAL — only when a key happens to exist. Never required.
-  const cloudPersona = CLOUD_PERSONAS[persona.id] || CLOUD_PERSONAS.f1;
-  if (gemini || chirpKey) {
-    try {
-      let audio: CachedAudio | null = null;
-      if (gemini) audio = await synthesiseGeminiCompatible(gemini, text, language, cloudPersona);
-      if (!audio && chirpKey) audio = await synthesiseChirpNamed(chirpKey, text, language, cloudPersona);
-      if (audio) {
-        putCached(key, audio);
-        return audioResponse(audio, "MISS");
-      }
-    } catch {
-      // surface the unified failure below
-    }
-  }
+  // No alternate provider is allowed here. The browser will try the same
+  // Edge persona directly before it reports a retryable text-only failure.
 
   return NextResponse.json(
     {
@@ -405,7 +389,7 @@ export async function POST(req: Request) {
       engine: "edge-multilingual-neural",
       voice: persona.label,
       // The client should now try its own direct browser connection to
-      // the same keyless Edge service before any device fallback.
+      // the same keyless Edge service; device voices are deliberately not used.
       clientFallback: "edge-direct",
       retryable: true,
     },

@@ -188,8 +188,8 @@ export function teachFromKnowledge(
     out.push("");
     out.push(`**Study next:** ${k.related.join(" · ")} — ask me *"explain ${k.related[0]}"*.`);
   }
-  out.push("");
-  out.push(`<sub>Reference: ${k.url}</sub>`);
+  // This is a fallback research aid, not a citation renderer. The tutor should
+  // sound like a tutor, not append a Wikipedia source to every answer.
   return out.join("\n");
 }
 

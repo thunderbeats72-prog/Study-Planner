@@ -68,13 +68,13 @@ export async function callLLM(
     groqKey ? "groq" : null,
     openrouterKey ? "openrouter" : null,
   ].filter(Boolean) as Array<"gemini" | "groq" | "openrouter">;
-  const deadline = Date.now() + 15000; // one bounded budget for the whole chain
+  const deadline = Date.now() + 12000; // one bounded budget for the whole chain
 
   for (const provider of providers) {
     const remaining = deadline - Date.now();
     if (remaining < 500) break;
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), Math.min(8500, remaining));
+    const timer = setTimeout(() => ctrl.abort(), Math.min(7000, remaining));
     let text: string | null = null;
 
     try {
@@ -882,7 +882,11 @@ export async function localTutor(
   const knowledge = await lookupKnowledge(q);
   if (knowledge) return { text: teachFromKnowledge(knowledge, q, ctx.level, subjectHint) };
 
-  return { text: `Ask me to explain any concept from your subjects or say *"what should I study today?"*` };
+  if (/^(hi|hello|hey|good (morning|afternoon|evening))/i.test(q.trim())) {
+    return { text: "Hello! I can help with study planning, explanations, writing, calculations, ideas, and everyday questions. What would you like to explore?" };
+  }
+  if (/(thanks|thank you)/i.test(q)) return { text: "You’re welcome. What would you like to do next?" };
+  return { text: "I don’t have enough reliable context to answer that well yet. Share a little more detail and I’ll help directly — it does not need to be a study question." };
 }
 
 /** Maps a selected voice profile id to its spoken grammatical gender. */
@@ -911,6 +915,9 @@ a current-affairs study strategy if their course includes it).
 Learner: ${ctx.name}. Course: ${ctx.courseName}. Days Left: ${ctx.daysLeft} (exam: ${ctx.examDate}). Progress: ${ctx.progressPct}%.
 Streak: ${ctx.streak} days. This week: ${ctx.hoursThisWeek}h studied vs ${ctx.dailyHours * 7}h target. Overdue tasks: ${ctx.overdue}.
 Use these numbers when coaching — be specific, reference their actual data.
+You are also a helpful general conversational assistant: answer ordinary questions,
+brainstorming, writing, calculations, and day-to-day requests directly. Do not tell
+someone to ask only study questions. Keep app data in the background unless relevant.
 Teach step-by-step using clear markdown formatting.
 Voice: intelligent, concise, supportive, confident — like a calm senior tutor.
 Use at most one emoji per reply, and only when it genuinely helps; usually use none.
