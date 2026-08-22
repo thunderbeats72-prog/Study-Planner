@@ -419,7 +419,7 @@ export default function Home() {
   };
 
   const askTutor = useCallback(
-    async (q: string, meta?: { voice?: boolean; voiceId?: string }) => {
+    async (q: string) => {
       const message = q.trim();
       setChatOpen(true);
       // Disable duplicate taps synchronously; waiting for `thinking` to render
@@ -441,7 +441,7 @@ export default function Home() {
           "/api/chat",
           {
             method: "POST",
-            body: JSON.stringify({ message, source: meta?.voice ? "voice" : "text", voiceId: meta?.voiceId || "f1" }),
+            body: JSON.stringify({ message, source: "text" }),
             timeoutMs: 35_000,
           }
         );
@@ -480,9 +480,8 @@ export default function Home() {
         }
       } catch (error) {
         console.warn("API call failed, using client-side local tutor fallback:", error);
-        const voiceGender = meta?.voiceId === "m1" ? ("male" as const) : ("female" as const);
         const action = parseCommand(message);
-        const langReply = languageCapabilityReply(message, voiceGender);
+        const langReply = languageCapabilityReply(message);
         const currentCtx = state?.context;
         const instant = (action || !currentCtx) ? null : instantTutorReply(message, currentCtx);
 
@@ -490,7 +489,7 @@ export default function Home() {
         if (langReply) {
           fallbackText = langReply;
         } else if (action) {
-          fallbackText = commandReply(action, message, currentCtx?.daysLeft ?? 90, voiceGender);
+          fallbackText = commandReply(action, message, currentCtx?.daysLeft ?? 90);
           if (action.type === "navigate") setPage(String(action.payload) as Page);
           if (action.type === "startTimer") { if (!clock.running) { if (clock.sessionActive) clock.resume(); else startSmartClock(); } }
           if (action.type === "stopTimer") { if (clock.sessionActive) clockOutNow(); }
@@ -570,14 +569,6 @@ export default function Home() {
   const todayDone = state.tasks.filter((x) => x.date === t && x.status === "done").length;
   const todayTotal = state.tasks.filter((x) => x.date === t).length;
   const allMsgs = [...state.messages, ...pendingMsgs];
-  const speechHints = Array.from(new Set([
-    "Shigun",
-    "Study Planner Pro",
-    state.user.courseName,
-    ...state.subjects.map((subject) => subject.name),
-    ...state.topics.slice(0, 18).map((topic) => topic.title),
-    ...state.tasks.slice(0, 18).map((task) => task.title),
-  ].map((hint) => hint.trim()).filter(Boolean))).slice(0, 36);
 
   // The full task title, untruncated — CSS wraps it cleanly instead of
   // slicing it in JS (fixes "Principles of Marketing: Introduction…").
@@ -736,8 +727,7 @@ export default function Home() {
 
       <ChatPanel open={chatOpen} setOpen={setChatOpen} messages={allMsgs} onSend={askTutor}
         thinking={thinking} provider={state.aiProvider}
-        learner={{ name: state.user.name, daysLeft: ctx.daysLeft, progressPct: ctx.progressPct, streak: state.user.streak, todayDone, todayTotal }}
-        speechHints={speechHints} />
+        learner={{ name: state.user.name, daysLeft: ctx.daysLeft, progressPct: ctx.progressPct, streak: state.user.streak, todayDone, todayTotal }} />
 
       <CommandPalette commands={commands} />
       <div className="cmdk-tip">Press ⌘K / Ctrl-K for commands</div>

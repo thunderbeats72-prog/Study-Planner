@@ -6,7 +6,6 @@ import {
   languageCapabilityReply,
   parseCommand,
 } from "../src/lib/ai";
-import { cleanForSpeech, splitSpeechChunks, preferredSttLang, STT_LANG_OPTIONS } from "../src/lib/voice";
 import { detectLanguage } from "../src/lib/language";
 import { wikiLangFor, searchTerms, teachFromKnowledge } from "../src/lib/knowledge";
 import { appendChatTurn, isFallbackUser } from "../src/lib/chatTurn";
@@ -46,23 +45,21 @@ async function runTests() {
   check(detectLanguage("తెలుగు భాష") === "te-IN", "Telugu script detection");
   check(detectLanguage("میں اردو بول سکتا ہوں") === "ur-PK", "Urdu script detection");
   check(detectLanguage("مرحبا بك") === "ar-XA", "Arabic script detection");
-  check(STT_LANG_OPTIONS.some((opt) => opt.id === "en-IN"), "STT options include English");
-  check(preferredSttLang() === "en-IN", "Preferred STT defaults to English (en-IN)");
 
   console.log("\n--- 2. AI Language Capabilities & Commands ---");
-  const hiReply = languageCapabilityReply("Can you speak Hindi?", "female");
-  check(typeof hiReply === "string" && hiReply.includes("हिंदी"), "Hindi capability query (female)");
-  const mrReply = languageCapabilityReply("Do you know Marathi?", "male");
-  check(typeof mrReply === "string" && mrReply.includes("मराठीत"), "Marathi capability query (male)");
-  const taReply = languageCapabilityReply("Can you talk in Tamil?", "female");
+  const hiReply = languageCapabilityReply("Can you speak Hindi?");
+  check(typeof hiReply === "string" && hiReply.includes("हिंदी"), "Hindi capability query");
+  const mrReply = languageCapabilityReply("Do you know Marathi?");
+  check(typeof mrReply === "string" && mrReply.includes("मराठीत"), "Marathi capability query");
+  const taReply = languageCapabilityReply("Can you talk in Tamil?");
   check(typeof taReply === "string" && taReply.includes("தமிழில்"), "Tamil capability query");
-  const thReply = languageCapabilityReply("Can you speak Thai?", "female");
+  const thReply = languageCapabilityReply("Can you speak Thai?");
   check(typeof thReply === "string" && thReply.includes("ภาษาไทย"), "Thai capability query");
-  const enReply = languageCapabilityReply("Do you know English?", "female");
+  const enReply = languageCapabilityReply("Do you know English?");
   check(typeof enReply === "string" && enReply.includes("English"), "English capability query");
-  const hiScriptReply = languageCapabilityReply("क्या तुम हिंदी बोल सकती हो?", "female");
+  const hiScriptReply = languageCapabilityReply("क्या तुम हिंदी बोल सकते हो?");
   check(typeof hiScriptReply === "string" && hiScriptReply.includes("हिंदी"), "Hindi-script capability query (no Latin trigger word)");
-  const bnScriptReply = languageCapabilityReply("আপনি কি বাংলায় কথা বলতে পারেন?", "female");
+  const bnScriptReply = languageCapabilityReply("আপনি কি বাংলায় কথা বলতে পারেন?");
   check(typeof bnScriptReply === "string" && bnScriptReply.includes("বাংলা"), "Bengali-script capability query (no Latin trigger word)");
   check(parseCommand("start timer")?.type === "startTimer", "Command: start timer");
   check(parseCommand("pause")?.type === "pause", "Command: pause");
@@ -258,55 +255,7 @@ async function runTests() {
   if (oldGroq === undefined) delete process.env.GROQ_API_KEY; else process.env.GROQ_API_KEY = oldGroq;
   if (oldOpenRouter === undefined) delete process.env.OPENROUTER_API_KEY; else process.env.OPENROUTER_API_KEY = oldOpenRouter;
 
-  console.log("\n--- 5. Gemini TTS API Compatibility ---");
-  const oldTtsModel = process.env.GEMINI_TTS_MODEL;
-  process.env.GEMINI_API_KEY = "test-gemini-tts";
-  process.env.GEMINI_TTS_MODEL = "gemini-3.1-flash-tts-preview";
-  let ttsUrl = "";
-  let ttsBody: Record<string, unknown> = {};
-  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
-    ttsUrl = String(input);
-    ttsBody = JSON.parse(String(init?.body || "{}")) as Record<string, unknown>;
-    return new Response(JSON.stringify({
-      output_audio: { data: Buffer.from([0, 0, 0, 0]).toString("base64"), mime_type: "audio/pcm;rate=24000" },
-    }), { status: 200, headers: { "content-type": "application/json" } });
-  }) as typeof fetch;
-  const { POST: voicePost } = await import("../src/app/api/voice/route");
-  const voiceResponse = await voicePost(new Request("http://localhost/api/voice", {
-    method: "POST",
-    headers: { "content-type": "application/json", "x-user-key": "u_TTSTESTTTSTESTTTSTEST" },
-    body: JSON.stringify({ text: "Test this voice", voiceId: "f1" }),
-  }));
-  const voiceBytes = Buffer.from(await voiceResponse.arrayBuffer());
-  check(ttsUrl.endsWith("/v1beta/interactions"), "Gemini 3.1 TTS uses the current Interactions endpoint");
-  check(ttsBody.model === "gemini-3.1-flash-tts-preview" && (ttsBody.response_format as { type?: string })?.type === "audio", "Interactions request uses the current audio schema");
-  check(voiceResponse.ok && voiceBytes.subarray(0, 4).toString("ascii") === "RIFF", "Interactions PCM response is returned as playable WAV");
-  globalThis.fetch = originalFetch;
-  if (oldGemini === undefined) delete process.env.GEMINI_API_KEY; else process.env.GEMINI_API_KEY = oldGemini;
-  if (oldTtsModel === undefined) delete process.env.GEMINI_TTS_MODEL; else process.env.GEMINI_TTS_MODEL = oldTtsModel;
-
-  console.log("\n--- 6. TTS Cleaning & Chunking ---");
-  const markdownSample = `
-# Core Microeconomics Lessons
-Here are the key takeaways:
-1. **Supply and Demand**: Foundation of pricing.
-2. **Elasticity**: Sensitivity to price changes.
-
-| Topic | Difficulty |
-| --- | --- |
-| Supply | Easy |
-`;
-  const cleanedText = cleanForSpeech(markdownSample);
-  check(!cleanedText.includes("#") && !cleanedText.includes("**"), "Speech text removes markdown noise");
-  check(cleanedText.includes("Core Microeconomics Lessons."), "Speech headers become punctuated sentences");
-  check(cleanedText.includes("Foundation of pricing."), "Numbered content remains readable");
-  const longText = "यह एक विस्तृत वाक्य है। This is a detailed sentence. ".repeat(180);
-  const chunks = splitSpeechChunks(longText, 2000);
-  const encoder = new TextEncoder();
-  check(chunks.length >= 3, "Long multilingual text splits into multiple chunks");
-  check(chunks.every((chunk) => chunk.length > 0 && encoder.encode(chunk).length <= 2000), "Every speech chunk stays inside the UTF-8 byte limit");
-
-  console.log("\n--- 7. Study Clock Accounting ---");
+  console.log("\n--- 5. Study Clock Accounting ---");
   const originalNow = Date.now;
   const originalWindow = (globalThis as { window?: unknown }).window;
   const originalDocument = (globalThis as { document?: unknown }).document;
@@ -357,14 +306,14 @@ Here are the key takeaways:
   if (originalDocument === undefined) delete (globalThis as { document?: unknown }).document;
   else (globalThis as { document?: unknown }).document = originalDocument;
 
-  console.log("\n--- 8. Curriculum Ground Truth ---");
+  console.log("\n--- 6. Curriculum Ground Truth ---");
   check(nmimsSem1Subjects().length === 6, "NMIMS Semester 1 ground truth has 6 subjects");
   const cbseClass10 = cbseCatalogFor("Class 10 CBSE");
   check(cbseClass10 !== null && cbseClass10.length > 0, "CBSE Class 10 catalog found");
   const courseSuggest = await aiSuggestSubjects("Class 10 CBSE", "school");
   check(courseSuggest.subjects.length > 0, "CBSE suggestion returns subjects without a cloud call");
 
-  console.log("\n--- 9. Scheduler Invariants ---");
+  console.log("\n--- 7. Scheduler Invariants ---");
   const mockSubjects = [
     { id: 1, name: "Economics", difficulty: "Medium", color: "#6366f1" },
     { id: 2, name: "Mathematics", difficulty: "Hard", color: "#10b981" },
@@ -394,7 +343,7 @@ Here are the key takeaways:
   const revisionPlan = buildPlan(mockSubjects, mockTopics, { ...settings, planMode: "revision" });
   check(revisionPlan.tasks.some((task) => task.kind === "revise"), "Revision mode schedules revision cards");
 
-  console.log("\n--- 10. Validation, Transcript & Safe Rendering ---");
+  console.log("\n--- 8. Validation, Transcript & Safe Rendering ---");
   check(isIsoDate("2026-02-28"), "Strict date accepts a real date");
   check(!isIsoDate("2026-02-31") && !isIsoDate("not-a-date"), "Strict date rejects normalized/impossible dates");
   let rejectedInfinity = false;
