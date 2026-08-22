@@ -554,9 +554,6 @@ export async function speak(
     return;
   }
 
-  // A device voice can be selected directly. Named profiles use the studio
-  // voice first, then continue with the closest local voice if the service
-  // is unavailable rather than abandoning a spoken answer.
   if (voiceId === "device" || options.forceNative) {
     const nativeVoiceId = voiceId === "device" ? "f1" : voiceId;
     if (await speakNative(text, nativeVoiceId, generation, start, finish, playbackRate)) return;
@@ -610,15 +607,6 @@ export async function speak(
     if (generation !== speechGeneration) return;
   } finally {
     if (speechAbort?.signal.aborted || generation === speechGeneration) speechAbort = null;
-  }
-
-  // A voice outage must not turn a spoken lesson into an error-only state.
-  // Preserve the requested gender/language as closely as the browser permits
-  // and continue immediately with the local speech engine instead.
-  if (generation === speechGeneration
-    && await speakNative(text, voiceId, generation, start, finish, playbackRate)) {
-    callbacks.onFallback?.("Studio voice is reconnecting — continuing with your device voice.");
-    return;
   }
 
   fail(`${errorMessage} The answer remains available as text.`);
@@ -817,10 +805,6 @@ export async function speakLong(
 
   let startedOnce = false;
   let completed = 0;
-  // If the studio provider fails once, do not make every remaining long-text
-  // part wait through the same timeout. The rest of this answer stays in the
-  // selected profile's closest device voice and keeps flowing.
-  let continueLocally = false;
   const start = () => {
     if (startedOnce || !isCurrent()) return;
     startedOnce = true;
@@ -834,7 +818,7 @@ export async function speakLong(
     // on-demand fetch in speak() then hits the cache and starts instantly,
     // so long lessons flow as one continuous narration instead of pausing
     // after every sentence.
-    if (voiceId !== "device" && !continueLocally) {
+    if (voiceId !== "device") {
       // The current part owns the cancellable request. Prime only future
       // parts, so stopping a slow first request can fall back immediately.
       for (let offset = 1; offset <= LONG_SPEECH_PREFETCH_COUNT; offset++) {
@@ -850,7 +834,6 @@ export async function speakLong(
       void speak(current.text, voiceId, {
         onStart: start,
         onFallback: (message) => {
-          continueLocally = true;
           callbacks.onFallback?.(message);
         },
         onEnd: () => {
@@ -865,7 +848,7 @@ export async function speakLong(
           errorMessage = message;
           resolve();
         },
-      }, { ...options, forceNative: options.forceNative || continueLocally });
+      }, { ...options });
       // Safety poll: a mid-chunk stop bumps the token without speak()'s
       // finish() firing, and no engine is hang-proof — resolve either way.
       const softCap = Math.max(25000, (current.text.length / 11) * 1500);

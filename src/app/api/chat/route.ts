@@ -264,7 +264,7 @@ async function handleChat(req: Request, opts: { source: "voice" | "text"; voiceI
         + curriculumGrounding(text, state)
         + (source === "voice"
           ? "\n\nVOICE TURN: Keep the opening reply to 80-140 spoken words UNLESS the learner asked for detail, a lesson, or an explanation — then answer in full depth; the app speaks long answers in consecutive parts. Lead with the answer; avoid long preambles."
-          : "");
+          : "\n\nTEXT TURN: Provide a rich, highly prominent, well-structured response using markdown headings, bold text, and bullet points. Give a detailed, actionable, and comprehensive answer that stands out visually.");
       const result = await callLLMDetailed(
         systemPrompt,
         [...history, { role: "user", content: text }],
