@@ -33,9 +33,7 @@ export default function ChatPanel({
   const submitLock = useRef(false);
   useEffect(() => { if (!thinking) submitLock.current = false; }, [thinking]);
 
-  // Provider connectivity chip: fetched once per session so the learner can
-  // SEE whether Gemini/Groq/Grok/OpenRouter are actually configured before
-  // asking anything (previously the only signal was a failure toast).
+  // Fetch active provider info once per session for the status chip.
   useEffect(() => {
     if (!open || health) return;
     let alive = true;
@@ -81,11 +79,10 @@ export default function ChatPanel({
     } catch { /* clipboard blocked — silently ignore */ }
   };
 
-  const providers = health?.ai?.configuredProviders?.length
-    ? health.ai.configuredProviders
-    : provider
-      ? [provider]
-      : [];
+  const isCloudActive = !!(
+    health?.ai?.configuredProviders?.length
+    || provider
+  );
 
   return (
     <>
@@ -105,13 +102,13 @@ export default function ChatPanel({
             <div className="ai-head-main">
               <div className="brand-logo-icon ai-avatar"><IconSpark size={16} /></div>
               <div className="ai-identity">
-                <div className="ai-title">Shigun <span>AI Tutor</span></div>
-                <div className={`ai-status${providers.length ? "" : " off"}`} aria-live="polite">
+                <div className="ai-title">Shigun <span>AI Study Coach</span></div>
+                <div className={`ai-status${isCloudActive ? "" : " off"}`} aria-live="polite">
                   {thinking
-                    ? "Working on your answer…"
-                    : providers.length
-                      ? `${providers.join(" + ")} live · local fallback ready`
-                      : "Local tutor mode — add an AI key for cloud answers"}
+                    ? "Thinking…"
+                    : isCloudActive
+                      ? "AI + ML engine active"
+                      : "ML engine active · add an AI key to unlock cloud tutoring"}
                 </div>
               </div>
               <button className="ai-close" aria-label="Close chat" onClick={() => setOpen(false)}><IconClose size={17} /></button>
@@ -137,7 +134,7 @@ export default function ChatPanel({
             )}
             {!messages.length && !learner && (
               <div className="ai-msg bot">
-                Hi! I&apos;m Shigun. Ask me anything about your studies.
+                Hi! I&apos;m Shigun — your AI study coach. Ask me anything about your subjects, plan, or progress.
               </div>
             )}
             {messages.map((m) => {

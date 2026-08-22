@@ -1,37 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
-import { api, ApiError, THEMES, type AppState } from "@/lib/client";
-import { IconSignal, IconSpark } from "./icons";
-
-type Probe = {
-  id: string;
-  label: string;
-  configured: boolean;
-  ok: boolean;
-  model: string | null;
-  status: number | null;
-  latencyMs: number;
-  error: string | null;
-  detail: string;
-};
-
-const PROVIDER_ENV: Record<string, string> = {
-  gemini: "GEMINI_API_KEY",
-  groq: "GROQ_API_KEY",
-  grok: "XAI_API_KEY",
-  openrouter: "OPENROUTER_API_KEY",
-};
-
-const FRIENDLY_ERROR: Record<string, string> = {
-  auth: "API key rejected — check the key value in your deployment env",
-  rate_limit: "Rate-limited / quota exhausted right now",
-  model: "Model ID unavailable — a fallback model will be tried",
-  timeout: "Provider did not answer in time",
-  network: "This deployment cannot reach the provider (network/egress block?)",
-  blocked: "Provider refused the probe request",
-  empty: "Provider returned an empty response",
-};
+import { THEMES, type AppState } from "@/lib/client";
+import { IconSpark } from "./icons";
 
 export default function SettingsView({
   state, onPatch, onRestart, busy,
@@ -49,41 +20,6 @@ export default function SettingsView({
     planMode: s.planMode, studyStyle: s.studyStyle, weakSubject: s.weakSubject, revisionWeeks: s.revisionWeeks,
   });
   const set = (k: string, v: unknown) => setLocal((p) => ({ ...p, [k]: v }));
-
-  const [probing, setProbing] = useState(false);
-  const [probes, setProbes] = useState<Probe[] | null>(null);
-  const [probeNote, setProbeNote] = useState<string | null>(null);
-
-  const runProbe = async () => {
-    if (probing) return;
-    setProbing(true);
-    setProbeNote(null);
-    try {
-      const result = await api<{ ok: boolean; probes: Probe[] }>("/api/ai-status", {
-        method: "POST",
-        timeoutMs: 30_000,
-      });
-      setProbes(result.probes);
-      setProbeNote(
-        result.ok
-          ? "At least one provider answered — cloud tutoring is working."
-          : "No provider answered. Add or fix a key in your deployment environment, redeploy, and test again."
-      );
-    } catch (error) {
-      setProbeNote(error instanceof ApiError ? error.message : "The test could not run. Check your connection and retry.");
-    } finally {
-      setProbing(false);
-    }
-  };
-
-  const allProbes: Probe[] = probes && probes.length
-    ? probes
-    : (["gemini", "groq", "grok", "openrouter"] as const).map((id) => ({
-        id,
-        label: id === "gemini" ? "Gemini" : id === "groq" ? "Groq" : id === "grok" ? "Grok" : "OpenRouter",
-        configured: false, ok: false, model: null, status: null, latencyMs: 0, error: null,
-        detail: `Not tested yet — expected env: ${PROVIDER_ENV[id]}`,
-      }));
 
   return (
     <div className="fade-in">
@@ -138,41 +74,6 @@ export default function SettingsView({
         </div>
 
         <div className="flex-col gap-md">
-          <div className="glass-panel tilt-card" style={{ padding: 22 }}>
-            <h3 style={{ fontSize: ".95rem", fontWeight: 800, margin: "0 0 4px" }}>AI Connectivity</h3>
-            <p style={{ fontSize: ".76rem", color: "var(--text-muted)", margin: "0 0 12px", lineHeight: 1.5 }}>
-              Live test of every configured provider (Gemini, Groq, Grok, OpenRouter) from this deployment.
-              Active chain: <strong>{state.aiProvider || "local engine only"}</strong>.
-            </p>
-            <div className="ai-diag" role="status" aria-live="polite">
-              {allProbes.map((probe) => {
-                const tone = probes
-                  ? probe.ok ? "ok" : probe.configured ? "bad" : "idle"
-                  : "idle";
-                return (
-                  <div key={probe.id} className="ai-diag-row">
-                    <span className={`ai-diag-dot ${tone}`} aria-hidden="true" />
-                    <span className="ai-diag-name">{probe.label}</span>
-                    <span className="ai-diag-meta">
-                      {probe.ok && `OK · ${probe.model || "model"}${probe.latencyMs ? ` · ${probe.latencyMs} ms` : ""}`}
-                      {!probe.ok && probes && probe.error && (FRIENDLY_ERROR[probe.error] || probe.error)}
-                      {!probe.ok && probes && !probe.error && probe.detail}
-                      {!probes && probe.detail}
-                      {probes && !probe.ok && probe.error && probe.detail ? ` — ${probe.detail.slice(0, 120)}` : ""}
-                    </span>
-                    <span className="ai-diag-lat">{PROVIDER_ENV[probe.id]}</span>
-                  </div>
-                );
-              })}
-            </div>
-            {probeNote && (
-              <p className={`ai-diag-note ${probes?.some((probe) => probe.ok) ? "ok" : "bad"}`}>{probeNote}</p>
-            )}
-            <button className="btn btn-secondary w-full mt-md" onClick={() => void runProbe()} disabled={probing}>
-              <IconSignal size={13} />{probing ? "Testing providers…" : "Run connectivity test"}
-            </button>
-          </div>
-
           <div className="glass-panel tilt-card" style={{ padding: 22 }}>
             <h3 style={{ fontSize: ".95rem", fontWeight: 800, margin: "0 0 16px" }}>Appearance</h3>
             <div className="grid-2" style={{ gap: 9 }}>
