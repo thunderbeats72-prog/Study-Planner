@@ -2613,3 +2613,166 @@ button,a,.nav-item,.vtab,.cal-cell,.chip,.task-row,.rate-btn,input,select{touch-
   .task-row > .btn.task-clock{min-height:32px}
   .task-row > .btn.task-clock.clock-live{font-weight:800}
 }
+
+/* ════════════════════════════════════════════════════════════════
+   v8 — CONNECTIVITY VISIBILITY + CROSS-DEVICE UX POLISH
+   (appended last so it wins the cascade over the sections above)
+════════════════════════════════════════════════════════════════ */
+
+/* ── 1. Global keyboard focus ring (a11y) ─────────────────────── */
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn:focus-visible,.nav-item:focus-visible,.ai-quick button:focus-visible{outline-offset:2px}
+.input-field:focus-visible{outline:none} /* keeps its box-shadow ring */
+
+/* ── 2. Fluid type scale — titles scale with the viewport ────── */
+.page-title{font-size:clamp(1.42rem,1.05rem + 1.55vw,2.05rem);letter-spacing:-.5px}
+@media(max-width:860px){.page-title{font-size:clamp(1.22rem,1rem + 1.2vw,1.5rem)}}
+
+/* ── 3. Chat panel: roomier on desktop, taller sheet on phones ── */
+@media(min-width:861px){
+  .ai-panel{
+    width:min(480px,calc(100vw - 32px));
+    height:min(700px,calc(100vh - 120px));
+    bottom:92px;
+  }
+  @supports(height:100dvh){.ai-panel{height:min(700px,calc(100dvh - 120px))}}
+  .ai-msgs{scrollbar-gutter:stable}
+}
+@media(max-width:860px) and (min-width:641px){
+  .ai-panel{height:min(80dvh,660px)}
+}
+@media(max-width:640px){
+  .ai-panel{height:min(90dvh,760px);border-radius:20px 20px 0 0}
+}
+/* Landscape phones: the sheet becomes the screen */
+@media(max-height:500px) and (orientation:landscape){
+  .ai-panel{top:8px;left:8px;right:8px;bottom:calc(70px + env(safe-area-inset-bottom));width:auto;height:auto}
+  .ai-sheet-handle{display:none}
+  .ai-quick{display:none}
+}
+
+/* ── 4. Chat composer: auto-growing textarea, Shift+Enter hint ── */
+.ai-composer{align-items:flex-end}
+.ai-chat-input{
+  resize:none;min-height:46px;max-height:132px;line-height:1.5;
+  padding:11px 13px;overflow-y:auto;flex:1 1 auto;
+}
+.ai-send{min-width:46px;width:46px;min-height:46px;padding:0;flex:0 0 46px}
+/* Coarse pointers: taller composer + send, no hover-only affordances */
+@media(hover:none) and (pointer:coarse){
+  .ai-chat-input{min-height:50px}
+  .ai-send{min-width:52px;width:52px;min-height:50px;flex-basis:52px}
+}
+
+/* ── 5. Chat status chip states (live / local-off) ────────────── */
+.ai-status.off{color:var(--text-muted)}
+.ai-status.off::before{background:var(--text-dim);animation:none}
+.ai-status.warn{color:var(--warning-accent)}
+.ai-status.warn::before{background:var(--warning-accent);animation:none}
+
+/* ── 6. Copy-answer button on tutor replies ───────────────────── */
+.ai-copy{
+  flex:0 0 28px;width:28px;height:28px;border-radius:9px;
+  display:flex;align-items:center;justify-content:center;
+  border:1px solid var(--glass-border);background:var(--surface);
+  color:var(--text-dim);cursor:pointer;opacity:0;
+  transition:opacity .16s ease,color .16s ease,border-color .16s ease,transform .1s ease;
+  align-self:flex-end;margin-bottom:2px;
+}
+.ai-message-row.bot:hover .ai-copy,
+.ai-copy:focus-visible,
+.ai-copy.copied{opacity:1}
+.ai-copy:hover{color:var(--text-main);border-color:var(--glass-border-hover)}
+.ai-copy:active{transform:scale(.9)}
+.ai-copy.copied{color:var(--success-accent);border-color:rgba(22,163,122,.45)}
+@media(hover:none) and (pointer:coarse){
+  .ai-copy{opacity:.72;width:34px;height:34px;flex-basis:34px;border-radius:10px}
+}
+
+/* ── 7. Tutor message readability: links, quotes, spacing ─────── */
+.ai-msg{line-height:1.62}
+.ai-msg a{color:var(--color-ai);text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:2.5px}
+.ai-msg a:hover{text-decoration-thickness:2px}
+.ai-msg blockquote{
+  margin:6px 0;padding:5px 12px;border-left:3px solid rgba(var(--ai-rgb),.45);
+  color:var(--text-muted);border-radius:0 8px 8px 0;
+}
+.ai-msg hr{border:none;border-top:1px solid var(--glass-border);margin:10px 0}
+.ai-msg pre{margin:8px 0;line-height:1.5}
+
+/* ── 8. AI Connectivity diagnostics card (Settings) ───────────── */
+.ai-diag{display:flex;flex-direction:column;gap:7px}
+.ai-diag-row{
+  display:flex;align-items:center;gap:10px;padding:9px 12px;
+  border:1px solid var(--glass-border);border-radius:var(--radius-md);
+  background:var(--row-bg);font-size:.78rem;min-width:0;
+}
+.ai-diag-dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px;background:var(--text-dim)}
+.ai-diag-dot.ok{background:var(--success-accent);box-shadow:0 0 0 3px rgba(22,163,122,.16)}
+.ai-diag-dot.bad{background:var(--danger-accent);box-shadow:0 0 0 3px rgba(224,82,82,.15)}
+.ai-diag-name{font-weight:750;flex:0 0 72px}
+.ai-diag-meta{flex:1 1 auto;min-width:0;color:var(--text-muted);font-size:.68rem;line-height:1.45;overflow-wrap:anywhere}
+.ai-diag-lat{
+  flex:0 0 auto;font-family:var(--font-jetbrains-mono),ui-monospace,monospace;
+  font-size:.6rem;color:var(--text-dim);letter-spacing:.2px;
+}
+.ai-diag-note{margin:10px 0 0;font-size:.74rem;font-weight:650;line-height:1.5}
+.ai-diag-note.ok{color:var(--status-done-text)}
+.ai-diag-note.bad{color:var(--status-skipped-text)}
+@media(max-width:430px){
+  .ai-diag-row{flex-wrap:wrap;gap:6px 8px}
+  .ai-diag-lat{flex:1 1 100%;order:3}
+}
+
+/* ── 9. Quick-prompt chips: fade edge while scrolling on phones ── */
+@media(max-width:640px){
+  .ai-quick{position:relative;scroll-padding-left:14px}
+  .ai-quick::after{
+    content:"";position:absolute;right:0;top:0;bottom:0;width:30px;pointer-events:none;
+    background:linear-gradient(90deg,rgba(255,255,255,0),var(--surface));
+  }
+  body.theme-dark .ai-quick::after,
+  body.theme-obsidian .ai-quick::after,
+  body.theme-nebula .ai-quick::after{background:linear-gradient(90deg,rgba(255,255,255,0),var(--surface))}
+}
+
+/* ── 10. Toast: full-bleed comfort on small phones ────────────── */
+@media(max-width:640px){
+  .toast{left:10px;right:10px;min-width:0;margin-bottom:4px}
+  .toast-msg{font-size:.78rem}
+}
+
+/* ── 11. Desktop-only hover lift (touch stays flat & snappy) ──── */
+@media(hover:hover) and (pointer:fine){
+  .btn-primary:hover{transform:translateY(-1px)}
+  .tilt-card:hover{transform:translateY(-2px)}
+  .nav-item:hover{transform:translateX(2px)}
+}
+
+/* ── 12. Stronger contrast mode support ───────────────────────── */
+@media(prefers-contrast:more){
+  :root{--text-dim:#5C6478;--glass-border:#B9BECE}
+  body.theme-dark,:root .theme-obsidian{--text-dim:#8A8A96}
+  .glass-panel{box-shadow:none}
+  .ai-msg.user{outline:1px solid rgba(255,255,255,.5)}
+}
+
+/* ── 13. Mobile dock: comfier 44px-class touch targets ────────── */
+@media(max-width:860px){
+  .nav-item{min-height:52px;border-radius:16px}
+  .mobile-header{padding:0 12px}
+  .tracker-bar{gap:10px}
+}
+
+/* ── 14. Very large screens: chat panel grows with the viewport ─ */
+@media(min-width:1800px){
+  .ai-panel{width:min(540px,calc(100vw - 32px));height:min(780px,calc(100dvh - 120px))}
+}
+
+/* ── 15. Chat scroll containment + balanced headings (final v8 polish) ── */
+.ai-msgs{overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+.page-title,.page-subtitle{text-wrap:balance}
+@media(max-width:360px){
+  .ai-quick button{padding:6px 10px;font-size:.66rem}
+  .ai-composer{gap:7px}
+}

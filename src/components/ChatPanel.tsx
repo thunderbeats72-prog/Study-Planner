@@ -1,14 +1,18 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
-import { mdToHtml, escapeHtml, type MessageRow } from "@/lib/client";
-import { IconChat, IconClose, IconSend, IconSpark } from "./icons";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { api, mdToHtml, escapeHtml, type MessageRow } from "@/lib/client";
+import { IconChat, IconCheck, IconClose, IconCopy, IconSend, IconSpark } from "./icons";
 
 const QUICKS = [
   "What should I study today?",
   "I'm behind — replan",
   "Explain my weakest topic in detail",
 ];
+
+type HealthSnapshot = {
+  ai?: { mode?: string; configuredProviders?: string[] };
+};
 
 export default function ChatPanel({
   open, setOpen, messages, onSend, thinking, provider, learner,
@@ -22,13 +26,43 @@ export default function ChatPanel({
   learner?: { name: string; daysLeft: number; progressPct: number; streak: number; todayDone: number; todayTotal: number };
 }) {
   const [text, setText] = useState("");
+  const [copiedId, setCopiedId] = useState<number | null>(null);
+  const [health, setHealth] = useState<HealthSnapshot | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const submitLock = useRef(false);
   useEffect(() => { if (!thinking) submitLock.current = false; }, [thinking]);
+
+  // Provider connectivity chip: fetched once per session so the learner can
+  // SEE whether Gemini/Groq/Grok/OpenRouter are actually configured before
+  // asking anything (previously the only signal was a failure toast).
+  useEffect(() => {
+    if (!open || health) return;
+    let alive = true;
+    api<HealthSnapshot>("/api/health", { timeoutMs: 10_000 })
+      .then((snapshot) => { if (alive) setHealth(snapshot); })
+      .catch(() => { /* status chip falls back to the provider prop */ });
+    return () => { alive = false; };
+  }, [open, health]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages.length, thinking, open]);
+
+  // Focus the composer when the sheet opens on pointer devices (avoids
+  // popping the mobile keyboard on touch, where the FAB tap is recent).
+  useEffect(() => {
+    if (open && window.matchMedia?.("(hover: hover) and (pointer: fine)").matches) {
+      inputRef.current?.focus();
+    }
+  }, [open]);
+
+  const autosize = useCallback(() => {
+    const node = inputRef.current;
+    if (!node) return;
+    node.style.height = "auto";
+    node.style.height = `${Math.min(node.scrollHeight, 132)}px`;
+  }, []);
 
   const send = (q?: string) => {
     const msg = (q ?? text).trim();
@@ -36,7 +70,22 @@ export default function ChatPanel({
     submitLock.current = true;
     onSend(msg);
     setText("");
+    requestAnimationFrame(autosize);
   };
+
+  const copyMessage = async (m: MessageRow) => {
+    try {
+      await navigator.clipboard.writeText(m.content);
+      setCopiedId(m.id);
+      setTimeout(() => setCopiedId((current) => (current === m.id ? null : current)), 1600);
+    } catch { /* clipboard blocked — silently ignore */ }
+  };
+
+  const providers = health?.ai?.configuredProviders?.length
+    ? health.ai.configuredProviders
+    : provider
+      ? [provider]
+      : [];
 
   return (
     <>
@@ -49,6 +98,7 @@ export default function ChatPanel({
         <div
           className={`ai-panel glass-panel${thinking ? " is-thinking" : ""}`}
           role="dialog" aria-modal="true" aria-label="SHIGUN AI tutor chat"
+          onKeyDown={(e) => { if (e.key === "Escape") setOpen(false); }}
         >
           <div className="ai-sheet-handle" aria-hidden="true" />
           <div className="ai-head">
@@ -56,17 +106,19 @@ export default function ChatPanel({
               <div className="brand-logo-icon ai-avatar"><IconSpark size={16} /></div>
               <div className="ai-identity">
                 <div className="ai-title">Shigun <span>AI Tutor</span></div>
-                <div className="ai-status">
+                <div className={`ai-status${providers.length ? "" : " off"}`} aria-live="polite">
                   {thinking
-                    ? "Working on your answer"
-                    : provider ? `${provider} configured · local fallback ready` : "Local tutor ready"}
+                    ? "Working on your answer…"
+                    : providers.length
+                      ? `${providers.join(" + ")} live · local fallback ready`
+                      : "Local tutor mode — add an AI key for cloud answers"}
                 </div>
               </div>
               <button className="ai-close" aria-label="Close chat" onClick={() => setOpen(false)}><IconClose size={17} /></button>
             </div>
           </div>
 
-          <div className="ai-msgs">
+          <div className="ai-msgs" role="log" aria-busy={thinking || undefined}>
             {!messages.length && learner && (
               <div className="companion-hello">
                 <div className="companion-orb"><IconSpark size={22} /></div>
@@ -94,7 +146,18 @@ export default function ChatPanel({
                 <div key={m.id} className={`ai-message-row ${isUser ? "user" : "bot"}`}>
                   {!isUser && <div className="ai-mini-avatar" aria-hidden="true"><IconSpark size={11} /></div>}
                   <div className={`ai-msg ${isUser ? "user" : "bot"}`}
+                    title={new Date(m.createdAt).toLocaleString()}
                     dangerouslySetInnerHTML={{ __html: isUser ? escapeHtml(m.content) : mdToHtml(m.content) }} />
+                  {!isUser && (
+                    <button
+                      className={`ai-copy${copiedId === m.id ? " copied" : ""}`}
+                      aria-label={copiedId === m.id ? "Copied" : "Copy answer"}
+                      title={copiedId === m.id ? "Copied!" : "Copy answer"}
+                      onClick={() => void copyMessage(m)}
+                    >
+                      {copiedId === m.id ? <IconCheck size={12} /> : <IconCopy size={13} />}
+                    </button>
+                  )}
                 </div>
               );
             })}
@@ -103,26 +166,30 @@ export default function ChatPanel({
                 <div className="ai-mini-avatar" aria-hidden="true"><IconSpark size={11} /></div>
                 <div className="ai-msg bot">
                   <span className="thinking-dots"><i /><i /><i /></span>
-                  <span className="thinking-label">Thinking through your plan</span>
+                  <span className="thinking-label">Thinking through your answer</span>
                 </div>
               </div>
             )}
             <div ref={endRef} />
           </div>
 
-          <div className="ai-quick">
+          <div className="ai-quick" aria-label="Suggested questions">
             <span className="ai-quick-label">Try</span>
             {QUICKS.map((q) => <button key={q} onClick={() => send(q)} disabled={thinking}>{q}</button>)}
           </div>
 
-          <div className="ai-input-row">
-            <input
+          <div className="ai-input-row ai-composer">
+            <textarea
+              ref={inputRef}
               className="input-field ai-chat-input"
-              placeholder="Message Shigun…"
+              placeholder="Message Shigun…  (Shift+Enter for a new line)"
               value={text}
+              rows={1}
               aria-label="Message Shigun"
-              onChange={(e) => setText(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && send()}
+              onChange={(e) => { setText(e.target.value); autosize(); }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+              }}
             />
             <button className="btn btn-primary ai-send" aria-label="Send message" onClick={() => send()} disabled={thinking || !text.trim()}><IconSend /></button>
           </div>

@@ -5,6 +5,7 @@ import {
   instantTutorReply,
   languageCapabilityReply,
   parseCommand,
+  probeProviders,
   tutorSystemPrompt,
 } from "../src/lib/ai";
 import { detectLanguage } from "../src/lib/language";
@@ -285,6 +286,63 @@ async function runTests() {
   if (oldGemini === undefined) delete process.env.GEMINI_API_KEY; else process.env.GEMINI_API_KEY = oldGemini;
   if (oldGroq === undefined) delete process.env.GROQ_API_KEY; else process.env.GROQ_API_KEY = oldGroq;
   if (oldOpenRouter === undefined) delete process.env.OPENROUTER_API_KEY; else process.env.OPENROUTER_API_KEY = oldOpenRouter;
+
+  console.log("\n--- 4b. v8 Provider Chain: retired models, sticky success, probe ---");
+  {
+    const originalFetch = globalThis.fetch;
+    const oldGemini = process.env.GEMINI_API_KEY;
+    const oldGroq = process.env.GROQ_API_KEY;
+    const oldXai = process.env.XAI_API_KEY;
+    const oldOpenRouter = process.env.OPENROUTER_API_KEY;
+    delete process.env.GEMINI_API_KEY;
+    process.env.GROQ_API_KEY = "test-groq";
+    delete process.env.XAI_API_KEY;
+    delete process.env.OPENROUTER_API_KEY;
+    const stickyGlobal = globalThis as { __studyPlannerPreferred?: { provider: string; model: string } };
+    delete stickyGlobal.__studyPlannerPreferred;
+
+    const calls: { url: string; model: string }[] = [];
+    globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input);
+      const model = String(JSON.parse(String(init?.body || "{}")).model || "");
+      calls.push({ url, model });
+      // Simulate the 2026-08-16 Groq retirement: the old default model ID
+      // is gone, but the replacement models still answer.
+      if (model === "openai/gpt-oss-120b" && calls.filter((c) => c.model === "openai/gpt-oss-120b").length === 1) {
+        return new Response(JSON.stringify({ error: { message: "model not found: decommissioned" } }), {
+          status: 404, headers: { "content-type": "application/json" },
+        });
+      }
+      return new Response(JSON.stringify({ choices: [{ message: { content: "Chain answer" } }] }), {
+        status: 200, headers: { "content-type": "application/json" },
+      });
+    }) as typeof fetch;
+
+    const first = await callLLMDetailed("Tutor", [{ role: "user", content: "explain demand" }], 200);
+    check(first.text === "Chain answer" && first.provider === "groq",
+      "Retired Groq model falls through the chain to a live replacement");
+    check(first.model && first.model !== "openai/gpt-oss-120b",
+      "Fallback picked a replacement model, not the retired ID");
+
+    const second = await callLLMDetailed("Tutor", [{ role: "user", content: "explain supply" }], 200);
+    check(second.provider === "groq" && second.model === first.model && second.text === "Chain answer",
+      "Sticky success reuses the provider+model that answered");
+    check(calls[calls.length - 1].model === first.model,
+      "Second call goes straight to the sticky model");
+
+    const probes = await probeProviders();
+    check(Array.isArray(probes) && probes.some((probe) => probe.label === "Groq" && probe.ok),
+      "Connectivity probe verifies the live provider end-to-end");
+    check(probes.every((probe) => !JSON.stringify(probe).includes("test-groq")),
+      "Probe results never leak the API key");
+
+    globalThis.fetch = originalFetch;
+    delete stickyGlobal.__studyPlannerPreferred;
+    if (oldGemini === undefined) delete process.env.GEMINI_API_KEY; else process.env.GEMINI_API_KEY = oldGemini;
+    if (oldGroq === undefined) delete process.env.GROQ_API_KEY; else process.env.GROQ_API_KEY = oldGroq;
+    if (oldXai === undefined) delete process.env.XAI_API_KEY; else process.env.XAI_API_KEY = oldXai;
+    if (oldOpenRouter === undefined) delete process.env.OPENROUTER_API_KEY; else process.env.OPENROUTER_API_KEY = oldOpenRouter;
+  }
 
   console.log("\n--- 5. Study Clock Accounting ---");
   const originalNow = Date.now;
