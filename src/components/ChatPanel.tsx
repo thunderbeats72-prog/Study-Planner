@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { mdToHtml, escapeHtml, type MessageRow } from "@/lib/client";
 import { IconChat, IconClose, IconSend, IconSpark, IconVolume } from "./icons";
 import {
-  VOICE_OPTIONS, SPEECH_RATE_OPTIONS, voiceSupported, speakLong, stopSpeaking, listen, learnSttLang,
+  VOICE_OPTIONS, SPEECH_RATE_OPTIONS, STT_LANG_OPTIONS, voiceSupported, speakLong, stopSpeaking, listen, learnSttLang,
   prepareVoicePlayback, type ListenHandle,
 } from "@/lib/voice";
 import { mergeTranscriptSegments } from "@/lib/transcript";
@@ -39,6 +39,7 @@ export default function ChatPanel({
   const [text, setText] = useState("");
   const voiceReplyArmed = useRef(false); // speak the next reply only after mic input
   const [voiceId, setVoiceId] = useState("f1");
+  const [sttLang, setSttLang] = useState("en-IN");
   const [speechRate, setSpeechRate] = useState(1.15);
   const [listening, setListening] = useState(false);
   const [micWaking, setMicWaking] = useState(false);
@@ -58,8 +59,7 @@ export default function ChatPanel({
   useEffect(() => { if (!thinking) submitLock.current = false; }, [thinking]);
   const support = typeof window !== "undefined" ? voiceSupported() : { stt: false, tts: false };
 
-  // Voice profile IDs map to fixed cloud voices, so persisting the ID keeps
-  // the same Shigun voice selected on every viewport on this device.
+  // Voice profile IDs and STT language map to fixed user preferences.
   useEffect(() => {
     const saved = localStorage.getItem("shigun-voice-id");
     const timer = window.setTimeout(() => {
@@ -68,6 +68,21 @@ export default function ChatPanel({
     return () => window.clearTimeout(timer);
   }, []);
   useEffect(() => { localStorage.setItem("shigun-voice-id", voiceId); }, [voiceId]);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("shigun-stt-lang");
+    const timer = window.setTimeout(() => {
+      if (saved && STT_LANG_OPTIONS.some((opt) => opt.id === saved || opt.bcp === saved)) {
+        const matched = STT_LANG_OPTIONS.find((opt) => opt.id === saved || opt.bcp === saved);
+        if (matched) setSttLang(matched.id);
+      } else {
+        setSttLang("en-IN");
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+  useEffect(() => { localStorage.setItem("shigun-stt-lang", sttLang); }, [sttLang]);
+
   useEffect(() => {
     const saved = Number(localStorage.getItem("shigun-speech-rate"));
     const timer = window.setTimeout(() => {
@@ -140,6 +155,23 @@ export default function ChatPanel({
     setVoiceHint("");
   };
 
+  const forceEnglishStt = () => {
+    setSttLang("en-IN");
+    localStorage.setItem("shigun-stt-lang", "en-IN");
+    setText("");
+    setVoiceErr("");
+    setVoiceNotice("Microphone input switched to English.");
+    if (listening || micWaking) {
+      listenRef.current?.stop();
+      listenRef.current = null;
+      setListening(false);
+      setMicWaking(false);
+      window.setTimeout(() => {
+        void toggleListen();
+      }, 120);
+    }
+  };
+
   const toggleListen = async () => {
     setVoiceErr("");
     setVoiceNotice("");
@@ -174,6 +206,9 @@ export default function ChatPanel({
     setMicWaking(true);            // instant feedback — button pulses immediately
     setVoiceHint("");
     const isCurrent = () => token === listenSession.current && openRef.current;
+
+    const activeBcp = STT_LANG_OPTIONS.find((opt) => opt.id === sttLang)?.bcp || "en-IN";
+
     const h = await listen(
       (interim) => { if (isCurrent()) setText(interim); },
       (final) => {
@@ -194,7 +229,7 @@ export default function ChatPanel({
           if (dispatch(final.text, true)) setText("");
         } else {
           // unsure — show the transcript for a quick review instead of
-          // sending a wrong message (fixes the 2-3 retry loop)
+          // sending a wrong message
           voiceReplyArmed.current = true;
           setVoiceHint(final.confidence > 0
             ? `I heard you (${Math.round(final.confidence * 100)}% sure) — check the text, then send or edit.`
@@ -205,7 +240,7 @@ export default function ChatPanel({
         if (!isCurrent()) return;
         setListening(false); setMicWaking(false); listenRef.current = null; setVoiceErr(err);
       },
-      { hints: speechHints }
+      { lang: activeBcp, hints: speechHints }
     );
     if (!isCurrent()) { h?.stop(); return; }
     if (h) { listenRef.current = h; setMicWaking(false); setListening(true); }
@@ -213,6 +248,7 @@ export default function ChatPanel({
   };
 
   const selectedVoiceName = VOICE_OPTIONS.find((voice) => voice.id === voiceId)?.label.split(" · ")[0] || "Shigun";
+  const selectedSttLabel = STT_LANG_OPTIONS.find((opt) => opt.id === sttLang)?.label || "English (IN)";
 
   return (
     <>
@@ -228,66 +264,90 @@ export default function ChatPanel({
         >
           <div className="ai-sheet-handle" aria-hidden="true" />
           <div className="ai-head">
-            <div className="brand-logo-icon ai-avatar"><IconSpark size={16} /></div>
-            <div className="ai-identity">
-              <div className="ai-title">Shigun <span>AI Tutor</span></div>
-              <div className="ai-status">
-                {micWaking ? "Preparing microphone"
-                  : listening ? "Listening — detecting language"
-                  : voicePreparing ? `Preparing ${selectedVoiceName}…`
-                  : speaking
-                    ? `${selectedVoiceName} speaking${speakProgress ? ` · part ${speakProgress.done}/${speakProgress.total}` : ""}`
-                    : thinking ? "Working on your answer"
-                    : provider ? `${provider} configured · local fallback ready` : "Local tutor ready · cloud AI not configured"}
+            <div className="ai-head-main">
+              <div className="brand-logo-icon ai-avatar"><IconSpark size={16} /></div>
+              <div className="ai-identity">
+                <div className="ai-title">Shigun <span>AI Tutor</span></div>
+                <div className="ai-status">
+                  {micWaking ? "Preparing microphone"
+                    : listening ? `Listening in ${selectedSttLabel}`
+                    : voicePreparing ? `Preparing ${selectedVoiceName}…`
+                    : speaking
+                      ? `${selectedVoiceName} speaking${speakProgress ? ` · part ${speakProgress.done}/${speakProgress.total}` : ""}`
+                      : thinking ? "Working on your answer"
+                      : provider ? `${provider} configured · local fallback ready` : "Local tutor ready"}
+                </div>
               </div>
+              <button className="ai-close" aria-label="Close chat" onClick={() => setOpen(false)}><IconClose size={17} /></button>
             </div>
-            {support.tts && (
-              <>
-                <button
-                  className={`voice-replay${speaking || voicePreparing ? " active" : ""}`}
-                  onClick={() => {
-                    if (speaking || voicePreparing) {
-                      stopSpeaking();
-                      setSpeaking(false);
-                      setVoicePreparing(false);
-                      setSpeakProgress(null);
-                      return;
-                    }
-                    if (lastAssistant) speakReply(lastAssistant.content);
-                  }}
-                  disabled={thinking || (!lastAssistant && !speaking && !voicePreparing)}
-                  aria-label={speaking || voicePreparing ? "Stop spoken reply" : "Read the latest reply aloud"}
-                  title={speaking || voicePreparing ? "Stop spoken reply" : "Read the latest reply aloud"}
-                >
-                  <IconVolume size={15} />
-                </button>
+
+            <div className="ai-toolbar">
+              <div className="ai-toolbar-group" title="Speech Input Language">
+                <span className="ai-toolbar-label">Input</span>
                 <select
-                  className="voice-select"
-                  value={voiceId}
-                  onChange={(e) => setVoiceId(e.target.value)}
-                  aria-label="Shigun voice (female or male)"
-                  title="Shigun's voice — replies adapt their grammar to the selected female or male voice"
+                  className="voice-select stt-select"
+                  value={sttLang}
+                  onChange={(e) => setSttLang(e.target.value)}
+                  aria-label="Speech recognition input language"
                 >
-                  {VOICE_OPTIONS.map((v) => (
-                    <option key={v.id} value={v.id}>
-                      {v.id === "device" ? v.label : `${v.label} ${v.gender === "male" ? "♂" : "♀"}`}
-                    </option>
+                  {STT_LANG_OPTIONS.map((opt) => (
+                    <option key={opt.id} value={opt.id}>{opt.label}</option>
                   ))}
                 </select>
-                <select
-                  className="voice-select voice-speed-select"
-                  value={speechRate}
-                  onChange={(e) => setSpeechRate(Number(e.target.value))}
-                  aria-label="Spoken answer speed"
-                  title="Spoken answer speed"
-                >
-                  {SPEECH_RATE_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>{option.label}</option>
-                  ))}
-                </select>
-              </>
-            )}
-            <button className="ai-close" aria-label="Close chat" onClick={() => setOpen(false)}><IconClose size={17} /></button>
+              </div>
+
+              {support.tts && (
+                <>
+                  <div className="ai-toolbar-group" title="Shigun Voice Persona">
+                    <span className="ai-toolbar-label">Voice</span>
+                    <select
+                      className="voice-select"
+                      value={voiceId}
+                      onChange={(e) => setVoiceId(e.target.value)}
+                      aria-label="Shigun voice (female or male)"
+                    >
+                      {VOICE_OPTIONS.map((v) => (
+                        <option key={v.id} value={v.id}>
+                          {v.id === "device" ? v.label : `${v.label} ${v.gender === "male" ? "♂" : "♀"}`}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="ai-toolbar-group" title="Spoken Speed">
+                    <select
+                      className="voice-select voice-speed-select"
+                      value={speechRate}
+                      onChange={(e) => setSpeechRate(Number(e.target.value))}
+                      aria-label="Spoken answer speed"
+                    >
+                      {SPEECH_RATE_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <button
+                    className={`voice-replay${speaking || voicePreparing ? " active" : ""}`}
+                    onClick={() => {
+                      if (speaking || voicePreparing) {
+                        stopSpeaking();
+                        setSpeaking(false);
+                        setVoicePreparing(false);
+                        setSpeakProgress(null);
+                        return;
+                      }
+                      if (lastAssistant) speakReply(lastAssistant.content);
+                    }}
+                    disabled={thinking || (!lastAssistant && !speaking && !voicePreparing)}
+                    aria-label={speaking || voicePreparing ? "Stop spoken reply" : "Read the latest reply aloud"}
+                    title={speaking || voicePreparing ? "Stop spoken reply" : "Read the latest reply aloud"}
+                  >
+                    <IconVolume size={14} />
+                  </button>
+                </>
+              )}
+            </div>
           </div>
 
           <div className="ai-msgs">
@@ -302,9 +362,9 @@ export default function ChatPanel({
                     ? "Everything done for today — impressive."
                     : learner.todayTotal > 0
                       ? `${learner.todayTotal - learner.todayDone} of ${learner.todayTotal} sessions left today · ${learner.daysLeft} days to your exam.`
-                      : `${learner.daysLeft} days to your exam · ${learner.progressPct}% of the syllabus behind you.`}
+                      : `${learner.daysLeft} days to your exam · ${learner.progressPct}% of syllabus completed.`}
                 </p>
-                <p className="companion-hint">Ask me anything, give a command, or tap the mic and just talk.</p>
+                <p className="companion-hint">Ask me anything, give a command, or tap the mic and talk to me in English or your language.</p>
               </div>
             )}
             {!messages.length && !learner && (
@@ -338,8 +398,16 @@ export default function ChatPanel({
           {(listening || micWaking) && (
             <div className="voice-live" role="status">
               <span className="voice-wave" aria-hidden="true"><i /><i /><i /><i /><i /></span>
-              <span><strong>{micWaking ? "Preparing your mic" : "Listening"}</strong>{text ? ` · ${text}` : " · Speak naturally — Shigun detects the language"}</span>
-              <button onClick={() => void toggleListen()}>Finish</button>
+              <span className="voice-live-text">
+                <strong>{micWaking ? "Preparing mic" : "Listening"}</strong>
+                {text ? ` · ${text}` : ` · Listening in ${selectedSttLabel}`}
+              </span>
+              {sttLang !== "en-IN" && (
+                <button type="button" className="voice-switch-btn" onClick={forceEnglishStt} title="Switch to English microphone mode">
+                  🇬🇧 English
+                </button>
+              )}
+              <button type="button" className="voice-finish-btn" onClick={() => void toggleListen()}>Finish</button>
             </div>
           )}
           {voiceErr && <div className="voice-err" role="alert">{voiceErr}</div>}
@@ -358,7 +426,7 @@ export default function ChatPanel({
                 onClick={() => void toggleListen()}
                 disabled={thinking}
                 aria-label={listening || micWaking ? "Stop listening" : speaking || voicePreparing ? "Stop the voice" : "Speak to Shigun"}
-                title={listening || micWaking ? "Stop listening" : speaking || voicePreparing ? "Stop the voice" : "Speak to Shigun — language is detected automatically"}
+                title={listening || micWaking ? "Stop listening" : speaking || voicePreparing ? "Stop the voice" : `Speak to Shigun — input set to ${selectedSttLabel}`}
               >
                 {speaking || voicePreparing
                   ? <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" stroke="none" /></svg>
@@ -368,9 +436,14 @@ export default function ChatPanel({
                     </svg>}
               </button>
             )}
-            <input className="input-field ai-chat-input" placeholder={listening || micWaking ? "Listening…" : "Message Shigun…"} value={text}
+            <input
+              className="input-field ai-chat-input"
+              placeholder={listening || micWaking ? `Listening in ${selectedSttLabel}…` : "Message Shigun…"}
+              value={text}
               aria-label="Message Shigun"
-              onChange={(e) => { setText(e.target.value); if (voiceHint) setVoiceHint(""); }} onKeyDown={(e) => e.key === "Enter" && send()} />
+              onChange={(e) => { setText(e.target.value); if (voiceHint) setVoiceHint(""); }}
+              onKeyDown={(e) => e.key === "Enter" && send()}
+            />
             <button className="btn btn-primary ai-send" aria-label="Send message" onClick={() => send()} disabled={thinking || !text.trim()}><IconSend /></button>
           </div>
         </div>

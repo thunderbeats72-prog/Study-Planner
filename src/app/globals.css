@@ -238,11 +238,19 @@ select.input-field{appearance:none;background-image:linear-gradient(45deg,transp
 .ai-panel{position:fixed;right:22px;bottom:88px;width:min(430px,calc(100vw - 32px));height:min(620px,calc(100vh - 130px));z-index:201;display:flex;flex-direction:column;overflow:hidden;background:var(--surface-elevated);color:var(--text-main);border:1px solid var(--glass-border);border-radius:var(--radius-xl);box-shadow:0 8px 24px rgba(10,12,26,.14),0 28px 80px rgba(10,12,26,.18)}
 body.theme-dark .ai-panel,body.theme-obsidian .ai-panel,body.theme-nebula .ai-panel{box-shadow:0 8px 28px rgba(0,0,0,.55),0 32px 90px rgba(0,0,0,.45)}
 /* Header: violet AI identity strip with soft luminous wash */
-.ai-head{padding:15px 18px;display:flex;align-items:center;gap:11px;position:relative;
+.ai-head{padding:12px 16px;display:flex;flex-direction:column;gap:9px;position:relative;
   background:var(--surface-elevated);
   border-bottom:1px solid var(--glass-border);color:var(--text-main)}
+.ai-head-main{display:flex;align-items:center;gap:11px;width:100%;min-width:0}
 .ai-head::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:1.5px;
   background:linear-gradient(90deg,rgba(var(--ai-rgb),.55),rgba(var(--ai-rgb),.08) 70%,transparent)}
+.ai-toolbar{display:flex;align-items:center;gap:8px;width:100%;padding-top:7px;border-top:1px solid var(--glass-border);overflow-x:auto;scrollbar-width:none}
+.ai-toolbar::-webkit-scrollbar{display:none}
+.ai-toolbar-group{display:flex;align-items:center;gap:5px;flex-shrink:0}
+.ai-toolbar-label{font-size:.6rem;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:var(--text-dim)}
+.stt-select{max-width:116px;font-size:.68rem;border-radius:9px}
+.voice-switch-btn{border:1px solid rgba(var(--ai-rgb),.35)!important;border-radius:8px!important;padding:4px 9px!important;background:rgba(var(--ai-rgb),.12)!important;color:var(--color-ai)!important;font-size:.66rem!important;font-weight:700!important;cursor:pointer;transition:all .15s ease;white-space:nowrap}
+.voice-switch-btn:hover{background:var(--color-ai)!important;color:#fff!important}
 .ai-status{font-size:.64rem;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--color-ai);display:inline-flex;align-items:center;gap:5px;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ai-status::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--color-ai);animation:aiPulse 2.4s ease-in-out infinite}
 @keyframes aiPulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(var(--ai-rgb),.4)}50%{opacity:.6;box-shadow:0 0 0 4px rgba(var(--ai-rgb),0)}}

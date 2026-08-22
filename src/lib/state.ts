@@ -85,55 +85,95 @@ export async function loadState(userId: number) {
   return { settings: st, subjects: subs, topics: tps, tasks: tsk, sessions: ses, messages: msgs };
 }
 
+export function defaultFallbackState(userKey: string) {
+  const today = todayStr();
+  return {
+    user: {
+      id: 0,
+      userKey,
+      name: "Learner",
+      courseName: "General Curriculum",
+      level: "Intermediate",
+      streak: 1,
+      onboarded: true,
+      createdAt: new Date().toISOString(),
+    },
+    settings: {
+      id: 0,
+      userId: 0,
+      startDate: today,
+      examDate: addDays(today, 90),
+      dailyHours: 3,
+      enabledDays: [true, true, true, true, true, false, false],
+      preferredTime: "morning" as const,
+      revisionMode: "spaced" as const,
+      theme: "silver-lavender",
+      aiProvider: "local",
+      aiApiKey: null,
+      customModel: null,
+    },
+    subjects: [],
+    topics: [],
+    tasks: [],
+    sessions: [],
+    messages: [],
+  };
+}
+
 export async function fullState(userKey: string) {
-  const user = await getOrCreateUser(userKey);
-  const rest = await loadState(user.id);
+  try {
+    const user = await getOrCreateUser(userKey);
+    const rest = await loadState(user.id);
 
-  // Existing plans created before advanced curriculum metadata was added get
-  // a deterministic, non-destructive response upgrade immediately. New plans
-  // persist these fields in PostgreSQL; old titles/mastery/timing stay intact.
-  const subjectById = new Map(rest.subjects.map((subject) => [subject.id, subject]));
-  const topicLists = new Map<number, typeof rest.topics>();
-  for (const topic of rest.topics) {
-    const list = topicLists.get(topic.subjectId) || [];
-    list.push(topic);
-    topicLists.set(topic.subjectId, list);
-  }
-  for (const list of topicLists.values()) list.sort((a, b) => a.position - b.position);
+    // Existing plans created before advanced curriculum metadata was added get
+    // a deterministic, non-destructive response upgrade immediately. New plans
+    // persist these fields in PostgreSQL; old titles/mastery/timing stay intact.
+    const subjectById = new Map(rest.subjects.map((subject) => [subject.id, subject]));
+    const topicLists = new Map<number, typeof rest.topics>();
+    for (const topic of rest.topics) {
+      const list = topicLists.get(topic.subjectId) || [];
+      list.push(topic);
+      topicLists.set(topic.subjectId, list);
+    }
+    for (const list of topicLists.values()) list.sort((a, b) => a.position - b.position);
 
-  const enrichedTopics = rest.topics.map((topic) => {
-    const hasAdvancedData = !!(
-      topic.keyConcepts?.length && topic.prerequisites?.length
-      && topic.practice && topic.sources?.length
-    );
-    if (hasAdvancedData) return topic;
-    const subject = subjectById.get(topic.subjectId);
-    if (!subject) return topic;
-    const list = topicLists.get(topic.subjectId) || [topic];
-    const index = Math.max(0, list.findIndex((item) => item.id === topic.id));
-    const metadata = advancedTopicMetadata({
-      title: topic.title,
-      subjectName: subject.name,
-      index,
-      total: list.length,
-      difficulty: subject.difficulty,
-      level: user.level,
-      courseName: user.courseName,
-      previousTitle: list[index - 1]?.title,
+    const enrichedTopics = rest.topics.map((topic) => {
+      const hasAdvancedData = !!(
+        topic.keyConcepts?.length && topic.prerequisites?.length
+        && topic.practice && topic.sources?.length
+      );
+      if (hasAdvancedData) return topic;
+      const subject = subjectById.get(topic.subjectId);
+      if (!subject) return topic;
+      const list = topicLists.get(topic.subjectId) || [topic];
+      const index = Math.max(0, list.findIndex((item) => item.id === topic.id));
+      const metadata = advancedTopicMetadata({
+        title: topic.title,
+        subjectName: subject.name,
+        index,
+        total: list.length,
+        difficulty: subject.difficulty,
+        level: user.level,
+        courseName: user.courseName,
+        previousTitle: list[index - 1]?.title,
+      });
+      return {
+        ...topic,
+        summary: topic.summary || metadata.summary,
+        objectives: topic.objectives?.length ? topic.objectives : metadata.objectives,
+        prerequisites: topic.prerequisites?.length ? topic.prerequisites : metadata.prerequisites,
+        keyConcepts: topic.keyConcepts?.length ? topic.keyConcepts : metadata.keyConcepts,
+        practice: topic.practice || metadata.practice,
+        depth: metadata.depth,
+        sources: topic.sources?.length ? topic.sources : metadata.sources,
+      };
     });
-    return {
-      ...topic,
-      summary: topic.summary || metadata.summary,
-      objectives: topic.objectives?.length ? topic.objectives : metadata.objectives,
-      prerequisites: topic.prerequisites?.length ? topic.prerequisites : metadata.prerequisites,
-      keyConcepts: topic.keyConcepts?.length ? topic.keyConcepts : metadata.keyConcepts,
-      practice: topic.practice || metadata.practice,
-      depth: metadata.depth,
-      sources: topic.sources?.length ? topic.sources : metadata.sources,
-    };
-  });
 
-  return { user, ...rest, topics: enrichedTopics };
+    return { user, ...rest, topics: enrichedTopics };
+  } catch (error) {
+    console.warn("DB unavailable during fullState; using fallback state:", error instanceof Error ? error.message : error);
+    return defaultFallbackState(userKey);
+  }
 }
 
 type St = Awaited<ReturnType<typeof fullState>>;
