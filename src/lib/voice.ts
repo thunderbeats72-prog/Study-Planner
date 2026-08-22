@@ -134,16 +134,36 @@ export function voiceSupported(): { stt: boolean; tts: boolean } {
   return { stt: !!recognition, tts: "Audio" in window || "speechSynthesis" in window };
 }
 
-function cleanForSpeech(markdown: string): string {
-  return markdown
-    .replace(/\[\[action:[^\]]*\]\]/g, "")
-    .replace(/[*_#`>]+/g, "")
-    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
-    .replace(/\s+/g, " ")
-    .trim()
-    // Long answers stay intact here; speakLong() splits them into
-    // voice-sized chunks so nothing is silently dropped mid-lesson.
-    .slice(0, MAX_SPOKEN_CHARS);
+export function cleanForSpeech(markdown: string): string {
+  if (!markdown) return "";
+  let text = markdown;
+  // Remove action tags like [[action:replan]]
+  text = text.replace(/\[\[action:[^\]]*\]\]/g, "");
+  // Remove code blocks
+  text = text.replace(/```[\s\S]*?```/g, " [code block omitted]. ");
+  // Format markdown headers into sentences with periods
+  text = text.replace(/^#{1,6}\s+(.+)$/gm, "$1.");
+  // Format markdown lists (bullet points and numbered lists) into sentences
+  text = text.replace(/^[\s]*[-*+]\s+(.+)$/gm, "$1.");
+  text = text.replace(/^[\s]*\d+\.\s+(.+)$/gm, "$1.");
+  // Blockquotes
+  text = text.replace(/^>\s*/gm, "");
+  // Format tables: replace pipe with comma
+  text = text.replace(/\|/g, " , ");
+  // Remove markdown formatting chars like **, __, *, _, `, ~
+  text = text.replace(/[*_#`~]+/g, "");
+  // Remove markdown links [text](url) -> text
+  text = text.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
+  // Replace multiple newlines with period space if line didn't end in punctuation
+  text = text.replace(/([^\n.?!।:,])\n+/g, "$1. ");
+  text = text.replace(/\n+/g, " ");
+  // Fix double punctuation like .. or :.
+  text = text.replace(/([:;,])\./g, "$1");
+  text = text.replace(/\.{2,}/g, ".");
+  text = text.replace(/\s*,\s*,/g, ",");
+  // Normalize whitespace
+  text = text.replace(/\s+/g, " ").trim();
+  return text.slice(0, MAX_SPOKEN_CHARS);
 }
 
 export function splitLanguageRuns(text: string): { lang: string; text: string }[] {
@@ -382,30 +402,133 @@ async function speakNative(
   finish: () => void,
   playbackRate: number
 ): Promise<boolean> {
-  if (!("speechSynthesis" in window) || generation !== speechGeneration) return false;
+  if (typeof window === "undefined" || !("speechSynthesis" in window) || generation !== speechGeneration) {
+    return false;
+  }
   await loadVoices();
   if (generation !== speechGeneration) return false;
 
-  const utterance = new SpeechSynthesisUtterance(text);
+  const synth = window.speechSynthesis;
+  try { synth.cancel(); } catch { /* ignore */ }
+
   const voice = pickPinnedNativeVoice(voiceId);
-  // Native speech is a last resort. Pin its actual voice and locale rather than
-  // requesting a locale the selected device voice does not own; browsers silently
-  // substitute a different speaker when asked to do that.
-  if (voice) {
-    utterance.voice = voice;
-    utterance.lang = voice.lang;
-  } else {
-    utterance.lang = "en-IN";
-  }
   const profile = voiceId === "m1"
     ? { rate: 0.96, pitch: 0.86 }
     : voiceId === "f2" ? { rate: 1.02, pitch: 1.04 } : { rate: 0.98, pitch: 0.96 };
-  utterance.rate = Math.min(1.6, profile.rate * playbackRate);
-  utterance.pitch = profile.pitch;
-  utterance.onend = () => { if (generation === speechGeneration) finish(); };
-  utterance.onerror = () => { if (generation === speechGeneration) finish(); };
-  window.speechSynthesis.speak(utterance);
-  start();
+  const rate = Math.min(1.6, profile.rate * playbackRate);
+
+  // Split native text into short sentences (under 180 chars) to prevent WebKit freeze
+  const rawSentences = text
+    .split(/(?<=[.?!।॥。！？؟…])\s+|\n+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const sentences: string[] = [];
+  for (const s of rawSentences) {
+    if (s.length > 180) {
+      const parts = s.split(/(?<=[,;:—])\s+/).filter(Boolean);
+      for (const p of parts) {
+        if (p.length > 180) {
+          const words = p.split(/\s+/);
+          let acc = "";
+          for (const w of words) {
+            if (acc && (acc + " " + w).length > 180) {
+              sentences.push(acc);
+              acc = w;
+            } else {
+              acc = acc ? acc + " " + w : w;
+            }
+          }
+          if (acc) sentences.push(acc);
+        } else {
+          sentences.push(p);
+        }
+      }
+    } else {
+      sentences.push(s);
+    }
+  }
+
+  if (!sentences.length) {
+    finish();
+    return true;
+  }
+
+  let currentIdx = 0;
+  let started = false;
+  let keepAliveInterval: ReturnType<typeof setInterval> | null = null;
+
+  const cleanup = () => {
+    if (keepAliveInterval) {
+      clearInterval(keepAliveInterval);
+      keepAliveInterval = null;
+    }
+  };
+
+  // Keep-alive workaround for Chrome/WebKit bug where SpeechSynthesis pauses after 15s
+  keepAliveInterval = setInterval(() => {
+    if (generation !== speechGeneration || !synth.speaking) {
+      cleanup();
+      return;
+    }
+    try {
+      if (synth.paused) {
+        synth.resume();
+      } else {
+        synth.pause();
+        synth.resume();
+      }
+    } catch {
+      cleanup();
+    }
+  }, 10000);
+
+  const speakNextSentence = () => {
+    if (generation !== speechGeneration || currentIdx >= sentences.length) {
+      cleanup();
+      if (generation === speechGeneration) finish();
+      return;
+    }
+
+    const sentenceText = sentences[currentIdx++];
+    const utterance = new SpeechSynthesisUtterance(sentenceText);
+    if (voice) {
+      utterance.voice = voice;
+      utterance.lang = voice.lang;
+    } else {
+      utterance.lang = "en-IN";
+    }
+    utterance.rate = rate;
+    utterance.pitch = profile.pitch;
+
+    utterance.onstart = () => {
+      if (!started && generation === speechGeneration) {
+        started = true;
+        start();
+      }
+    };
+
+    utterance.onend = () => {
+      if (generation === speechGeneration) {
+        speakNextSentence();
+      }
+    };
+
+    utterance.onerror = () => {
+      if (generation === speechGeneration) {
+        speakNextSentence();
+      }
+    };
+
+    try {
+      synth.speak(utterance);
+    } catch {
+      cleanup();
+      if (generation === speechGeneration) finish();
+    }
+  };
+
+  speakNextSentence();
   return true;
 }
 
@@ -552,40 +675,59 @@ function utf8Len(text: string): number {
  * then at a real sentence boundary, never mid-word.
  */
 export function splitSpeechChunks(text: string, maxBytes = DEFAULT_SPEECH_CHUNK_BYTES): string[] {
+  const normalized = text.trim();
+  if (!normalized) return [];
+
+  // Split text into atomic sentences / clauses
+  const rawSentences = normalized
+    .split(/(?<=[.?!।॥。！？؟…])\s+|\n+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
   const chunks: string[] = [];
-  let current = "";
-  let lastBoundary = 0; // safe cut point (right after a sentence ender)
-  let lastClauseBoundary = 0; // softer cut point for unusually long sentences
+  let currentChunk = "";
 
-  for (let i = 0; i < text.length; i++) {
-    current += text[i];
-    const next = text[i + 1] ?? " ";
-    const ended = SENTENCE_ENDERS.has(text[i]) && (next === " " || next === "\n" || i === text.length - 1);
-    if (ended) lastBoundary = current.length;
-    const clauseEnded = CLAUSE_ENDERS.has(text[i])
-      && (next === " " || next === "\n")
-      && utf8Len(current) >= Math.floor(maxBytes * 0.55);
-    if (clauseEnded) lastClauseBoundary = current.length;
-
-    if (utf8Len(current) >= maxBytes) {
-      const safeBoundary = lastBoundary || lastClauseBoundary;
-      if (safeBoundary > 0) {
-        chunks.push(current.slice(0, safeBoundary).trim());
-        current = current.slice(safeBoundary).trimStart();
-        lastBoundary = 0;
-        lastClauseBoundary = 0;
+  for (const sentence of rawSentences) {
+    if (utf8Len(sentence) > maxBytes) {
+      if (currentChunk.trim()) {
+        chunks.push(currentChunk.trim());
+        currentChunk = "";
+      }
+      const parts = sentence.split(/(?<=[,;:—])\s+/).filter(Boolean);
+      for (const part of parts) {
+        if (utf8Len(part) > maxBytes) {
+          const words = part.split(/\s+/).filter(Boolean);
+          for (const word of words) {
+            if (currentChunk && utf8Len(currentChunk + " " + word) > maxBytes) {
+              chunks.push(currentChunk.trim());
+              currentChunk = word;
+            } else {
+              currentChunk = currentChunk ? currentChunk + " " + word : word;
+            }
+          }
+        } else {
+          if (currentChunk && utf8Len(currentChunk + " " + part) > maxBytes) {
+            chunks.push(currentChunk.trim());
+            currentChunk = part;
+          } else {
+            currentChunk = currentChunk ? currentChunk + " " + part : part;
+          }
+        }
+      }
+    } else {
+      if (currentChunk && utf8Len(currentChunk + " " + sentence) > maxBytes) {
+        chunks.push(currentChunk.trim());
+        currentChunk = sentence;
       } else {
-        // A single sentence longer than the cap: cut at the last word gap.
-        const gap = current.lastIndexOf(" ");
-        const cut = gap > 32 ? gap + 1 : current.length;
-        chunks.push(current.slice(0, cut).trim());
-        current = current.slice(cut).trimStart();
-        lastBoundary = 0;
-        lastClauseBoundary = 0;
+        currentChunk = currentChunk ? currentChunk + " " + sentence : sentence;
       }
     }
   }
-  if (current.trim()) chunks.push(current.trim());
+
+  if (currentChunk.trim()) {
+    chunks.push(currentChunk.trim());
+  }
+
   return chunks;
 }
 
@@ -609,20 +751,8 @@ function buildSpeechQueue(text: string): PendingSpeechChunk[] {
   const normalized = text.trim();
   if (!normalized) return [];
 
-  const queue: PendingSpeechChunk[] = [];
-  let remaining = normalized;
-  if (utf8Len(remaining) > DEFAULT_SPEECH_CHUNK_BYTES) {
-    const early = splitSpeechChunks(remaining, INITIAL_SPEECH_CHUNK_BYTES)[0] || "";
-    if (early && early.length < remaining.length) {
-      queue.push({ text: early, maxBytes: INITIAL_SPEECH_CHUNK_BYTES });
-      remaining = remaining.slice(early.length).trimStart();
-    }
-  }
-
-  for (const chunk of splitSpeechChunks(remaining, DEFAULT_SPEECH_CHUNK_BYTES)) {
-    queue.push({ text: chunk, maxBytes: DEFAULT_SPEECH_CHUNK_BYTES });
-  }
-  return queue;
+  const chunks = splitSpeechChunks(normalized, DEFAULT_SPEECH_CHUNK_BYTES);
+  return chunks.map((chunk) => ({ text: chunk, maxBytes: DEFAULT_SPEECH_CHUNK_BYTES }));
 }
 
 async function fetchVoiceClip(
