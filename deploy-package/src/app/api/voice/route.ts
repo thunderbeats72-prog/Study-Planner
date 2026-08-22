@@ -376,7 +376,29 @@ export async function POST(req: Request) {
         return audioResponse(audio, "MISS");
       }
     } catch {
-      // client will try the same selected Edge persona directly
+      // fall through to the Gemini fallback / client-side Edge retry
+    }
+  }
+
+  // Keyless Edge is the primary engine (same person in every language).
+  // When this server cannot reach it (serverless egress/TLS block), and a
+  // Gemini API key is configured, use the built-in Gemini TTS fallback so
+  // the reply is still spoken instead of silently failing.
+  const geminiTtsKey = geminiKey();
+  if (geminiTtsKey) {
+    const profile = CLOUD_PERSONAS[persona.id] || CLOUD_PERSONAS.f1;
+    const gemKey = cacheKey(`gemini:${profile.name}`, persona.name, language, text);
+    const gemCached = getCached(gemKey);
+    if (gemCached) return audioResponse(gemCached, "HIT");
+
+    try {
+      const gem = await synthesiseGeminiCompatible(geminiTtsKey, text, language, profile);
+      if (gem) {
+        putCached(gemKey, gem);
+        return audioResponse(gem, "MISS");
+      }
+    } catch {
+      // The browser will still try the same Edge persona directly.
     }
   }
 

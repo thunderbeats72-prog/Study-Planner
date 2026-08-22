@@ -54,11 +54,108 @@ export function activeProvider(): string | null {
 /* ============================================================
    LLM CALLER — Gemini → Groq → OpenRouter Fallback Chain
 ============================================================ */
+let llmLastError: string | null = null;
+
+/** Last provider/model failure, surfaced to /api/chat meta so the app can
+ *  tell whether a bad model/key or a network outage caused the local fallback. */
+export function llmError(): string | null {
+  return llmLastError;
+}
+
+function recordLlmError(message: string): void {
+  llmLastError = message;
+}
+
+async function fetchText(url: string, init: RequestInit, timeoutMs: number): Promise<Response> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: ctrl.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** Gemini model candidates in preference order. The configured model is tried
+ *  first, then the stable/current models. This avoids a single bad
+ *  NEXT_PUBLIC_GEMINI_MODEL value silently killing the whole chain. */
+function geminiModels(): string[] {
+  const configured = getSafeKey("GEMINI_MODEL") || getSafeKey("NEXT_PUBLIC_GEMINI_MODEL");
+  const candidates = [
+    configured,
+    "gemini-2.5-flash",
+    "gemini-2.0-flash",
+    "gemini-flash-latest",
+    "gemini-2.5-pro",
+    "gemini-2.5-flash-lite",
+  ].filter((model): model is string => Boolean(model?.trim()));
+  return [...new Set(candidates)];
+}
+
+async function callGemini(
+  apiKey: string,
+  model: string,
+  system: string,
+  messages: ChatMsg[],
+  maxTokens: number,
+  timeoutMs: number
+): Promise<string | null> {
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
+  const headers = { "content-type": "application/json", "x-goog-api-key": apiKey };
+  const contents = messages.map((message) => ({
+    role: message.role === "assistant" ? "model" : "user",
+    parts: [{ text: message.content }],
+  }));
+
+  const attempts: Array<Record<string, unknown>> = [
+    {
+      systemInstruction: { parts: [{ text: system }] },
+      contents,
+      generationConfig: { maxOutputTokens: maxTokens },
+    },
+    // Some Gemini model versions reject systemInstruction; retry the same
+    // request with the system prompt folded into the first user turn.
+    {
+      contents: [
+        { role: "user", parts: [{ text: `${system}\n\n---\n\n${messages[0]?.content || ""}` }] },
+        ...contents.slice(1),
+      ],
+      generationConfig: { maxOutputTokens: maxTokens },
+    },
+  ];
+
+  for (const body of attempts) {
+    const response = await fetchText(endpoint, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+    }, timeoutMs).catch((error) => {
+      recordLlmError(`Gemini ${model}: ${error instanceof Error ? error.message : "network error"}`);
+      return null;
+    });
+    if (!response) return null;
+    if (response.ok) {
+      const json = await response.json().catch(() => null);
+      const text = json?.candidates?.[0]?.content?.parts
+        ?.map((part: { text?: string }) => part.text || "").join("") ?? null;
+      if (text?.trim()) return text.trim();
+    } else {
+      const err = await response.text().catch(() => "");
+      recordLlmError(`Gemini ${model}: HTTP ${response.status} ${err.slice(0, 160)}`);
+      if (response.status === 400) continue; // retry with inline-system shape
+      return null;
+    }
+  }
+  recordLlmError(`Gemini ${model}: no usable response`);
+  return null;
+}
+
 export async function callLLM(
   system: string,
   messages: ChatMsg[],
   maxTokens = 2500
 ): Promise<string | null> {
+  llmLastError = null;
   const geminiKey = getSafeKey("GEMINI_API_KEY") || getSafeKey("GOOGLE_API_KEY")
     || getSafeKey("NEXT_PUBLIC_GEMINI_API_KEY") || getSafeKey("NEXT_PUBLIC_GOOGLE_API_KEY");
   const groqKey = getSafeKey("GROQ_API_KEY") || getSafeKey("NEXT_PUBLIC_GROQ_API_KEY");
@@ -68,63 +165,52 @@ export async function callLLM(
     groqKey ? "groq" : null,
     openrouterKey ? "openrouter" : null,
   ].filter(Boolean) as Array<"gemini" | "groq" | "openrouter">;
-  const deadline = Date.now() + 12000; // one bounded budget for the whole chain
+
+  if (!providers.length) {
+    recordLlmError("no cloud AI key configured");
+    return null;
+  }
+
+  const deadline = Date.now() + 25000; // one bounded budget for the whole chain
 
   for (const provider of providers) {
-    const remaining = deadline - Date.now();
-    if (remaining < 500) break;
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), Math.min(7000, remaining));
-    let text: string | null = null;
-
     try {
       if (provider === "gemini" && geminiKey) {
-        const configured = getSafeKey("GEMINI_MODEL") || getSafeKey("NEXT_PUBLIC_GEMINI_MODEL");
-        const geminiModels = [...new Set([configured, "gemini-3.7-flash", "gemini-2.5-flash"].filter(Boolean))] as string[];
-        for (const model of geminiModels) {
-          if (Date.now() >= deadline) break;
-          const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
-            {
-              method: "POST",
-              signal: ctrl.signal,
-              headers: { "content-type": "application/json", "x-goog-api-key": geminiKey },
-              body: JSON.stringify({
-                systemInstruction: { parts: [{ text: system }] },
-                contents: messages.map((message) => ({
-                  role: message.role === "assistant" ? "model" : "user",
-                  parts: [{ text: message.content }],
-                })),
-                generationConfig: { maxOutputTokens: maxTokens },
-              }),
-            }
-          );
-          if (response.ok) {
-            const json = await response.json();
-            text = json?.candidates?.[0]?.content?.parts
-              ?.map((part: { text?: string }) => part.text || "").join("") ?? null;
-            if (text) break;
-          }
+        for (const model of geminiModels()) {
+          const remaining = deadline - Date.now();
+          if (remaining < 800) break;
+          const text = await callGemini(geminiKey, model, system, messages, maxTokens, Math.min(12000, remaining));
+          if (text) return text;
         }
       } else if (provider === "groq" && groqKey) {
-        const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        const remaining = deadline - Date.now();
+        if (remaining < 800) break;
+        const response = await fetchText("https://api.groq.com/openai/v1/chat/completions", {
           method: "POST",
-          signal: ctrl.signal,
           headers: { "content-type": "application/json", authorization: `Bearer ${groqKey}` },
           body: JSON.stringify({
             model: "llama-3.3-70b-versatile",
             max_tokens: maxTokens,
             messages: [{ role: "system", content: system }, ...messages],
           }),
+        }, Math.min(12000, remaining)).catch((error) => {
+          recordLlmError(`Groq: ${error instanceof Error ? error.message : "network error"}`);
+          return null;
         });
+        if (!response) continue;
         if (response.ok) {
-          const json = await response.json();
-          text = json?.choices?.[0]?.message?.content ?? null;
+          const json = await response.json().catch(() => null);
+          const text = json?.choices?.[0]?.message?.content ?? null;
+          if (text?.trim()) return text.trim();
+        } else {
+          const err = await response.text().catch(() => "");
+          recordLlmError(`Groq: HTTP ${response.status} ${err.slice(0, 160)}`);
         }
       } else if (provider === "openrouter" && openrouterKey) {
-        const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        const remaining = deadline - Date.now();
+        if (remaining < 800) break;
+        const response = await fetchText("https://openrouter.ai/api/v1/chat/completions", {
           method: "POST",
-          signal: ctrl.signal,
           headers: {
             "content-type": "application/json",
             authorization: `Bearer ${openrouterKey}`,
@@ -136,19 +222,23 @@ export async function callLLM(
             max_tokens: maxTokens,
             messages: [{ role: "system", content: system }, ...messages],
           }),
+        }, Math.min(12000, remaining)).catch((error) => {
+          recordLlmError(`OpenRouter: ${error instanceof Error ? error.message : "network error"}`);
+          return null;
         });
+        if (!response) continue;
         if (response.ok) {
-          const json = await response.json();
-          text = json?.choices?.[0]?.message?.content ?? null;
+          const json = await response.json().catch(() => null);
+          const text = json?.choices?.[0]?.message?.content ?? null;
+          if (text?.trim()) return text.trim();
+        } else {
+          const err = await response.text().catch(() => "");
+          recordLlmError(`OpenRouter: HTTP ${response.status} ${err.slice(0, 160)}`);
         }
       }
-    } catch {
-      // Try the next configured provider within the shared deadline.
-    } finally {
-      clearTimeout(timer);
+    } catch (error) {
+      recordLlmError(`${provider}: ${error instanceof Error ? error.message : "unknown error"}`);
     }
-
-    if (text?.trim()) return text.trim();
   }
   return null;
 }
@@ -867,6 +957,22 @@ export function instantTutorReply(q: string, ctx: TutorContext): TutorReply | nu
   return null;
 }
 
+/** Only run the Wikipedia/glossary search for clear factual lookup questions.
+ *  Open-ended, opinion, advice, or "what is the best/perfect…" questions must
+ *  not be answered by an unrelated encyclopedia page. */
+function isFactualLookupQuestion(q: string): boolean {
+  if (/how\b|\bwhy\b|\bshould\b|\bbest\b|\bperfect\b|\bideal\b|\brecommend\b|\badvice\b|\bopinion\b|\bthink\b|\bfeel\b|\bsolution\b|\bany war\b/i.test(q)) return false;
+  return /\b(what is|what's|define|definition of|meaning of|what does .* mean|explain)\b/i.test(q);
+}
+
+function openEndedFallback(q: string): string {
+  const n = q.toLowerCase();
+  if (/\b(perfect|best|ideal|solution)\b|\bany war\b|world peace/i.test(n)) {
+    return "That's an open-ended question, so I don't want to give a rushed one-line answer. Tell me the specific angle you need — for example the conflict/exam topic, the course chapter, or whether you want a definition, comparison, or study strategy — and I'll answer it directly.";
+  }
+  return "I need one more detail to give you the right answer. Tell me the specific topic or subject you mean, and I'll explain it properly rather than guess.";
+}
+
 export async function localTutor(
   q: string,
   ctx: TutorContext,
@@ -895,10 +1001,6 @@ export async function localTutor(
   const instant = instantTutorReply(q, ctx);
   if (instant) return instant;
 
-  if (isSelfEngineQuestion(q)) {
-    return { text: selfEngineReply(ctx) };
-  }
-
   const pct = percentQ(q);
   if (pct) return { text: pct };
 
@@ -911,15 +1013,23 @@ export async function localTutor(
     if (aiResponse) return { text: aiResponse };
   }
 
-  const subjectHint = ctx.subjects.find((s) => n.includes(s.name.toLowerCase().split(" ")[0]))?.name;
-  const knowledge = await lookupKnowledge(q);
-  if (knowledge) return { text: teachFromKnowledge(knowledge, q, ctx.level, subjectHint) };
+  // Meta questions about Shigun's engine get an honest status answer instead
+  // of a glossary hit; concept questions ("what is AI") still use the lookup.
+  if (isSelfEngineQuestion(q)) {
+    return { text: selfEngineReply(ctx) };
+  }
+
+  if (isFactualLookupQuestion(q)) {
+    const subjectHint = ctx.subjects.find((s) => n.includes(s.name.toLowerCase().split(" ")[0]))?.name;
+    const knowledge = await lookupKnowledge(q);
+    if (knowledge) return { text: teachFromKnowledge(knowledge, q, ctx.level, subjectHint) };
+  }
 
   if (/^(hi|hello|hey|good (morning|afternoon|evening))/i.test(q.trim())) {
     return { text: "Hello! I can help with study planning, explanations, writing, calculations, ideas, and everyday questions. What would you like to explore?" };
   }
   if (/(thanks|thank you)/i.test(q)) return { text: "You’re welcome. What would you like to do next?" };
-  return { text: "I don’t have enough reliable context to answer that well yet. Share a little more detail and I’ll help directly — it does not need to be a study question." };
+  return { text: openEndedFallback(q) };
 }
 
 /** Meta questions about SHIGUN's own engine must be answered directly, not
@@ -937,11 +1047,18 @@ function isSelfEngineQuestion(q: string): boolean {
 }
 
 function selfEngineReply(ctx: TutorContext): string {
-  return [
+  const provider = activeProvider();
+  const error = llmError();
+  const parts = [
     `I'm Shigun, the built-in study coach in **${ctx.courseName}**.`,
-    "I run on Study Planner Pro's hybrid engine: the local planner and knowledge base are always available, and when the cloud AI key is set, questions get the richer AI model answer on top.",
-    "Right now this server has no cloud AI key configured, so I'm answering from the built-in hybrid/local engine.",
-  ].join("\n\n");
+    "I run on Study Planner Pro's hybrid engine: the local planner and knowledge base are always available, and the cloud AI model is used on top when this server has a provider key.",
+  ];
+  if (provider) {
+    parts.push(`The cloud AI layer is configured (${provider}).${error ? ` This request couldn't reach it — ${error}.` : ""}`);
+  } else {
+    parts.push("No cloud AI key is configured on this server, so I'm answering from the built-in hybrid/local engine.");
+  }
+  return parts.join("\n\n");
 }
 
 /** Maps a selected voice profile id to its spoken grammatical gender. */

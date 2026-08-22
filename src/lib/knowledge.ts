@@ -331,30 +331,41 @@ export async function lookupKnowledge(question: string): Promise<Knowledge | nul
   const hits = search?.query?.search || [];
   if (!hits.length) return null;
 
-  const best = hits[0];
-  const ex = await jget<WikiExtract>(
-    `https://en.wikipedia.org/w/api.php?action=query&prop=extracts&explaintext=1&exintro=0&exchars=2400&pageids=${best.pageid}&format=json&origin=*`
-  );
-  let extract = "";
-  const pages = ex?.query?.pages;
-  if (pages) {
-    const first = Object.values(pages)[0];
-    extract = (first?.extract || "").trim();
-  }
-  if (!extract) {
-    const sum = await jget<WikiSummary>(
-      `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(best.title.replace(/ /g, "_"))}`
+  const queryTerms = term.split(" ").filter((t) => t.length >= 4);
+  for (const best of hits.slice(0, 3)) {
+    const ex = await jget<WikiExtract>(
+      `https://en.wikipedia.org/w/api.php?action=query&prop=extracts&explaintext=1&exintro=0&exchars=2400&pageids=${best.pageid}&format=json&origin=*`
     );
-    extract = (sum?.extract || "").trim();
-  }
-  if (!extract || extract.length < 60) return null;
+    let extract = "";
+    const pages = ex?.query?.pages;
+    if (pages) {
+      const first = Object.values(pages)[0];
+      extract = (first?.extract || "").trim();
+    }
+    if (!extract) {
+      const sum = await jget<WikiSummary>(
+        `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(best.title.replace(/ /g, "_"))}`
+      );
+      extract = (sum?.extract || "").trim();
+    }
+    if (!extract || extract.length < 60) continue;
 
-  return {
-    title: best.title,
-    extract,
-    url: `https://en.wikipedia.org/wiki/${encodeURIComponent(best.title.replace(/ /g, "_"))}`,
-    related: hits.slice(1, 4).map((h) => h.title),
-  };
+    // Relevance gate: never present an unrelated encyclopedia page (e.g.
+    // "The Alabama Solution" for a question about a perfect war solution).
+    const haystack = `${best.title} ${extract}`.toLowerCase();
+    const matches = queryTerms.filter((t) => haystack.includes(t)).length;
+    const titleMatch = queryTerms.some((t) => best.title.toLowerCase().includes(t));
+    const relevant = titleMatch || matches >= Math.max(1, Math.min(2, queryTerms.length));
+    if (!relevant) continue;
+
+    return {
+      title: best.title,
+      extract,
+      url: `https://en.wikipedia.org/wiki/${encodeURIComponent(best.title.replace(/ /g, "_"))}`,
+      related: hits.slice(1, 4).map((h) => h.title),
+    };
+  }
+  return null;
 }
 
 function sentences(text: string): string[] {

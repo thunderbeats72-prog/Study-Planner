@@ -6,7 +6,7 @@ import { buildContext, fullState, getOrCreateUser, getSettings, keyFrom } from "
 import {
   callLLM, localTutor, parseCommand, tutorSystemPrompt, activeProvider,
   extractLlmAction, languageCapabilityReply, instantTutorReply, commandReply,
-  voiceGenderFor,
+  voiceGenderFor, llmError,
 } from "@/lib/ai";
 import { regeneratePlan } from "@/lib/generate";
 import { mergeTranscriptSegments } from "@/lib/transcript";
@@ -168,6 +168,9 @@ export async function POST(req: Request) {
     action: action || null,
     state: { ...fresh, messages: freshMsgs, context: buildContext(fresh) },
     replanned,
+    provider: activeProvider(),
+    source: activeProvider() ? "cloud" : "local",
+    aiError: llmError(),
   });
 }
 
