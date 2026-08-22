@@ -8,7 +8,8 @@ import {
 } from "../src/lib/ai";
 import { cleanForSpeech, splitSpeechChunks, preferredSttLang, STT_LANG_OPTIONS } from "../src/lib/voice";
 import { detectLanguage } from "../src/lib/language";
-import { wikiLangFor, searchTerms } from "../src/lib/knowledge";
+import { wikiLangFor, searchTerms, teachFromKnowledge } from "../src/lib/knowledge";
+import { appendChatTurn, isFallbackUser } from "../src/lib/chatTurn";
 import { mergeTranscriptSegments } from "../src/lib/transcript";
 import { mdToHtml } from "../src/lib/client";
 import { buildPlan, countStudyDays, projectCompletionDate } from "../src/lib/planner";
@@ -125,6 +126,40 @@ async function runTests() {
   check(searchTerms("फोटोसिंथेसिस क्या है समझाओ") === "फोटोसिंथेसिस", "Hindi question words stripped from search");
   check(searchTerms("সালোকসংশ্লেষণ কী ব্যাখ্যা করো") === "সালোকসংশ্লেষণ", "Bengali question words stripped from search");
   check(searchTerms("What is photosynthesis in simple words?") === "photosynthesis", "English question words stripped from search");
+  const englishLesson = teachFromKnowledge({
+    title: "Photosynthesis",
+    extract: "Photosynthesis is the process by which green plants convert light energy into chemical energy. It takes place mainly in chloroplasts. Carbon dioxide and water are converted into glucose and oxygen. The light-dependent reactions produce ATP and NADPH. The Calvin cycle then fixes carbon into sugar.",
+    url: "https://en.wikipedia.org/wiki/Photosynthesis",
+    related: ["Chloroplast", "Calvin cycle"],
+    lang: "en",
+  }, "What is photosynthesis?", "ug");
+  check(englishLesson.includes("### Photosynthesis") && englishLesson.includes("**Definition.**"),
+    "English local lesson no longer crashes on missing HEADERS.en");
+  const marathiLesson = teachFromKnowledge({
+    title: "प्रकाशसंश्लेषण",
+    extract: "प्रकाशसंश्लेषण ही प्रक्रिया आहे ज्यामध्ये वनस्पती सूर्यप्रकाशाचे रूपांतर रासायनिक ऊर्जेत करतात. ही क्रिया हरितद्रव्यात होते. कार्बन डायऑक्साइड आणि पाणी यांपासून ग्लुकोज तयार होतो.",
+    url: "https://mr.wikipedia.org/wiki/x",
+    related: [],
+    lang: "mr",
+  }, "प्रकाशसंश्लेषण म्हणजे काय?", "school");
+  check(marathiLesson.includes("###") && marathiLesson.includes("परिभाषा"),
+    "Marathi wiki extract uses Hindi structure headers instead of crashing");
+
+  console.log("\n--- 2f. Chat turn is never dropped from UI state ---");
+  const emptyTurn = appendChatTurn([], "What should I study today?", "Study photosynthesis first.");
+  check(emptyTurn.length === 2 && emptyTurn[0].role === "user" && emptyTurn[1].role === "assistant",
+    "Empty history receives both sides of the turn");
+  const alreadySaved = appendChatTurn(emptyTurn, "What should I study today?", "Study photosynthesis first.");
+  check(alreadySaved.length === 2, "Persisted turn is not duplicated");
+  const userOnly = appendChatTurn(
+    [{ id: 9, userId: 1, role: "user", content: "hello", createdAt: "2026-08-22T00:00:00.000Z" }],
+    "hello",
+    "Hi — I am Shigun.",
+  );
+  check(userOnly.length === 2 && userOnly[1].content.includes("Shigun"),
+    "Assistant reply is attached when only the user line was saved");
+  check(isFallbackUser({ id: 0 }) && isFallbackUser(null) && !isFallbackUser({ id: 4 }),
+    "Fallback user detection");
 
   console.log("\n--- 2c. Local curriculum replies must stay on-topic ---");
   {
@@ -132,7 +167,7 @@ async function runTests() {
     // no query runs in this test.
     const oldDbUrl = process.env.DATABASE_URL;
     process.env.DATABASE_URL = "postgres://test:test@localhost:5432/test";
-    const { localCurriculumReply } = await import("../src/app/api/chat/route");
+    const { localCurriculumReply, POST } = await import("../src/app/api/chat/route");
     if (oldDbUrl === undefined) delete process.env.DATABASE_URL; else process.env.DATABASE_URL = oldDbUrl;
     const state = {
       subjects: [
@@ -174,6 +209,16 @@ async function runTests() {
     const onTopic = localCurriculumReply("explain the photosynthesis process in detail", state);
     check(typeof onTopic === "string" && onTopic.includes("Photosynthesis Process"),
       "On-topic lesson question answered from the curriculum");
+    const chatRes = await POST(new Request("http://localhost/api/chat", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-user-key": "u_CHATTESTCHATTESTCHAT" },
+      body: JSON.stringify({ message: "What should I study today?" }),
+    }));
+    const chatJson = await chatRes.json() as { reply?: string; state?: { messages?: { role: string }[] } };
+    check(chatRes.ok && typeof chatJson.reply === "string" && chatJson.reply.length > 0,
+      "Chat POST always returns a visible reply");
+    check(Array.isArray(chatJson.state?.messages) && chatJson.state.messages.some((m) => m.role === "assistant"),
+      "Chat POST state includes the assistant message even without a database");
   }
 
   console.log("\n--- 3. Safe LLM Action Handling ---");

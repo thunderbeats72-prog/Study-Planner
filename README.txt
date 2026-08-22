@@ -88,6 +88,24 @@ instead of stopping on a “voice model unavailable” error; the chat shows a
 clear non-error notice. One failed long-answer part switches the remaining
 parts to that local voice, so every later part keeps flowing.
 
+v7 FIXES (this build)
+---------------------
+ - SHIGUN ALWAYS SHOWS A REPLY. The chat UI used to replace the conversation
+   with whatever /api/chat returned in `state.messages`. If the database was
+   down, unconfigured, or the second state reload fell back to an empty
+   guest account, the reply was generated but never painted — it looked like
+   Shigun was ignoring you. The API now always attaches the user+assistant
+   turn to the returned state, and the client treats `reply` as source of
+   truth. A real onboarded plan is never overwritten by the empty fallback.
+ - ENGLISH LOCAL LESSONS NO LONGER CRASH. teachFromKnowledge looked up
+   HEADERS.en, which did not exist, so every English (and Marathi/Nepali)
+   Wikipedia-backed answer threw. That 500'd the chat route on keyless
+   deployments. English headers are in place; other missing languages fall
+   back instead of throwing.
+ - Fallback learner state now matches the AppState the UI actually renders
+   (pomodoro, studyDays, course, …), so a degraded chat response cannot
+   crash Settings or wipe the tracker.
+
 v6 FIXES (this build)
 ---------------------
  - QUESTIONS ARE NEVER MISTAKEN FOR COMMANDS. "how do I replan?", "should I

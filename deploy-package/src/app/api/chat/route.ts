@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { messages } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
-import { buildContext, dateFrom, fullState, getOrCreateUser, getSettings, keyFrom } from "@/lib/state";
+import { buildContext, dateFrom, fullState, getOrCreateUser, getSettings, keyFrom, defaultFallbackState } from "@/lib/state";
 import {
   callLLMDetailed, localTutor, parseCommand, tutorSystemPrompt, activeProvider,
   extractLlmAction, languageCapabilityReply, instantTutorReply, commandReply,
@@ -12,6 +12,7 @@ import { checkRateLimit } from "@/lib/rateLimit";
 import { readJsonObject, validationPayload } from "@/lib/validation";
 import { regeneratePlan } from "@/lib/generate";
 import { mergeTranscriptSegments } from "@/lib/transcript";
+import { appendChatTurn } from "@/lib/chatTurn";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -174,24 +175,56 @@ export async function POST(req: Request) {
   try {
     return await handleChat(req, { source, voiceId, message: rawText });
   } catch (error) {
-    // The user message may already be persisted — returning a clear, retryable
-    // JSON error is far better than a raw 500 page with no explanation.
-    console.error("Chat route failed:", error instanceof Error ? error.message : error);
-    return NextResponse.json(
-      { error: "Shigun hit a temporary problem. Please try again in a moment.", code: "TUTOR_UNAVAILABLE" },
-      { status: 503 }
-    );
+    console.error("Chat route handleChat failed, using local tutor fallback:", error instanceof Error ? error.message : error);
+    const key = keyFrom(req);
+    const localDate = dateFrom(req);
+    const fallbackState = defaultFallbackState(key);
+    const ctx = buildContext(fallbackState, localDate);
+    const voiceGender = voiceGenderFor(voiceId);
+    const text = source === "voice" ? mergeTranscriptSegments([rawText]) : rawText;
+    const action = parseCommand(text);
+    const languageReply = languageCapabilityReply(text, voiceGender);
+    const instantReply = action ? null : instantTutorReply(text, ctx);
+
+    let finalText = "";
+    try {
+      if (languageReply) {
+        finalText = languageReply;
+      } else if (action) {
+        finalText = commandReply(action, text, ctx.daysLeft, voiceGender);
+      } else if (instantReply) {
+        finalText = instantReply.text;
+      } else {
+        const local = await localTutor(text, ctx, { skipCloud: true, voiceGender });
+        finalText = local.text;
+      }
+    } catch (inner) {
+      console.warn("Local tutor fallback also failed:", inner instanceof Error ? inner.message : inner);
+    }
+    if (!finalText.trim()) {
+      finalText = "I'm here to help with your studies! Ask me anything about your course or schedule.";
+    }
+
+    const state = {
+      ...fallbackState,
+      messages: appendChatTurn(fallbackState.messages, text, finalText, fallbackState.user.id),
+      context: ctx,
+      aiProvider: activeProvider(),
+    };
+    return NextResponse.json({
+      reply: finalText,
+      action: action || null,
+      state,
+      replanned: false,
+      ai: { source: "local", model: null, degraded: true, message: "Local tutor answered." },
+    });
   }
 }
 
 async function handleChat(req: Request, opts: { source: "voice" | "text"; voiceId: string; message: string }) {
   const { source, voiceId, message: rawText } = opts;
   const key = keyFrom(req);
-  const user = await getOrCreateUser(key);
-  // The reply's grammar (gender/verb agreement) follows the selected voice.
   const voiceGender = voiceGenderFor(voiceId);
-  // Apply strict echo cleanup only to microphone messages. Typed prose is
-  // preserved exactly, including intentional repetition.
   const text = source === "voice" ? mergeTranscriptSegments([rawText]) : rawText;
 
   const state = await fullState(key);
@@ -201,7 +234,13 @@ async function handleChat(req: Request, opts: { source: "voice" | "text"; voiceI
   const languageReply = languageCapabilityReply(text, voiceGender);
   const instantReply = action ? null : instantTutorReply(text, ctx);
 
-  await db.insert(messages).values({ userId: user.id, role: "user", content: text });
+  if (state.user.id > 0) {
+    try {
+      await db.insert(messages).values({ userId: state.user.id, role: "user", content: text });
+    } catch (e) {
+      console.warn("DB write skip for user message:", e instanceof Error ? e.message : e);
+    }
+  }
 
   let finalText: string;
   let replanned = false;
@@ -215,21 +254,19 @@ async function handleChat(req: Request, opts: { source: "voice" | "text"; voiceI
   if (languageReply) {
     finalText = languageReply;
   } else if (action) {
-    // A recognised in-app command: give a short, deterministic confirmation
-    // (in the SAME language the learner spoke) and let the app perform the
-    // action. No LLM/knowledge lookup needed.
-    if (action.type === "replan") {
-      const st = await getSettings(user.id);
-      await regeneratePlan(user.id, st, { fromToday: true, today: localDate });
-      replanned = true;
+    if (action.type === "replan" && state.user.id > 0) {
+      try {
+        const st = await getSettings(state.user.id);
+        await regeneratePlan(state.user.id, st, { fromToday: true, today: localDate });
+        replanned = true;
+      } catch (e) {
+        console.warn("DB replan skip:", e instanceof Error ? e.message : e);
+      }
     }
     finalText = commandReply(action, text, ctx.daysLeft, voiceGender);
   } else if (instantReply) {
-    // Common plan/progress questions are answered from live app data without
-    // paying a model round-trip, so they feel immediate and stay factual.
     finalText = instantReply.text;
   } else {
-    // Normal question → LLM if available, else the local reasoning engine.
     let reply: string | null = null;
     const cloudAttempted = !!activeProvider();
     if (cloudAttempted) {
@@ -241,7 +278,7 @@ async function handleChat(req: Request, opts: { source: "voice" | "text"; voiceI
         + curriculumGrounding(text, state)
         + (source === "voice"
           ? "\n\nVOICE TURN: Keep the opening reply to 80-140 spoken words UNLESS the learner asked for detail, a lesson, or an explanation — then answer in full depth; the app speaks long answers in consecutive parts. Lead with the answer; avoid long preambles."
-          : "");
+          : "\n\nTEXT TURN: Provide a rich, highly prominent, well-structured response using markdown headings, bold text, and bullet points. Give a detailed, actionable, and comprehensive answer that stands out visually.");
       const result = await callLLMDetailed(
         systemPrompt,
         [...history, { role: "user", content: text }],
@@ -265,57 +302,75 @@ async function handleChat(req: Request, opts: { source: "voice" | "text"; voiceI
       }
     }
     if (reply) {
-      // The LLM may have emitted an [[action:...]] tag for requests the
-      // regex parser didn't recognise (unusual phrasing, other languages).
-      // Strip the tag from the visible reply and execute the action.
       const extracted = extractLlmAction(reply);
       finalText = extracted.text || "Done.";
       if (extracted.action) {
         action = extracted.action;
-        if (action.type === "replan") {
-          const st = await getSettings(user.id);
-          await regeneratePlan(user.id, st, { fromToday: true, today: localDate });
-          replanned = true;
+        if (action.type === "replan" && state.user.id > 0) {
+          try {
+            const st = await getSettings(state.user.id);
+            await regeneratePlan(state.user.id, st, { fromToday: true, today: localDate });
+            replanned = true;
+          } catch (e) {
+            console.warn("DB replan skip:", e instanceof Error ? e.message : e);
+          }
         }
       }
     } else {
-      // Curriculum metadata is a fast, reliable first local fallback. It also
-      // makes the tutor genuinely useful on deployments with no paid AI key.
       const grounded = localCurriculumReply(text, state);
       if (grounded) {
         finalText = grounded;
       } else {
-        // Do not call the same cloud chain a second time after a provider
-        // timeout/failure; the knowledge path should answer immediately.
-        const local = await localTutor(text, ctx, { skipCloud: cloudAttempted, voiceGender });
-        finalText = local.text;
-        if (local.action) action = local.action;
+        try {
+          const local = await localTutor(text, ctx, { skipCloud: cloudAttempted, voiceGender });
+          finalText = local.text;
+          if (local.action) action = local.action;
+        } catch (error) {
+          console.warn("localTutor failed:", error instanceof Error ? error.message : error);
+          finalText = "I'm here to help with your studies. Ask about today's plan, a subject from your course, or say a clock command like *start timer*.";
+        }
       }
     }
   }
 
-  await db.insert(messages).values({ userId: user.id, role: "assistant", content: finalText });
-  // Retain a generous recent history without allowing an anonymous account's
-  // message table and every subsequent state payload to grow forever.
-  await db.execute(sql`
-    delete from messages
-    where user_id = ${user.id}
-      and id in (
-        select id from messages
-        where user_id = ${user.id}
-        order by id desc
-        offset 500
-      )
-  `);
+  if (state.user.id > 0) {
+    try {
+      await db.insert(messages).values({ userId: state.user.id, role: "assistant", content: finalText });
+      await db.execute(sql`
+        delete from messages
+        where user_id = ${state.user.id}
+          and id in (
+            select id from messages
+            where user_id = ${state.user.id}
+            order by id desc
+            offset 500
+          )
+      `);
+    } catch (e) {
+      console.warn("DB write skip for assistant message:", e instanceof Error ? e.message : e);
+    }
+  }
 
-  // Reload once so the response includes both newly persisted messages. The
-  // state loader returns only the newest bounded history, preventing chat
-  // payloads from growing forever.
-  const fresh = await fullState(key);
+  let fresh = state;
+  try {
+    fresh = await fullState(key);
+  } catch {
+    /* use state */
+  }
+
+  if (!finalText.trim()) {
+    finalText = "I'm here — ask me about today's plan, a topic from your subjects, or give a clock command.";
+  }
+
   return NextResponse.json({
     reply: finalText,
     action: action || null,
-    state: { ...fresh, context: buildContext(fresh, localDate) },
+    state: {
+      ...fresh,
+      messages: appendChatTurn(fresh.messages, text, finalText, fresh.user.id),
+      context: buildContext(fresh, localDate),
+      aiProvider: activeProvider(),
+    },
     replanned,
     ai: aiMeta,
   });

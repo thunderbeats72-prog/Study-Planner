@@ -12,6 +12,7 @@ import { checkRateLimit } from "@/lib/rateLimit";
 import { readJsonObject, validationPayload } from "@/lib/validation";
 import { regeneratePlan } from "@/lib/generate";
 import { mergeTranscriptSegments } from "@/lib/transcript";
+import { appendChatTurn } from "@/lib/chatTurn";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -186,21 +187,34 @@ export async function POST(req: Request) {
     const instantReply = action ? null : instantTutorReply(text, ctx);
 
     let finalText = "";
-    if (languageReply) {
-      finalText = languageReply;
-    } else if (action) {
-      finalText = commandReply(action, text, ctx.daysLeft, voiceGender);
-    } else if (instantReply) {
-      finalText = instantReply.text;
-    } else {
-      const local = await localTutor(text, ctx, { skipCloud: true, voiceGender });
-      finalText = local.text;
+    try {
+      if (languageReply) {
+        finalText = languageReply;
+      } else if (action) {
+        finalText = commandReply(action, text, ctx.daysLeft, voiceGender);
+      } else if (instantReply) {
+        finalText = instantReply.text;
+      } else {
+        const local = await localTutor(text, ctx, { skipCloud: true, voiceGender });
+        finalText = local.text;
+      }
+    } catch (inner) {
+      console.warn("Local tutor fallback also failed:", inner instanceof Error ? inner.message : inner);
+    }
+    if (!finalText.trim()) {
+      finalText = "I'm here to help with your studies! Ask me anything about your course or schedule.";
     }
 
+    const state = {
+      ...fallbackState,
+      messages: appendChatTurn(fallbackState.messages, text, finalText, fallbackState.user.id),
+      context: ctx,
+      aiProvider: activeProvider(),
+    };
     return NextResponse.json({
-      reply: finalText || "I'm here to help with your studies! Ask me anything about your course or schedule.",
+      reply: finalText,
       action: action || null,
-      state: { ...fallbackState, context: ctx },
+      state,
       replanned: false,
       ai: { source: "local", model: null, degraded: true, message: "Local tutor answered." },
     });
@@ -307,9 +321,14 @@ async function handleChat(req: Request, opts: { source: "voice" | "text"; voiceI
       if (grounded) {
         finalText = grounded;
       } else {
-        const local = await localTutor(text, ctx, { skipCloud: cloudAttempted, voiceGender });
-        finalText = local.text;
-        if (local.action) action = local.action;
+        try {
+          const local = await localTutor(text, ctx, { skipCloud: cloudAttempted, voiceGender });
+          finalText = local.text;
+          if (local.action) action = local.action;
+        } catch (error) {
+          console.warn("localTutor failed:", error instanceof Error ? error.message : error);
+          finalText = "I'm here to help with your studies. Ask about today's plan, a subject from your course, or say a clock command like *start timer*.";
+        }
       }
     }
   }
@@ -339,10 +358,19 @@ async function handleChat(req: Request, opts: { source: "voice" | "text"; voiceI
     /* use state */
   }
 
+  if (!finalText.trim()) {
+    finalText = "I'm here — ask me about today's plan, a topic from your subjects, or give a clock command.";
+  }
+
   return NextResponse.json({
     reply: finalText,
     action: action || null,
-    state: { ...fresh, context: buildContext(fresh, localDate) },
+    state: {
+      ...fresh,
+      messages: appendChatTurn(fresh.messages, text, finalText, fresh.user.id),
+      context: buildContext(fresh, localDate),
+      aiProvider: activeProvider(),
+    },
     replanned,
     ai: aiMeta,
   });

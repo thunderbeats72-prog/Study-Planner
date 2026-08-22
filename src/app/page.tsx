@@ -23,6 +23,7 @@ import {
 import {
   parseCommand, languageCapabilityReply, instantTutorReply, commandReply,
 } from "@/lib/ai";
+import { appendChatTurn, isFallbackUser } from "@/lib/chatTurn";
 
 type Page = "dashboard" | "planner" | "focus" | "subjects" | "settings";
 
@@ -444,7 +445,24 @@ export default function Home() {
             timeoutMs: 35_000,
           }
         );
-        setState(r.state);
+        const reply = (r.reply || "").trim()
+          || "I'm here — try asking again about your plan or a topic from your subjects.";
+        setState((prev) => {
+          const incoming = r.state;
+          // Never replace a real onboarded plan with the empty DB-less
+          // fallback. That used to wipe the chat (and the syllabus) after
+          // a perfectly good tutor reply.
+          const keepPrev = !!prev && isFallbackUser(incoming?.user) && !isFallbackUser(prev.user);
+          const base = (keepPrev ? prev : incoming) || prev;
+          if (!base) return prev;
+          const history = (base.messages || []).filter((row) => row.id > 0);
+          return {
+            ...base,
+            messages: appendChatTurn(history, message, reply, base.user?.id || 0),
+            context: keepPrev && prev ? prev.context : (incoming.context || base.context),
+            aiProvider: incoming.aiProvider ?? base.aiProvider,
+          };
+        });
         setPendingMsgs([]);
         if (r.ai?.degraded && r.ai.message) notify(r.ai.message, "info");
         const a = r.action;
