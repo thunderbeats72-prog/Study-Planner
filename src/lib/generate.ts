@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { subjects, topics, tasks } from "@/db/schema";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { aiGenerateTopics } from "./ai";
 import { buildPlan, todayStr, diffDays, type PlanSettings, type PlanTopic } from "./planner";
 import {
@@ -46,7 +46,7 @@ export async function regeneratePlan(userId: number, settingsRow: {
   startDate: string; examDate: string; dailyHours: number; subjectsPerDay: number;
   studyDays: string; bufferDays: number; planMode: string; studyStyle: string;
   weakSubject: string; revisionWeeks: number;
-}, opts: { fromToday?: boolean } = {}) {
+}, opts: { fromToday?: boolean; today?: string } = {}) {
   const subs = await db.select().from(subjects).where(eq(subjects.userId, userId));
   const tps = await db.select().from(topics).where(eq(topics.userId, userId));
 
@@ -56,14 +56,7 @@ export async function regeneratePlan(userId: number, settingsRow: {
     .from(tasks)
     .where(and(eq(tasks.userId, userId), eq(tasks.status, "done")));
   const doneTopicIds = new Set(doneTaskRows.filter((t) => t.kind === "learn" && t.topicId).map((t) => t.topicId));
-  if (doneTopicIds.size) {
-    await db
-      .update(topics)
-      .set({ status: "done", mastery: 60 })
-      .where(and(eq(topics.userId, userId), inArray(topics.id, [...doneTopicIds] as number[])));
-  }
-
-  const today = todayStr();
+  const today = opts.today || todayStr();
   const start =
     opts.fromToday || diffDays(settingsRow.startDate, today) > 0 ? today : settingsRow.startDate;
 
@@ -102,7 +95,7 @@ export async function regeneratePlan(userId: number, settingsRow: {
   };
 
   const pending: PlanTopic[] = tps
-    .filter((t) => !doneTopicIds.has(t.id) && t.status !== "done")
+    .filter((t) => settingsRow.planMode === "revision" || (!doneTopicIds.has(t.id) && t.status !== "done"))
     .sort((a, b) => a.position - b.position)
     .map((t) => ({
       id: t.id,
@@ -132,17 +125,33 @@ export async function regeneratePlan(userId: number, settingsRow: {
     { dayFactor: (date) => weekdayLoadFactor(weekdays, date) }
   );
 
-  // wipe only future/pending tasks, keep history
-  const existing = await db.select().from(tasks).where(eq(tasks.userId, userId));
-  const dropIds = existing.filter((t) => t.status === "pending").map((t) => t.id);
-  if (dropIds.length) await db.delete(tasks).where(inArray(tasks.id, dropIds));
+  // Replace unfinished cards atomically. If one insert fails, PostgreSQL
+  // rolls the deletion back, so a re-plan can never leave a blank calendar.
+  // The advisory lock serialises two server/API requests for this learner.
+  await db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(7321, ${userId})`);
 
-  if (result.tasks.length) {
-    const chunk = 400;
-    const rows = result.tasks.map((t) => ({ ...t, userId }));
-    for (let i = 0; i < rows.length; i += chunk) {
-      await db.insert(tasks).values(rows.slice(i, i + chunk));
+    if (doneTopicIds.size) {
+      // Re-planning must not reduce a learner's 80/100 mastery back to 60.
+      await tx
+        .update(topics)
+        .set({ status: "done" })
+        .where(and(eq(topics.userId, userId), inArray(topics.id, [...doneTopicIds] as number[])));
     }
-  }
+
+    const existing = await tx.select().from(tasks).where(eq(tasks.userId, userId));
+    const dropIds = existing.filter((task) => task.status !== "done").map((task) => task.id);
+    if (dropIds.length) {
+      await tx.delete(tasks).where(and(eq(tasks.userId, userId), inArray(tasks.id, dropIds)));
+    }
+
+    if (result.tasks.length) {
+      const chunk = 400;
+      const rows = result.tasks.map((task) => ({ ...task, userId }));
+      for (let index = 0; index < rows.length; index += chunk) {
+        await tx.insert(tasks).values(rows.slice(index, index + chunk));
+      }
+    }
+  });
   return result.stats;
 }

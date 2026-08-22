@@ -3,14 +3,14 @@
 
 const UA = "StudyPlannerPro/1.0 (educational study planner)";
 
-async function jget<T>(url: string, ms = 9000): Promise<T | null> {
+async function jget<T>(url: string, ms = 3500): Promise<T | null> {
   try {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), ms);
-    const r = await fetch(url, { signal: ctrl.signal, headers: { "user-agent": UA, accept: "application/json" } });
-    clearTimeout(timer);
-    if (!r.ok) return null;
-    return (await r.json()) as T;
+    const response = await fetch(url, {
+      signal: AbortSignal.timeout(ms),
+      headers: { "user-agent": UA, accept: "application/json" },
+    });
+    if (!response.ok) return null;
+    return (await response.json()) as T;
   } catch {
     return null;
   }
@@ -189,7 +189,7 @@ export function teachFromKnowledge(
     out.push(`**Study next:** ${k.related.join(" · ")} — ask me *"explain ${k.related[0]}"*.`);
   }
   out.push("");
-  out.push(`<sub>Reference: ${k.url}</sub>`);
+  out.push(`_Reference: [${k.title}](${k.url})_`);
   return out.join("\n");
 }
 

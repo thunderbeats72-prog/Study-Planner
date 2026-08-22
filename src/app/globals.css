@@ -34,7 +34,7 @@
   --input-bg:#FFFFFF;
   --surface-elevated:#FFFFFF;
   --anim-dur:0.2s; --dur-fast:.14s; --dur-normal:.22s; --dur-complex:.3s; --sidebar-w:260px;
-  --font-display:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  --font-display:var(--font-inter),-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
 }
 
 body.theme-dark{--color-ai:#9C9CF6;--color-ai-soft:rgba(156,156,246,.12);--ai-rgb:156,156,246;--color-ai-bright:#B6B6F9;--app-bg:#050506;--bg-gradient:radial-gradient(1100px 480px at 50% -12%,rgba(255,255,255,.04),transparent 65%);--surface:#0E0E10;--surface-solid:#0E0E10;--surface-elevated:#161618;--surface-hover:#1A1A1D;--glass-border:#232326;--glass-border-hover:#333338;--glass-shadow:0 1px 3px rgba(0,0,0,.6);--glass-shadow-hover:0 8px 28px rgba(0,0,0,.65);--text-main:#F5F5F7;--text-muted:#A3A3AB;--text-dim:#5C5C66;--accent:#8A8AF4;--accent-hover:#9C9CF6;--accent-light:#AEAEF8;--accent-glow:rgba(138,138,244,.2);--accent-gradient:linear-gradient(135deg,#9494F5,#6E6EF0);--nav-active-bg:rgba(138,138,244,.13);--nav-active-text:#B4B4F9;--nav-active-border:rgba(138,138,244,.3);--row-bg:rgba(255,255,255,.035);--row-hover:rgba(255,255,255,.07);--status-pending-bg:rgba(245,176,65,.15);--status-pending-text:#EFBE6E;--status-done-bg:rgba(52,211,153,.14);--status-done-text:#5EE0A8;--status-skipped-bg:rgba(248,113,113,.14);--status-skipped-text:#F49E9E;--chart-bar:rgba(138,138,244,.75);--input-bg:#161618}
@@ -49,12 +49,12 @@ html,body{padding:0;margin:0}
    nowrap labels and fixed-width controls (breaks layout at large font sizes). */
 html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 body{
-  font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  font-family:var(--font-inter),-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
   background:var(--app-bg);background-image:var(--bg-gradient);background-attachment:fixed;
   color:var(--text-main);min-height:100vh;overflow-x:hidden;
   transition:background-color .4s ease,color .4s ease;
 }
-.mono{font-family:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+.mono{font-family:var(--font-jetbrains-mono),ui-monospace,SFMono-Regular,Menlo,monospace}
 ::-webkit-scrollbar{width:8px;height:8px}
 ::-webkit-scrollbar-thumb{background:var(--glass-border-hover);border-radius:99px}
 ::-webkit-scrollbar-track{background:transparent}
@@ -254,7 +254,7 @@ body.theme-dark .ai-panel,body.theme-obsidian .ai-panel,body.theme-nebula .ai-pa
 .ai-msg.bot{align-self:flex-start;background:var(--surface);border:1px solid var(--glass-border);border-left:2.5px solid var(--color-ai);border-bottom-left-radius:5px;color:var(--text-main)}
 body.theme-dark .ai-msg.bot,body.theme-obsidian .ai-msg.bot,body.theme-nebula .ai-msg.bot{background:var(--surface-hover)}
 .ai-msg strong{font-weight:700;color:inherit}
-.ai-msg code{background:rgba(var(--ai-rgb),.12);color:var(--color-ai);padding:1px 6px;border-radius:var(--radius-sm);font-family:"JetBrains Mono",monospace;font-size:.78rem}
+.ai-msg code{background:rgba(var(--ai-rgb),.12);color:var(--color-ai);padding:1px 6px;border-radius:var(--radius-sm);font-family:var(--font-jetbrains-mono),ui-monospace,monospace;font-size:.78rem}
 .ai-msg.user code{background:rgba(255,255,255,.2);color:#fff}
 /* Lists inside replies: proper hanging indent so wrapped lines align
    under the text (not under the number/bullet). */
@@ -1371,7 +1371,7 @@ html{scrollbar-gutter:stable}
 .field-error{font-size:.72rem;color:var(--danger-accent);margin-top:5px;font-weight:600}
 
 /* ── Keyboard hints: consistent kbd styling ── */
-.cmdk-kbd,kbd{font-family:"JetBrains Mono",monospace;box-shadow:inset 0 -1.5px 0 var(--glass-border-hover)}
+.cmdk-kbd,kbd{font-family:var(--font-jetbrains-mono),ui-monospace,monospace;box-shadow:inset 0 -1.5px 0 var(--glass-border-hover)}
 
 /* ── Selection states: table/list rows ── */
 .task-row.selected{border-color:var(--accent);background:var(--color-primary-soft)}

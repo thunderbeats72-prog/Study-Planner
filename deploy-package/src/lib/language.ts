@@ -45,8 +45,8 @@ export const LANGS: LangInfo[] = [
   { code: "en", bcp: "en-IN" },
 ];
 
-const MARATHI_MARKERS = /[ळऱ]|(\b(मी|आहे|आहेत|तुम्ही|तुमचा|अभ्यास|करू|शकते|शकतो|आम्ही)\b)/;
-const NEPALI_MARKERS = /(\b(हो|छु|छौं|तपाईं|पढाइ|सक्छु|मद्दत)\b)/;
+const MARATHI_MARKERS = /[ळऱ]|(?:^|\s+)(मी|आहे|आहेत|तुम्ही|तुमचा|अभ्यास|करू|शकते|शकतो|आम्ही|मराठीत|मराठी)(?:\s+|$|[.,?!])/;
+const NEPALI_MARKERS = /(?:^|\s+)(हो|छु|छौं|तपाईं|पढाइ|सक्छु|मद्दत|नेपाली)(?:\s+|$|[.,?!])/;
 const URDU_MARKERS = /[\u0679\u067E\u0686\u0688\u0691\u0698\u06A9\u06AF\u06BE\u06C1-\u06C3\u06CC\u06D2\u06BA]/;
 // Latin-script Hindi is deliberately not used for automatic locale switching.
 // Ambiguous words such as "hai", "kal", "do", and "please" occur in ordinary

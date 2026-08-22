@@ -238,7 +238,7 @@ export default function ChatPanel({
                   : speaking
                     ? `${selectedVoiceName} speaking${speakProgress ? ` · part ${speakProgress.done}/${speakProgress.total}` : ""}`
                     : thinking ? "Working on your answer"
-                    : provider ? `${provider} connected` : "Hybrid engine online"}
+                    : provider ? `${provider} configured · local fallback ready` : "Local tutor ready · cloud AI not configured"}
               </div>
             </div>
             {support.tts && (

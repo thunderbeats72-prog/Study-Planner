@@ -2,12 +2,13 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { tasks, sessions, topics, subjects } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { getOrCreateUser, getSettings, keyFrom } from "@/lib/state";
-import { todayStr, diffDays } from "@/lib/planner";
+import { dateFrom, getOrCreateUser, getSettings, keyFrom } from "@/lib/state";
+import { diffDays } from "@/lib/planner";
 import {
   learnPace, paceFor, learnWeekdays, learnTimeOfDay, skipRisk,
   projectReadiness, retrievability, learnEffectiveDailyMinutes,
 } from "@/lib/ml";
+import { checkRateLimit } from "@/lib/rateLimit";
 
 export const dynamic = "force-dynamic";
 
@@ -17,10 +18,17 @@ export const dynamic = "force-dynamic";
  * dashboard. All deterministic TypeScript; no LLM involved.
  */
 export async function GET(req: Request) {
+  const limit = checkRateLimit(req, "analytics", 30, 60_000);
+  if (!limit.allowed) {
+    return NextResponse.json(
+      { error: "Analytics are refreshing too frequently.", code: "RATE_LIMITED" },
+      { status: 429, headers: { "retry-after": String(limit.retryAfterSeconds) } }
+    );
+  }
   const key = keyFrom(req);
   const user = await getOrCreateUser(key);
   const st = await getSettings(user.id);
-  const today = todayStr();
+  const today = dateFrom(req);
 
   const [allTasks, allSessions, allTopics, allSubjects] = await Promise.all([
     db.select().from(tasks).where(eq(tasks.userId, user.id)),
@@ -50,7 +58,7 @@ export async function GET(req: Request) {
   })));
 
   // ── Tomorrow's skip risk ──
-  const tomorrow = new Date();
+  const tomorrow = new Date(`${today}T12:00:00`);
   tomorrow.setDate(tomorrow.getDate() + 1);
   const tomorrowStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, "0")}-${String(tomorrow.getDate()).padStart(2, "0")}`;
   const tomorrowTasks = allTasks.filter((t) => t.date === tomorrowStr && t.status === "pending");

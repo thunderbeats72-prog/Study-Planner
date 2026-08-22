@@ -83,6 +83,19 @@ function isStudyDay(dateStr: string, mode: string): boolean {
   return true;
 }
 
+/** Inclusive number of usable study days in a date window. */
+export function countStudyDays(start: string, end: string, mode: string): number {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end) || diffDays(start, end) < 0) return 0;
+  let count = 0;
+  let cursor = start;
+  const span = Math.min(5000, diffDays(start, end));
+  for (let day = 0; day <= span; day++) {
+    if (isStudyDay(cursor, mode)) count++;
+    cursor = addDays(cursor, 1);
+  }
+  return count;
+}
+
 function diffWeight(d: string): number {
   return d === "Hard" ? 1.3 : d === "Easy" ? 0.8 : 1;
 }
@@ -324,20 +337,31 @@ export function buildPlan(
 
       // ── 8a. Spaced-repetition recalls due today (up to 3) ──
 
-      const due = (reviewQueue.get(d) || []).slice(0, 3);
-      for (const r of due) {
-        const mins = r.pass === 1 ? 15 : 20;
-        if (remaining < mins + 20) break;
+      const queuedReviews = reviewQueue.get(d) || [];
+      const due = queuedReviews.slice(0, 3);
+      const deferred = queuedReviews.slice(3);
+      for (let reviewIndex = 0; reviewIndex < due.length; reviewIndex++) {
+        const review = due[reviewIndex];
+        const mins = review.pass === 1 ? 15 : 20;
+        if (remaining < mins + 20) {
+          deferred.unshift(...due.slice(reviewIndex));
+          break;
+        }
         remaining -= mins;
         tasks.push({
-          date, subjectId: r.topic.subjectId, topicId: r.topic.id, kind: "revise",
-          title: `Recall: ${r.topic.title}`,
+          date, subjectId: review.topic.subjectId, topicId: review.topic.id, kind: "revise",
+          title: `Recall: ${review.topic.title}`,
           detail:
-            r.pass === 1
+            review.pass === 1
               ? "24–48h spaced recall. Close the book, write everything you remember, then check gaps."
               : "1-week spaced recall. Do 5 mixed questions from this lesson without notes.",
           plannedMinutes: mins, position: pos++,
         });
+      }
+      // Never silently discard the fourth review (or a review that did not
+      // fit today). Carry it to the next learn day within the plan window.
+      if (deferred.length && d + 1 < learnDates.length) {
+        reviewQueue.set(d + 1, [...(reviewQueue.get(d + 1) || []), ...deferred]);
       }
 
       // ── 8b. Weekly checkpoint test ──────────────────────────

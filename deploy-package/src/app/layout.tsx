@@ -1,5 +1,20 @@
 import type { Metadata, Viewport } from "next";
+import localFont from "next/font/local";
 import "./globals.css";
+
+const inter = localFont({
+  src: "./fonts/inter-latin-variable.woff2",
+  display: "swap",
+  weight: "100 900",
+  variable: "--font-inter",
+});
+
+const jetBrainsMono = localFont({
+  src: "./fonts/jetbrains-mono-latin-variable.woff2",
+  display: "swap",
+  weight: "100 800",
+  variable: "--font-jetbrains-mono",
+});
 
 export const metadata: Metadata = {
   title: "Study Planner Pro — AI Study Engine",
@@ -19,15 +34,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap"
-          rel="stylesheet"
-        />
-      </head>
+    <html lang="en" className={`${inter.variable} ${jetBrainsMono.variable}`}>
       <body className="theme-silver-lavender">{children}</body>
     </html>
   );

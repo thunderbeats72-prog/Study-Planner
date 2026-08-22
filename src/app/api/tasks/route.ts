@@ -1,143 +1,237 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { tasks, topics } from "@/db/schema";
+import { subjects, tasks, topics } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
-import { buildContext, fullState, getOrCreateUser, keyFrom } from "@/lib/state";
-import { todayStr } from "@/lib/planner";
+import { buildContext, dateFrom, fullState, getOrCreateUser, keyFrom } from "@/lib/state";
 import { fsrsInit, fsrsReview, masteryDelta, type ReviewRating } from "@/lib/ml";
+import {
+  enumValue, finiteNumber, isoDate, positiveId, readJsonObject,
+  textValue, validationPayload,
+} from "@/lib/validation";
 
 export const dynamic = "force-dynamic";
 
+const TASK_STATUSES = ["pending", "done", "skipped"] as const;
+const TASK_KINDS = ["learn", "revise", "practice", "mock", "buffer"] as const;
+
+async function responseState(key: string, localDate: string) {
+  const state = await fullState(key);
+  return NextResponse.json({ ...state, context: buildContext(state, localDate) });
+}
+
 export async function PATCH(req: Request) {
+  let body: Record<string, unknown>;
+  try { body = await readJsonObject(req, 16_000); }
+  catch (error) {
+    const payload = validationPayload(error);
+    return NextResponse.json({ error: payload.error, code: payload.code }, { status: payload.status });
+  }
+
   const key = keyFrom(req);
   const user = await getOrCreateUser(key);
-  const b = (await req.json()) as {
-    id?: number;
-    status?: string;
-    actualMinutes?: number;
-    date?: string;
-    title?: string;
-    detail?: string;
-    plannedMinutes?: number;
-    subjectId?: number | null;
-    skipSubjectId?: number;
-    skipDate?: string;
-    /** FSRS review rating: 1 Again · 2 Hard · 3 Good · 4 Easy */
-    rating?: number;
-  };
 
-  // Bulk skip: skip all pending tasks from one subject on one day.
-  if (b.skipSubjectId) {
+  // Bulk skip: skip all pending tasks from one owned subject on one day.
+  if (body.skipSubjectId != null) {
+    let subjectId: number;
+    let date: string;
+    try {
+      subjectId = positiveId(body.skipSubjectId, "skipSubjectId") as number;
+      date = body.skipDate == null ? dateFrom(req) : isoDate(body.skipDate, "skipDate");
+    } catch (error) {
+      const payload = validationPayload(error);
+      return NextResponse.json({ error: payload.error, code: payload.code }, { status: payload.status });
+    }
+    const owned = await db
+      .select({ id: subjects.id })
+      .from(subjects)
+      .where(and(eq(subjects.id, subjectId), eq(subjects.userId, user.id)))
+      .limit(1);
+    if (!owned.length) return NextResponse.json({ error: "Subject not found.", code: "SUBJECT_NOT_FOUND" }, { status: 404 });
     await db
       .update(tasks)
       .set({ status: "skipped" })
-      .where(
-        and(
-          eq(tasks.userId, user.id),
-          eq(tasks.subjectId, b.skipSubjectId),
-          eq(tasks.date, b.skipDate || todayStr()),
-          eq(tasks.status, "pending")
-        )
-      );
-    const s = await fullState(key);
-    return NextResponse.json({ ...s, context: buildContext(s) });
+      .where(and(
+        eq(tasks.userId, user.id), eq(tasks.subjectId, subjectId),
+        eq(tasks.date, date), eq(tasks.status, "pending")
+      ));
+    return responseState(key, dateFrom(req));
   }
 
-  if (!b.id) return NextResponse.json({ error: "id required" }, { status: 400 });
+  let id: number;
+  try { id = positiveId(body.id, "id") as number; }
+  catch (error) {
+    const payload = validationPayload(error);
+    return NextResponse.json({ error: payload.error, code: payload.code }, { status: payload.status });
+  }
+
+  const previous = (await db
+    .select()
+    .from(tasks)
+    .where(and(eq(tasks.id, id), eq(tasks.userId, user.id)))
+    .limit(1))[0];
+  if (!previous) return NextResponse.json({ error: "Task not found.", code: "TASK_NOT_FOUND" }, { status: 404 });
 
   const patch: Record<string, unknown> = {};
-  if (b.status) patch.status = b.status;
-  if (typeof b.actualMinutes === "number") patch.actualMinutes = Math.max(0, Math.round(b.actualMinutes));
-  if (b.date) patch.date = b.date;
-  if (typeof b.title === "string" && b.title.trim()) patch.title = b.title.trim();
-  if (typeof b.detail === "string") patch.detail = b.detail.trim();
-  if (typeof b.plannedMinutes === "number") patch.plannedMinutes = Math.max(1, Math.round(b.plannedMinutes));
-  if (Object.prototype.hasOwnProperty.call(b, "subjectId")) {
-    patch.subjectId = b.subjectId ?? null;
+  let nextStatus: typeof TASK_STATUSES[number] | undefined;
+  let rating: ReviewRating | 0 = 0;
+  try {
+    if (body.status != null) {
+      nextStatus = enumValue(body.status, "status", TASK_STATUSES);
+      patch.status = nextStatus;
+    }
+    if (body.actualMinutes != null) {
+      patch.actualMinutes = finiteNumber(body.actualMinutes, "actualMinutes", { min: 0, max: 100_000, integer: true });
+    }
+    if (body.date != null) patch.date = isoDate(body.date, "date");
+    if (body.title != null) patch.title = textValue(body.title, "title", { required: true, max: 300 });
+    if (body.detail != null) patch.detail = textValue(body.detail, "detail", { max: 4_000 });
+    if (body.plannedMinutes != null) {
+      patch.plannedMinutes = finiteNumber(body.plannedMinutes, "plannedMinutes", { min: 1, max: 720, integer: true });
+    }
+    if (body.rating != null) {
+      rating = finiteNumber(body.rating, "rating", { min: 1, max: 4, integer: true }) as ReviewRating;
+    }
+  } catch (error) {
+    const payload = validationPayload(error);
+    return NextResponse.json({ error: payload.error, code: payload.code }, { status: payload.status });
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body, "subjectId")) {
+    let subjectId: number | null;
+    try { subjectId = positiveId(body.subjectId, "subjectId", true); }
+    catch (error) {
+      const payload = validationPayload(error);
+      return NextResponse.json({ error: payload.error, code: payload.code }, { status: payload.status });
+    }
+    if (subjectId) {
+      const owned = await db
+        .select({ id: subjects.id })
+        .from(subjects)
+        .where(and(eq(subjects.id, subjectId), eq(subjects.userId, user.id)))
+        .limit(1);
+      if (!owned.length) return NextResponse.json({ error: "Subject not found.", code: "SUBJECT_NOT_FOUND" }, { status: 404 });
+    }
+    patch.subjectId = subjectId;
     patch.topicId = null;
   }
-  if (typeof b.title === "string" || typeof b.detail === "string") patch.topicId = null;
-
-  if (Object.keys(patch).length) {
-    await db.update(tasks).set(patch).where(and(eq(tasks.id, b.id), eq(tasks.userId, user.id)));
+  if (body.title != null || body.detail != null) patch.topicId = null;
+  if (!Object.keys(patch).length && !rating) {
+    return NextResponse.json({ error: "No supported task changes were supplied.", code: "EMPTY_PATCH" }, { status: 400 });
   }
 
-  // reflect mastery on the linked lesson
-  const row = (await db.select().from(tasks).where(eq(tasks.id, b.id)).limit(1))[0];
-  if (row?.topicId) {
-    if (b.status === "done") {
-      const t = (await db.select().from(topics).where(eq(topics.id, row.topicId)).limit(1))[0];
-      if (t) {
-        const gain = row.kind === "learn" ? 55 : 20;
-        const patch: Record<string, unknown> = {
-          mastery: Math.min(100, t.mastery + gain),
-          status: row.kind === "learn" ? "done" : t.status,
-        };
+  await db.transaction(async (tx) => {
+    const updated = Object.keys(patch).length
+      ? (await tx
+          .update(tasks)
+          .set(patch)
+          .where(and(eq(tasks.id, id), eq(tasks.userId, user.id)))
+          .returning())[0]
+      : previous;
 
-        // ── FSRS-lite update from the review rating ────────────
-        // A rating trains the memory model: stability grows on
-        // Good/Easy, shrinks on Again, and the topic's next review
-        // lands when recall is predicted to hit ~90%.
-        const rating = (b.rating && b.rating >= 1 && b.rating <= 4 ? b.rating : 0) as ReviewRating | 0;
-        if (rating) {
-          const today = todayStr();
-          const elapsed = t.lastReview
-            ? Math.max(0, Math.round((Date.parse(today) - Date.parse(t.lastReview)) / 86400000))
-            : 0;
-          const next =
-            t.stability > 0
-              ? fsrsReview(t.stability, t.difficulty, elapsed, rating)
-              : { stability: fsrsInit(rating, t.difficulty), intervalDays: 0 };
-          patch.stability = next.stability;
-          patch.lastReview = today;
-          patch.mastery = Math.max(0, Math.min(100, t.mastery + gain + masteryDelta(rating)));
-          // "Again" reopens a learn topic — it clearly is not mastered.
-          if (rating === 1 && row.kind !== "learn") patch.status = t.status;
-          if (rating === 1) patch.mastery = Math.max(0, Math.min(100, t.mastery + masteryDelta(rating)));
-        }
+    const topicId = updated?.topicId;
+    if (!topicId) return;
+    const topic = (await tx
+      .select()
+      .from(topics)
+      .where(and(eq(topics.id, topicId), eq(topics.userId, user.id)))
+      .limit(1))[0];
+    if (!topic) return;
 
-        await db.update(topics).set(patch).where(eq(topics.id, row.topicId));
+    // Apply mastery once per pending/skipped -> done transition. Network
+    // retries or repeated Done taps can no longer inflate mastery repeatedly.
+    const becameDone = nextStatus === "done" && previous.status !== "done";
+    if (becameDone) {
+      const gain = updated.kind === "learn" ? 55 : 20;
+      const topicPatch: Record<string, unknown> = {
+        mastery: Math.min(100, topic.mastery + gain),
+        status: updated.kind === "learn" ? "done" : topic.status,
+      };
+      if (rating) {
+        const today = dateFrom(req);
+        const elapsed = topic.lastReview
+          ? Math.max(0, Math.round((Date.parse(today) - Date.parse(topic.lastReview)) / 86_400_000))
+          : 0;
+        const next = topic.stability > 0
+          ? fsrsReview(topic.stability, topic.difficulty, elapsed, rating)
+          : { stability: fsrsInit(rating, topic.difficulty), intervalDays: 0 };
+        topicPatch.stability = next.stability;
+        topicPatch.lastReview = today;
+        topicPatch.mastery = rating === 1
+          ? Math.max(0, topic.mastery + masteryDelta(rating))
+          : Math.min(100, topic.mastery + gain + masteryDelta(rating));
       }
-    } else if (b.status === "pending" && row.kind === "learn") {
-      await db.update(topics).set({ status: "pending" }).where(eq(topics.id, row.topicId));
+      await tx
+        .update(topics)
+        .set(topicPatch)
+        .where(and(eq(topics.id, topicId), eq(topics.userId, user.id)));
+    } else if (nextStatus === "pending" && previous.status !== "pending" && updated.kind === "learn") {
+      await tx
+        .update(topics)
+        .set({ status: "pending" })
+        .where(and(eq(topics.id, topicId), eq(topics.userId, user.id)));
     }
-  }
+  });
 
-  const s = await fullState(key);
-  return NextResponse.json({ ...s, context: buildContext(s) });
+  return responseState(key, dateFrom(req));
 }
 
 export async function POST(req: Request) {
+  let body: Record<string, unknown>;
+  try { body = await readJsonObject(req, 16_000); }
+  catch (error) {
+    const payload = validationPayload(error);
+    return NextResponse.json({ error: payload.error, code: payload.code }, { status: payload.status });
+  }
   const key = keyFrom(req);
   const user = await getOrCreateUser(key);
-  const b = (await req.json()) as {
-    title: string;
-    date?: string;
-    subjectId?: number | null;
-    plannedMinutes?: number;
-    kind?: string;
-    detail?: string;
-  };
+
+  let title: string;
+  let date: string;
+  let subjectId: number | null;
+  let plannedMinutes: number;
+  let kind: typeof TASK_KINDS[number];
+  let detail: string;
+  try {
+    title = textValue(body.title, "title", { required: true, max: 300 });
+    date = body.date == null ? dateFrom(req) : isoDate(body.date, "date");
+    subjectId = positiveId(body.subjectId, "subjectId", true);
+    plannedMinutes = finiteNumber(body.plannedMinutes ?? 30, "plannedMinutes", { min: 1, max: 720, integer: true });
+    kind = enumValue(body.kind, "kind", TASK_KINDS, "practice");
+    detail = textValue(body.detail, "detail", { max: 4_000, fallback: "Added manually." }) || "Added manually.";
+  } catch (error) {
+    const payload = validationPayload(error);
+    return NextResponse.json({ error: payload.error, code: payload.code }, { status: payload.status });
+  }
+
+  if (subjectId) {
+    const owned = await db
+      .select({ id: subjects.id })
+      .from(subjects)
+      .where(and(eq(subjects.id, subjectId), eq(subjects.userId, user.id)))
+      .limit(1);
+    if (!owned.length) return NextResponse.json({ error: "Subject not found.", code: "SUBJECT_NOT_FOUND" }, { status: 404 });
+  }
+
   await db.insert(tasks).values({
-    userId: user.id,
-    date: b.date || todayStr(),
-    title: b.title,
-    detail: b.detail || "Added manually.",
-    subjectId: b.subjectId ?? null,
-    topicId: null,
-    kind: b.kind || "practice",
-    plannedMinutes: b.plannedMinutes ?? 30,
-    position: 99,
+    userId: user.id, date, title, detail, subjectId, topicId: null,
+    kind, plannedMinutes, position: 99,
   });
-  const s = await fullState(key);
-  return NextResponse.json({ ...s, context: buildContext(s) });
+  return responseState(key, dateFrom(req));
 }
 
 export async function DELETE(req: Request) {
   const key = keyFrom(req);
   const user = await getOrCreateUser(key);
-  const id = Number(new URL(req.url).searchParams.get("id"));
-  if (id) await db.delete(tasks).where(and(eq(tasks.id, id), eq(tasks.userId, user.id)));
-  const s = await fullState(key);
-  return NextResponse.json({ ...s, context: buildContext(s) });
+  let id: number;
+  try { id = positiveId(new URL(req.url).searchParams.get("id"), "id") as number; }
+  catch (error) {
+    const payload = validationPayload(error);
+    return NextResponse.json({ error: payload.error, code: payload.code }, { status: payload.status });
+  }
+  const deleted = await db
+    .delete(tasks)
+    .where(and(eq(tasks.id, id), eq(tasks.userId, user.id)))
+    .returning({ id: tasks.id });
+  if (!deleted.length) return NextResponse.json({ error: "Task not found.", code: "TASK_NOT_FOUND" }, { status: 404 });
+  return responseState(key, dateFrom(req));
 }

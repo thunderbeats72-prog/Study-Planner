@@ -46,17 +46,31 @@ export default function Dashboard({
   const t = today();
   const ctx = state.context;
 
+  const taskProgressVersion = `${state.tasks.length}:${state.tasks.filter((task) => task.status === "done").length}:${state.tasks.filter((task) => task.status === "skipped").length}`;
+  const loggedQuarterHour = Math.floor(
+    state.sessions.reduce((total, session) => total + session.minutes, 0) / 15
+  );
+
+  // Analytics may change as time is logged, but refreshing on every one-minute
+  // clock flush caused a request loop. A 15-minute bucket stays useful without
+  // hammering the database. Coaching text refreshes only when task progress
+  // changes; the server also caches identical insight snapshots.
   useEffect(() => {
     let cancelled = false;
     api<typeof intel>("/api/analytics")
-      .then((d) => { if (!cancelled) setIntel(d); })
-      .catch(() => {});
+      .then((data) => { if (!cancelled) setIntel(data); })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [taskProgressVersion, loggedQuarterHour]);
+
+  useEffect(() => {
+    let cancelled = false;
     api<{ insights: string }>("/api/insights")
-      .then((d) => { if (!cancelled) setInsights(d.insights); })
+      .then((data) => { if (!cancelled) setInsights(data.insights); })
       .catch(() => { if (!cancelled) setInsights(""); })
       .finally(() => { if (!cancelled) setLoadingIns(false); });
     return () => { cancelled = true; };
-  }, [state.tasks.length, state.sessions.length]);
+  }, [taskProgressVersion]);
 
   const week = useMemo(() => {
     const arr: { label: string; date: string; hours: number }[] = [];

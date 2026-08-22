@@ -1,36 +1,76 @@
 import { db } from "@/db";
 import { users, settings, subjects, topics, tasks, sessions, messages } from "@/db/schema";
 import { and, eq, desc, asc, sql } from "drizzle-orm";
+import { createHash } from "node:crypto";
 import { addDays, diffDays, todayStr } from "./planner";
 import type { TutorContext } from "./ai";
 import { advancedTopicMetadata } from "./curriculum";
+import { dateDistanceDays, isIsoDate } from "./validation";
+
+const USER_KEY_RE = /^u_[A-Za-z0-9_-]{12,120}$/;
 
 export function keyFrom(req: Request): string {
-  const h = req.headers.get("x-user-key");
-  return (h && h.trim()) || "anon-default";
+  const supplied = req.headers.get("x-user-key")?.trim() || "";
+  if (USER_KEY_RE.test(supplied)) return supplied;
+
+  // Never put every header-less request into one shared "anon-default"
+  // account. A bounded one-way fingerprint provides isolation for legacy or
+  // non-browser clients without storing raw IP/User-Agent data.
+  const forwarded = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  const agent = req.headers.get("user-agent")?.slice(0, 300) || "unknown";
+  const seed = `${supplied}\0${forwarded}\0${agent}`;
+  return `u_fallback_${createHash("sha256").update(seed).digest("hex").slice(0, 32)}`;
+}
+
+export function dateFrom(req: Request): string {
+  const serverDate = todayStr();
+  const supplied = req.headers.get("x-local-date");
+  return isIsoDate(supplied) && Math.abs(dateDistanceDays(serverDate, supplied)) <= 2
+    ? supplied
+    : serverDate;
 }
 
 export async function getOrCreateUser(userKey: string) {
   const found = await db.select().from(users).where(eq(users.userKey, userKey)).limit(1);
   if (found.length) return found[0];
-  const inserted = await db.insert(users).values({ userKey }).returning();
-  const u = inserted[0];
-  await db.insert(settings).values({
-    userId: u.id,
-    startDate: todayStr(),
-    examDate: addDays(todayStr(), 90),
-  });
-  return u;
+
+  // Two API calls can be the first request from a new browser. The unique
+  // user_key constraint plus ON CONFLICT makes that race harmless.
+  const inserted = await db
+    .insert(users)
+    .values({ userKey })
+    .onConflictDoNothing({ target: users.userKey })
+    .returning();
+  const user = inserted[0] || (await db.select().from(users).where(eq(users.userKey, userKey)).limit(1))[0];
+  if (!user) throw new Error("Could not initialise learner account.");
+  await db
+    .insert(settings)
+    .values({ userId: user.id, startDate: todayStr(), examDate: addDays(todayStr(), 90) })
+    .onConflictDoNothing({ target: settings.userId });
+  return user;
 }
 
 export async function getSettings(userId: number) {
   const rows = await db.select().from(settings).where(eq(settings.userId, userId)).limit(1);
   if (rows.length) return rows[0];
-  const ins = await db
+  const inserted = await db
     .insert(settings)
     .values({ userId, startDate: todayStr(), examDate: addDays(todayStr(), 90) })
+    .onConflictDoNothing({ target: settings.userId })
     .returning();
-  return ins[0];
+  const row = inserted[0] || (await db.select().from(settings).where(eq(settings.userId, userId)).limit(1))[0];
+  if (!row) throw new Error("Could not initialise learner settings.");
+  return row;
+}
+
+async function latestMessages(userId: number, limit = 120) {
+  const newestFirst = await db
+    .select()
+    .from(messages)
+    .where(eq(messages.userId, userId))
+    .orderBy(desc(messages.id))
+    .limit(limit);
+  return newestFirst.reverse();
 }
 
 export async function loadState(userId: number) {
@@ -40,7 +80,7 @@ export async function loadState(userId: number) {
     db.select().from(topics).where(eq(topics.userId, userId)).orderBy(asc(topics.position)),
     db.select().from(tasks).where(eq(tasks.userId, userId)).orderBy(asc(tasks.date), asc(tasks.position)),
     db.select().from(sessions).where(eq(sessions.userId, userId)).orderBy(desc(sessions.createdAt)).limit(400),
-    db.select().from(messages).where(eq(messages.userId, userId)).orderBy(asc(messages.id)).limit(120),
+    latestMessages(userId, 120),
   ]);
   return { settings: st, subjects: subs, topics: tps, tasks: tsk, sessions: ses, messages: msgs };
 }
@@ -98,8 +138,7 @@ export async function fullState(userKey: string) {
 
 type St = Awaited<ReturnType<typeof fullState>>;
 
-export function buildContext(s: St): TutorContext {
-  const today = todayStr();
+export function buildContext(s: St, today = todayStr()): TutorContext {
   const doneTopicIds = new Set(
     s.tasks.filter((t) => t.kind === "learn" && t.status === "done" && t.topicId).map((t) => t.topicId)
   );
@@ -116,7 +155,9 @@ export function buildContext(s: St): TutorContext {
   const totalTopics = s.topics.length || 1;
   const doneCount = subs.reduce((a, x) => a + x.done, 0);
   const weekAgo = addDays(today, -7);
-  const hoursRaw = s.sessions.filter((x) => diffDays(weekAgo, x.date) >= 0).reduce((a, x) => a + x.minutes, 0) / 60;
+  const hoursRaw = s.sessions
+    .filter((x) => diffDays(weekAgo, x.date) >= 0 && diffDays(x.date, today) >= 0)
+    .reduce((a, x) => a + x.minutes, 0) / 60;
   const hoursThisWeek = Math.round(hoursRaw * 100) / 100;
   return {
     name: s.user.name,
@@ -161,7 +202,8 @@ export async function recomputeStreak(userId: number, asOf = todayStr()) {
     streak++;
     cursor = addDays(cursor, -1);
   }
-  await db.update(users).set({ streak, lastStudyDate: asOf }).where(eq(users.id, userId));
+  const lastStudyDate = [...days].sort().at(-1) || null;
+  await db.update(users).set({ streak, lastStudyDate }).where(eq(users.id, userId));
   return streak;
 }
 
@@ -176,6 +218,6 @@ export async function markTopicsDoneFromTasks(userId: number) {
     .where(and(eq(tasks.userId, userId), eq(tasks.status, "done")));
   const ids = rows.filter((r) => r.kind === "learn" && r.topicId).map((r) => r.topicId as number);
   for (const id of ids) {
-    await db.update(topics).set({ status: "done" }).where(eq(topics.id, id));
+    await db.update(topics).set({ status: "done" }).where(and(eq(topics.id, id), eq(topics.userId, userId)));
   }
 }

@@ -31,7 +31,7 @@ export type TaskRow = {
 };
 export type SessionRow = {
   id: number; userId: number; subjectId: number | null; taskId: number | null;
-  date: string; minutes: number; mode: string; createdAt: string;
+  date: string; minutes: number; mode: string; eventId?: string | null; createdAt: string;
 };
 export type MessageRow = { id: number; userId: number; role: string; content: string; createdAt: string };
 export type Ctx = {
@@ -51,23 +51,112 @@ export type PlanStats = {
   dailyMinutes: number; requiredMinutes: number; feasible: boolean; loadRatio: number;
 };
 
-export function userKey(): string {
-  if (typeof window === "undefined") return "anon";
-  let k = localStorage.getItem("spp-user-key");
-  if (!k) {
-    k = "u_" + Math.random().toString(36).slice(2) + Date.now().toString(36);
-    localStorage.setItem("spp-user-key", k);
-  }
-  return k;
+const USER_KEY_STORAGE = "spp-user-key";
+const USER_KEY_COOKIE = "spp_user_key";
+const USER_KEY_RE = /^u_[A-Za-z0-9_-]{12,120}$/;
+let volatileUserKey = "";
+
+function generatedUserKey(): string {
+  const random = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+    ? crypto.randomUUID().replace(/-/g, "")
+    : `${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
+  return `u_${random}`;
 }
 
-export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const res = await fetch(path, {
-    ...init,
-    headers: { "content-type": "application/json", "x-user-key": userKey(), ...(init.headers || {}) },
-  });
-  if (!res.ok) throw new Error(`${path} failed: ${res.status}`);
-  return (await res.json()) as T;
+/**
+ * A stable anonymous account key. localStorage can throw in private/locked
+ * browser modes, so a first-party cookie and an in-memory value provide safe
+ * fallbacks instead of making every API request crash before it starts.
+ */
+export function userKey(): string {
+  if (typeof window === "undefined") return "anon";
+  if (USER_KEY_RE.test(volatileUserKey)) return volatileUserKey;
+
+  let stored = "";
+  try { stored = localStorage.getItem(USER_KEY_STORAGE) || ""; } catch { /* storage is unavailable */ }
+  if (!USER_KEY_RE.test(stored)) {
+    try {
+      const cookie = document.cookie
+        .split(";")
+        .map((part) => part.trim())
+        .find((part) => part.startsWith(`${USER_KEY_COOKIE}=`));
+      stored = cookie ? decodeURIComponent(cookie.slice(USER_KEY_COOKIE.length + 1)) : "";
+    } catch { /* cookies are unavailable */ }
+  }
+
+  volatileUserKey = USER_KEY_RE.test(stored) ? stored : generatedUserKey();
+  try { localStorage.setItem(USER_KEY_STORAGE, volatileUserKey); } catch { /* use cookie/memory fallback */ }
+  try {
+    document.cookie = `${USER_KEY_COOKIE}=${encodeURIComponent(volatileUserKey)}; Path=/; Max-Age=31536000; SameSite=Lax; Secure`;
+  } catch { /* memory fallback still works for this page */ }
+  return volatileUserKey;
+}
+
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+    public readonly code?: string,
+    public readonly retryable = false
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
+export type ApiRequestInit = RequestInit & { timeoutMs?: number };
+
+export async function api<T>(path: string, init: ApiRequestInit = {}): Promise<T> {
+  const { timeoutMs = 30_000, signal: callerSignal, ...requestInit } = init;
+  const controller = new AbortController();
+  const abortFromCaller = () => controller.abort(callerSignal?.reason);
+  if (callerSignal?.aborted) abortFromCaller();
+  else callerSignal?.addEventListener("abort", abortFromCaller, { once: true });
+  const timeout = window.setTimeout(() => controller.abort(new DOMException("Request timed out", "TimeoutError")), timeoutMs);
+
+  const headers = new Headers(init.headers);
+  headers.set("x-user-key", userKey());
+  const localNow = new Date();
+  headers.set(
+    "x-local-date",
+    `${localNow.getFullYear()}-${String(localNow.getMonth() + 1).padStart(2, "0")}-${String(localNow.getDate()).padStart(2, "0")}`
+  );
+  if (requestInit.body != null && !(requestInit.body instanceof FormData) && !headers.has("content-type")) {
+    headers.set("content-type", "application/json");
+  }
+
+  try {
+    const res = await fetch(path, { ...requestInit, headers, signal: controller.signal });
+    const raw = await res.text();
+    let payload: unknown = null;
+    if (raw) {
+      try { payload = JSON.parse(raw); } catch { payload = raw; }
+    }
+    if (!res.ok) {
+      const body = payload && typeof payload === "object" ? payload as Record<string, unknown> : null;
+      const message = typeof body?.error === "string"
+        ? body.error
+        : typeof body?.message === "string"
+          ? body.message
+          : `Request failed (${res.status}).`;
+      throw new ApiError(
+        message,
+        res.status,
+        typeof body?.code === "string" ? body.code : undefined,
+        res.status === 408 || res.status === 429 || res.status >= 500
+      );
+    }
+    return payload as T;
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    if (controller.signal.aborted) {
+      throw new ApiError("The request took too long. Please try again.", 408, "REQUEST_TIMEOUT", true);
+    }
+    throw new ApiError("Could not reach the server. Check your connection and try again.", 0, "NETWORK_ERROR", true);
+  } finally {
+    window.clearTimeout(timeout);
+    callerSignal?.removeEventListener("abort", abortFromCaller);
+  }
 }
 
 export const fmtDate = (d: Date) =>
@@ -88,15 +177,31 @@ export const prettyLong = (s: string) =>
   parseDate(s).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
 
 export function escapeHtml(t: string): string {
-  return t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return t
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 export function mdToHtml(md: string): string {
-  const esc = md.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  // Escape first, then add only the tiny, explicit markup subset below.
+  // This function feeds dangerouslySetInnerHTML, so unknown HTML and unsafe
+  // URL protocols must remain inert text.
+  const esc = escapeHtml(md);
+
+  const safeLink = (_match: string, label: string, href: string): string => {
+    const normalized = href.trim();
+    if (!/^(https?:\/\/|mailto:)/i.test(normalized)) return label;
+    const external = /^https?:\/\//i.test(normalized);
+    return `<a href="${normalized}"${external ? ' target="_blank" rel="noopener noreferrer"' : ""}>${label}</a>`;
+  };
 
   // Inline formatting applied per line (after escaping).
   const inline = (s: string): string =>
     s
+      .replace(/\[([^\]\n]+)\]\(([^)\s]+)\)/g, safeLink)
       .replace(/`([^`]+)`/g, "<code>$1</code>")
       .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
       .replace(/(^|\s)\*([^*\n]+)\*/g, "$1<em>$2</em>")

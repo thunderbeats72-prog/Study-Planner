@@ -8,6 +8,7 @@ import {
   jsonb,
   real,
   index,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 export const users = pgTable("users", {
@@ -46,7 +47,7 @@ export const settings = pgTable(
   confetti: boolean("confetti").notNull().default(true),
     sounds: boolean("sounds").notNull().default(true),
   },
-  (t) => [index("settings_user_id_idx").on(t.userId)]
+  (t) => [uniqueIndex("settings_user_id_unique").on(t.userId)]
 );
 
 export const subjects = pgTable(
@@ -142,6 +143,7 @@ export const sessions = pgTable(
     date: text("date").notNull(),
     minutes: real("minutes").notNull().default(0),
     mode: text("mode").notNull().default("focus"),
+    eventId: text("event_id"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (t) => [
@@ -150,6 +152,7 @@ export const sessions = pgTable(
     index("sessions_task_id_idx").on(t.taskId),
     index("sessions_user_created_idx").on(t.userId, t.createdAt),
     index("sessions_user_date_idx").on(t.userId, t.date),
+    uniqueIndex("sessions_user_event_unique").on(t.userId, t.eventId),
   ]
 );
 

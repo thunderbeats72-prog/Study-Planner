@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { api, prettyLong, today, type AppState, type MessageRow } from "@/lib/client";
+import { api, ApiError, prettyLong, today, type AppState, type MessageRow } from "@/lib/client";
 import { mmss, useFocusTimer, useStudyClock, type TimerMode } from "@/lib/useTimer";
 import Onboarding from "@/components/Onboarding";
 import Dashboard from "@/components/Dashboard";
@@ -32,8 +32,35 @@ const NAV: { id: Page; label: string; icon: React.ReactNode }[] = [
 
 type ToastTone = "success" | "info" | "error";
 type Toast = { id: number; msg: string; tone: ToastTone };
+type PendingSessionLog = {
+  eventId: string;
+  minutes: number;
+  subjectId: number | null;
+  taskId: number | null;
+  mode: string;
+  date: string;
+};
 
 const SIDEBAR_KEY = "spp-sidebar-collapsed";
+const SESSION_QUEUE_KEY = "spp-pending-session-logs";
+
+function apiFailureMessage(error: unknown, fallback: string): string {
+  return error instanceof ApiError && error.message ? error.message : fallback;
+}
+
+function savedSessionQueue(raw: string | null): PendingSessionLog[] {
+  try {
+    const parsed = JSON.parse(raw || "[]") as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((entry): entry is PendingSessionLog => {
+      if (!entry || typeof entry !== "object") return false;
+      const value = entry as Partial<PendingSessionLog>;
+      return typeof value.eventId === "string"
+        && typeof value.minutes === "number" && Number.isFinite(value.minutes) && value.minutes > 0
+        && typeof value.mode === "string" && typeof value.date === "string";
+    }).slice(-200);
+  } catch { return []; }
+}
 
 export default function Home() {
   const [state, setState] = useState<AppState | null>(null);
@@ -52,6 +79,9 @@ export default function Home() {
   const [pendingMsgs, setPendingMsgs] = useState<MessageRow[]>([]);
   const chatInFlightRef = useRef(false);
   const replanInFlightRef = useRef(false);
+  const sessionQueueRef = useRef<PendingSessionLog[] | null>(null);
+  const sessionDrainRef = useRef(false);
+  const lastSessionErrorRef = useRef(0);
   const [forceWizard, setForceWizard] = useState(false);
   const [confirmWipe, setConfirmWipe] = useState(false);
   useBackClose(confirmWipe, () => setConfirmWipe(false));
@@ -78,12 +108,18 @@ export default function Home() {
   }, []);
   useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current); }, []);
 
-  useEffect(() => {
-    api<AppState>("/api/state")
+  const loadInitialState = useCallback(() => {
+    setLoading(true);
+    api<AppState>("/api/state", { timeoutMs: 20_000 })
       .then(setState)
-      .catch(() => notify("Could not reach the server.", "error"))
+      .catch((error) => notify(error instanceof ApiError ? error.message : "Could not reach the server.", "error"))
       .finally(() => setLoading(false));
   }, [notify]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(loadInitialState, 0);
+    return () => window.clearTimeout(timer);
+  }, [loadInitialState]);
 
   useEffect(() => {
     // Theme + age-adaptive presentation mode.
@@ -98,17 +134,80 @@ export default function Home() {
     document.body.className = [theme, mode].filter(Boolean).join(" ");
   }, [state?.settings.theme, state?.user.level]);
 
+  const persistSessionQueue = useCallback(() => {
+    try { localStorage.setItem(SESSION_QUEUE_KEY, JSON.stringify(sessionQueueRef.current || [])); }
+    catch { /* in-memory queue still protects this page session */ }
+  }, []);
+
+  const drainSessionQueue = useCallback(async () => {
+    if (sessionDrainRef.current) return;
+    if (sessionQueueRef.current == null) {
+      try { sessionQueueRef.current = savedSessionQueue(localStorage.getItem(SESSION_QUEUE_KEY)); }
+      catch { sessionQueueRef.current = []; }
+    }
+    if (!sessionQueueRef.current.length) return;
+
+    sessionDrainRef.current = true;
+    try {
+      while (sessionQueueRef.current.length) {
+        const entry = sessionQueueRef.current[0];
+        try {
+          const fresh = await api<AppState>("/api/sessions", {
+            method: "POST",
+            body: JSON.stringify(entry),
+            timeoutMs: 25_000,
+          });
+          sessionQueueRef.current.shift();
+          persistSessionQueue();
+          setState(fresh);
+        } catch {
+          const now = Date.now();
+          if (now - lastSessionErrorRef.current > 60_000) {
+            lastSessionErrorRef.current = now;
+            notify("Study time is saved on this device and will sync when the connection returns.", "error");
+          }
+          break;
+        }
+      }
+    } finally {
+      sessionDrainRef.current = false;
+    }
+  }, [notify, persistSessionQueue]);
+
   const logSession = useCallback(
     (minutes: number, subjectId: number | null, taskId: number | null, mode: string) => {
-      // Send the CLIENT's local date: the server's clock/timezone must
-      // never shift a session into a different day than the user sees.
-      api<AppState>("/api/sessions", {
-        method: "POST",
-        body: JSON.stringify({ minutes, subjectId, taskId, mode, date: today() }),
-      }).then(setState).catch(() => {});
+      if (!Number.isFinite(minutes) || minutes <= 0) return;
+      if (sessionQueueRef.current == null) {
+        try { sessionQueueRef.current = savedSessionQueue(localStorage.getItem(SESSION_QUEUE_KEY)); }
+        catch { sessionQueueRef.current = []; }
+      }
+      const random = typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `${Date.now()}_${Math.random().toString(36).slice(2)}`;
+      sessionQueueRef.current.push({
+        eventId: `session_${random}`,
+        minutes,
+        subjectId,
+        taskId,
+        mode,
+        // Send the CLIENT's local date: server timezone must not move a
+        // session into a different day than the learner sees.
+        date: today(),
+      });
+      // Keep a hard bound if a device stays offline for a very long time.
+      if (sessionQueueRef.current.length > 200) sessionQueueRef.current.splice(0, sessionQueueRef.current.length - 200);
+      persistSessionQueue();
+      void drainSessionQueue();
     },
-    []
+    [drainSessionQueue, persistSessionQueue]
   );
+
+  useEffect(() => {
+    void drainSessionQueue();
+    const onOnline = () => void drainSessionQueue();
+    window.addEventListener("online", onOnline);
+    return () => window.removeEventListener("online", onOnline);
+  }, [drainSessionQueue]);
 
   // 1) The study clock — tracks actual studied time
   const clock = useStudyClock(logSession);
@@ -162,7 +261,7 @@ export default function Home() {
           "success"
         );
       }
-    } catch { notify("Update failed.", "error"); }
+    } catch (error) { notify(apiFailureMessage(error, "Update failed."), "error"); }
   };
 
   const updateTask = async (id: number, patch: TaskPatch) => {
@@ -170,7 +269,7 @@ export default function Home() {
       const s = await api<AppState>("/api/tasks", { method: "PATCH", body: JSON.stringify({ id, ...patch }) });
       setState(s);
       notify("Task updated successfully.", "success");
-    } catch { notify("Could not update task.", "error"); }
+    } catch (error) { notify(apiFailureMessage(error, "Could not update task."), "error"); }
   };
 
   const skipSubjectForDay = async (subjectId: number, date: string) => {
@@ -182,7 +281,7 @@ export default function Home() {
       setState(s);
       const name = s.subjects.find((x) => x.id === subjectId)?.name || "subject";
       notify(`Skipped ${name} for that day.`);
-    } catch { notify("Could not skip subject.", "error"); }
+    } catch (error) { notify(apiFailureMessage(error, "Could not skip subject."), "error"); }
   };
 
   const replan = async () => {
@@ -192,7 +291,7 @@ export default function Home() {
     replanInFlightRef.current = true;
     setBusy(true);
     try {
-      const s = await api<AppState>("/api/replan", { method: "POST" });
+      const s = await api<AppState>("/api/replan", { method: "POST", timeoutMs: 90_000 });
       setState(s);
       const scheduled = s.stats?.scheduledTopics;
       notify(
@@ -201,40 +300,41 @@ export default function Home() {
           : "Schedule rebalanced from today — overdue work moved forward.",
         "success"
       );
-    } catch {
-      notify("Re-plan failed — your existing schedule was left unchanged.", "error");
+    } catch (error) {
+      notify(apiFailureMessage(error, "Re-plan failed — your existing schedule was left unchanged."), "error");
     } finally {
       replanInFlightRef.current = false;
       setBusy(false);
     }
   };
 
-  const patchSettings = async (patch: Record<string, unknown>, replanIt = false) => {
+  const patchSettings = useCallback(async (patch: Record<string, unknown>, replanIt = false) => {
     setBusy(true);
     try {
       const s = await api<AppState>("/api/settings", {
         method: "PATCH",
         body: JSON.stringify({ ...patch, _replan: replanIt }),
+        timeoutMs: replanIt ? 90_000 : 30_000,
       });
       setState(s);
       notify(replanIt ? "Settings saved — schedule regenerated." : "Saved.", "success");
-    } catch { notify("Save failed.", "error"); } finally { setBusy(false); }
-  };
+    } catch (error) { notify(apiFailureMessage(error, "Save failed."), "error"); } finally { setBusy(false); }
+  }, [notify]);
 
   const addSubject = async (payload: { name: string; units: number; difficulty: string; color: string }) => {
     setBusy(true);
     try {
-      setState(await api<AppState>("/api/subjects", { method: "POST", body: JSON.stringify(payload) }));
+      setState(await api<AppState>("/api/subjects", { method: "POST", body: JSON.stringify(payload), timeoutMs: 90_000 }));
       notify("Subject added and lessons generated.", "success");
-    } catch { notify("Could not add subject.", "error"); } finally { setBusy(false); }
+    } catch (error) { notify(apiFailureMessage(error, "Could not add subject."), "error"); } finally { setBusy(false); }
   };
 
   const editSubject = async (payload: { id: number; name: string; units: number; difficulty: string; color: string }) => {
     setBusy(true);
     try {
-      setState(await api<AppState>("/api/subjects", { method: "PATCH", body: JSON.stringify(payload) }));
+      setState(await api<AppState>("/api/subjects", { method: "PATCH", body: JSON.stringify(payload), timeoutMs: 90_000 }));
       notify("Subject updated, schedule rebalanced.", "success");
-    } catch { notify("Could not update.", "error"); } finally { setBusy(false); }
+    } catch (error) { notify(apiFailureMessage(error, "Could not update."), "error"); } finally { setBusy(false); }
   };
 
   const deleteSubject = async (id: number) => {
@@ -242,27 +342,27 @@ export default function Home() {
     try {
       setState(await api<AppState>(`/api/subjects?id=${id}`, { method: "DELETE" }));
       notify("Subject removed.");
-    } catch { notify("Could not delete.", "error"); } finally { setBusy(false); }
+    } catch (error) { notify(apiFailureMessage(error, "Could not delete."), "error"); } finally { setBusy(false); }
   };
 
-  const startSmartClock = () => {
-    const t = today();
-    const task = state?.tasks.find((x) => x.date === t && x.status === "pending") ||
-      state?.tasks.find((x) => x.date === t);
+  const startSmartClock = useCallback(() => {
+    const currentDay = today();
+    const task = state?.tasks.find((item) => item.date === currentDay && item.status === "pending") ||
+      state?.tasks.find((item) => item.date === currentDay);
     if (task) {
       clock.clockIn({ taskId: task.id, subjectId: task.subjectId ?? null });
       notify(`Clocked in: ${task.title.slice(0, 48)}`);
     } else {
-      const sub = state?.subjects[0];
-      clock.clockIn({ subjectId: sub?.id ?? null, taskId: null });
-      notify(sub ? `Clocked in to ${sub.name}.` : "Clocked in — free session.");
+      const subject = state?.subjects[0];
+      clock.clockIn({ subjectId: subject?.id ?? null, taskId: null });
+      notify(subject ? `Clocked in to ${subject.name}.` : "Clocked in — free session.");
     }
-  };
+  }, [clock, notify, state]);
 
   // Clock out from ANYWHERE — one handler for the tracker bar, the up-next
   // card, task rows and Zen mode. Confirms the saved minutes by name.
-  const clockOutNow = () => {
-    const task = state?.tasks.find((x) => x.id === clock.taskId);
+  const clockOutNow = useCallback(() => {
+    const task = state?.tasks.find((item) => item.id === clock.taskId);
     const minutes = Math.floor(clock.elapsed / 60);
     clock.clockOut();
     haptic([12, 30]);
@@ -272,7 +372,7 @@ export default function Home() {
         : `Clocked out — ${minutes > 0 ? `${minutes} min saved.` : "minutes saved."}`,
       "success"
     );
-  };
+  }, [clock, notify, state]);
 
   // Pause when recording; resume when paused/on break.
   const pauseOrResume = () => {
@@ -327,15 +427,22 @@ export default function Home() {
       };
       setPendingMsgs((p) => [...p, optimistic]);
       try {
-        const r = await api<{ reply: string; action: { type: string; payload?: unknown } | null; state: AppState }>(
+        const r = await api<{
+          reply: string;
+          action: { type: string; payload?: unknown } | null;
+          state: AppState;
+          ai?: { source: string; model: string | null; degraded: boolean; message?: string };
+        }>(
           "/api/chat",
           {
             method: "POST",
             body: JSON.stringify({ message, source: meta?.voice ? "voice" : "text", voiceId: meta?.voiceId || "f1" }),
+            timeoutMs: 35_000,
           }
         );
         setState(r.state);
         setPendingMsgs([]);
+        if (r.ai?.degraded && r.ai.message) notify(r.ai.message, "info");
         const a = r.action;
         if (a) {
           if (a.type === "navigate") setPage(String(a.payload) as Page);
@@ -349,13 +456,14 @@ export default function Home() {
           // /api/replan again here caused a second rebuild and race.
           if (a.type === "theme") { void patchSettings({ theme: String(a.payload) }); }
         }
-      } catch {
-        notify("Tutor unavailable right now.", "error");
+      } catch (error) {
+        const message = error instanceof ApiError ? error.message : "Tutor unavailable right now.";
+        notify(message, "error");
         setPendingMsgs((prev) => [
           ...prev,
           {
             id: -Date.now() - 1, userId: 0, role: "assistant",
-            content: "I couldn't reach the tutor service just now. Please try asking again.",
+            content: `I couldn't complete that request. ${message}`,
             createdAt: new Date().toISOString(),
           },
         ]);
@@ -364,7 +472,7 @@ export default function Home() {
         setThinking(false);
       }
     },
-    [clock]
+    [clock, clockOutNow, notify, patchSettings, startSmartClock]
   );
 
   if (loading) {
@@ -389,7 +497,8 @@ export default function Home() {
     return (
       <div className="loader-screen">
         <div className="loader-title">Connection problem</div>
-        <div className="loader-sub">Refresh the page to retry.</div>
+        <div className="loader-sub">Your data is still safe. Check the connection and try again.</div>
+        <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={loadInitialState}>Retry</button>
       </div>
     );
   }
