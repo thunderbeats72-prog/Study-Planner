@@ -26,6 +26,15 @@ export const VOICE_OPTIONS: VoiceOption[] = [
   { id: "device", label: "Device", gender: "female" },
 ];
 
+export type SttLangOption = { id: string; label: string; bcp: string };
+
+export const STT_LANG_OPTIONS: SttLangOption[] = [
+  { id: "en-IN", label: "English (IN)", bcp: "en-IN" },
+  { id: "en-US", label: "English (US)", bcp: "en-US" },
+  { id: "hi-IN", label: "Hindi (हिंदी)", bcp: "hi-IN" },
+  { id: "auto", label: "Auto Detect", bcp: "en-IN" },
+];
+
 export const SPEECH_RATE_OPTIONS = [
   { value: 1, label: "1×" },
   { value: 1.15, label: "1.15×" },
@@ -905,24 +914,32 @@ export type ListenFinal = {
 
 const LAST_LANG_KEY = "shigun-stt-lang";
 
-/** The recognition language. Shigun assesses the language itself: it starts
- *  from the last script the learner spoke and keeps learning as they talk —
- *  there is no manual picker to get wrong. */
+/** The recognition language. Default is English (en-IN). Users can also pick
+ *  their input language directly in the Shigun Chat controls. */
 export function preferredSttLang(): string {
   if (typeof window === "undefined") return "en-IN";
-  return localStorage.getItem(LAST_LANG_KEY) || "en-IN";
+  const saved = localStorage.getItem(LAST_LANG_KEY);
+  if (!saved || saved === "auto") return "en-IN";
+  const matched = STT_LANG_OPTIONS.find((opt) => opt.id === saved || opt.bcp === saved);
+  if (matched) return matched.bcp;
+  return saved;
 }
 
-/** Learn the language from the learner's own speech so the NEXT listen
- *  already tunes recognition (and the reply script) to match. */
+/** Update auto-detected language preference when in Auto mode.
+ *  Explicit language choices (en-IN, en-US, hi-IN) selected by the user
+ *  are preserved so speaking English never accidentally forces Hindi. */
 export function learnSttLang(transcript: string): void {
-  for (const language of LANGS) {
-    if (language.range.test(transcript)) {
-      localStorage.setItem(LAST_LANG_KEY, language.bcp);
-      return;
-    }
+  if (typeof window === "undefined") return;
+  const saved = localStorage.getItem(LAST_LANG_KEY);
+  // Respect explicit user selections
+  if (saved && saved !== "auto") return;
+
+  // In auto mode, require at least 3 Devanagari characters to select Hindi
+  const devanagariHits = (transcript.match(/[\u0900-\u097F]/g) || []).length;
+  if (devanagariHits >= 3) {
+    localStorage.setItem(LAST_LANG_KEY, "auto");
+    return;
   }
-  localStorage.setItem(LAST_LANG_KEY, "en-IN");
 }
 
 let micWarmed = false;

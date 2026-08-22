@@ -6,7 +6,7 @@ import {
   languageCapabilityReply,
   parseCommand,
 } from "../src/lib/ai";
-import { cleanForSpeech, splitSpeechChunks } from "../src/lib/voice";
+import { cleanForSpeech, splitSpeechChunks, preferredSttLang, STT_LANG_OPTIONS } from "../src/lib/voice";
 import { detectLanguage } from "../src/lib/language";
 import { wikiLangFor, searchTerms } from "../src/lib/knowledge";
 import { mergeTranscriptSegments } from "../src/lib/transcript";
@@ -45,6 +45,8 @@ async function runTests() {
   check(detectLanguage("తెలుగు భాష") === "te-IN", "Telugu script detection");
   check(detectLanguage("میں اردو بول سکتا ہوں") === "ur-PK", "Urdu script detection");
   check(detectLanguage("مرحبا بك") === "ar-XA", "Arabic script detection");
+  check(STT_LANG_OPTIONS.some((opt) => opt.id === "en-IN"), "STT options include English");
+  check(preferredSttLang() === "en-IN", "Preferred STT defaults to English (en-IN)");
 
   console.log("\n--- 2. AI Language Capabilities & Commands ---");
   const hiReply = languageCapabilityReply("Can you speak Hindi?", "female");
