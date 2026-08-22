@@ -197,6 +197,15 @@ const HEADERS: Record<string, {
   explainInOne: string; exampleNonExample: string; solveOne: string; nameLimitation: string;
   studyNext: string; askMe: string; reference: string;
 }> = {
+  en: {
+    oneLine: "**In one line:**", definition: "**Definition.**", whyMatters: "**Why it matters.**",
+    howWorks: "**How it actually works**", keyMechanisms: "**Key mechanisms & structure**",
+    examAngle: "**Exam angle**", watchOut: "**Watch out**", testNow: "**Test yourself now**",
+    explainInOne: "Explain it in one sentence without looking.", exampleNonExample: "Give one example and one non-example.",
+    solveOne: "Solve one question that uses this.",
+    nameLimitation: "Name one limitation and a source that addresses it.",
+    studyNext: "**Study next:**", askMe: "Explain", reference: "**Source:**",
+  },
   hi: {
     oneLine: "**एक पंक्ति में:**", definition: "**परिभाषा.**", whyMatters: "**यह क्यों ज़रूरी है.**",
     howWorks: "**यह वास्तव में कैसे काम करता है**", keyMechanisms: "**मुख्य तंत्र और संरचना**",
@@ -299,7 +308,11 @@ const HEADERS: Record<string, {
 };
 
 function lessonHeaders(lang: string) {
-  return HEADERS[lang] || HEADERS.en;
+  if (HEADERS[lang]) return HEADERS[lang];
+  // Marathi / Nepali share Devanagari with Hindi; everything else uses English
+  // structure labels so teachFromKnowledge never reads undefined fields.
+  if (lang === "mr" || lang === "ne") return HEADERS.hi;
+  return HEADERS.en;
 }
 
 /**

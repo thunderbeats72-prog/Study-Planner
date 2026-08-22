@@ -1360,8 +1360,15 @@ export async function localTutor(
   }
 
   const subjectHint = ctx.subjects.find((s) => n.includes(s.name.toLowerCase().split(" ")[0]))?.name;
-  const knowledge = await lookupKnowledge(q);
-  if (knowledge) return { text: teachFromKnowledge(knowledge, q, ctx.level, subjectHint) };
+  try {
+    const knowledge = await lookupKnowledge(q);
+    if (knowledge) {
+      const taught = teachFromKnowledge(knowledge, q, ctx.level, subjectHint);
+      if (taught.trim()) return { text: taught };
+    }
+  } catch (error) {
+    console.warn("Local knowledge tutor failed:", error instanceof Error ? error.message : error);
+  }
 
   // Be honest about WHY the answer is limited. A deployment without an AI key
   // (or with a provider outage) previously got an unexplained generic line,

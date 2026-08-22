@@ -20,6 +20,11 @@ import {
   IconLogo, IconPanelLeft, IconSpark, IconWarn,
 } from "@/components/icons";
 
+import {
+  parseCommand, languageCapabilityReply, instantTutorReply, commandReply,
+} from "@/lib/ai";
+import { appendChatTurn, isFallbackUser } from "@/lib/chatTurn";
+
 type Page = "dashboard" | "planner" | "focus" | "subjects" | "settings";
 
 const NAV: { id: Page; label: string; icon: React.ReactNode }[] = [
@@ -440,7 +445,24 @@ export default function Home() {
             timeoutMs: 35_000,
           }
         );
-        setState(r.state);
+        const reply = (r.reply || "").trim()
+          || "I'm here — try asking again about your plan or a topic from your subjects.";
+        setState((prev) => {
+          const incoming = r.state;
+          // Never replace a real onboarded plan with the empty DB-less
+          // fallback. That used to wipe the chat (and the syllabus) after
+          // a perfectly good tutor reply.
+          const keepPrev = !!prev && isFallbackUser(incoming?.user) && !isFallbackUser(prev.user);
+          const base = (keepPrev ? prev : incoming) || prev;
+          if (!base) return prev;
+          const history = (base.messages || []).filter((row) => row.id > 0);
+          return {
+            ...base,
+            messages: appendChatTurn(history, message, reply, base.user?.id || 0),
+            context: keepPrev && prev ? prev.context : (incoming.context || base.context),
+            aiProvider: incoming.aiProvider ?? base.aiProvider,
+          };
+        });
         setPendingMsgs([]);
         if (r.ai?.degraded && r.ai.message) notify(r.ai.message, "info");
         const a = r.action;
@@ -457,22 +479,53 @@ export default function Home() {
           if (a.type === "theme") { void patchSettings({ theme: String(a.payload) }); }
         }
       } catch (error) {
-        const message = error instanceof ApiError ? error.message : "Tutor unavailable right now.";
-        notify(message, "error");
-        setPendingMsgs((prev) => [
-          ...prev,
-          {
-            id: -Date.now() - 1, userId: 0, role: "assistant",
-            content: `I couldn't complete that request. ${message}`,
-            createdAt: new Date().toISOString(),
-          },
-        ]);
+        console.warn("API call failed, using client-side local tutor fallback:", error);
+        const voiceGender = meta?.voiceId === "m1" ? ("male" as const) : ("female" as const);
+        const action = parseCommand(message);
+        const langReply = languageCapabilityReply(message, voiceGender);
+        const currentCtx = state?.context;
+        const instant = (action || !currentCtx) ? null : instantTutorReply(message, currentCtx);
+
+        let fallbackText = "";
+        if (langReply) {
+          fallbackText = langReply;
+        } else if (action) {
+          fallbackText = commandReply(action, message, currentCtx?.daysLeft ?? 90, voiceGender);
+          if (action.type === "navigate") setPage(String(action.payload) as Page);
+          if (action.type === "startTimer") { if (!clock.running) { if (clock.sessionActive) clock.resume(); else startSmartClock(); } }
+          if (action.type === "stopTimer") { if (clock.sessionActive) clockOutNow(); }
+          if (action.type === "pause") { if (clock.running) clock.pause(); else notify("No session running to pause."); }
+          if (action.type === "resume") { if (clock.onBreak || clock.elapsed > 0) clock.resume(); else if (!clock.running) startSmartClock(); }
+          if (action.type === "break") { if (clock.running) clock.takeBreak(); else notify("Start a session first, then take a break."); }
+          if (action.type === "zen") setZen(true);
+          if (action.type === "theme") { void patchSettings({ theme: String(action.payload) }); }
+        } else if (instant) {
+          fallbackText = instant.text;
+        } else {
+          fallbackText = "I'm running in local mode right now. Ask me anything about your study plan, subjects, practice questions, or clock commands.";
+        }
+
+        const botMsg: MessageRow = {
+          id: Date.now() + 1,
+          userId: state?.user.id || 0,
+          role: "assistant",
+          content: fallbackText,
+          createdAt: new Date().toISOString(),
+        };
+
+        if (state) {
+          setState({
+            ...state,
+            messages: [...state.messages, optimistic, botMsg],
+          });
+        }
+        setPendingMsgs([]);
       } finally {
         chatInFlightRef.current = false;
         setThinking(false);
       }
     },
-    [clock, clockOutNow, notify, patchSettings, startSmartClock]
+    [clock, clockOutNow, notify, patchSettings, startSmartClock, state]
   );
 
   if (loading) {

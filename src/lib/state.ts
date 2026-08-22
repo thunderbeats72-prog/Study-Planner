@@ -87,16 +87,22 @@ export async function loadState(userId: number) {
 
 export function defaultFallbackState(userKey: string) {
   const today = todayStr();
+  // Shape must match the AppState the client renders. A mismatched fallback
+  // (missing pomodoro / studyDays / course) used to crash Settings and wipe
+  // the chat after a successful tutor reply.
   return {
     user: {
       id: 0,
       userKey,
       name: "Learner",
+      level: "ug",
+      course: "custom",
       courseName: "General Curriculum",
-      level: "Intermediate",
-      streak: 1,
+      year: "1",
       onboarded: true,
-      createdAt: new Date().toISOString(),
+      streak: 1,
+      lastStudyDate: null,
+      createdAt: new Date(),
     },
     settings: {
       id: 0,
@@ -104,13 +110,19 @@ export function defaultFallbackState(userKey: string) {
       startDate: today,
       examDate: addDays(today, 90),
       dailyHours: 3,
-      enabledDays: [true, true, true, true, true, false, false],
-      preferredTime: "morning" as const,
-      revisionMode: "spaced" as const,
+      subjectsPerDay: 2,
+      studyDays: "all",
+      bufferDays: 5,
+      planMode: "syllabus",
+      studyStyle: "balanced",
+      weakSubject: "none",
+      revisionWeeks: 1,
       theme: "silver-lavender",
-      aiProvider: "local",
-      aiApiKey: null,
-      customModel: null,
+      pomodoro: 25,
+      shortBreak: 5,
+      longBreak: 15,
+      confetti: true,
+      sounds: true,
     },
     subjects: [],
     topics: [],
