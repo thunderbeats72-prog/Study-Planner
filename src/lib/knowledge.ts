@@ -149,6 +149,24 @@ async function searchAndExtract(lang: string, term: string): Promise<Knowledge |
   };
 }
 
+/** True when the encyclopedia hit is actually about the asked topic, not a
+ *  loosely related article that happened to share one common word. */
+export function isRelevantKnowledge(k: Knowledge, question: string): boolean {
+  const term = searchTerms(question).toLowerCase();
+  if (!term) return false;
+  const title = k.title.toLowerCase();
+  const extract = k.extract.toLowerCase();
+  const words = term.split(/\s+/).filter((word) => word.length >= 3);
+  if (!words.length) {
+    return title.includes(term) || extract.slice(0, 400).includes(term);
+  }
+  if (words.length === 1) {
+    return title.includes(words[0]) || extract.slice(0, 600).includes(words[0]);
+  }
+  const hits = words.filter((word) => title.includes(word) || extract.slice(0, 800).includes(word));
+  return hits.length >= Math.min(2, words.length);
+}
+
 /** Search Wikipedia (in the question's language, falling back to English)
  *  and return a rich extract for the best matching article. */
 export async function lookupKnowledge(question: string): Promise<Knowledge | null> {
@@ -157,12 +175,14 @@ export async function lookupKnowledge(question: string): Promise<Knowledge | nul
 
   const lang = wikiLangFor(question);
   const found = await searchAndExtract(lang, term);
-  if (found) return found;
+  if (found && isRelevantKnowledge(found, question)) return found;
 
   // Some technical topics only exist (or are far richer) on the English wiki.
   // A non-English learner still gets a useful, correctly structured lesson —
   // the bilingual lesson headers below stay in their language.
-  return lang === "en" ? null : searchAndExtract("en", term);
+  if (lang === "en") return null;
+  const english = await searchAndExtract("en", term);
+  return english && isRelevantKnowledge(english, question) ? english : null;
 }
 
 function sentences(text: string): string[] {
