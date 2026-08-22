@@ -6,9 +6,6 @@ import { IconCheck } from "./icons";
 
 type Level = { id: string; label: string; sub: string };
 type SeedSubject = { name: string; units: number; difficulty: string; color: string };
-type CurriculumSource = {
-  title: string; publisher: string; type: string; url?: string; note?: string;
-};
 type CourseMeta = { id: string; name: string; level: string; subjects: SeedSubject[] };
 
 const PALETTE = ["#6366f1", "#10b981", "#f59e0b", "#ef4444", "#06b6d4", "#ec4899", "#84cc16", "#8b5cf6"];
@@ -41,7 +38,6 @@ export default function Onboarding({
   const [goalText, setGoalText] = useState("");
   const [suggesting, setSuggesting] = useState(false);
   const [suggestSource, setSuggestSource] = useState("");
-  const [suggestSources, setSuggestSources] = useState<CurriculumSource[]>([]);
   // adaptive course-detail fields
   const [institution, setInstitution] = useState("");
   const [specialisation, setSpecialisation] = useState("");
@@ -114,13 +110,12 @@ export default function Onboarding({
     setSuggesting(true);
     setErr("");
     try {
-      const r = await api<{ subjects: SeedSubject[]; source: string; sources: CurriculumSource[] }>("/api/course-suggest", {
+      const r = await api<{ subjects: SeedSubject[]; source: string }>("/api/course-suggest", {
         method: "POST",
         body: JSON.stringify({ courseName: assessmentText, level }),
       });
       setSubs(r.subjects.map((x) => ({ ...x })));
       setSuggestSource(r.source);
-      setSuggestSources(r.sources || []);
       setStep(4);
     } catch {
       setErr("Could not build the subject list. Add your subjects manually below.");
@@ -132,12 +127,7 @@ export default function Onboarding({
 
   const totalUnits = subs.reduce((a, s) => a + (Number(s.units) || 0), 0);
   const availDays = Math.max(1, dayDiff(start, exam));
-  // Capacity reflects the actual difficulty-weighted lesson engine instead of
-  // pretending every unit costs the same 50 minutes.
-  const estMinutes = subs.reduce((total, subject) => {
-    const perUnit = subject.difficulty === "Hard" ? 65 : subject.difficulty === "Easy" ? 40 : 50;
-    return total + (Number(subject.units) || 0) * perUnit;
-  }, 0);
+  const estMinutes = totalUnits * 50;
   const capacity = availDays * hrs * 60 * 0.78;
   const feasible = capacity >= estMinutes;
   const projected = addDays(start, Math.min(availDays, Math.ceil(estMinutes / Math.max(1, hrs * 60 * 0.78))));
@@ -156,15 +146,11 @@ export default function Onboarding({
       if (title.trim()) {
         setSuggesting(true);
         try {
-          const r = await api<{ subjects: SeedSubject[]; source: string; sources: CurriculumSource[] }>("/api/course-suggest", {
+          const r = await api<{ subjects: SeedSubject[]; source: string }>("/api/course-suggest", {
             method: "POST",
             body: JSON.stringify({ courseName: buildAssessmentText(title, goalText), level }),
           });
-          if (r.subjects?.length) {
-            setSubs(r.subjects.map((x) => ({ ...x })));
-            setSuggestSource(r.source);
-            setSuggestSources(r.sources || []);
-          }
+          if (r.subjects?.length) { setSubs(r.subjects.map((x) => ({ ...x }))); setSuggestSource(r.source); }
         } catch { /* keep whatever we have */ } finally { setSuggesting(false); }
       }
     }
@@ -376,7 +362,7 @@ export default function Onboarding({
                     <select value={priorPrep} onChange={(e) => setPriorPrep(e.target.value)}>
                       <option value="fresh">Starting fresh (0-20%)</option>
                       <option value="partial">Partly done (20-60%)</option>
-                      <option value="revision">Mostly done (60%+)</option>
+                      <option value="revision">Mostly done, need revision (60%+)</option>
                     </select>
                   </div>
                 </>
@@ -431,24 +417,8 @@ export default function Onboarding({
                 <span className="chip chip-kind">source: {suggestSource}</span>
               )}
             </div>
-            {!!suggestSources.length && (
-              <div className="curriculum-sources" aria-label="Curriculum source details">
-                <div className="curriculum-sources-title">Source details used for this curriculum</div>
-                {suggestSources.map((source, index) => (
-                  <div className="curriculum-source" key={`${source.publisher}-${source.title}-${index}`}>
-                    <span className="curriculum-source-type">{source.type}</span>
-                    <div>
-                      {source.url ? (
-                        <a href={source.url} target="_blank" rel="noreferrer">{source.title}</a>
-                      ) : <strong>{source.title}</strong>}
-                      <div>{source.publisher}{source.note ? ` · ${source.note}` : ""}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
             <div className="ob-hint" style={{ marginTop: 10 }}>
-              {subs.length} subjects · <strong>{totalUnits} advanced lessons</strong> will be generated with prerequisites, key concepts, applied practice, and source references.
+              {subs.length} subjects · <strong>{totalUnits} lessons</strong> will be generated by the AI curriculum engine.
             </div>
           </>
         )}
@@ -468,9 +438,9 @@ export default function Onboarding({
               <div className="ob-field">
                 <label>Study Style</label>
                 <select value={style} onChange={(e) => setStyle(e.target.value)}>
-                  <option value="balanced">Balanced — all-round</option>
-                  <option value="theory">Theory heavy</option>
-                  <option value="practice">Practice heavy</option>
+                  <option value="balanced">Balanced (theory + practice)</option>
+                  <option value="theory">Theory heavy (concept first)</option>
+                  <option value="practice">Practice heavy (question first)</option>
                 </select>
               </div>
               <div className="ob-field">
@@ -479,15 +449,15 @@ export default function Onboarding({
                   <option value="1">Last 1 week</option>
                   <option value="2">Last 2 weeks</option>
                   <option value="3">Last 3 weeks</option>
-                  <option value="0">No revision block</option>
+                  <option value="0">No dedicated revision block</option>
                 </select>
               </div>
               <div className="ob-field">
                 <label>Plan Mode</label>
                 <select value={planMode} onChange={(e) => setPlanMode(e.target.value)}>
-                  <option value="syllabus">Syllabus — from scratch</option>
-                  <option value="revision">Revision — studied once</option>
-                  <option value="mock">Mock-heavy — test &amp; fix</option>
+                  <option value="syllabus">Syllabus — learn everything from scratch</option>
+                  <option value="revision">Revision — I&apos;ve studied it once already</option>
+                  <option value="mock">Mock-heavy — test &amp; fix weak areas</option>
                 </select>
               </div>
             </div>

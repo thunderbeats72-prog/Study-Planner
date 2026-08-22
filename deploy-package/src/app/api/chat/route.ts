@@ -3,80 +3,29 @@ import { db } from "@/db";
 import { messages } from "@/db/schema";
 import { asc, eq } from "drizzle-orm";
 import { buildContext, fullState, getOrCreateUser, getSettings, keyFrom } from "@/lib/state";
-import {
-  callLLM, localTutor, parseCommand, tutorSystemPrompt, activeProvider,
-  extractLlmAction, languageCapabilityReply, instantTutorReply,
-} from "@/lib/ai";
+import { callLLM, localTutor, parseCommand, tutorSystemPrompt, activeProvider, extractLlmAction } from "@/lib/ai";
 import { regeneratePlan } from "@/lib/generate";
-import { mergeTranscriptSegments } from "@/lib/transcript";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
-type GroundingState = Awaited<ReturnType<typeof fullState>>;
-
-function curriculumGrounding(question: string, state: GroundingState): string {
-  const normalized = question.toLowerCase();
-  const queryTokens = new Set(
-    normalized.split(/[^a-z0-9]+/).filter((token) => token.length >= 4)
-  );
-  const subjectById = new Map(state.subjects.map((subject) => [subject.id, subject]));
-  const ranked = state.topics
-    .map((topic) => {
-      const title = topic.title.toLowerCase();
-      const titleTokens = title.split(/[^a-z0-9]+/).filter((token) => token.length >= 4);
-      const exact = normalized.includes(title) ? 20 : 0;
-      const overlap = titleTokens.filter((token) => queryTokens.has(token)).length;
-      const subject = subjectById.get(topic.subjectId);
-      const subjectHit = subject && normalized.includes(subject.name.toLowerCase()) ? 3 : 0;
-      return { topic, subject, score: exact + overlap + subjectHit };
-    })
-    .filter((candidate) => candidate.score >= 2)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 2);
-
-  if (!ranked.length) return "";
-  const lessons = ranked.map(({ topic, subject }) => {
-    const sources = (topic.sources || []).map((source) =>
-      `${source.title} — ${source.publisher}${source.section ? `, section: ${source.section}` : ""}`
-    ).join("; ");
-    return [
-      `Lesson: ${topic.title} (${subject?.name || "course"}, ${topic.unit}, ${topic.depth})`,
-      `Summary: ${topic.summary}`,
-      `Key concepts: ${(topic.keyConcepts || []).join(", ")}`,
-      `Outcomes: ${(topic.objectives || []).join("; ")}`,
-      `Practice: ${topic.practice}`,
-      sources ? `Approved sources: ${sources}` : "",
-    ].filter(Boolean).join("\n");
-  }).join("\n\n");
-
-  return `\n\nCURRICULUM-GROUNDED CONTEXT:\n${lessons}\nUse this lesson context first. Cite only the approved source titles/publishers above; never invent a citation.`;
-}
-
 export async function POST(req: Request) {
   const key = keyFrom(req);
   const user = await getOrCreateUser(key);
-  const { message, source } = (await req.json()) as { message: string; source?: "voice" | "text" };
-  const rawText = (message || "").trim();
-  // Apply strict echo cleanup only to microphone messages. Typed prose is
-  // preserved exactly, including intentional repetition.
-  const text = source === "voice" ? mergeTranscriptSegments([rawText]) : rawText;
+  const { message } = (await req.json()) as { message: string };
+  const text = (message || "").trim();
   if (!text) return NextResponse.json({ error: "empty" }, { status: 400 });
 
   const state = await fullState(key);
   const ctx = buildContext(state);
   let action = parseCommand(text);
-  const languageReply = languageCapabilityReply(text);
-  const instantReply = action ? null : instantTutorReply(text, ctx);
 
   await db.insert(messages).values({ userId: user.id, role: "user", content: text });
 
   let finalText: string;
   let replanned = false;
 
-  if (languageReply) {
-    finalText = languageReply;
-  } else if (action) {
+  if (action) {
     // A recognised in-app command: give a short, deterministic confirmation and
     // let the app perform the action. No LLM/knowledge lookup needed.
     if (action.type === "replan") {
@@ -96,25 +45,15 @@ export async function POST(req: Request) {
       theme: `Theme updated. Other styles: *obsidian*, *nebula*, *sunset*, *mint*, *lavender*.`,
     };
     finalText = confirmations[action.type] || "Done.";
-  } else if (instantReply) {
-    // Common plan/progress questions are answered from live app data without
-    // paying a model round-trip, so they feel immediate and stay factual.
-    finalText = instantReply.text;
   } else {
     // Normal question → LLM if available, else the local reasoning engine.
     let reply: string | null = null;
-    const cloudAttempted = !!activeProvider();
-    if (cloudAttempted) {
+    if (activeProvider()) {
       const history = state.messages.slice(-10).map((m) => ({
         role: m.role === "assistant" ? ("assistant" as const) : ("user" as const),
         content: m.content,
       }));
-      const systemPrompt = tutorSystemPrompt(ctx)
-        + curriculumGrounding(text, state)
-        + (source === "voice"
-          ? "\n\nVOICE TURN: Answer in 80-140 spoken words unless the learner explicitly asks for a detailed lesson. Lead with the answer; avoid long preambles and oversized lists."
-          : "");
-      reply = await callLLM(systemPrompt, [...history, { role: "user", content: text }], source === "voice" ? 700 : 1600);
+      reply = await callLLM(tutorSystemPrompt(ctx), [...history, { role: "user", content: text }], 1600);
     }
     if (reply) {
       // The LLM may have emitted an [[action:...]] tag for requests the
@@ -131,9 +70,7 @@ export async function POST(req: Request) {
         }
       }
     } else {
-      // Do not call the same cloud chain a second time after a provider
-      // timeout/failure; the local knowledge path should answer immediately.
-      const local = await localTutor(text, ctx, { skipCloud: cloudAttempted });
+      const local = await localTutor(text, ctx);
       finalText = local.text;
       if (local.action) action = local.action;
     }

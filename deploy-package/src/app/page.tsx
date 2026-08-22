@@ -50,8 +50,6 @@ export default function Home() {
   const [toast, setToast] = useState<Toast | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [pendingMsgs, setPendingMsgs] = useState<MessageRow[]>([]);
-  const chatInFlightRef = useRef(false);
-  const replanInFlightRef = useRef(false);
   const [forceWizard, setForceWizard] = useState(false);
   const [confirmWipe, setConfirmWipe] = useState(false);
   useBackClose(confirmWipe, () => setConfirmWipe(false));
@@ -170,27 +168,12 @@ export default function Home() {
   };
 
   const replan = async () => {
-    // A fast second tap previously launched two destructive rebuilds in
-    // parallel. The ref closes that pre-render window immediately.
-    if (replanInFlightRef.current) return;
-    replanInFlightRef.current = true;
     setBusy(true);
     try {
       const s = await api<AppState>("/api/replan", { method: "POST" });
       setState(s);
-      const scheduled = s.stats?.scheduledTopics;
-      notify(
-        scheduled
-          ? `Rebalanced from today · ${scheduled} lessons scheduled.`
-          : "Schedule rebalanced from today — overdue work moved forward.",
-        "success"
-      );
-    } catch {
-      notify("Re-plan failed — your existing schedule was left unchanged.", "error");
-    } finally {
-      replanInFlightRef.current = false;
-      setBusy(false);
-    }
+      notify("Schedule mathematically rebalanced from today.", "success");
+    } catch { notify("Re-plan failed.", "error"); } finally { setBusy(false); }
   };
 
   const patchSettings = async (patch: Record<string, unknown>, replanIt = false) => {
@@ -265,25 +248,17 @@ export default function Home() {
   };
 
   const askTutor = useCallback(
-    async (q: string, meta?: { voice?: boolean }) => {
-      const message = q.trim();
+    async (q: string) => {
       setChatOpen(true);
-      // Disable duplicate taps synchronously; waiting for `thinking` to render
-      // left enough time for the same mobile request to be inserted twice.
-      if (!message || chatInFlightRef.current) return;
-      chatInFlightRef.current = true;
       setThinking(true);
       const optimistic: MessageRow = {
-        id: -Date.now(), userId: 0, role: "user", content: message, createdAt: new Date().toISOString(),
+        id: -Date.now(), userId: 0, role: "user", content: q, createdAt: new Date().toISOString(),
       };
       setPendingMsgs((p) => [...p, optimistic]);
       try {
         const r = await api<{ reply: string; action: { type: string; payload?: unknown } | null; state: AppState }>(
           "/api/chat",
-          {
-            method: "POST",
-            body: JSON.stringify({ message, source: meta?.voice ? "voice" : "text" }),
-          }
+          { method: "POST", body: JSON.stringify({ message: q }) }
         );
         setState(r.state);
         setPendingMsgs([]);
@@ -296,8 +271,7 @@ export default function Home() {
           if (a.type === "resume") { if (clock.onBreak) clock.endBreak(); else if (!clock.running) startSmartClock(); }
           if (a.type === "break") { if (clock.running) clock.takeBreak(); else notify("Start a session first, then take a break."); }
           if (a.type === "zen") setZen(true);
-          // The chat API already performs and returns a fresh replan. Calling
-          // /api/replan again here caused a second rebuild and race.
+          if (a.type === "replan") { void replan(); }
           if (a.type === "theme") { void patchSettings({ theme: String(a.payload) }); }
         }
       } catch {
@@ -310,10 +284,7 @@ export default function Home() {
             createdAt: new Date().toISOString(),
           },
         ]);
-      } finally {
-        chatInFlightRef.current = false;
-        setThinking(false);
-      }
+      } finally { setThinking(false); }
     },
     [clock]
   );

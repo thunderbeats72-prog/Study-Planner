@@ -5,25 +5,11 @@ export type SeedSubject = {
   color: string;
 };
 
-export type CurriculumSource = {
-  title: string;
-  publisher: string;
-  type: "Official syllabus" | "Primary text" | "Reference";
-  url?: string;
-  note?: string;
-  section?: string;
-};
-
 export type GeneratedTopic = {
   unit: string;
   title: string;
   summary: string;
   objectives: string[];
-  prerequisites: string[];
-  keyConcepts: string[];
-  practice: string;
-  depth: "Foundation" | "Core" | "Advanced" | "Synthesis";
-  sources: CurriculumSource[];
   difficulty: "Easy" | "Medium" | "Hard";
   estMinutes: number;
 };
@@ -217,7 +203,7 @@ export function isNmimsQuery(q: string): boolean {
   if (/university|college|institute|iim\b|school of/i.test(s) && !/nmims|cdoe|nga[\s.-]?sce/i.test(s)) {
     return false;
   }
-  return /nmims|cdoe|nga[\s.-]?sce/i.test(s);
+  return /nmims|cdoe|nga[\s.-]?sce|distance[\s.-]*mba|online[\s.-]*mba|mba[\s.-]*\(?\s*(in\s+)?marketing|marketing[\s.-]*mba/i.test(s);
 }
 
 /**
@@ -940,152 +926,12 @@ export function normalise(str: string): string {
   return str.toLowerCase().replace(/[^a-z\s&]/g, " ").replace(/\s+/g, " ").trim();
 }
 
-/**
- * Curated, durable source metadata for generated curricula. We do not accept
- * citation URLs from the LLM: that would turn a useful reference panel into
- * a hallucinated bibliography. Institution/board sources take precedence,
- * followed by an authoritative subject reference.
- */
-export function curriculumSources(
-  courseName: string,
-  subjectName = "",
-  level = ""
-): CurriculumSource[] {
-  const query = `${courseName} ${subjectName}`.toLowerCase();
-  const sources: CurriculumSource[] = [];
-  const add = (source: CurriculumSource) => {
-    if (!sources.some((item) => item.title === source.title && item.publisher === source.publisher)) {
-      sources.push(source);
-    }
-  };
-
-  if (isNmimsQuery(courseName)) {
-    add({
-      title: `${subjectName || "MBA"} course material`,
-      publisher: "NMIMS Centre for Distance and Online Education",
-      type: "Primary text",
-      url: "https://online.nmims.edu/",
-      note: "Chapter order follows the verified NMIMS CDOE course-book contents catalog.",
-    });
-  } else if (isAmityQuery(courseName)) {
-    add({
-      title: "Online MBA programme syllabus",
-      publisher: "Amity University Online",
-      type: "Official syllabus",
-      url: "https://amityonline.com/",
-      note: "Use the current programme handbook for term-specific assessment rules.",
-    });
-  }
-
-  if (getCbseChapters(subjectName) || /\bcbse\b|\bncert\b/.test(query)) {
-    add({
-      title: `${subjectName || "NCERT"} textbook and rationalised contents`,
-      publisher: "National Council of Educational Research and Training (NCERT)",
-      type: "Primary text",
-      url: "https://ncert.nic.in/textbook.php",
-      note: "Lesson titles are aligned to the official textbook contents.",
-    });
-    add({
-      title: "Current curriculum and syllabus",
-      publisher: "Central Board of Secondary Education (CBSE)",
-      type: "Official syllabus",
-      url: "https://cbseacademic.nic.in/curriculum.html",
-    });
-  } else if (/\bjee\b|\bneet\b|\bnta\b/.test(query)) {
-    add({
-      title: "Current examination syllabus and information bulletin",
-      publisher: "National Testing Agency (NTA)",
-      type: "Official syllabus",
-      url: "https://www.nta.ac.in/",
-      note: "Confirm the bulletin for the learner's target attempt before scheduling.",
-    });
-  } else if (/\bupsc\b|civil services/.test(query)) {
-    add({
-      title: "Civil Services Examination syllabus and scheme",
-      publisher: "Union Public Service Commission",
-      type: "Official syllabus",
-      url: "https://upsc.gov.in/examinations/revised-syllabus-scheme",
-    });
-  } else if (/\bgate\b/.test(query)) {
-    add({
-      title: "GATE papers and syllabus",
-      publisher: "Graduate Aptitude Test in Engineering",
-      type: "Official syllabus",
-      url: "https://gate2026.iitg.ac.in/exam-papers-and-syllabus.html",
-      note: "Verify against the official portal for the learner's target examination year.",
-    });
-  } else if (/\bca\b|chartered account|icai/.test(query)) {
-    add({
-      title: "New Scheme of Education and Training",
-      publisher: "Institute of Chartered Accountants of India (ICAI)",
-      type: "Official syllabus",
-      url: "https://www.icai.org/post/new-scheme-of-education-and-training",
-    });
-  } else if (/\bcfa\b/.test(query)) {
-    add({
-      title: "CFA Program Level I candidate resources",
-      publisher: "CFA Institute",
-      type: "Official syllabus",
-      url: "https://www.cfainstitute.org/programs/cfa-program/candidate-resources/level-i-exam",
-    });
-  } else if (/\bpmp\b|project management/.test(query)) {
-    add({
-      title: "PMP examination content and certification resources",
-      publisher: "Project Management Institute",
-      type: "Official syllabus",
-      url: "https://www.pmi.org/certifications/project-management-pmp",
-    });
-  }
-
-  if (/law|legal|constitution|criminal|contract|taxation/.test(query)) {
-    add({
-      title: "Central Acts and subordinate legislation",
-      publisher: "India Code, Government of India",
-      type: "Reference",
-      url: "https://www.indiacode.nic.in/",
-      note: "Check amendment dates before relying on a statutory provision.",
-    });
-  } else if (/anatomy|physiology|medical|medicine|nursing|mbbs/.test(query)) {
-    add({
-      title: "Undergraduate medical curriculum",
-      publisher: "National Medical Commission",
-      type: "Official syllabus",
-      url: "https://www.nmc.org.in/information-desk/for-colleges/ug-curriculum/",
-    });
-  } else if (/programming|computer|software|algorithm|data structure|web development|database|network|operating system|machine learning|artificial intelligence/.test(query)) {
-    add({
-      title: /web development/.test(query) ? "MDN Learn Web Development" : "OpenDSA interactive computer science materials",
-      publisher: /web development/.test(query) ? "Mozilla" : "Virginia Tech OpenDSA",
-      type: "Reference",
-      url: /web development/.test(query)
-        ? "https://developer.mozilla.org/en-US/docs/Learn_web_development"
-        : "https://opendsa-server.cs.vt.edu/",
-    });
-  } else if (/physics|chemistry|biology|mathematics|statistics|economics|accounting|finance|marketing|management|business|psychology|sociology/.test(query)) {
-    add({
-      title: `${subjectName || "Subject"} supporting text collection`,
-      publisher: "OpenStax, Rice University",
-      type: "Reference",
-      url: "https://openstax.org/subjects",
-      note: "Use the matching peer-reviewed open textbook for worked examples and practice.",
-    });
-  }
-
-  if (!sources.length) {
-    add({
-      title: `${courseName || subjectName || "Programme"} official syllabus or handbook`,
-      publisher: level === "school" ? "Learner's board or school" : "Awarding institution",
-      type: "Official syllabus",
-      note: "Baseline reference: verify unit names and assessment weightings against the current official handbook.",
-    });
-  }
-  return sources.slice(0, 3);
-}
-
 export function lookupTopicBank(subjectName: string): string[] | null {
-  // CBSE/NCERT verified subjects use strict-equality ground truth. NMIMS is
-  // resolved by generateTopics only when the course itself identifies NMIMS;
-  // common names such as "Marketing Management" must not be misattributed.
+  // NMIMS verified subjects resolve by strict equality first — the exact
+  // textbook chapters, never a fuzzy neighbour like "Quantitative Aptitude".
+  const nmims = getNmimsChapters(subjectName);
+  if (nmims) return nmims;
+  // CBSE/NCERT verified subjects: same strict-equality ground truth.
   const cbse = getCbseChapters(subjectName);
   if (cbse) return cbse;
 
@@ -1123,61 +969,21 @@ const GENERIC_TEMPLATES = [
   "Previous-year question drill — {S}",
 ];
 
-export function advancedTopicMetadata({
-  title, subjectName, index, total, difficulty, level, courseName, previousTitle,
-}: {
-  title: string;
-  subjectName: string;
-  index: number;
-  total: number;
-  difficulty: string;
-  level: string;
-  courseName: string;
-  previousTitle?: string;
-}): Pick<GeneratedTopic,
-  "summary" | "objectives" | "prerequisites" | "keyConcepts" | "practice" | "depth" | "sources" | "difficulty" | "estMinutes"
-> {
-  const phase = index / Math.max(1, total - 1);
-  const topicDifficulty: GeneratedTopic["difficulty"] =
-    difficulty === "Hard" ? (phase < 0.2 ? "Medium" : "Hard")
-    : difficulty === "Easy" ? (phase > 0.8 ? "Medium" : "Easy")
-    : phase > 0.66 ? "Hard" : phase < 0.3 ? "Easy" : "Medium";
-  const depth: GeneratedTopic["depth"] = phase < 0.2
-    ? "Foundation" : phase < 0.62 ? "Core" : phase < 0.86 ? "Advanced" : "Synthesis";
-  // Keep lesson estimates aligned with the onboarding capacity model. Depth
-  // comes from better outcomes/practice, not inflated seat time.
-  const baseMin = level === "nursery" ? 20 : level === "school" ? 40 : level === "phd" ? 70 : 50;
-  const diffMul = difficulty === "Hard" ? 1.3 : difficulty === "Easy" ? 0.8 : 1;
-  return {
-    summary: buildSummary(title, subjectName, depth),
-    objectives: buildObjectives(title, subjectName, depth),
-    prerequisites: index === 0
-      ? [`Working vocabulary and baseline concepts for ${subjectName}`]
-      : [`Recall and apply: ${previousTitle || `the previous ${subjectName} lesson`}`],
-    keyConcepts: buildKeyConcepts(title, subjectName, depth),
-    practice: buildPractice(title, subjectName, topicDifficulty, level),
-    depth,
-    sources: curriculumSources(courseName, subjectName, level).map((source) => ({ ...source, section: title })),
-    difficulty: topicDifficulty,
-    estMinutes: Math.round((baseMin * diffMul * (0.9 + phase * 0.45)) / 5) * 5,
-  };
-}
-
 export function generateTopics(
   subjectName: string,
   unitCount: number,
   difficulty: string,
-  level: string,
-  courseName = ""
+  level: string
 ): GeneratedTopic[] {
-  // Verified catalogs define the unit count. A stale UI value or model output
-  // can never truncate or extend these official chapter sequences.
-  const nmimsChapters = isNmimsQuery(courseName) ? getNmimsChapters(subjectName) : null;
+  // NMIMS ground truth: the verified chapter list defines the unit count.
+  // Even if a caller passes a stale/hallucinated count, we lock to the
+  // exact textbook chapters (12 / 16 units per the physical books).
+  const nmimsChapters = getNmimsChapters(subjectName);
   if (nmimsChapters) unitCount = nmimsChapters.length;
   const cbseChapters = getCbseChapters(subjectName);
   if (cbseChapters) unitCount = cbseChapters.length;
 
-  const bank = nmimsChapters || cbseChapters || lookupTopicBank(subjectName);
+  const bank = lookupTopicBank(subjectName);
   const titles: string[] = [];
   if (bank) {
     const extend = [
@@ -1196,78 +1002,37 @@ export function generateTopics(
       titles.push(GENERIC_TEMPLATES[i % GENERIC_TEMPLATES.length].replace("{S}", subjectName));
     }
   }
-  return titles.map((title, index) => ({
-    unit: `Unit ${index + 1}`,
-    title,
-    ...advancedTopicMetadata({
+  const baseMin = level === "nursery" ? 20 : level === "school" ? 40 : level === "phd" ? 70 : 50;
+  const diffMul = difficulty === "Hard" ? 1.35 : difficulty === "Easy" ? 0.8 : 1;
+
+  return titles.map((title, i) => {
+    const phase = i / Math.max(1, titles.length - 1);
+    const topicDiff: "Easy" | "Medium" | "Hard" =
+      difficulty === "Hard" ? (phase < 0.25 ? "Medium" : "Hard")
+      : difficulty === "Easy" ? (phase > 0.8 ? "Medium" : "Easy")
+      : phase > 0.66 ? "Hard" : phase < 0.3 ? "Easy" : "Medium";
+    return {
+      unit: `Unit ${i + 1}`,
       title,
-      subjectName,
-      index,
-      total: titles.length,
-      difficulty,
-      level,
-      courseName,
-      previousTitle: titles[index - 1],
-    }),
-  }));
+      summary: buildSummary(title, subjectName, phase),
+      objectives: buildObjectives(title, subjectName),
+      difficulty: topicDiff,
+      estMinutes: Math.round((baseMin * diffMul * (0.85 + phase * 0.4)) / 5) * 5,
+    };
+  });
 }
 
-function buildSummary(title: string, subject: string, depth: GeneratedTopic["depth"]): string {
-  if (depth === "Foundation") {
-    return `Establish the vocabulary, assumptions, and first-principles model behind “${title}” in ${subject}. Connect each definition to a concrete example, then test the model against a simple counterexample.`;
-  }
-  if (depth === "Core") {
-    return `Develop the core methods behind “${title}” and compare when each method is valid. Move from a guided example to independent analysis, explicitly recording assumptions, intermediate steps, and common failure modes.`;
-  }
-  if (depth === "Advanced") {
-    return `Analyse “${title}” at an advanced level by combining competing frameworks, boundary cases, and evidence. Defend a solution or interpretation, then evaluate how the conclusion changes when a key assumption is relaxed.`;
-  }
-  return `Synthesize “${title}” with the wider ${subject} syllabus. Solve an unfamiliar transfer task under exam conditions, diagnose errors by cause, and convert the result into a concise retrieval and revision plan.`;
+function buildSummary(title: string, subject: string, phase: number): string {
+  const stage = phase < 0.33 ? "foundational" : phase < 0.7 ? "core" : "advanced";
+  return `A ${stage} lesson in ${subject}. Build a clear mental model of "${title}", work the standard derivations/definitions, then apply them to 8–12 graded questions before moving on.`;
 }
 
-function buildObjectives(
-  title: string,
-  subject: string,
-  depth: GeneratedTopic["depth"]
-): string[] {
+function buildObjectives(title: string, subject: string): string[] {
   return [
-    `Derive or explain the governing ideas in ${title} from first principles`,
-    `Select and justify an appropriate method for a new ${title} problem`,
-    depth === "Foundation"
-      ? `Distinguish the key terms in ${title} using examples and non-examples`
-      : `Evaluate assumptions, limitations, and edge cases in ${title}`,
-    `Connect ${title} to at least two earlier ideas in ${subject}`,
+    `Explain the central idea of ${title} in your own words`,
+    `Solve at least 8 practice questions from ${title}`,
+    `Create a one-page recall sheet linking ${title} to the rest of ${subject}`,
   ];
-}
-
-function buildKeyConcepts(
-  title: string,
-  subject: string,
-  depth: GeneratedTopic["depth"]
-): string[] {
-  const titleConcepts = title
-    .split(/[:—,&/]|\band\b/i)
-    .map((part) => part.trim())
-    .filter((part) => part.length > 2)
-    .slice(0, 3);
-  return [...new Set([
-    ...titleConcepts,
-    `${subject} assumptions and notation`,
-    depth === "Advanced" || depth === "Synthesis" ? "Boundary cases and transfer" : "Method selection and application",
-  ])].slice(0, 5);
-}
-
-function buildPractice(
-  title: string,
-  subject: string,
-  topicDifficulty: GeneratedTopic["difficulty"],
-  level: string
-): string {
-  if (level === "nursery") return `Complete one guided activity and one play-based recall activity for ${title}.`;
-  if (topicDifficulty === "Hard") {
-    return `Complete 2 worked examples, 8 independent problems, and 1 unfamiliar transfer problem on ${title}; classify every error before checking the solution.`;
-  }
-  return `Complete a retrieval summary, 6 graded questions, and one applied example that links ${title} to another part of ${subject}.`;
 }
 
 export const KIND_LABEL = KIND_SUFFIX;
@@ -1555,8 +1320,8 @@ export function synthesiseSubjects(courseName: string, level: string): SeedSubje
   let picked: SeedSubject[] | null = null;
 
   // ── NMIMS GROUND-TRUTH INTERCEPTION ─────────────────────────────
-  // Any explicit NMIMS/CDOE query with no semester (or semester 1)
-  // ALWAYS returns the verified Semester 1 catalog:
+  // Any NMIMS/CDOE/MBA-Marketing query with no explicit semester (or
+  // semester 1) ALWAYS returns the verified Semester 1 catalog:
   // exactly 6 subjects, exactly 76 units (12+12+12+16+12+12), with
   // the locked colors — bypassing every heuristic below.
   if (isAmityQuery(q)) {

@@ -227,24 +227,13 @@ export function useFocusTimer(
     [durations.pomodoro, durations.shortBreak, durations.longBreak, customMin]
   );
 
-  // Reset the displayed time whenever the mode or configured length changes
-  // while idle. The "previous value in state" pattern keeps this out of an
-  // effect (and avoids the cascading renders effects can introduce).
-  const [idleSnapshot, setIdleSnapshot] = useState(() => ({
-    mode,
-    running,
-    total: durFor(mode),
-  }));
-  {
+  // reset displayed time whenever the mode or configured length changes while idle
+  useEffect(() => {
+    if (running) return;
     const d = durFor(mode);
-    if (idleSnapshot.mode !== mode || idleSnapshot.running !== running || idleSnapshot.total !== d) {
-      setIdleSnapshot({ mode, running, total: d });
-      if (!running) {
-        setSeconds(mode === "stopwatch" ? 0 : d);
-        setTotal(mode === "stopwatch" ? 3600 : d);
-      }
-    }
-  }
+    setSeconds(mode === "stopwatch" ? 0 : d);
+    setTotal(mode === "stopwatch" ? 3600 : d);
+  }, [mode, durFor, running]);
 
   useEffect(() => {
     if (!running) return;

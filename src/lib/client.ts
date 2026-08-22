@@ -14,14 +14,9 @@ export type SubjectRow = {
   id: number; userId: number; name: string; color: string; difficulty: string;
   units: number; weight: number; position: number;
 };
-export type CurriculumSourceRow = {
-  title: string; publisher: string; type: "Official syllabus" | "Primary text" | "Reference";
-  url?: string; note?: string; section?: string;
-};
 export type TopicRow = {
   id: number; userId: number; subjectId: number; unit: string; title: string; summary: string;
-  objectives: string[]; prerequisites: string[]; keyConcepts: string[]; practice: string;
-  depth: string; sources: CurriculumSourceRow[]; difficulty: string; estMinutes: number; position: number;
+  objectives: string[]; difficulty: string; estMinutes: number; position: number;
   mastery: number; status: string;
 };
 export type TaskRow = {
@@ -92,64 +87,16 @@ export function escapeHtml(t: string): string {
 }
 
 export function mdToHtml(md: string): string {
-  const esc = md.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-
-  // Inline formatting applied per line (after escaping).
-  const inline = (s: string): string =>
-    s
-      .replace(/`([^`]+)`/g, "<code>$1</code>")
-      .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
-      .replace(/(^|\s)\*([^*\n]+)\*/g, "$1<em>$2</em>")
-      .replace(/^#{1,3}\s*(.*)$/, "<strong>$1</strong>");
-
-  const lines = esc.split("\n");
-  const out: string[] = [];
-  let textBuf: string[] = [];
-  let listType: "ol" | "ul" | null = null;
-  let inCode = false;
-  let codeBuf: string[] = [];
-
-  const flushText = () => {
-    if (textBuf.length) { out.push(textBuf.map(inline).join("<br/>")); textBuf = []; }
-  };
-  const closeList = () => {
-    if (listType) { out.push(`</${listType}>`); listType = null; }
-  };
-
-  for (const line of lines) {
-    if (/^\s*```/.test(line)) {
-      closeList();
-      flushText();
-      if (inCode) {
-        out.push(`<pre><code>${codeBuf.join("\n")}</code></pre>`);
-        codeBuf = [];
-        inCode = false;
-      } else {
-        inCode = true;
-      }
-      continue;
-    }
-    if (inCode) { codeBuf.push(line); continue; }
-
-    const ol = line.match(/^\s*(\d+)[.)]\s+(.*)$/);
-    const ul = line.match(/^\s*[-*•]\s+(.*)$/);
-    if (ol) {
-      flushText();
-      if (listType !== "ol") { closeList(); out.push("<ol>"); listType = "ol"; }
-      out.push(`<li>${inline(ol[2])}</li>`);
-    } else if (ul) {
-      flushText();
-      if (listType !== "ul") { closeList(); out.push("<ul>"); listType = "ul"; }
-      out.push(`<li>${inline(ul[1])}</li>`);
-    } else {
-      closeList();
-      textBuf.push(line);
-    }
-  }
-  if (inCode) { flushText(); out.push(`<pre><code>${codeBuf.join("\n")}</code></pre>`); }
-  closeList();
-  flushText();
-  return out.join("");
+  const esc = md
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return esc
+    .replace(/```([\s\S]*?)```/g, "<pre><code>$1</code></pre>")
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/(^|\s)\*([^*\n]+)\*/g, "$1<em>$2</em>")
+    .replace(/^### (.*)$/gm, "<strong>$1</strong>")
+    .replace(/^## (.*)$/gm, "<strong>$1</strong>")
+    .replace(/\n/g, "<br/>");
 }
 
 export const KIND_META: Record<string, { label: string; color: string }> = {

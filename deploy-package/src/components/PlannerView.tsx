@@ -124,46 +124,21 @@ export default function PlannerView({
         )}
         {open && topic && (
           <div className="glass-panel slide-in" style={{ padding: 16, margin: "0 0 10px 22px", borderLeft: `3px solid ${subj?.color || "var(--accent)"}` }}>
-            <div className="lesson-brief-heading">
-              Lesson brief · {topic.unit} · {topic.depth || "Core"}
+            <div style={{ fontSize: ".74rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: ".7px", color: "var(--text-muted)", marginBottom: 6 }}>
+              Lesson brief · {topic.unit}
             </div>
-            <div className="lesson-summary">{topic.summary}</div>
-            {!!topic.prerequisites?.length && (
-              <div className="lesson-detail-block compact">
-                <strong>Before you start</strong>
-                <span>{topic.prerequisites.join(" · ")}</span>
-              </div>
-            )}
-            {!!topic.keyConcepts?.length && (
-              <div className="lesson-concepts" style={{ marginBottom: 10 }}>
-                {topic.keyConcepts.map((concept, i) => <span className="chip chip-kind" key={i}>{concept}</span>)}
-              </div>
-            )}
+            <div style={{ fontSize: ".86rem", fontWeight: 650, marginBottom: 10, lineHeight: 1.55 }}>{topic.summary}</div>
             {!!topic.objectives?.length && (
-              <ul className="lesson-outcomes">
+              <ul style={{ margin: "0 0 12px", paddingLeft: 18, fontSize: ".82rem", color: "var(--text-muted)", lineHeight: 1.7, fontWeight: 550 }}>
                 {topic.objectives.map((o, i) => <li key={i}>{o}</li>)}
               </ul>
             )}
-            {topic.practice && <div className="lesson-practice"><strong>Applied practice</strong><span>{topic.practice}</span></div>}
-            {!!topic.sources?.length && (
-              <div className="lesson-source-list compact" aria-label="Lesson sources">
-                {topic.sources.map((source, i) => (
-                  <div className="lesson-source" key={`${source.publisher}-${i}`}>
-                    <span>{source.type}</span>
-                    <div>
-                      {source.url ? <a href={source.url} target="_blank" rel="noreferrer">{source.title}</a> : <b>{source.title}</b>}
-                      <small>{source.publisher}{source.section ? ` · ${source.section}` : ""}</small>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-            <div className="flex-row gap-sm" style={{ flexWrap: "wrap", marginTop: 12 }}>
+            <div className="flex-row gap-sm" style={{ flexWrap: "wrap" }}>
               <div className="chip chip-kind">Mastery {topic.mastery}%</div>
-              <button className="btn btn-xs btn-primary" onClick={() => onAskTutor(`Explain "${topic.title}" from ${subj?.name || "my course"} step by step with an example. Address these outcomes: ${(topic.objectives || []).join("; ")}. Use the listed curriculum sources.`)}>
+              <button className="btn btn-xs btn-primary" onClick={() => onAskTutor(`Explain "${topic.title}" from ${subj?.name || "my course"} step by step with an example.`)}>
                 <IconSpark size={12} /> Teach me this
               </button>
-              <button className="btn btn-xs btn-secondary" onClick={() => onAskTutor(`Create a graded practice set for "${topic.title}" based on this requirement: ${topic.practice || "5 practice questions with answers"}.`)}>
+              <button className="btn btn-xs btn-secondary" onClick={() => onAskTutor(`Give me 5 practice questions on "${topic.title}" with answers.`)}>
                 Practice questions
               </button>
             </div>
@@ -205,9 +180,8 @@ export default function PlannerView({
             <option value="all">All subjects</option>
             {state.subjects.map((s) => <option key={s.id} value={String(s.id)}>{s.name}</option>)}
           </select>
-          <button className="btn btn-primary" onClick={onReplan} disabled={replanning} aria-busy={replanning}>
-            <span className={replanning ? "replanning-spark" : ""}><IconSpark size={14} /></span>
-            {replanning ? "Rebalancing schedule…" : "Rebalance schedule"}
+          <button className="btn btn-primary" onClick={onReplan} disabled={replanning}>
+            <IconSpark size={14} />{replanning ? "Re-planning…" : "Re-plan"}
           </button>
         </div>
       </div>
@@ -220,10 +194,7 @@ export default function PlannerView({
           <div style={{ fontSize: ".78rem", color: "var(--text-muted)", marginTop: 4, marginBottom: 10 }}>
             Don&apos;t cram them into today — let the engine redistribute them across your remaining days.
           </div>
-          <button className="btn btn-sm btn-primary" onClick={onReplan} disabled={replanning} aria-busy={replanning}>
-            {replanning && <span className="replanning-spark"><IconSpark size={12} /></span>}
-            {replanning ? "Moving overdue work…" : "Rebalance my schedule"}
-          </button>
+          <button className="btn btn-sm btn-primary" onClick={onReplan} disabled={replanning}>Rebalance my schedule</button>
         </div>
       )}
 
@@ -347,7 +318,6 @@ export default function PlannerView({
       )}
 
       <TaskEditor
-        key={editingTaskId ?? "closed"}
         state={state}
         task={state.tasks.find((x) => x.id === editingTaskId) || null}
         onClose={() => setEditingTaskId(null)}

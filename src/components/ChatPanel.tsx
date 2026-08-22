@@ -3,11 +3,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { mdToHtml, escapeHtml, type MessageRow } from "@/lib/client";
 import { IconChat, IconClose, IconSend, IconSpark } from "./icons";
-import {
-  VOICE_OPTIONS, voiceSupported, speak, stopSpeaking, listen, learnSttLang,
-  prepareVoicePlayback, type ListenHandle,
-} from "@/lib/voice";
-import { mergeTranscriptSegments } from "@/lib/transcript";
+import { VOICE_OPTIONS, voiceSupported, speak, stopSpeaking, listen, learnSttLang, type ListenHandle } from "@/lib/voice";
 
 const QUICKS = [
   "What should I study today?",
@@ -28,7 +24,7 @@ export default function ChatPanel({
   open: boolean;
   setOpen: (v: boolean) => void;
   messages: MessageRow[];
-  onSend: (q: string, meta?: { voice?: boolean }) => void;
+  onSend: (q: string) => void;
   thinking: boolean;
   provider?: string | null;
   learner?: { name: string; daysLeft: number; progressPct: number; streak: number; todayDone: number; todayTotal: number };
@@ -38,7 +34,6 @@ export default function ChatPanel({
   const [voiceId, setVoiceId] = useState("f1");
   const [listening, setListening] = useState(false);
   const [micWaking, setMicWaking] = useState(false);
-  const [voicePreparing, setVoicePreparing] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const [voiceErr, setVoiceErr] = useState("");
   const [voiceHint, setVoiceHint] = useState(""); // "review what I heard" prompt
@@ -47,21 +42,8 @@ export default function ChatPanel({
   const lastSpokenId = useRef<number>(0);
   const openRef = useRef(open);
   const listenSession = useRef(0); // invalidates a pending mic start on cancel/close
-  const submitLock = useRef(false); // closes the double-tap window before React rerenders
   useEffect(() => { openRef.current = open; }, [open]);
-  useEffect(() => { if (!thinking) submitLock.current = false; }, [thinking]);
   const support = typeof window !== "undefined" ? voiceSupported() : { stt: false, tts: false };
-
-  // Voice profile IDs map to fixed cloud voices, so persisting the ID keeps
-  // the same Shigun voice selected on every viewport on this device.
-  useEffect(() => {
-    const saved = localStorage.getItem("shigun-voice-id");
-    const timer = window.setTimeout(() => {
-      if (saved && VOICE_OPTIONS.some((voice) => voice.id === saved)) setVoiceId(saved);
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, []);
-  useEffect(() => { localStorage.setItem("shigun-voice-id", voiceId); }, [voiceId]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -74,74 +56,48 @@ export default function ChatPanel({
     if (last && last.role === "assistant" && last.id !== lastSpokenId.current && last.id > 0) {
       lastSpokenId.current = last.id;
       voiceReplyArmed.current = false;
-      setVoiceErr("");
-      setVoicePreparing(true);
-      setSpeaking(false);
-      void speak(last.content, voiceId, {
-        onStart: () => { setVoicePreparing(false); setSpeaking(true); },
-        onEnd: () => { setVoicePreparing(false); setSpeaking(false); },
-        onError: (message) => setVoiceErr(message),
-      });
+      setSpeaking(true);
+      speak(last.content, voiceId, () => setSpeaking(false));
     }
   }, [messages, voiceId, support.tts]);
 
   // Stop everything when the panel closes
   useEffect(() => {
-    if (open) return;
-    listenSession.current++; // cancel any in-flight mic warm-up
-    stopSpeaking(); listenRef.current?.stop(); listenRef.current = null;
-    const timer = window.setTimeout(() => {
-      if (!openRef.current) { setListening(false); setSpeaking(false); setVoicePreparing(false); setMicWaking(false); }
-    }, 0);
-    return () => window.clearTimeout(timer);
+    if (!open) {
+      listenSession.current++; // cancel any in-flight mic warm-up
+      stopSpeaking(); listenRef.current?.stop(); listenRef.current = null;
+      setListening(false); setSpeaking(false); setMicWaking(false);
+    }
   }, [open]);
-
-  const dispatch = (message: string, fromVoice = false): boolean => {
-    const msg = message.trim();
-    if (!msg || thinking || submitLock.current) return false;
-    submitLock.current = true;
-    onSend(msg, { voice: fromVoice });
-    return true;
-  };
 
   const send = (q?: string) => {
     const msg = (q ?? text).trim();
-    if (!dispatch(msg, q === undefined && voiceReplyArmed.current)) return;
+    if (!msg || thinking) return;
     setText("");
     setVoiceHint("");
+    onSend(msg);
   };
 
   const toggleListen = async () => {
     setVoiceErr("");
-    if (listening) {
-      // Do not invalidate this session: stop() delivers the last interim/final
-      // transcript, including the words spoken just before the tap.
-      listenRef.current?.stop();
-      listenRef.current = null;
-      setListening(false);
-      return;
-    }
-    if (micWaking) {
-      listenSession.current++; // invalidate the pending permission/start call
+    if (listening || micWaking) {
+      // tap while active = stop & finalize what was heard
+      listenSession.current++; // invalidate any pending start
+      if (listening) { listenRef.current?.stop(); listenRef.current = null; setListening(false); }
       setMicWaking(false);
       return;
     }
-
-    // Resume Web Audio inside the tap gesture. The cloud reply can then play
-    // after recognition + network work even on iOS autoplay-restricted pages.
-    void prepareVoicePlayback();
-    stopSpeaking(); setSpeaking(false); setVoicePreparing(false);
+    stopSpeaking(); setSpeaking(false);
     const token = ++listenSession.current;
     setMicWaking(true);            // instant feedback — button pulses immediately
     setVoiceHint("");
-    const isCurrent = () => token === listenSession.current && openRef.current;
     const h = await listen(
-      (interim) => { if (isCurrent()) setText(interim); },
+      (interim) => { if (openRef.current) setText(interim); },
       (final) => {
-        if (!isCurrent()) return; // cancelled, replaced, or closed session
         setListening(false);
         setMicWaking(false);
         listenRef.current = null;
+        if (!openRef.current) return; // panel was closed mid-listen — discard
         if (!final.text.trim()) {
           // manual stop with nothing captured = stay quiet; engine gave up = explain
           if (!final.cancelled) setVoiceErr("I didn't hear anything clearly — tap the mic and try once more.");
@@ -152,7 +108,8 @@ export default function ChatPanel({
         if (final.confidence >= AUTO_SEND_CONFIDENCE) {
           // confident — seamless send, reply comes back aloud
           voiceReplyArmed.current = true;
-          if (dispatch(final.text, true)) setText("");
+          setText("");
+          onSend(final.text.trim());
         } else {
           // unsure — show the transcript for a quick review instead of
           // sending a wrong message (fixes the 2-3 retry loop)
@@ -162,17 +119,12 @@ export default function ChatPanel({
             : "I heard you — check the text, then send or edit.");
         }
       },
-      (err) => {
-        if (!isCurrent()) return;
-        setListening(false); setMicWaking(false); listenRef.current = null; setVoiceErr(err);
-      }
+      (err) => { setListening(false); setMicWaking(false); listenRef.current = null; if (openRef.current) setVoiceErr(err); }
     );
-    if (!isCurrent()) { h?.stop(); return; }
+    if (token !== listenSession.current) { h?.stop(); return; } // cancelled/closed meanwhile
     if (h) { listenRef.current = h; setMicWaking(false); setListening(true); }
     else setMicWaking(false);
   };
-
-  const selectedVoiceName = VOICE_OPTIONS.find((voice) => voice.id === voiceId)?.label.split(" · ")[0] || "Shigun";
 
   return (
     <>
@@ -180,19 +132,15 @@ export default function ChatPanel({
         {open ? <IconClose size={20} /> : <IconChat />}
       </button>
 
-      {open && <button className="ai-scrim" aria-label="Close Shigun" onClick={() => setOpen(false)} />}
       {open && (
-        <div
-          className={`ai-panel glass-panel${thinking ? " is-thinking" : ""}${listening || micWaking ? " is-listening" : ""}${voicePreparing ? " is-preparing" : ""}${speaking ? " is-speaking" : ""}`}
-          role="dialog" aria-modal="true" aria-label="SHIGUN AI tutor chat"
-        >
+        <div className="ai-panel glass-panel slide-in" role="dialog" aria-label="SHIGUN AI tutor chat">
           <div className="ai-sheet-handle" aria-hidden="true" />
           <div className="ai-head">
-            <div className="brand-logo-icon ai-avatar"><IconSpark size={16} /></div>
-            <div className="ai-identity">
-              <div className="ai-title">Shigun <span>AI Tutor</span></div>
+            <div className="brand-logo-icon" style={{ width: 32, height: 32 }}><IconSpark size={16} /></div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: ".9rem", fontWeight: 800 }}>SHIGUN AI Tutor</div>
               <div className="ai-status">
-                {micWaking ? "Preparing microphone" : listening ? "Listening now" : voicePreparing ? `Preparing ${selectedVoiceName}…` : speaking ? `${selectedVoiceName} speaking` : thinking ? "Working on your answer" : provider ? `${provider} connected` : "Hybrid engine online"}
+                {micWaking ? "waking mic…" : listening ? "listening…" : speaking ? "speaking…" : provider ? `${provider} connected` : "hybrid engine online"}
               </div>
             </div>
             {support.tts && (
@@ -200,13 +148,13 @@ export default function ChatPanel({
                 className="voice-select"
                 value={voiceId}
                 onChange={(e) => setVoiceId(e.target.value)}
-                aria-label="Shigun voice"
-                title="Shigun's consistent cloud voice"
+                aria-label="Voice"
+                title="Shigun's voice"
               >
                 {VOICE_OPTIONS.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
               </select>
             )}
-            <button className="ai-close" aria-label="Close chat" onClick={() => setOpen(false)}><IconClose size={17} /></button>
+            <button className="btn btn-xs btn-secondary" aria-label="Close chat" onClick={() => setOpen(false)}><IconClose size={13} /></button>
           </div>
 
           <div className="ai-msgs">
@@ -231,50 +179,30 @@ export default function ChatPanel({
                 Hi! I&apos;m Shigun. Ask me anything about your studies, or tap the mic and talk to me.
               </div>
             )}
-            {messages.map((m) => {
-              const isUser = m.role === "user";
-              const visibleContent = isUser ? mergeTranscriptSegments([m.content]) : m.content;
-              return (
-                <div key={m.id} className={`ai-message-row ${isUser ? "user" : "bot"}`}>
-                  {!isUser && <div className="ai-mini-avatar" aria-hidden="true"><IconSpark size={11} /></div>}
-                  <div className={`ai-msg ${isUser ? "user" : "bot"}`}
-                    dangerouslySetInnerHTML={{ __html: isUser ? escapeHtml(visibleContent) : mdToHtml(visibleContent) }} />
-                </div>
-              );
-            })}
+            {messages.map((m) => (
+              <div key={m.id} className={`ai-msg ${m.role === "user" ? "user" : "bot"}`}
+                dangerouslySetInnerHTML={{ __html: m.role === "user" ? escapeHtml(m.content) : mdToHtml(m.content) }} />
+            ))}
             {thinking && (
-              <div className="ai-message-row bot thinking-row">
-                <div className="ai-mini-avatar" aria-hidden="true"><IconSpark size={11} /></div>
-                <div className="ai-msg bot">
-                  <span className="thinking-dots"><i /><i /><i /></span>
-                  <span className="thinking-label">Thinking through your plan</span>
-                </div>
+              <div className="ai-msg bot">
+                <span className="thinking-dots"><i /><i /><i /></span>
               </div>
             )}
             <div ref={endRef} />
           </div>
 
-          {(listening || micWaking) && (
-            <div className="voice-live" role="status">
-              <span className="voice-wave" aria-hidden="true"><i /><i /><i /><i /><i /></span>
-              <span><strong>{micWaking ? "Preparing your mic" : "Listening"}</strong>{text ? ` · ${text}` : " · Speak naturally"}</span>
-              <button onClick={() => void toggleListen()}>Finish</button>
-            </div>
-          )}
           {voiceErr && <div className="voice-err" role="alert">{voiceErr}</div>}
           {voiceHint && <div className="voice-hint">{voiceHint}</div>}
 
           <div className="ai-quick">
-            <span className="ai-quick-label">Try</span>
-            {QUICKS.map((q) => <button key={q} onClick={() => send(q)} disabled={thinking}>{q}</button>)}
+            {QUICKS.map((q) => <button key={q} onClick={() => send(q)}>{q}</button>)}
           </div>
 
           <div className="ai-input-row">
             {support.stt && (
               <button
-                className={`voice-btn${listening || micWaking ? " listening" : ""}${voicePreparing ? " preparing" : ""}${speaking ? " speaking" : ""}`}
+                className={`voice-btn${listening || micWaking ? " listening" : ""}${speaking ? " speaking" : ""}`}
                 onClick={() => void toggleListen()}
-                disabled={thinking}
                 aria-label={listening || micWaking ? "Stop listening" : "Speak to Shigun"}
                 title={listening || micWaking ? "Stop listening" : "Speak to Shigun"}
               >
@@ -284,10 +212,9 @@ export default function ChatPanel({
                 </svg>
               </button>
             )}
-            <input className="input-field ai-chat-input" placeholder={listening || micWaking ? "Listening…" : "Message Shigun…"} value={text}
-              aria-label="Message Shigun"
+            <input className="input-field ai-chat-input" placeholder={listening || micWaking ? "Listening… speak now" : "Ask anything, or tap the mic…"} value={text}
               onChange={(e) => { setText(e.target.value); if (voiceHint) setVoiceHint(""); }} onKeyDown={(e) => e.key === "Enter" && send()} />
-            <button className="btn btn-primary ai-send" aria-label="Send message" onClick={() => send()} disabled={thinking || !text.trim()}><IconSend /></button>
+            <button className="btn btn-primary" aria-label="Send message" onClick={() => send()} disabled={thinking}><IconSend /></button>
           </div>
         </div>
       )}

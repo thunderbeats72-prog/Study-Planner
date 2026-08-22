@@ -20,7 +20,6 @@ export default function SubjectsView({
   const [color, setColor] = useState("#6366f1");
   const [editing, setEditing] = useState<SubjectRow | null>(null);
   const [openTopics, setOpenTopics] = useState<number | null>(null);
-  const [openLesson, setOpenLesson] = useState<number | null>(null);
 
   const doneTopicIds = new Set(state.topics.filter((x) => x.status === "done").map((x) => x.id));
 
@@ -60,70 +59,21 @@ export default function SubjectsView({
                 {open && (
                   <div className="slide-in" style={{ marginTop: 16 }}>
                     {list.map((tp, i) => (
-                      <React.Fragment key={tp.id}>
-                        <div className="task-row">
-                          <div className="task-info-top">
-                            <div style={{ fontSize: ".76rem", fontWeight: 800, color: "var(--text-dim)", width: 24, marginTop: 2 }}>{i + 1}</div>
-                            <div className="task-info">
-                              <div className="task-title">{tp.title}</div>
-                              <div className="task-sub">{tp.unit} · {tp.depth || "Core"} · {tp.difficulty} · {tp.estMinutes} min · mastery {tp.mastery}%</div>
-                            </div>
-                          </div>
-                          <div className="task-actions">
-                            <button className="btn btn-xs btn-secondary"
-                              onClick={() => setOpenLesson(openLesson === tp.id ? null : tp.id)}>
-                              {openLesson === tp.id ? "Hide brief" : "Lesson brief"}
-                            </button>
-                            <button className="btn btn-xs btn-secondary"
-                              onClick={() => onAskTutor(`Teach me "${tp.title}" from ${s.name}. Use these curriculum objectives: ${(tp.objectives || []).join("; ")}. Explain from first principles with a worked example and cite the listed sources.`)}>
-                              <IconSpark size={12} /> Teach
-                            </button>
+                      <div className="task-row" key={tp.id}>
+                        <div className="task-info-top">
+                          <div style={{ fontSize: ".76rem", fontWeight: 800, color: "var(--text-dim)", width: 24, marginTop: 2 }}>{i + 1}</div>
+                          <div className="task-info">
+                            <div className="task-title">{tp.title}</div>
+                            <div className="task-sub">{tp.unit} · {tp.difficulty} · {tp.estMinutes} min · mastery {tp.mastery}%</div>
                           </div>
                         </div>
-                        {openLesson === tp.id && (
-                          <div className="lesson-detail slide-in">
-                            <p className="lesson-summary">{tp.summary}</p>
-                            {!!tp.prerequisites?.length && (
-                              <div className="lesson-detail-block">
-                                <strong>Prerequisites</strong>
-                                <ul>{tp.prerequisites.map((item, j) => <li key={j}>{item}</li>)}</ul>
-                              </div>
-                            )}
-                            {!!tp.keyConcepts?.length && (
-                              <div className="lesson-detail-block">
-                                <strong>Key concepts</strong>
-                                <div className="lesson-concepts">{tp.keyConcepts.map((item, j) => <span className="chip chip-kind" key={j}>{item}</span>)}</div>
-                              </div>
-                            )}
-                            {!!tp.objectives?.length && (
-                              <div className="lesson-detail-block">
-                                <strong>Measurable outcomes</strong>
-                                <ul>{tp.objectives.map((item, j) => <li key={j}>{item}</li>)}</ul>
-                              </div>
-                            )}
-                            {tp.practice && (
-                              <div className="lesson-practice"><strong>Applied practice</strong><span>{tp.practice}</span></div>
-                            )}
-                            {!!tp.sources?.length && (
-                              <div className="lesson-detail-block">
-                                <strong>Sources</strong>
-                                <div className="lesson-source-list">
-                                  {tp.sources.map((source, j) => (
-                                    <div className="lesson-source" key={`${source.publisher}-${j}`}>
-                                      <span>{source.type}</span>
-                                      <div>
-                                        {source.url ? <a href={source.url} target="_blank" rel="noreferrer">{source.title}</a> : <b>{source.title}</b>}
-                                        <small>{source.publisher}{source.section ? ` · ${source.section}` : ""}</small>
-                                        {source.note && <small>{source.note}</small>}
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </React.Fragment>
+                        <div className="task-actions">
+                          <button className="btn btn-xs btn-secondary"
+                            onClick={() => onAskTutor(`Teach me "${tp.title}" from ${s.name}. Explain from first principles with a worked example.`)}>
+                            <IconSpark size={12} /> Teach
+                          </button>
+                        </div>
+                      </div>
                     ))}
                     {!list.length && <div style={{ fontSize: ".82rem", color: "var(--text-dim)" }}>No lessons generated yet.</div>}
                   </div>
