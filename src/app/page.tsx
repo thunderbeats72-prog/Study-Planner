@@ -501,7 +501,10 @@ export default function Home() {
         } else if (instant) {
           fallbackText = instant.text;
         } else {
-          fallbackText = "I'm running in local mode right now. Ask me anything about your study plan, subjects, practice questions, or clock commands.";
+          const pending = (currentCtx?.today || []).filter((task) => task.status === "pending").slice(0, 3);
+          fallbackText = pending.length
+            ? `I couldn't reach the cloud tutor just now. From your plan, start with **${pending[0].title}**. Ask me to explain it, or say *"what should I study today?"*.`
+            : "I couldn't reach the cloud tutor just now. Ask again in a moment, or say *\"what should I study today?\"* / *\"explain [a topic from your subjects]\"*.";
         }
 
         const botMsg: MessageRow = {

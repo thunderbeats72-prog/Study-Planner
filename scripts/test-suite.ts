@@ -5,9 +5,10 @@ import {
   instantTutorReply,
   languageCapabilityReply,
   parseCommand,
+  tutorSystemPrompt,
 } from "../src/lib/ai";
 import { detectLanguage } from "../src/lib/language";
-import { wikiLangFor, searchTerms, teachFromKnowledge } from "../src/lib/knowledge";
+import { wikiLangFor, searchTerms, teachFromKnowledge, isRelevantKnowledge } from "../src/lib/knowledge";
 import { appendChatTurn, isFallbackUser } from "../src/lib/chatTurn";
 import { mergeTranscriptSegments } from "../src/lib/transcript";
 import { mdToHtml } from "../src/lib/client";
@@ -61,6 +62,10 @@ async function runTests() {
   check(typeof hiScriptReply === "string" && hiScriptReply.includes("हिंदी"), "Hindi-script capability query (no Latin trigger word)");
   const bnScriptReply = languageCapabilityReply("আপনি কি বাংলায় কথা বলতে পারেন?");
   check(typeof bnScriptReply === "string" && bnScriptReply.includes("বাংলা"), "Bengali-script capability query (no Latin trigger word)");
+  check(languageCapabilityReply("explain Hindi grammar") === null, "Study question about Hindi is not a capability reply");
+  check(languageCapabilityReply("I need to understand photosynthesis") === null, "Understand + concept is not a capability reply");
+  check(languageCapabilityReply("Do you know English literature?") === null, "English literature question is not a capability reply");
+  check(parseCommand("I study better in the dark") === undefined, "Casual mention of dark is not a theme command");
   check(parseCommand("start timer")?.type === "startTimer", "Command: start timer");
   check(parseCommand("pause")?.type === "pause", "Command: pause");
   check(parseCommand("stop timer")?.type === "stopTimer", "Command: stop timer");
@@ -141,6 +146,32 @@ async function runTests() {
   }, "प्रकाशसंश्लेषण म्हणजे काय?", "school");
   check(marathiLesson.includes("###") && marathiLesson.includes("परिभाषा"),
     "Marathi wiki extract uses Hindi structure headers instead of crashing");
+
+  check(isRelevantKnowledge({
+    title: "Photosynthesis",
+    extract: "Photosynthesis is the process by which green plants convert light energy into chemical energy stored as sugar.",
+    url: "https://en.wikipedia.org/wiki/Photosynthesis",
+    related: [],
+    lang: "en",
+  }, "What is photosynthesis?"), "On-topic wiki hit is accepted");
+  check(!isRelevantKnowledge({
+    title: "The Alabama Solution",
+    extract: "The Alabama Solution is a 2025 American documentary film about a prison system.",
+    url: "https://en.wikipedia.org/wiki/The_Alabama_Solution",
+    related: [],
+    lang: "en",
+  }, "what is the perfect solution of any war?"), "Off-topic wiki hit is rejected");
+  {
+    const prompt = tutorSystemPrompt({
+      name: "Aarav", courseName: "Class 10 CBSE", level: "school", examDate: "2026-11-30",
+      daysLeft: 100, dailyHours: 2,
+      subjects: [{ id: 1, name: "Science", difficulty: "Medium", done: 3, total: 10 }],
+      today: [{ title: "Photosynthesis", kind: "learn", minutes: 60, status: "pending" }],
+      progressPct: 55, streak: 6, hoursThisWeek: 8.5, overdue: 2,
+    });
+    check(prompt.includes("Photosynthesis") && prompt.includes("Science") && prompt.includes("TEACH"),
+      "Tutor prompt includes today's plan, subjects, and teaching instructions");
+  }
 
   console.log("\n--- 2f. Chat turn is never dropped from UI state ---");
   const emptyTurn = appendChatTurn([], "What should I study today?", "Study photosynthesis first.");

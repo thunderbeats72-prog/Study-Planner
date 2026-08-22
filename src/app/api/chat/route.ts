@@ -267,11 +267,12 @@ async function handleChat(req: Request, opts: { message: string }) {
       }));
       const systemPrompt = tutorSystemPrompt(ctx)
         + curriculumGrounding(text, state)
-        + "\n\nTEXT TURN: Provide a rich, well-structured response using markdown headings, bold text, and bullet points. Give a detailed, actionable, and comprehensive answer.";
+        + "\n\nAnswer the learner's question directly. If they asked you to explain something, TEACH it with a definition, how it works, one worked example, and a short recap. Do not reply with only a syllabus outline or learning-objective list.";
       const result = await callLLMDetailed(
         systemPrompt,
         [...history, { role: "user", content: text }],
-        2400
+        2400,
+        { temperature: 0.6 }
       );
       reply = result.text;
       if (result.text && result.provider) {
@@ -306,18 +307,29 @@ async function handleChat(req: Request, opts: { message: string }) {
         }
       }
     } else {
+      const asksPractice = /practice|questions?|quiz|test me|problems?|अभ्यास|प्रश्न/i.test(text);
       const grounded = localCurriculumReply(text, state);
-      if (grounded) {
+      let localText = "";
+      try {
+        const local = await localTutor(text, ctx, { skipCloud: cloudAttempted });
+        localText = local.text;
+        if (local.action) action = local.action;
+      } catch (error) {
+        console.warn("localTutor failed:", error instanceof Error ? error.message : error);
+      }
+      const knowledgeLooksGood = !!localText.trim()
+        && !/without a cloud answer|local mode|couldn't find that in your study plan/i.test(localText);
+      // Practice / plan-card requests stay on the curriculum set. Concept
+      // questions prefer a real Wikipedia-backed lesson over a syllabus dump.
+      if (asksPractice && grounded) {
+        finalText = grounded;
+      } else if (knowledgeLooksGood) {
+        finalText = localText;
+      } else if (grounded) {
         finalText = grounded;
       } else {
-        try {
-          const local = await localTutor(text, ctx, { skipCloud: cloudAttempted });
-          finalText = local.text;
-          if (local.action) action = local.action;
-        } catch (error) {
-          console.warn("localTutor failed:", error instanceof Error ? error.message : error);
-          finalText = "I'm here to help with your studies. Ask about today's plan, a subject from your course, or say a clock command like *start timer*.";
-        }
+        finalText = localText
+          || "I'm here to help with your studies. Ask about today's plan, a subject from your course, or say a clock command like *start timer*.";
       }
     }
   }
