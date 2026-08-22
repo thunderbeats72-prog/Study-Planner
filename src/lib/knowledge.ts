@@ -279,8 +279,16 @@ const LOCAL_CONCEPTS: LocalConcept[] = [
   },
 ];
 
+function isMetaQuestion(q: string): boolean {
+  if (/\bwhat is|explain|define|definition of|meaning of\b/i.test(q)) return false;
+  return /\b(are you|is shigun|is this|what are you|who are you|do you|does shigun|is shigun)\b|\byou\s+(connected|using|running|powered|linked)\b|\bconnected\s+(to|with)\s+(any\s+)?(ai|llm|engine|model|provider)\b/i.test(q);
+}
+
 function localKnowledge(question: string): Knowledge | null {
   const q = question.toLowerCase();
+  // Do not let a glossary word ("ai" inside "any ai") answer a meta question
+  // about Shigun/its engine.
+  if (isMetaQuestion(q)) return null;
   let best: LocalConcept | null = null;
   let bestScore = 0;
   for (const concept of LOCAL_CONCEPTS) {

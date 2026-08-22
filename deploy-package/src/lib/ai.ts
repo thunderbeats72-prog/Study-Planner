@@ -895,6 +895,10 @@ export async function localTutor(
   const instant = instantTutorReply(q, ctx);
   if (instant) return instant;
 
+  if (isSelfEngineQuestion(q)) {
+    return { text: selfEngineReply(ctx) };
+  }
+
   const pct = percentQ(q);
   if (pct) return { text: pct };
 
@@ -916,6 +920,28 @@ export async function localTutor(
   }
   if (/(thanks|thank you)/i.test(q)) return { text: "You’re welcome. What would you like to do next?" };
   return { text: "I don’t have enough reliable context to answer that well yet. Share a little more detail and I’ll help directly — it does not need to be a study question." };
+}
+
+/** Meta questions about SHIGUN's own engine must be answered directly, not
+ *  run through the offline glossary. Without this guard "do you connected
+ *  with any ai?" was matched by the glossary term 'ai' and answered with the
+ *  definition of Artificial Intelligence instead of talking about Shigun. */
+const SELF_ENGINE_QUESTION_RE =
+  /\b(are you|is shigun|is this|what are you|who are you)\b|\b(do you|does shigun|is shigun)\s+(use|have|connect|run|work|connected|powered|operate)\b|\byou\s+(connected|using|running|powered|linked)\b|\bconnected\s+(to|with)\s+(any\s+)?(ai|llm|engine|model|provider)\b|\b(which|what)\s+(ai|llm|engine|model|provider)\s*(do\s+you|are\s+you|is\s+shigun|you\s+use)\b/i;
+
+function isSelfEngineQuestion(q: string): boolean {
+  // "What is AI?" / "Explain artificial intelligence" are real questions
+  // about the concept, not about Shigun, so they keep the glossary path.
+  if (/\b(what is|explain|define|definition of|meaning of)\s+(an?\s+)?(ai|artificial intelligence)\b/i.test(q)) return false;
+  return SELF_ENGINE_QUESTION_RE.test(q);
+}
+
+function selfEngineReply(ctx: TutorContext): string {
+  return [
+    `I'm Shigun, the built-in study coach in **${ctx.courseName}**.`,
+    "I run on Study Planner Pro's hybrid engine: the local planner and knowledge base are always available, and when the cloud AI key is set, questions get the richer AI model answer on top.",
+    "Right now this server has no cloud AI key configured, so I'm answering from the built-in hybrid/local engine.",
+  ].join("\n\n");
 }
 
 /** Maps a selected voice profile id to its spoken grammatical gender. */
