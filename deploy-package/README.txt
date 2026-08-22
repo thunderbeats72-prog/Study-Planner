@@ -23,6 +23,10 @@ AI CONNECTIVITY
 ---------------
 The chat service needs a working `DATABASE_URL` for account, plan, and chat
 history. For full open-ended AI answers, configure at least one server-side
-provider key: `GEMINI_API_KEY`, `GROQ_API_KEY`, or `OPENROUTER_API_KEY`.
+provider key: `ANTHROPIC_API_KEY` (Claude, preferred), `GEMINI_API_KEY`,
+`GROQ_API_KEY`, `OPENAI_API_KEY`, or `OPENROUTER_API_KEY`. If the cloud
+provider is missing/out of credits/blocked, Shigun still answers plan,
+progress, theme, navigation and subject questions from built-in data in the
+learner's language instead of showing a generic "tell me more" line.
 Without one, Shigun still handles planner actions and local study knowledge,
 but cannot reliably act as a full general-purpose AI assistant.

@@ -128,9 +128,9 @@ export async function POST(req: Request) {
         + curriculumGrounding(text, state)
         + `\n\nDETECTED LEARNER LANGUAGE: ${spokenLang}. Answer in this language unless they clearly asked for another.`
         + (source === "voice"
-          ? "\n\nVOICE TURN: Keep the opening reply to 80-140 spoken words UNLESS the learner asked for detail, a lesson, or an explanation — then answer in full depth; the app speaks long answers in consecutive parts. Lead with the answer; avoid long preambles."
+          ? "\n\nVOICE TURN: Lead directly with the answer without long preambles. If the learner asked for detail, a lesson, or an explanation, answer in full depth — the app speaks long answers in consecutive parts."
           : "");
-      reply = await callLLM(systemPrompt, [...history, { role: "user", content: text }], source === "voice" ? 1100 : 2400);
+      reply = await callLLM(systemPrompt, [...history, { role: "user", content: text }], 1100);
     }
     if (reply) {
       // The LLM may have emitted an [[action:...]] tag for requests the

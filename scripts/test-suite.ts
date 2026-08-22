@@ -65,7 +65,10 @@ async function runTests() {
   const tutorCtx = {
     name: "Test", courseName: "Class 12 CBSE", level: "school", examDate: "2026-12-01",
     daysLeft: 100, dailyHours: 2, progressPct: 42, streak: 5, hoursThisWeek: 6.5, overdue: 2,
-    subjects: [{ id: 1, name: "Physics", difficulty: "Hard", done: 2, total: 10 }],
+    subjects: [
+      { id: 1, name: "Physics", difficulty: "Hard", done: 2, total: 10 },
+      { id: 2, name: "Business Communication", difficulty: "Medium", done: 1, total: 8 },
+    ],
     today: [{ title: "Physics: Waves", kind: "learn", minutes: 60, status: "pending" }],
   };
   const hinglishToday = await localTutor("aaj kya padhu", tutorCtx, { skipCloud: true });
@@ -91,6 +94,19 @@ async function runTests() {
   assert(hinglishCmd.includes("Clock shuru"), "Hinglish command confirmation stays in Hinglish");
   const hindiCmd = commandReply({ type: "stopTimer" }, "घड़ी बंद करो", 30, "male");
   assert(hindiCmd.includes("घड़ी बंद"), "Hindi command confirmation stays in Hindi");
+
+  // Vague theme asks must still be handled locally (this used to fall through
+  // to "I need one more detail..." when the cloud provider failed).
+  const vagueThemeAction = parseCommand("could you please change theme to something brighter");
+  assert(vagueThemeAction?.type === "theme" && vagueThemeAction.payload === "silver-lavender", "Vague brighter theme parsed locally");
+  const vagueThemeLocal = await localTutor("could you please change theme to something brighter", tutorCtx, { skipCloud: true });
+  assert(vagueThemeLocal.action?.type === "theme" && vagueThemeLocal.action.payload === "silver-lavender", "Vague brighter theme executes without cloud");
+  assert(!vagueThemeLocal.text.includes("I need one more detail"), "Vague theme does not produce irrelevant fallback");
+
+  // A learner can ask about a subject already in their plan even keyless.
+  const subjectLocal = await localTutor("what about Business Communication?", tutorCtx, { skipCloud: true });
+  assert(subjectLocal.text.includes("Business Communication"), "Keyless subject question stays relevant");
+  assert(!subjectLocal.text.includes("I need one more detail"), "Keyless subject question does not dump generic fallback");
 
   const extracted = extractLlmAction("Here is your plan. [[action:navigate:planner]]");
   assert(extracted.text === "Here is your plan.", "Action tag stripped from text");

@@ -44,6 +44,8 @@ function getSafeKey(keyName: string): string | null {
 type ChatMsg = { role: "user" | "assistant"; content: string };
 
 export function activeProvider(): string | null {
+  if (getSafeKey("ANTHROPIC_API_KEY") || getSafeKey("CLAUDE_API_KEY")
+    || getSafeKey("NEXT_PUBLIC_ANTHROPIC_API_KEY")) return "Claude";
   if (getSafeKey("GEMINI_API_KEY") || getSafeKey("GOOGLE_API_KEY")
     || getSafeKey("NEXT_PUBLIC_GEMINI_API_KEY") || getSafeKey("NEXT_PUBLIC_GOOGLE_API_KEY")) return "AI Cloud";
   if (getSafeKey("GROQ_API_KEY") || getSafeKey("NEXT_PUBLIC_GROQ_API_KEY")) return "Groq";
@@ -153,23 +155,84 @@ async function callGemini(
   return null;
 }
 
+/** Claude/Anthropic message endpoint. Claude is the preferred provider when a
+ *  key is configured because it is the most reliable conversational model for
+ *  the long prompt this tutor uses. */
+function claudeModels(): string[] {
+  const configured = getSafeKey("ANTHROPIC_MODEL") || getSafeKey("CLAUDE_MODEL")
+    || getSafeKey("NEXT_PUBLIC_ANTHROPIC_MODEL");
+  const candidates = [
+    configured,
+    "claude-sonnet-4-20250514",
+    "claude-sonnet-4-5-20250929",
+    "claude-3-5-sonnet-latest",
+    "claude-3-5-haiku-latest",
+    "claude-3-5-sonnet-20241022",
+  ].filter((model): model is string => Boolean(model?.trim()));
+  return [...new Set(candidates)];
+}
+
+async function callClaude(
+  apiKey: string,
+  model: string,
+  system: string,
+  messages: ChatMsg[],
+  maxTokens: number,
+  timeoutMs: number
+): Promise<string | null> {
+  const response = await fetchText("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-direct-browser-access": "true",
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: maxTokens,
+      system,
+      messages,
+    }),
+  }, timeoutMs).catch((error) => {
+    recordLlmError(`Claude ${model}: ${error instanceof Error ? error.message : "network error"}`);
+    return null;
+  });
+  if (!response) return null;
+  if (response.ok) {
+    const json = await response.json().catch(() => null);
+    const text = Array.isArray(json?.content)
+      ? json.content.map((part: { text?: string }) => part.text || "").join("").trim()
+      : null;
+    if (text) return text;
+    recordLlmError(`Claude ${model}: no usable response`);
+    return null;
+  }
+  const err = await response.text().catch(() => "");
+  recordLlmError(`Claude ${model}: HTTP ${response.status} ${err.slice(0, 160)}`);
+  return null;
+}
+
 export async function callLLM(
   system: string,
   messages: ChatMsg[],
   maxTokens = 2500
 ): Promise<string | null> {
   llmLastError = null;
+  const claudeKey = getSafeKey("ANTHROPIC_API_KEY") || getSafeKey("CLAUDE_API_KEY")
+    || getSafeKey("NEXT_PUBLIC_ANTHROPIC_API_KEY");
   const geminiKey = getSafeKey("GEMINI_API_KEY") || getSafeKey("GOOGLE_API_KEY")
     || getSafeKey("NEXT_PUBLIC_GEMINI_API_KEY") || getSafeKey("NEXT_PUBLIC_GOOGLE_API_KEY");
   const groqKey = getSafeKey("GROQ_API_KEY") || getSafeKey("NEXT_PUBLIC_GROQ_API_KEY");
   const openaiKey = getSafeKey("OPENAI_API_KEY") || getSafeKey("NEXT_PUBLIC_OPENAI_API_KEY");
   const openrouterKey = getSafeKey("OPENROUTER_API_KEY") || getSafeKey("NEXT_PUBLIC_OPENROUTER_API_KEY");
   const providers = [
+    claudeKey ? "claude" : null,
     geminiKey ? "gemini" : null,
     groqKey ? "groq" : null,
     openaiKey ? "openai" : null,
     openrouterKey ? "openrouter" : null,
-  ].filter(Boolean) as Array<"gemini" | "groq" | "openai" | "openrouter">;
+  ].filter(Boolean) as Array<"claude" | "gemini" | "groq" | "openai" | "openrouter">;
 
   if (!providers.length) {
     recordLlmError("no cloud AI key configured");
@@ -180,7 +243,14 @@ export async function callLLM(
 
   for (const provider of providers) {
     try {
-      if (provider === "gemini" && geminiKey) {
+      if (provider === "claude" && claudeKey) {
+        for (const model of claudeModels()) {
+          const remaining = deadline - Date.now();
+          if (remaining < 800) break;
+          const text = await callClaude(claudeKey, model, system, messages, maxTokens, Math.min(12000, remaining));
+          if (text) return text;
+        }
+      } else if (provider === "gemini" && geminiKey) {
         for (const model of geminiModels()) {
           const remaining = deadline - Date.now();
           if (remaining < 800) break;
@@ -949,7 +1019,7 @@ export function parseCommand(q: string): TutorReply["action"] | undefined {
   // ordinary study words ("dark matter", "light waves", "black body"), so a
   // theme word alone is never enough — it needs a mode/theme phrase or a
   // theme-change action word.
-  const themeColor = /\b(midnight|dark|obsidian|nebula|emerald|sunset|mint|silver|lavender|samsung|light|black|white)\b/;
+  const themeColor = /\b(midnight|dark|obsidian|nebula|emerald|sunset|mint|silver|lavender|samsung|light|black|white|brighter|darker|nicer|default)\b/;
   const themeSurface = /\b(theme|mode|background|appearance|wallpaper|skin)\b/;
   const themeAction = /\b(set|change|switch|apply|turn|use|make|activate|try|choose|select|prefer|give|want|enable|disable|put|go)\b/;
   const themePhrase = /(^|\s)(midnight|dark|obsidian|nebula|emerald|sunset|mint|silver|lavender|samsung|light|black|white)\s+(mode|theme|background|appearance|wallpaper|skin)/;
@@ -961,7 +1031,7 @@ export function parseCommand(q: string): TutorReply["action"] | undefined {
     if (/(nebula)/.test(n)) return { type: "theme", payload: "nebula" };
     if (/(emerald|mint)/.test(n)) return { type: "theme", payload: "mint" };
     if (/(sunset|champagne)/.test(n)) return { type: "theme", payload: "sunset" };
-    if (/(bright|lighter|light|samsung|clean|white)/.test(n)) return { type: "theme", payload: "silver-lavender" };
+    if (/(bright|lighter|brighter|nicer|default|light|samsung|clean|white)/.test(n)) return { type: "theme", payload: "silver-lavender" };
     if (/(silver|lavender)/.test(n)) return { type: "theme", payload: "silver-lavender" };
     // Vague requests ("something nicer/brighter/cooler") fall through to
     // the LLM, which understands intent and replies with [[action:theme:x]].
@@ -1096,6 +1166,49 @@ function multilingualInstantReply(q: string, ctx: TutorContext): TutorReply | nu
   return null;
 }
 
+/** Local intent fallback used when no cloud provider can answer. It is the
+ *  difference between a useful reply and the old "I need one more detail…".
+ *  It handles vague theme requests and lets the learner ask directly about a
+ *  subject / lesson that is already in their plan. */
+function localAppIntentReply(q: string, ctx: TutorContext): TutorReply | null {
+  const n = q.toLowerCase();
+
+  // Theme request, including "something brighter", "change theme", "make it
+  // nicer", etc. When the learner's wording is vague, pick the light/default
+  // theme instead of doing nothing (the LLM used to answer this on happy path).
+  const themeSurface = /\b(theme|mode|background|appearance|wallpaper|skin)\b/;
+  const themeAction = /\b(set|change|switch|apply|make|activate|use|choose|select|prefer|give|want|turn|enable|disable|put|go)\b/;
+  const themeWord = /\b(midnight|dark|obsidian|nebula|emerald|sunset|mint|silver|lavender|samsung|light|black|white|brighter|darker|nicer|default)\b/;
+  if ((themeSurface.test(n) || n.includes("theme")) && (themeAction.test(n) || themeWord.test(n))) {
+    let payload = "silver-lavender";
+    if (/(midnight|dark|black)/.test(n)) payload = "dark";
+    else if (/(obsidian)/.test(n)) payload = "obsidian";
+    else if (/(nebula)/.test(n)) payload = "nebula";
+    else if (/(emerald|mint)/.test(n)) payload = "mint";
+    else if (/(sunset|champagne)/.test(n)) payload = "sunset";
+    return { text: commandReply({ type: "theme", payload }, q), action: { type: "theme", payload } };
+  }
+
+  // If the learner named a subject that is already in their plan, answer from
+  // their syllabus instead of asking them to repeat it.
+  const subject = ctx.subjects.find((s) => {
+    const name = s.name.toLowerCase();
+    return n.includes(name) || name.split(/\s+/).some((part) => part.length >= 4 && n.includes(part));
+  });
+  if (subject) {
+    const pct = subject.total ? Math.round((subject.done / subject.total) * 100) : 0;
+    const pendingTitle = ctx.today.find((task) => task.status === "pending")?.title;
+    const next = pendingTitle
+      ? ` Aaj ka pehla pending session: **${pendingTitle}**.`
+      : " Aaj koi pending lesson nahi hai.";
+    return {
+      text: `**${subject.name}** is in your plan — **${pct}%** complete (${subject.done}/${subject.total} lessons).${next}\n\nMain iske baare mein aur detail de sakta hoon, par sahi jawab ke liye batao: kaunsa chapter ya topic?`,
+    };
+  }
+
+  return null;
+}
+
 export function instantTutorReply(q: string, ctx: TutorContext): TutorReply | null {
   // Hinglish / non-English canned data replies must answer in the same
   // language before the English-only quick paths below.
@@ -1171,6 +1284,9 @@ export async function localTutor(
     return { text: commandReply(action, q, ctx.daysLeft, options.voiceGender), action };
   }
 
+  const localIntent = localAppIntentReply(q, ctx);
+  if (localIntent) return localIntent;
+
   const instant = instantTutorReply(q, ctx);
   if (instant) return instant;
 
@@ -1219,6 +1335,23 @@ function isSelfEngineQuestion(q: string): boolean {
   return SELF_ENGINE_QUESTION_RE.test(q);
 }
 
+function friendlyProviderError(error: string | null): string {
+  if (!error) return "";
+  if (/HTTP 402|credits|quota|billing|insufficient/i.test(error)) {
+    return " The cloud AI account is currently out of billing credits or quota, so I'm answering from the built-in engine instead.";
+  }
+  if (/HTTP 401|HTTP 403|unauthorized|api key|invalid.*key/i.test(error)) {
+    return " The cloud AI key on this server is invalid or not authorised, so I'm answering from the built-in engine instead.";
+  }
+  if (/HTTP 429|rate limit/i.test(error)) {
+    return " The cloud AI service is rate-limited right now; I'm answering from the built-in engine instead.";
+  }
+  if (/network|fetch|timeout|abort|ENOTFOUND|ECONN/i.test(error)) {
+    return " The cloud AI service could not be reached right now; I'm answering from the built-in engine instead.";
+  }
+  return " The cloud AI layer is temporarily unavailable; I'm answering from the built-in engine instead.";
+}
+
 function selfEngineReply(ctx: TutorContext): string {
   const provider = activeProvider();
   const error = llmError();
@@ -1227,7 +1360,7 @@ function selfEngineReply(ctx: TutorContext): string {
     "I run on Study Planner Pro's hybrid engine: the local planner and knowledge base are always available, and the cloud AI model is used on top when this server has a provider key.",
   ];
   if (provider) {
-    parts.push(`The cloud AI layer is configured (${provider}).${error ? ` This request couldn't reach it — ${error}.` : ""}`);
+    parts.push(`The cloud AI layer is configured (${provider}).${friendlyProviderError(error)}`);
   } else {
     parts.push("No cloud AI key is configured on this server, so I'm answering from the built-in hybrid/local engine.");
   }

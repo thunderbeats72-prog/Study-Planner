@@ -59,6 +59,7 @@ function tcpProbe(host: string, port = 443, timeoutMs = 5000): Promise<ProbeResu
 }
 
 function configuredAiProvider(): string {
+  if (envKey("ANTHROPIC_API_KEY", "CLAUDE_API_KEY", "NEXT_PUBLIC_ANTHROPIC_API_KEY")) return "claude";
   if (envKey("GEMINI_API_KEY", "GOOGLE_API_KEY", "NEXT_PUBLIC_GEMINI_API_KEY", "NEXT_PUBLIC_GOOGLE_API_KEY")) return "gemini";
   if (envKey("GROQ_API_KEY", "NEXT_PUBLIC_GROQ_API_KEY")) return "groq";
   if (envKey("OPENAI_API_KEY", "NEXT_PUBLIC_OPENAI_API_KEY")) return "openai";
@@ -74,16 +75,16 @@ export async function GET() {
     database = { ok: false };
   }
 
+  const provider = configuredAiProvider();
+
   // Run the network probes in parallel so the health check stays fast even
   // when the runtime has no internet / serverless egress is blocked.
   const [internet, edge, knowledge, providerHost] = await Promise.all([
     fetchProbe("https://example.com/"),
     tcpProbe("speech.platform.bing.com"),
     fetchProbe("https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=buffer&srlimit=1&format=json&origin=*"),
-    tcpProbe("generativelanguage.googleapis.com"),
+    provider === "claude" ? tcpProbe("api.anthropic.com") : tcpProbe("generativelanguage.googleapis.com"),
   ]);
-
-  const provider = configuredAiProvider();
 
   return Response.json({
     ok: database.ok,

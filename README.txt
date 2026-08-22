@@ -16,7 +16,7 @@ Everything the app actually runs lives in `src/`:
   src/lib/ml.ts               on-device ML (pace, weekdays, FSRS-lite,
                               decay, skip-risk, focus hours)
   src/lib/planner.ts          the mathematical scheduler
-  src/lib/ai.ts               Gemini/Groq/OpenRouter chain + local engine
+  src/lib/ai.ts               Claude/Gemini/Groq/OpenAI/OpenRouter chain + local engine
   src/db/schema.ts            tables + performance indexes
   src/app/api/**              every API route
 

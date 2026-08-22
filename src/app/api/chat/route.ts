@@ -130,7 +130,7 @@ export async function POST(req: Request) {
         + (source === "voice"
           ? "\n\nVOICE TURN: Lead directly with the answer without long preambles. If the learner asked for detail, a lesson, or an explanation, answer in full depth — the app speaks long answers in consecutive parts."
           : "");
-      reply = await callLLM(systemPrompt, [...history, { role: "user", content: text }], 2400);
+      reply = await callLLM(systemPrompt, [...history, { role: "user", content: text }], 1100);
     }
     if (reply) {
       // The LLM may have emitted an [[action:...]] tag for requests the
