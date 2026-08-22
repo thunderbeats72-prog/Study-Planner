@@ -1,8 +1,10 @@
 import {
   activeProvider,
+  commandReply,
   languageCapabilityReply,
   parseCommand,
   instantTutorReply,
+  localTutor,
   tutorSystemPrompt,
   voiceGenderFor,
   extractLlmAction,
@@ -58,6 +60,23 @@ async function runTests() {
   const taReply = languageCapabilityReply("Can you talk in Tamil?", "female");
   assert(typeof taReply === "string" && taReply.includes("தமிழில்"), "Tamil capability query");
 
+  // 2b. KEYLESS MULTILINGUAL FALLBACK (must never return a useless English
+  //     "tell me more" line to a Hindi/Hinglish learner when cloud fails).
+  const tutorCtx = {
+    name: "Test", courseName: "Class 12 CBSE", level: "school", examDate: "2026-12-01",
+    daysLeft: 100, dailyHours: 2, progressPct: 42, streak: 5, hoursThisWeek: 6.5, overdue: 2,
+    subjects: [{ id: 1, name: "Physics", difficulty: "Hard", done: 2, total: 10 }],
+    today: [{ title: "Physics: Waves", kind: "learn", minutes: 60, status: "pending" }],
+  };
+  const hinglishToday = await localTutor("aaj kya padhu", tutorCtx, { skipCloud: true });
+  assert(hinglishToday.text.includes("Aaj ke liye priority order"), "Hinglish today answer stays in Hinglish");
+  const hindiToday = await localTutor("मुझे आज क्या पढ़ना है?", tutorCtx, { skipCloud: true });
+  assert(hindiToday.text.includes("आज के लिए"), "Hindi today answer stays in Hindi");
+  const hinglishVague = await localTutor("kuch batao", tutorCtx, { skipCloud: true });
+  assert(!hinglishVague.text.startsWith("I need") && !hinglishVague.text.startsWith("That's an open-ended"), "Hinglish vague ask does not get English tell-me-more");
+  const hindiVague = await localTutor("सही जवाब चाहिए", tutorCtx, { skipCloud: true });
+  assert(hindiVague.text.includes("सही जवाब"), "Hindi vague ask answers in Hindi");
+
   // 3. COMMAND PARSER & ACTION TAG EXTRACTION
   console.log("\n--- 3. Command Parser & Action Tag Handling ---");
   assert(parseCommand("start timer")?.type === "startTimer", "Command: start timer");
@@ -67,6 +86,11 @@ async function runTests() {
   assert(parseCommand("go to planner")?.type === "navigate", "Command: navigate planner");
   assert(parseCommand("change theme to dark")?.type === "theme", "Command: dark theme");
   assert(parseCommand("what is supply and demand") === undefined, "Study question not hijacked by command parser");
+
+  const hinglishCmd = commandReply({ type: "startTimer" }, "timer shuru karo", 30, "female");
+  assert(hinglishCmd.includes("Clock shuru"), "Hinglish command confirmation stays in Hinglish");
+  const hindiCmd = commandReply({ type: "stopTimer" }, "घड़ी बंद करो", 30, "male");
+  assert(hindiCmd.includes("घड़ी बंद"), "Hindi command confirmation stays in Hindi");
 
   const extracted = extractLlmAction("Here is your plan. [[action:navigate:planner]]");
   assert(extracted.text === "Here is your plan.", "Action tag stripped from text");

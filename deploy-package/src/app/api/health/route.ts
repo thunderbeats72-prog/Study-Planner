@@ -61,6 +61,7 @@ function tcpProbe(host: string, port = 443, timeoutMs = 5000): Promise<ProbeResu
 function configuredAiProvider(): string {
   if (envKey("GEMINI_API_KEY", "GOOGLE_API_KEY", "NEXT_PUBLIC_GEMINI_API_KEY", "NEXT_PUBLIC_GOOGLE_API_KEY")) return "gemini";
   if (envKey("GROQ_API_KEY", "NEXT_PUBLIC_GROQ_API_KEY")) return "groq";
+  if (envKey("OPENAI_API_KEY", "NEXT_PUBLIC_OPENAI_API_KEY")) return "openai";
   if (envKey("OPENROUTER_API_KEY", "NEXT_PUBLIC_OPENROUTER_API_KEY")) return "openrouter";
   return "";
 }

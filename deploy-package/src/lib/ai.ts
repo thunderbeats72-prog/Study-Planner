@@ -47,6 +47,7 @@ export function activeProvider(): string | null {
   if (getSafeKey("GEMINI_API_KEY") || getSafeKey("GOOGLE_API_KEY")
     || getSafeKey("NEXT_PUBLIC_GEMINI_API_KEY") || getSafeKey("NEXT_PUBLIC_GOOGLE_API_KEY")) return "AI Cloud";
   if (getSafeKey("GROQ_API_KEY") || getSafeKey("NEXT_PUBLIC_GROQ_API_KEY")) return "Groq";
+  if (getSafeKey("OPENAI_API_KEY") || getSafeKey("NEXT_PUBLIC_OPENAI_API_KEY")) return "OpenAI";
   if (getSafeKey("OPENROUTER_API_KEY") || getSafeKey("NEXT_PUBLIC_OPENROUTER_API_KEY")) return "OpenRouter";
   return null;
 }
@@ -85,6 +86,8 @@ function geminiModels(): string[] {
     configured,
     "gemini-2.5-flash",
     "gemini-2.0-flash",
+    "gemini-1.5-flash",
+    "gemini-1.5-pro",
     "gemini-flash-latest",
     "gemini-2.5-pro",
     "gemini-2.5-flash-lite",
@@ -159,12 +162,14 @@ export async function callLLM(
   const geminiKey = getSafeKey("GEMINI_API_KEY") || getSafeKey("GOOGLE_API_KEY")
     || getSafeKey("NEXT_PUBLIC_GEMINI_API_KEY") || getSafeKey("NEXT_PUBLIC_GOOGLE_API_KEY");
   const groqKey = getSafeKey("GROQ_API_KEY") || getSafeKey("NEXT_PUBLIC_GROQ_API_KEY");
+  const openaiKey = getSafeKey("OPENAI_API_KEY") || getSafeKey("NEXT_PUBLIC_OPENAI_API_KEY");
   const openrouterKey = getSafeKey("OPENROUTER_API_KEY") || getSafeKey("NEXT_PUBLIC_OPENROUTER_API_KEY");
   const providers = [
     geminiKey ? "gemini" : null,
     groqKey ? "groq" : null,
+    openaiKey ? "openai" : null,
     openrouterKey ? "openrouter" : null,
-  ].filter(Boolean) as Array<"gemini" | "groq" | "openrouter">;
+  ].filter(Boolean) as Array<"gemini" | "groq" | "openai" | "openrouter">;
 
   if (!providers.length) {
     recordLlmError("no cloud AI key configured");
@@ -205,6 +210,30 @@ export async function callLLM(
         } else {
           const err = await response.text().catch(() => "");
           recordLlmError(`Groq: HTTP ${response.status} ${err.slice(0, 160)}`);
+        }
+      } else if (provider === "openai" && openaiKey) {
+        const remaining = deadline - Date.now();
+        if (remaining < 800) break;
+        const response = await fetchText("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: { "content-type": "application/json", authorization: `Bearer ${openaiKey}` },
+          body: JSON.stringify({
+            model: "gpt-4o-mini",
+            max_tokens: maxTokens,
+            messages: [{ role: "system", content: system }, ...messages],
+          }),
+        }, Math.min(12000, remaining)).catch((error) => {
+          recordLlmError(`OpenAI: ${error instanceof Error ? error.message : "network error"}`);
+          return null;
+        });
+        if (!response) continue;
+        if (response.ok) {
+          const json = await response.json().catch(() => null);
+          const text = json?.choices?.[0]?.message?.content ?? null;
+          if (text?.trim()) return text.trim();
+        } else {
+          const err = await response.text().catch(() => "");
+          recordLlmError(`OpenAI: HTTP ${response.status} ${err.slice(0, 160)}`);
         }
       } else if (provider === "openrouter" && openrouterKey) {
         const remaining = deadline - Date.now();
@@ -815,6 +844,21 @@ const EN_CONFIRMATIONS: Record<string, string> = {
   theme: "Theme updated.",
 };
 
+/** Latin-script Hindi (Hinglish) confirmations. Without these a user who
+ *  says "timer shuru karo" received an English acknowledgement, which made
+ *  the tutor feel like it stopped listening to Hinglish. */
+const HINGLISH_CONFIRMATIONS: Record<string, string> = {
+  navigate: "Khol raha hoon: **{page}**.",
+  startTimer: "Clock shuru. Aaj ke task ke against time record ho raha hai.",
+  stopTimer: "Clock band. Minutes save ho gaye. Badhiya!",
+  break: "Break shuru. Utho, aankhon ko aaram do, paani piyo. *resume* bolne par wapas.",
+  pause: "Timer ruk gaya. Wapas aane par *resume* bolo.",
+  resume: "Wapas shuru — wahin se continue.",
+  zen: "Zen mode on — sirf tum aur timer.",
+  replan: "Schedule rebalance ho raha hai — baaki kaam ko aage badha rahe hain.",
+  theme: "Theme update ho gaya.",
+};
+
 const PAGE_LABELS: Record<string, string> = {
   planner: "Planner",
   dashboard: "Overview",
@@ -839,11 +883,14 @@ export function commandReply(
   voiceGender: "female" | "male" = "female"
 ): string {
   const detected = detectLanguage(sourceText);
+  const hinglish = isHinglishText(sourceText);
   const lang =
-    SCRIPT_LANG_DETECT.find((entry) => entry.range.test(sourceText))?.code
-    || (detected === "hi-IN" || detected === "mr-IN" || detected === "ne-NP" ? "hi" : undefined)
-    || (CONFIRMATIONS[detected.slice(0, 2)] ? detected.slice(0, 2) : undefined);
+    (hinglish ? "hinglish" :
+      SCRIPT_LANG_DETECT.find((entry) => entry.range.test(sourceText))?.code
+      || (detected === "hi-IN" || detected === "mr-IN" || detected === "ne-NP" ? "hi" : undefined)
+      || (CONFIRMATIONS[detected.slice(0, 2)] ? detected.slice(0, 2) : undefined));
   const base =
+    (hinglish ? HINGLISH_CONFIRMATIONS[action.type] : undefined) ||
     (lang && CONFIRMATIONS[lang]?.[action.type as keyof (typeof CONFIRMATIONS)["hi"]]) ||
     EN_CONFIRMATIONS[action.type] ||
     "Done.";
@@ -923,7 +970,138 @@ export function parseCommand(q: string): TutorReply["action"] | undefined {
   return undefined;
 }
 
+/* ──────────────────────────────────────────────────────────────
+   MULTILINGUAL OFFLINE FALLBACK
+   The cloud model is the ideal path, but a bad key, a provider
+   outage, a blocked network or a keyless deployment must NEVER
+   leave a learner with a useless English "tell me more" line after
+   a Hindi/Hinglish/Marathi/Tamil/... question. When no model text
+   can be obtained we still answer in the SAME language from live
+   app data, or ask for the missing topic in that same language.
+────────────────────────────────────────────────────────────── */
+const HINGLISH_WORDS =
+  /(?:^|\s)(aaj|kya|kyaa|hai|hain|hoga|hogi|ho|na|nahi|karo|karna|karne|kijiye|chahiye|mujhe|mujhko|mera|meri|tum|tumhara|aap|aapka|kaun|kaunsa|kaunsi|kab|kahan|padh|padhai|padhna|padhne|padhu|bata|batao|bataiye|samajh|samjha|matlab|toh|lekin|bhi|aur|bhai|yaar|hindi|kar|karo|de|dein|dena)(?:\s|$)/i;
+
+function isHinglishText(q: string): boolean {
+  const matches = q.match(HINGLISH_WORDS) || [];
+  return matches.length >= 2;
+}
+
+type LocalReplyLang =
+  | "hinglish" | "hi" | "mr" | "bn" | "ta" | "te" | "kn" | "ml" | "gu" | "pa" | "or"
+  | "ur" | "ar" | "ne" | "es" | "fr" | "de" | "pt" | "it" | "ru" | "zh" | "ja" | "ko" | "id" | "tr";
+
+/** Detect the language a local (keyless) reply should be written in.
+ *  Latin-script Hinglish is deliberately separate from English because
+ *  the project's tutor is supposed to answer Hinglish naturally. */
+function localReplyLang(q: string): LocalReplyLang | "en" {
+  if (isHinglishText(q)) return "hinglish";
+  const code = detectLanguage(q).slice(0, 2);
+  const supported: LocalReplyLang[] =
+    ["hi", "mr", "bn", "ta", "te", "kn", "ml", "gu", "pa", "or", "ur", "ar", "ne",
+     "es", "fr", "de", "pt", "it", "ru", "zh", "ja", "ko", "id", "tr"];
+  return (supported.includes(code as LocalReplyLang) ? code as LocalReplyLang : "en");
+}
+
+const LOCAL_FALLBACK_TEXT: Record<LocalReplyLang, string> = {
+  hinglish: "Sahi jawab ke liye mujhe bas exact topic chahiye — kaunsa subject, kaunsa chapter ya kaunsa topic? Phir aapko seedha sahi jawab milega.",
+  hi: "सही जवाब देने के लिए बस विषय या बिंदु बताइए — कौन सा विषय, कौन सा अध्याय या कौन सा टॉपिक? फिर सही जवाब आपको साफ़ मिलेगा।",
+  mr: "योग्य उत्तर देण्यासाठी फक्त विषय किंवा मुद्दा सांगा — कोणता विषय, कोणता अध्याय किंवा कोणता टॉपिक? मग योग्य उत्तर मिळेल.",
+  bn: "সঠিক উত্তর দিতে কেবল বিষয়টা বলুন — কোন বিষয়, কোন অধ্যায় বা কোন টপিক? তারপর সঠিক উত্তর পাবেন।",
+  ta: "சரியான பதில் சொல்ல தலைப்பை மட்டும் சொல்லுங்கள் — எந்தப் பாடம், எந்த அத்தியாயம் அல்லது எந்த தலைப்பு? பிறகு சரியான பதில் கிடைக்கும்.",
+  te: "సరైన సమాధానం చెప్పడానికి విషయాన్ని చెప్పండి — ఏ సబ్జెక్ట్, ఏ అధ్యాయం లేదా ఏ టాపిక్? తర్వాత సరైన సమాధానం వస్తుంది.",
+  kn: "ಸರಿಯಾದ ಉತ್ತರಕ್ಕಾಗಿ ವಿಷಯವನ್ನು ಹೇಳಿ — ಯಾವ ವಿಷಯ, ಯಾವ ಅಧ್ಯಾಯ ಅಥವಾ ಯಾವ ಟಾಪಿಕ್? ನಂತರ ಸರಿಯಾದ ಉತ್ತರ ಸಿಗುತ್ತದೆ.",
+  ml: "ശരിയായ ഉത്തരം ലഭിക്കാൻ വിഷയം പറയൂ — ഏത് വിഷയം, ഏത് അധ്യായം അല്ലെങ്കിൽ ഏത് ടോപിക്? പിന്നെ ശരിയായ ഉത്തരം കിട്ടും.",
+  gu: "સાચો જવાબ મેળવવા વિષય કહો — કયો વિષય, કયો અધ્યાય અથવા કયો ટૉપિક? પછી સાચો જવાબ મળશે.",
+  pa: "ਸਹੀ ਜਵਾਬ ਲਈ ਵਿਸ਼ਾ ਦੱਸੋ — ਕਿਹੜਾ ਵਿਸ਼ਾ, ਕਿਹੜਾ ਅਧਿਆਇ ਜਾਂ ਕਿਹੜਾ ਟੌਪਿਕ? ਫਿਰ ਸਹੀ ਜਵਾਬ ਮਿਲੇਗਾ।",
+  or: "ସଠିକ ଉତ୍ତର ପାଇଁ ବିଷୟ କୁହନ୍ତୁ — କେଉଁ ବିଷୟ, କେଉଁ ଅଧ୍ୟାୟ କିମ୍ବା କେଉଁ ଟପିକ୍? ପରେ ସଠିକ ଉତ୍ତର ମିଳିବ।",
+  ur: "درست جواب کے لیے موضوع بتائیں — کون سا مضمون، کون سا باب یا کون سا ٹاپک؟ پھر درست جواب ملے گا۔",
+  ar: "لتحصل على إجابة صحيحة، أخبرني بالموضوع فقط — أي مادة، أي فصل أو أي موضوع؟ ثم ستحصل على الإجابة الصحيحة.",
+  ne: "सही उत्तर पाउन विषय भन्नुहोस् — कुन विषय, कुन अध्याय वा कुन टपिक? त्यसपछि सही उत्तर पाउनुहुनेछ।",
+  es: "Para darte una respuesta correcta, dime el tema — ¿qué materia, capítulo o tema? Después recibirás la respuesta exacta.",
+  fr: "Pour une réponse exacte, indiquez le sujet — quelle matière, quel chapitre ou quel thème ? Vous aurez ensuite la réponse précise.",
+  de: "Für eine korrekte Antwort nenne mir das Thema — welches Fach, welches Kapitel oder welches Thema? Danach bekommst du die passende Antwort.",
+  pt: "Para uma resposta correta, diga o tema — qual matéria, capítulo ou tópico? Depois você receberá a resposta certa.",
+  it: "Per darti una risposta corretta, dimmi l'argomento — quale materia, capitolo o tema? Poi riceverai la risposta giusta.",
+  ru: "Чтобы получить точный ответ, назовите тему — какой предмет, какая глава или какая тема? Затем вы получите правильный ответ.",
+  zh: "为了给你准确回答，请告诉我主题——哪个科目、哪一章或哪个话题？然后你会得到正确的答案。",
+  ja: "正確な回答を得るために、テーマを教えてください。どの教科、どの章、どのトピックですか？その後、正しい答えが得られます。",
+  ko: "정확한 답을 위해 주제를 알려주세요 — 어떤 과목, 어떤 단원, 어떤 주제인가요? 그러면 정확한 답을 받을 수 있습니다.",
+  id: "Untuk jawaban yang tepat, sebutkan topiknya — mata pelajaran, bab, atau topik apa? Kemudian Anda akan mendapat jawaban yang tepat.",
+  tr: "Doğru bir cevap için konuyu söyleyin — hangi ders, hangi bölüm ya da hangi konu? Ardından doğru cevabı alacaksınız.",
+};
+
+/** Non-cloud answer for commonly asked plan questions in Hindi/Hinglish and
+ *  the other scripts the tutor advertises, so a keyless/offline run is still
+ *  useful instead of repeating an English "tell me more" line. */
+function multilingualInstantReply(q: string, ctx: TutorContext): TutorReply | null {
+  const hinglish = isHinglishText(q);
+  const tag = detectLanguage(q);
+  const isHindiFamily = hinglish || tag === "hi-IN";
+  if (!isHindiFamily) return null;
+
+  const pending = ctx.today.filter((task) => task.status === "pending");
+  const list = pending.slice(0, 6).map((task, index) =>
+    `${index + 1}. **${task.title}** (${task.minutes} min)`
+  ).join("\n");
+
+  // आज क्या पढ़ूँ / aaj kya padhu
+  if (/(today|aaj|आज).*(study|padh|पढ़|kya|क्या)|(kya|क्या).*(padhu|पढ़ूं|पढ़ूँ|padhna|पढ़ना|study|padhai|पढ़ाई)|(what).*(study|padh)/i.test(q)) {
+    if (!pending.length) {
+      return hinglish
+        ? { text: "Aaj ke liye koi pending task nahi hai. Is extra time ko active recall ya short mixed practice ke liye use karo." }
+        : { text: "आज के लिए कोई pending task नहीं है। यह अतिरिक्त समय active recall या छोटी mixed practice के लिए उपयोग करें।" };
+    }
+    return hinglish
+      ? { text: `Aaj ke liye priority order:\n\n${list}\n\nReady ho to bol *"start timer"*.` }
+      : { text: `आज के लिए सबसे पहले ये पढ़ें:\n\n${list}\n\nतैयार हों तो बोलें *"start timer"*।` };
+  }
+
+  // प्रगति / progress
+  if (/(progress|kaise chal rah|kya chal rah|kitna (hua|bacha)|कैसा चल रहा|कितना हुआ|कितना बचा|kya progress)/i.test(q)) {
+    const overdueLine = ctx.overdue
+      ? (hinglish ? ` ${ctx.overdue} overdue task ${ctx.overdue === 1 ? "hai" : "hain"}.` : ` ${ctx.overdue} overdue task हैं।`)
+      : (hinglish ? " Koi overdue task nahi hai." : " कोई overdue task नहीं है।");
+    return hinglish
+      ? { text: `Aap **${ctx.progressPct}%** syllabus complete kar chuke hain, aur **${ctx.streak} din** ki streak hai. Is week **${ctx.hoursThisWeek} ghante** study hui hai.${overdueLine}` }
+      : { text: `आप **${ctx.progressPct}%** सिलेबस पूरा कर चुके हैं, और **${ctx.streak} दिन** की स्ट्रीक है। इस हफ्ते **${ctx.hoursThisWeek} घंटे** पढ़ाई हुई है।${overdueLine}` };
+  }
+
+  // सबसे कमज़ोर topic / weak
+  if (/(weakest|sabse weak|weak (topic|subject)|kamzor|कमज़ोर|सबसे कमज़ोर|kya .*weak|weak (hu|ho|hai))/i.test(q)) {
+    const weakest = [...ctx.subjects]
+      .filter((subject) => subject.total > 0)
+      .sort((a, b) => (a.done / a.total) - (b.done / b.total))[0];
+    if (weakest) {
+      const pct = Math.round((weakest.done / weakest.total) * 100);
+      return hinglish
+        ? { text: `Aapka sabse kamzor subject hai **${weakest.name}** — **${pct}%** complete (${weakest.done}/${weakest.total} lessons). Subjects kholein aur uska pehla pending lesson start karo.` }
+        : { text: `आपका सबसे कमज़ोर विषय है **${weakest.name}** — **${pct}%** पूरा (${weakest.done}/${weakest.total} lessons)। Subjects खोलें और इसका पहला pending lesson शुरू करें।` };
+    }
+  }
+
+  // पीछे / behind
+  if (/(behind|piche|पीछे|overdue|late|मैं पीछे|kya (main|mein) piche)/i.test(q)) {
+    if (ctx.overdue) {
+      const count = ctx.overdue;
+      return hinglish
+        ? { text: `Aapke paas **${count}** overdue task ${count === 1 ? "hai" : "hain"}. Ek baar **Rebalance schedule** use karo — ye baaki kaam aage le jaayega bina completed lessons ko chhue.` }
+        : { text: `आपके पास **${count}** overdue task ${count === 1 ? "है" : "हैं"}। एक बार **Rebalance schedule** उपयोग करें — यह बाकी काम आगे ले जाएगा, completed lessons को बिना छुए।` };
+    }
+    return hinglish
+      ? { text: "Koi overdue task nahi hai. Aaj ke plan par raho, extra kaam jodne ki zaroorat nahi." }
+      : { text: "कोई overdue task नहीं है। आज के plan पर रहें, extra काम जोड़ने की ज़रूरत नहीं।" };
+  }
+
+  return null;
+}
+
 export function instantTutorReply(q: string, ctx: TutorContext): TutorReply | null {
+  // Hinglish / non-English canned data replies must answer in the same
+  // language before the English-only quick paths below.
+  const multilingual = multilingualInstantReply(q, ctx);
+  if (multilingual) return multilingual;
+
   // Non-English / Hinglish turns belong on the multilingual model path.
   // An English canned answer after a Hindi question is what made language
   // support feel broken.
@@ -965,7 +1143,15 @@ function isFactualLookupQuestion(q: string): boolean {
   return /\b(what is|what's|define|definition of|meaning of|what does .* mean|explain)\b/i.test(q);
 }
 
+function multilingualOpenEnded(q: string): string | null {
+  const lang = localReplyLang(q);
+  if (lang === "en") return null;
+  return LOCAL_FALLBACK_TEXT[lang];
+}
+
 function openEndedFallback(q: string): string {
+  const multilingual = multilingualOpenEnded(q);
+  if (multilingual) return multilingual;
   const n = q.toLowerCase();
   if (/\b(perfect|best|ideal|solution)\b|\bany war\b|world peace/i.test(n)) {
     return "That's an open-ended question, so I don't want to give a rushed one-line answer. Tell me the specific angle you need — for example the conflict/exam topic, the course chapter, or whether you want a definition, comparison, or study strategy — and I'll answer it directly.";
@@ -981,21 +1167,8 @@ export async function localTutor(
   const action = parseCommand(q);
   const n = q.toLowerCase();
 
-  if (action?.type === "replan") {
-    return { text: `Schedule rebalanced against your remaining syllabus.`, action };
-  }
   if (action) {
-    const msgs: Record<string, string> = {
-      navigate: `Opening **${String(action.payload)}** for you.`,
-      startTimer: `Clock started. Session logged against your current subject.`,
-      stopTimer: `Session logged. Well done.`,
-      break: `Break started. Hydrate and relax for a few minutes.`,
-      pause: `Timer paused. Say "resume" when ready.`,
-      resume: `Resumed — back on the clock.`,
-      zen: `Zen mode active.`,
-      theme: `Theme updated.`,
-    };
-    return { text: msgs[action.type] || "Done.", action };
+    return { text: commandReply(action, q, ctx.daysLeft, options.voiceGender), action };
   }
 
   const instant = instantTutorReply(q, ctx);
@@ -1025,10 +1198,10 @@ export async function localTutor(
     if (knowledge) return { text: teachFromKnowledge(knowledge, q, ctx.level, subjectHint) };
   }
 
-  if (/^(hi|hello|hey|good (morning|afternoon|evening))/i.test(q.trim())) {
+  if (/^(hi|hello|hey|good (morning|afternoon|evening))\b/i.test(q.trim())) {
     return { text: "Hello! I can help with study planning, explanations, writing, calculations, ideas, and everyday questions. What would you like to explore?" };
   }
-  if (/(thanks|thank you)/i.test(q)) return { text: "You’re welcome. What would you like to do next?" };
+  if (/\b(thanks|thank you)\b/i.test(q)) return { text: "You’re welcome. What would you like to do next?" };
   return { text: openEndedFallback(q) };
 }
 
