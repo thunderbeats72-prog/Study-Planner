@@ -228,7 +228,7 @@ type VoiceFetchResult = { clip: ClientAudioCache | null; errorMessage?: string }
 const clientAudioCache = new Map<string, ClientAudioCache>();
 const clientAudioInflight = new Map<string, Promise<VoiceFetchResult>>();
 const MAX_CLIENT_AUDIO_CACHE = 12;
-const VOICE_FETCH_TIMEOUT_MS = 42000;
+const VOICE_FETCH_TIMEOUT_MS = 16000;
 const DEFAULT_PLAYBACK_RATE = 1.15;
 const MIN_PLAYBACK_RATE = 0.85;
 const MAX_PLAYBACK_RATE = 1.5;
@@ -386,11 +386,17 @@ async function speakNative(
   await loadVoices();
   if (generation !== speechGeneration) return false;
 
-  const language = detectLanguage(text);
   const utterance = new SpeechSynthesisUtterance(text);
   const voice = pickPinnedNativeVoice(voiceId);
-  if (voice) utterance.voice = voice;
-  utterance.lang = language;
+  // Native speech is a last resort. Pin its actual voice and locale rather than
+  // requesting a locale the selected device voice does not own; browsers silently
+  // substitute a different speaker when asked to do that.
+  if (voice) {
+    utterance.voice = voice;
+    utterance.lang = voice.lang;
+  } else {
+    utterance.lang = "en-IN";
+  }
   const profile = voiceId === "m1"
     ? { rate: 0.96, pitch: 0.86 }
     : voiceId === "f2" ? { rate: 1.02, pitch: 1.04 } : { rate: 0.98, pitch: 0.96 };
@@ -470,9 +476,8 @@ export async function speak(
   };
 
   try {
-    let fetched = await requestClip();
+    const fetched = await requestClip();
     if (generation !== speechGeneration) return;
-    if (!fetched.clip) fetched = await requestClip();
     if (generation !== speechGeneration) return;
     if (fetched.clip) {
       const played = await playCloudAudio(
@@ -834,21 +839,25 @@ export type ListenFinal = {
   cancelled?: boolean;
 };
 
-const LAST_LANG_KEY = "shigun-stt-lang";
+const LAST_LANG_KEY = "shigun-stt-lang-v2";
 
-/** The recognition language. Shigun assesses the language itself: it starts
- *  from the last script the learner spoke and keeps learning as they talk —
- *  there is no manual picker to get wrong. */
+/** English is the safe microphone default. We only retain a non-English STT
+ * locale after actual non-Latin script is present; Latin transcripts are too
+ * ambiguous to let an accidental recognition result change future turns. */
 export function preferredSttLang(): string {
   if (typeof window === "undefined") return "en-IN";
   return localStorage.getItem(LAST_LANG_KEY) || "en-IN";
 }
 
-/** Learn the language from the learner's own speech so the NEXT listen
- *  already tunes recognition (and the reply script) to match. */
 export function learnSttLang(transcript: string): void {
   if (typeof window === "undefined" || !transcript.trim()) return;
-  localStorage.setItem(LAST_LANG_KEY, detectLanguage(transcript));
+  const language = detectLanguage(transcript);
+  if (language === "en-IN") {
+    localStorage.setItem(LAST_LANG_KEY, "en-IN");
+    return;
+  }
+  // detectLanguage returns a non-English tag only from a strong script signal.
+  localStorage.setItem(LAST_LANG_KEY, language);
 }
 
 let micWarmed = false;

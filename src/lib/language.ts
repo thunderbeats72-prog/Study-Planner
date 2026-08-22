@@ -48,7 +48,10 @@ export const LANGS: LangInfo[] = [
 const MARATHI_MARKERS = /[ळऱ]|(\b(मी|आहे|आहेत|तुम्ही|तुमचा|अभ्यास|करू|शकते|शकतो|आम्ही)\b)/;
 const NEPALI_MARKERS = /(\b(हो|छु|छौं|तपाईं|पढाइ|सक्छु|मद्दत)\b)/;
 const URDU_MARKERS = /[\u0679\u067E\u0686\u0688\u0691\u0698\u06A9\u06AF\u06BE\u06C1-\u06C3\u06CC\u06D2\u06BA]/;
-const HINGLISH = /\b(kya|kyaa|hai|haan|han|nahi|nahin|mat|bahut|padhai|padhna|padho|samjhao|samjha|bhai|yaar|karo|kar|do|mujhe|mera|meri|mere|aaj|kal|abhi|theek|accha|achha|achcha|shuru|band|rok|chalu|chalao|batao|bataao|samajh|please|thoda|zyada|kitna|kaise|kyun|kyon|jab|phir|bas|bilkul)\b/i;
+// Latin-script Hindi is deliberately not used for automatic locale switching.
+// Ambiguous words such as "hai", "kal", "do", and "please" occur in ordinary
+// English, names, and technical prose. Hinglish commands remain supported by
+// the command parser, but locale selection requires an actual script signal.
 const MARATHI_LATIN = /\b(ahe|aahe|tumhi|maza|majha|abhyas|kasa|kashi|kay)\b/i;
 const SPANISH_LATIN = /\b(qué|que|cómo|como|estoy|hola|gracias|puedes|ayuda|estudios)\b/i;
 const FRENCH_LATIN = /\b(quoi|comment|bonjour|merci|peux|aider|études|etudes)\b/i;
@@ -78,8 +81,10 @@ export function detectLanguage(text: string): LangTag {
   }
   if (best.count >= 3) return best.tag;
 
-  if (MARATHI_LATIN.test(sample)) return "mr-IN";
-  if (HINGLISH.test(sample)) return "hi-IN";
+  // Never guess an Indian language from Latin text. This prevents a single
+  // ambiguous English word from pinning the microphone to Hindi. Hinglish is
+  // handled conversationally by the tutor prompt, not as a locale guess.
+  if (MARATHI_LATIN.test(sample) && /\b(aahe|tumhi|abhyas)\b/i.test(sample)) return "mr-IN";
   if (SPANISH_LATIN.test(sample) && /[áéíóúñ¿¡]/i.test(sample)) return "es-ES";
   if (FRENCH_LATIN.test(sample) && /[àâçéèêëîïôùûü]/i.test(sample)) return "fr-FR";
   return "en-IN";
@@ -87,7 +92,7 @@ export function detectLanguage(text: string): LangTag {
 
 export function isMostlyEnglish(text: string): boolean {
   const tag = detectLanguage(text);
-  return tag === "en-IN" && !HINGLISH.test(text);
+  return tag === "en-IN";
 }
 
 export function bcpForCode(code: string): LangTag {
