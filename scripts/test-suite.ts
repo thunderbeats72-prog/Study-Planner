@@ -2,11 +2,13 @@ import {
   aiSuggestSubjects,
   callLLMDetailed,
   extractLlmAction,
+  instantTutorReply,
   languageCapabilityReply,
   parseCommand,
 } from "../src/lib/ai";
 import { cleanForSpeech, splitSpeechChunks } from "../src/lib/voice";
 import { detectLanguage } from "../src/lib/language";
+import { wikiLangFor, searchTerms } from "../src/lib/knowledge";
 import { mergeTranscriptSegments } from "../src/lib/transcript";
 import { mdToHtml } from "../src/lib/client";
 import { buildPlan, countStudyDays, projectCompletionDate } from "../src/lib/planner";
@@ -81,6 +83,46 @@ async function runTests() {
   check(parseCommand("should I pause?") === undefined, "Question about pause is not a command");
   check(parseCommand("explain how the timer works") === undefined, "How-to question is not a command");
   check(parseCommand("what are my weak points?") === undefined, "Weak-points question is not a command");
+
+  console.log("\n--- 2d. Localized instant plan/progress replies ---");
+  {
+    const tctx = {
+      name: "Aarav", courseName: "Class 10 CBSE", level: "school", examDate: "2026-11-30",
+      daysLeft: 100, dailyHours: 2,
+      subjects: [{ id: 1, name: "Science", difficulty: "Medium", done: 3, total: 10 }],
+      today: [
+        { title: "Photosynthesis", kind: "learn", minutes: 60, status: "pending" },
+        { title: "Quadratic Equations", kind: "learn", minutes: 45, status: "pending" },
+      ],
+      progressPct: 55, streak: 6, hoursThisWeek: 8.5, overdue: 2,
+    } as Parameters<typeof instantTutorReply>[1];
+    const hiToday = instantTutorReply("आज क्या पढ़ना है?", tctx);
+    check(typeof hiToday?.text === "string" && hiToday.text.includes("प्राथमिकता") && hiToday.text.includes("Photosynthesis"),
+      "Hindi instant today reply lists real tasks");
+    const hiProgress = instantTutorReply("मेरी प्रोग्रेस कैसी है?", tctx);
+    check(typeof hiProgress?.text === "string" && hiProgress.text.includes("55%") && hiProgress.text.includes("स्ट्रीक"),
+      "Hindi instant progress reply uses live data");
+    const hiWeakest = instantTutorReply("मेरा सबसे कमजोर विषय कौन सा है?", tctx);
+    check(typeof hiWeakest?.text === "string" && hiWeakest.text.includes("Science"), "Hindi instant weakest reply");
+    const hiBehind = instantTutorReply("मैं कितना पीछे हूँ?", tctx);
+    check(typeof hiBehind?.text === "string" && hiBehind.text.includes("2"), "Hindi instant behind reply");
+    const bnToday = instantTutorReply("আজ কী পড়ব?", tctx);
+    check(typeof bnToday?.text === "string" && bnToday.text.includes("অগ্রাধিকার"), "Bengali instant today reply");
+    const taProgress = instantTutorReply("என் முன்னேற்றம் எப்படி?", tctx);
+    check(typeof taProgress?.text === "string" && taProgress.text.includes("55%"), "Tamil instant progress reply");
+    const urBehind = instantTutorReply("میرے کتنے کام باقی ہیں?", tctx);
+    check(typeof urBehind?.text === "string" && urBehind.text.includes("2"), "Urdu instant behind reply");
+    const enUntouched = instantTutorReply("what should I study today?", tctx);
+    check(typeof enUntouched?.text === "string" && enUntouched.text.includes("priority order"), "English instant reply unchanged");
+  }
+
+  console.log("\n--- 2e. Multilingual knowledge lookup routing ---");
+  check(wikiLangFor("फोटोसिंथेसिस क्या है") === "hi", "Devanagari question routes to Hindi Wikipedia");
+  check(wikiLangFor("செயலாக்கம் என்றால் என்ன") === "ta", "Tamil question routes to Tamil Wikipedia");
+  check(wikiLangFor("What is photosynthesis?") === "en", "English question routes to English Wikipedia");
+  check(searchTerms("फोटोसिंथेसिस क्या है समझाओ") === "फोटोसिंथेसिस", "Hindi question words stripped from search");
+  check(searchTerms("সালোকসংশ্লেষণ কী ব্যাখ্যা করো") === "সালোকসংশ্লেষণ", "Bengali question words stripped from search");
+  check(searchTerms("What is photosynthesis in simple words?") === "photosynthesis", "English question words stripped from search");
 
   console.log("\n--- 2c. Local curriculum replies must stay on-topic ---");
   {

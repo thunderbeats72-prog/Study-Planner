@@ -121,6 +121,15 @@ v6 FIXES (this build)
    Api-Revision header; native device-voice preferences were added for
    Marathi, Bengali, Tamil, Telugu, Kannada, Malayalam, Gujarati, Punjabi,
    Odia, Urdu and Arabic so the offline fallback picks a matching voice.
+ - MULTILINGUAL LOCAL TUTORING (no AI key needed): "आज क्या पढ़ना है?",
+   "মেরা প্রগ্রেস কেমন?" and their equivalents in Bengali, Tamil, Telugu,
+   Kannada, Malayalam, Gujarati, Punjabi, Odia, Urdu and Arabic now get
+   INSTANT data-driven answers (today's plan, progress, weakest subject,
+   overdue count) in the learner's own language. Concept questions are
+   looked up on that language's Wikipedia (hi/bn/ta/te/kn/ml/gu/pa/or/ur/ar
+   and more, with an English fallback), and the lesson structure headers
+   switch to the learner's language. Indic question words ("क्या है",
+   "সমঝাও", ...) are stripped from search queries so results stay precise.
 
 v5 FIXES (this build)
 ---------------------

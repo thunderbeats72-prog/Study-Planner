@@ -13,6 +13,7 @@ import {
   type GeneratedTopic,
 } from "./curriculum";
 import { lookupKnowledge, teachFromKnowledge } from "./knowledge";
+import { detectLanguage } from "./language";
 
 // Re-export the canonical topic shape so existing imports from "./ai" keep working.
 export type { GeneratedTopic, CurriculumSource } from "./curriculum";
@@ -1014,7 +1015,280 @@ export function parseCommand(q: string): TutorReply["action"] | undefined {
   return undefined;
 }
 
+/* ── Localized instant plan/progress replies ───────────────────
+   The English instant replies below are fast and data-factual, but they
+   only match English phrasing. A Hindi/Bengali/Tamil/... learner asking
+   "आज क्या पढ़ना है?" previously fell through to the cloud or the wiki and,
+   on keyless deployments, to a generic apology. These script-based intents
+   return the SAME live data in the learner's own language, instantly and
+   without a model round-trip. */
+
+type InstantPhrases = {
+  todayIntro: string;
+  todayNone: string;
+  todayCta: string;
+  minUnit: string;
+  progress: (pct: number, streak: number, hours: number, overdue: number) => string;
+  weakest: (name: string, pct: number, done: number, total: number) => string;
+  behind: (overdue: number) => string;
+  behindNone: string;
+};
+
+const INSTANT_I18N: Record<string, InstantPhrases> = {
+  hi: {
+    todayIntro: "आज के लिए आपकी प्राथमिकता सूची:\n\n",
+    todayNone: "आज के लिए कुछ बाकी नहीं है। अतिरिक्त समय में सक्रिय याद (active recall) या छोटा मिश्रित अभ्यास करें।",
+    todayCta: "\n\nतैयार हों तो कहें *“टाइमर शुरू करो”*।",
+    minUnit: "मिनट",
+    progress: (pct, streak, hours, overdue) =>
+      `आप **${pct}%** पाठ्यक्रम पूरा कर चुके हैं, **${streak} दिन** की स्ट्रीक के साथ। इस हफ्ते **${hours} घंटे** पढ़ाई की और **${overdue} कार्य बकाया** हैं। ${overdue ? "पहले सबसे पुराना बकाया पाठ निपटाएँ, फिर आज की योजना पर लौटें।" : "आपकी योजना समय पर है — आज के सबसे ज़रूरी पाठ से स्ट्रीक बचाए रखें।"}`,
+    weakest: (name, pct, done, total) =>
+      `आपका सबसे कम पूर्णता वाला विषय **${name}** है (**${pct}%**, ${done}/${total} पाठ)। Subjects में जाकर उसका पहला बकाया पाठ चुनें; मैं उसे शुरू से सिखा सकता हूँ।`,
+    behind: (overdue) =>
+      `आपके **${overdue} कार्य बकाया** हैं। एक बार **Rebalance schedule** इस्तेमाल करें — यह अधूरा काम आगे बढ़ाएगा, पूरे हुए पाठों को नहीं छूएगा।`,
+    behindNone: "कोई बकाया कार्य नहीं है। योजना पर टिके रहें, अतिरिक्त काम न जोड़ें।",
+  },
+  bn: {
+    todayIntro: "আজকের জন্য আপনার অগ্রাধিকার তালিকা:\n\n",
+    todayNone: "আজকের জন্য কিছু বাকি নেই। অতিরিক্ত সময়ে সক্রিয় মনে-পড়া বা ছোট মিশ্র অনুশীলন করুন।",
+    todayCta: "\n\nপ্রস্তুত হলে বলুন *“টাইমার শুরু করো”*।",
+    minUnit: "মিনিট",
+    progress: (pct, streak, hours, overdue) =>
+      `আপনি পাঠ্যক্রমের **${pct}%** শেষ করেছেন, **${streak} দিনের** স্ট্রিক সহ। এই সপ্তাহে **${hours} ঘণ্টা** পড়েছেন এবং **${overdue}টি কাজ বাকি**। ${overdue ? "প্রথমে সবচেয়ে পুরনো বাকি পাঠ শেষ করুন, তারপর আজকের পরিকল্পনায় ফিরুন।" : "আপনার সময়সূচি সঠিক আছে — আজকের সবচেয়ে গুরুত্বপূর্ণ পাঠ দিয়ে স্ট্রিক ধরে রাখুন।"}`,
+    weakest: (name, pct, done, total) =>
+      `আপনার সবচেয়ে কম সম্পন্ন বিষয় **${name}** (**${pct}%**, ${done}/${total} পাঠ)। Subjects-এ গিয়ে এর প্রথম বাকি পাঠ বেছে নিন; আমি শুরু থেকে শেখাতে পারি।`,
+    behind: (overdue) =>
+      `আপনার **${overdue}টি কাজ বাকি**। একবার **Rebalance schedule** ব্যবহার করুন — এটি অসমাপ্ত কাজ সামনে এগিয়ে নেবে, সম্পন্ন পাঠ স্পর্শ করবে না।`,
+    behindNone: "কোনো বাকি কাজ নেই। পরিকল্পনায় থাকুন, অতিরিক্ত কাজ যোগ করবেন না।",
+  },
+  ta: {
+    todayIntro: "இன்றைய முன்னுரிமைப் பட்டியல்:\n\n",
+    todayNone: "இன்றைக்கு எதுவும் நிலுவையில் இல்லை. கூடுதல் நேரத்தில் செயலூக்க நினைவுகூரல் அல்லது சிறு கலப்பு பயிற்சி செய்யுங்கள்.",
+    todayCta: "\n\nதயாரானதும் *“டைமர் தொடங்கு”* என்று சொல்லுங்கள்.",
+    minUnit: "நிமிடம்",
+    progress: (pct, streak, hours, overdue) =>
+      `பாடத்திட்டத்தில் **${pct}%** முடித்துள்ளீர்கள், **${streak} நாள்** ஸ்ட்ரீக்குடன். இந்த வாரம் **${hours} மணிநேரம்** படித்தீர்கள், **${overdue} பணிகள்** நிலுவையில் உள்ளன. ${overdue ? "முதலில் பழமையான நிலுவைப் பாடத்தை முடித்து, பிறகு இன்றைய திட்டத்திற்குத் திரும்புங்கள்." : "உங்கள் அட்டவணை சரியாக உள்ளது — இன்றைய முதன்மைப் பாடத்துடன் ஸ்ட்ரீக்கைப் பாதுகாக்கவும்."}`,
+    weakest: (name, pct, done, total) =>
+      `உங்கள் குறைந்த முழுமை உள்ள பாடம் **${name}** (**${pct}%**, ${done}/${total} பாடங்கள்). Subjects-இல் சென்று அதன் முதல் நிலுவைப் பாடத்தைத் தேர்ந்தெடுக்கவும்; அதை அடிப்படையிலிருந்து கற்பிக்கிறேன்.`,
+    behind: (overdue) =>
+      `உங்களுக்கு **${overdue} பணிகள்** நிலுவையில் உள்ளன. ஒருமுறை **Rebalance schedule** பயன்படுத்தவும் — முடிக்காத வேலையை முன்னோக்கி நகர்த்தும், முடித்த பாடங்களைத் தொடாது.`,
+    behindNone: "நிலுவைப் பணிகள் இல்லை. திட்டத்தில் இருங்கள், கூடுதல் வேலையைச் சேர்க்க வேண்டாம்.",
+  },
+  te: {
+    todayIntro: "ఈరోజు మీ ప్రాధాన్యత జాబితా:\n\n",
+    todayNone: "ఈరోజుకి ఏమీ పెండింగ్ లేదు. అదనపు సమయంలో యాక్టివ్ రీకాల్ లేదా చిన్న మిక్స్డ్ ప్రాక్టీస్ చేయండి.",
+    todayCta: "\n\nసిద్ధంగా ఉంటే *“టైమర్ ప్రారంభించండి”* అనండి.",
+    minUnit: "నిమిషాలు",
+    progress: (pct, streak, hours, overdue) =>
+      `మీరు సిలబస్లో **${pct}%** పూర్తి చేశారు, **${streak} రోజుల** స్ట్రీక్తో. ఈ వారం **${hours} గంటలు** చదివారు, **${overdue} పనులు** బాకీ ఉన్నాయి. ${overdue ? "ముందు పాత బాకీ పాఠాన్ని పూర్తి చేసి, ఆపై ఈరోజు ప్లాన్కి తిరగండి." : "మీ షెడ్యూల్ సరిగ్గా ఉంది — ఈరోజు అత్యంత ముఖ్యమైన పాఠంతో స్ట్రీక్ను కాపాడుకోండి."}`,
+    weakest: (name, pct, done, total) =>
+      `మీ అత్యల్ప పూర్తి విషయం **${name}** (**${pct}%**, ${done}/${total} పాఠాలు). Subjectsలో వెళ్లి దాని మొదటి బాకీ పాఠాన్ని ఎంచుకోండి; నేను దానిని ప్రాథమికాల నుండి బోధిస్తాను.`,
+    behind: (overdue) =>
+      `మీకు **${overdue} పనులు** బాకీ ఉన్నాయి. ఒకసారి **Rebalance schedule** ఉపయోగించండి — ఇది పూర్తికాని పనిని ముందుకు కదిలిస్తుంది, పూర్తి పాఠాలను తాకదు.`,
+    behindNone: "బాకీ పనులు లేవు. ప్లాన్లోనే ఉండండి, అదనపు పని జోడించవద్దు.",
+  },
+  kn: {
+    todayIntro: "ಇಂದಿನ ಆದ್ಯತೆಯ ಪಟ್ಟಿ:\n\n",
+    todayNone: "ಇಂದಿಗೆ ಏನೂ ಬಾಕಿ ಇಲ್ಲ. ಹೆಚ್ಚುವರಿ ಸಮಯದಲ್ಲಿ ಸಕ್ರಿಯ ನೆನಪು ಅಥವಾ ಸಣ್ಣ ಮಿಶ್ರ ಅಭ್ಯಾಸ ಮಾಡಿ.",
+    todayCta: "\n\nಸಿದ್ಧರಾದಾಗ *“ಟೈಮರ್ ಪ್ರಾರಂಭಿಸಿ”* ಎನ್ನಿ.",
+    minUnit: "ನಿಮಿಷ",
+    progress: (pct, streak, hours, overdue) =>
+      `ನೀವು ಪಠ್ಯಕ್ರಮದಲ್ಲಿ **${pct}%** ಪೂರ್ಣಗೊಳಿಸಿದ್ದೀರಿ, **${streak} ದಿನಗಳ** ಸ್ಟ್ರೀಕ್ನೊಂದಿಗೆ. ಈ ವಾರ **${hours} ಗಂಟೆ** ಓದಿದ್ದೀರಿ, **${overdue} ಕಾರ್ಯಗಳು** ಬಾಕಿ ಇವೆ. ${overdue ? "ಮೊದಲು ಹಳೆಯ ಬಾಕಿ ಪಾಠವನ್ನು ಮುಗಿಸಿ, ನಂತರ ಇಂದಿನ ಯೋಜನೆಗೆ ಹಿಂತಿರುಗಿ." : "ನಿಮ್ಮ ವೇಳಾಪಟ್ಟಿ ಸರಿಯಾಗಿದೆ — ಇಂದಿನ ಅತ್ಯಂತ ಮುಖ್ಯ ಪಾಠದಿಂದ ಸ್ಟ್ರೀಕ್ ಉಳಿಸಿಕೊಳ್ಳಿ."}`,
+    weakest: (name, pct, done, total) =>
+      `ನಿಮ್ಮ ಕಡಿಮೆ ಪೂರ್ಣಗೊಂಡ ವಿಷಯ **${name}** (**${pct}%**, ${done}/${total} ಪಾಠಗಳು). Subjects ನಲ್ಲಿ ಹೋಗಿ ಅದರ ಮೊದಲ ಬಾಕಿ ಪಾಠವನ್ನು ಆರಿಸಿ; ನಾನು ಅದನ್ನು ಮೂಲದಿಂದ ಕಲಿಸಬಲ್ಲೆ.`,
+    behind: (overdue) =>
+      `ನಿಮಗೆ **${overdue} ಕಾರ್ಯಗಳು** ಬಾಕಿ ಇವೆ. ಒಮ್ಮೆ **Rebalance schedule** ಬಳಸಿ — ಇದು ಅಪೂರ್ಣ ಕೆಲಸವನ್ನು ಮುಂದಕ್ಕೆ ಸರಿಸುತ್ತದೆ, ಪೂರ್ಣ ಪಾಠಗಳನ್ನು ಮುಟ್ಟುವುದಿಲ್ಲ.`,
+    behindNone: "ಬಾಕಿ ಕಾರ್ಯಗಳಿಲ್ಲ. ಯೋಜನೆಯಲ್ಲಿ ಇರಿ, ಹೆಚ್ಚುವರಿ ಕೆಲಸ ಸೇರಿಸಬೇಡಿ.",
+  },
+  ml: {
+    todayIntro: "ഇന്നത്തെ മുൻഗണനാ പട്ടിക:\n\n",
+    todayNone: "ഇന്നത്തേക്ക് ഒന്നും ബാക്കിയില്ല. അധിക സമയത്ത് സജീവ ഓർമപ്പെടുത്തൽ അല്ലെങ്കിൽ ചെറിയ മിക്സഡ് പരിശീലനം ചെയ്യുക.",
+    todayCta: "\n\nതയ്യാറാകുമ്പോൾ *“ടൈമർ ആരംഭിക്കൂ”* എന്ന് പറയൂ.",
+    minUnit: "മിനിറ്റ്",
+    progress: (pct, streak, hours, overdue) =>
+      `നിങ്ങൾ സിലബസിന്റെ **${pct}%** പൂർത്തിയാക്കി, **${streak} ദിവസത്തെ** സ്ട്രീക്കോടെ. ഈ ആഴ്ച **${hours} മണിക്കൂർ** പഠിച്ചു, **${overdue} ജോലികൾ** ബാക്കിയുണ്ട്. ${overdue ? "ആദ്യം പഴയ ബാക്കി പാഠം പൂർത്തിയാക്കുക, പിന്നീട് ഇന്നത്തെ പ്ലാനിലേക്ക് മടങ്ങുക." : "നിങ്ങളുടെ ഷെഡ്യൂൾ ശരിയാണ് — ഇന്നത്തെ ഏറ്റവും പ്രധാനപ്പെട്ട പാഠം ഉപയോഗിച്ച് സ്ട്രീക്ക് സംരക്ഷിക്കുക."}`,
+    weakest: (name, pct, done, total) =>
+      `നിങ്ങളുടെ ഏറ്റവും കുറഞ്ഞ പൂർത്തീകരണ വിഷയം **${name}** (**${pct}%**, ${done}/${total} പാഠങ്ങൾ). Subjects-ൽ പോയി അതിന്റെ ആദ്യ ബാക്കി പാഠം തിരഞ്ഞെടുക്കുക; ഞാൻ അത് അടിസ്ഥാനത്തിൽ നിന്ന് പഠിപ്പിക്കാം.`,
+    behind: (overdue) =>
+      `നിങ്ങൾക്ക് **${overdue} ജോലികൾ** ബാക്കിയുണ്ട്. ഒരിക്കൽ **Rebalance schedule** ഉപയോഗിക്കുക — ഇത് പൂർത്തിയാകാത്ത ജോലി മുന്നോട്ട് നീക്കും, പൂർത്തിയായ പാഠങ്ങളെ തൊടില്ല.`,
+    behindNone: "ബാക്കി ജോലികളില്ല. പ്ലാനിൽ തുടരുക, അധിക ജോലി ചേർക്കരുത്.",
+  },
+  gu: {
+    todayIntro: "આજની પ્રાથમિકતા યાદી:\n\n",
+    todayNone: "આજ માટે કંઈ બાકી નથી. વધારાના સમયમાં સક્રિય યાદ અથવા ટૂંકી મિશ્ર પ્રેક્ટિસ કરો.",
+    todayCta: "\n\nતૈયાર હો ત્યારે કહો *“ટાઈમર શરૂ કરો”*।",
+    minUnit: "મિનિટ",
+    progress: (pct, streak, hours, overdue) =>
+      `તમે સિલેબસના **${pct}%** પૂરા કર્યા છે, **${streak} દિવસની** સ્ટ્રીક સાથે. આ અઠવાડિયે **${hours} કલાક** ભણ્યા અને **${overdue} કામ બાકી** છે. ${overdue ? "પહેલા સૌથી જૂનું બાકી પાઠ પૂરું કરો, પછી આજની યોજના પર પાછા ફરો." : "તમારું શેડ્યૂલ સમયસર છે — આજના સૌથી મહત્વપૂર્ણ પાઠથી સ્ટ્રીક સાચવો."}`,
+    weakest: (name, pct, done, total) =>
+      `તમારો સૌથી ઓછો પૂર્ણ વિષય **${name}** છે (**${pct}%**, ${done}/${total} પાઠ). Subjects માં જઈને તેનો પહેલો બાકી પાઠ પસંદ કરો; હું તેને શરૂઆતથી શીખવી શકું છું.`,
+    behind: (overdue) =>
+      `તમારા **${overdue} કામ બાકી** છે. એકવાર **Rebalance schedule** વાપરો — તે અધૂરું કામ આગળ ખસેડશે, પૂરા થયેલા પાઠોને સ્પર્શશે નહીં.`,
+    behindNone: "કોઈ બાકી કામ નથી. યોજના પર રહો, વધારાનું કામ ઉમેરશો નહીં.",
+  },
+  pa: {
+    todayIntro: "ਅੱਜ ਦੀ ਤਰਜੀਹ ਸੂਚੀ:\n\n",
+    todayNone: "ਅੱਜ ਲਈ ਕੁਝ ਬਾਕੀ ਨਹੀਂ। ਵਾਧੂ ਸਮੇਂ ਵਿੱਚ ਸਰਗਰਮ ਯਾਦ ਜਾਂ ਛੋਟਾ ਮਿਸ਼ਰਤ ਅਭਿਆਸ ਕਰੋ।",
+    todayCta: "\n\nਤਿਆਰ ਹੋਵੋ ਤਾਂ ਕਹੋ *“ਟਾਈਮਰ ਸ਼ੁਰੂ ਕਰੋ”*।",
+    minUnit: "ਮਿੰਟ",
+    progress: (pct, streak, hours, overdue) =>
+      `ਤੁਸੀਂ ਸਿਲੇਬਸ ਦਾ **${pct}%** ਪੂਰਾ ਕਰ ਲਿਆ ਹੈ, **${streak} ਦਿਨਾਂ** ਦੀ ਸਟ੍ਰੀਕ ਨਾਲ। ਇਸ ਹਫ਼ਤੇ **${hours} ਘੰਟੇ** ਪੜ੍ਹਾਈ ਕੀਤੀ ਅਤੇ **${overdue} ਕੰਮ ਬਾਕੀ** ਹਨ। ${overdue ? "ਪਹਿਲਾਂ ਸਭ ਤੋਂ ਪੁਰਾਣਾ ਬਾਕੀ ਪਾਠ ਨਿਪਟਾਓ, ਫਿਰ ਅੱਜ ਦੀ ਯੋਜਨਾ 'ਤੇ ਵਾਪਸ ਆਓ।" : "ਤੁਹਾਡਾ ਸ਼ਡਿਊਲ ਸਹੀ ਹੈ — ਅੱਜ ਦੇ ਸਭ ਤੋਂ ਮਹੱਤਵਪੂਰਨ ਪਾਠ ਨਾਲ ਸਟ੍ਰੀਕ ਬਚਾਓ।"}`,
+    weakest: (name, pct, done, total) =>
+      `ਤੁਹਾਡਾ ਸਭ ਤੋਂ ਘੱਟ ਪੂਰਾ ਵਿਸ਼ਾ **${name}** ਹੈ (**${pct}%**, ${done}/${total} ਪਾਠ)। Subjects ਵਿੱਚ ਜਾ ਕੇ ਇਸਦਾ ਪਹਿਲਾ ਬਾਕੀ ਪਾਠ ਚੁਣੋ; ਮੈਂ ਇਸਨੂੰ ਸ਼ੁਰੂ ਤੋਂ ਸਿਖਾ ਸਕਦਾ ਹਾਂ।`,
+    behind: (overdue) =>
+      `ਤੁਹਾਡੇ **${overdue} ਕੰਮ ਬਾਕੀ** ਹਨ। ਇੱਕ ਵਾਰ **Rebalance schedule** ਵਰਤੋ — ਇਹ ਅਧੂਰਾ ਕੰਮ ਅੱਗੇ ਵਧਾਏਗਾ, ਪੂਰੇ ਪਾਠਾਂ ਨੂੰ ਨਹੀਂ ਛੂਹੇਗਾ।`,
+    behindNone: "ਕੋਈ ਬਾਕੀ ਕੰਮ ਨਹੀਂ। ਯੋਜਨਾ 'ਤੇ ਰਹੋ, ਵਾਧੂ ਕੰਮ ਨਾ ਜੋੜੋ।",
+  },
+  or: {
+    todayIntro: "ଆଜିର ପ୍ରାଥମିକତା ତାଲିକା:\n\n",
+    todayNone: "ଆଜି ପାଇଁ କିଛି ବାକି ନାହିଁ। ଅତିରିକ୍ତ ସମୟରେ ସକ୍ରିୟ ମନେରଖା କିମ୍ବା ଛୋଟ ମିଶ୍ରିତ ଅଭ୍ୟାସ କରନ୍ତୁ।",
+    todayCta: "\n\nପ୍ରସ୍ତୁତ ହେଲେ କୁହନ୍ତୁ *“ଟାଇମର ଆରମ୍ଭ କରନ୍ତୁ”*।",
+    minUnit: "ମିନିଟ୍",
+    progress: (pct, streak, hours, overdue) =>
+      `ଆପଣ ସିଲାବସର **${pct}%** ସମ୍ପୂର୍ଣ୍ଣ କରିଛନ୍ତି, **${streak} ଦିନର** ଷ୍ଟ୍ରିକ୍ ସହିତ। ଏହି ସପ୍ତାହରେ **${hours} ଘଣ୍ଟା** ପଢ଼ିଛନ୍ତି ଏବଂ **${overdue} କାର୍ଯ୍ୟ ବାକି** ଅଛି। ${overdue ? "ପ୍ରଥମେ ସବୁଠାରୁ ପୁରୁଣା ବାକି ପାଠ ସାରନ୍ତୁ, ପରେ ଆଜିର ଯୋଜନାକୁ ଫେରନ୍ତୁ।" : "ଆପଣଙ୍କ କାର୍ଯ୍ୟସୂଚୀ ସମୟ ଅନୁସାରେ ଅଛି — ଆଜିର ସବୁଠାରୁ ଗୁରୁତ୍ୱପୂର୍ଣ୍ଣ ପାଠ ସହ ଷ୍ଟ୍ରିକ୍ ରକ୍ଷା କରନ୍ତୁ।"}`,
+    weakest: (name, pct, done, total) =>
+      `ଆପଣଙ୍କ ସର୍ବନିମ୍ନ ସମ୍ପୂର୍ଣ୍ଣ ବିଷୟ **${name}** (**${pct}%**, ${done}/${total} ପାଠ)। Subjects ରେ ଯାଇ ଏହାର ପ୍ରଥମ ବାକି ପାଠ ବାଛନ୍ତୁ; ମୁଁ ଏହାକୁ ମୂଳରୁ ଶିଖାଇପାରିବି।`,
+    behind: (overdue) =>
+      `ଆପଣଙ୍କର **${overdue} କାର୍ଯ୍ୟ ବାକି** ଅଛି। ଥରେ **Rebalance schedule** ବ୍ୟବହାର କରନ୍ତୁ — ଏହା ଅସମାପ୍ତ କାମ ଆଗକୁ ବଢ଼ାଇବ, ସମାପ୍ତ ପାଠକୁ ଛୁଇଁବ ନାହିଁ।`,
+    behindNone: "କୌଣସି ବାକି କାର୍ଯ୍ୟ ନାହିଁ। ଯୋଜନାରେ ରୁହନ୍ତୁ, ଅତିରିକ୍ତ କାମ ଯୋଡ଼ନ୍ତୁ ନାହିଁ।",
+  },
+  ur: {
+    todayIntro: "آج کی ترجیحات کی فہرست:\n\n",
+    todayNone: "آج کے لیے کچھ باقی نہیں۔ اضافی وقت میں فعال یادداشت یا مختصر مخلوط مشق کریں۔",
+    todayCta: "\n\nتیار ہوں تو کہیں *“ٹائمر شروع کریں”*۔",
+    minUnit: "منٹ",
+    progress: (pct, streak, hours, overdue) =>
+      `آپ نصاب کا **${pct}%** مکمل کر چکے ہیں، **${streak} دن** کی اسٹریک کے ساتھ۔ اس ہفتے **${hours} گھنٹے** پڑھائی کی اور **${overdue} کام باقی** ہیں۔ ${overdue ? "پہلے سب سے پرانا باقی سبق مکمل کریں، پھر آج کے منصوبے پر واپس آئیں۔" : "آپ کا شیڈول درست ہے — آج کے سب سے اہم سبق سے اسٹریک محفوظ رکھیں۔"}`,
+    weakest: (name, pct, done, total) =>
+      `آپ کا سب سے کم مکمل مضمون **${name}** ہے (**${pct}%**, ${done}/${total} اسباق)۔ Subjects میں جا کر اس کا پہلا باقی سبق چنیں؛ میں اسے شروع سے سکھا سکتا ہوں۔`,
+    behind: (overdue) =>
+      `آپ کے **${overdue} کام باقی** ہیں۔ ایک بار **Rebalance schedule** استعمال کریں — یہ ادھورا کام آگے بڑھائے گا، مکمل اسباق کو نہیں چھوئے گا۔`,
+    behindNone: "کوئی باقی کام نہیں۔ منصوبے پر رہیں، اضافی کام نہ جوڑیں۔",
+  },
+  ar: {
+    todayIntro: "قائمة أولوياتك اليوم:\n\n",
+    todayNone: "لا يوجد شيء متبقٍ لليوم. استغل الوقت الإضافي في استرجاع نشط أو تمرين مختصر.",
+    todayCta: "\n\nعندما تكون جاهزًا قل *«ابدأ المؤقت»*.",
+    minUnit: "دقيقة",
+    progress: (pct, streak, hours, overdue) =>
+      `أنت أنجزت **${pct}%** من المنهج مع سلسلة **${streak} أيام**. درست **${hours} ساعات** هذا الأسبوع ولديك **${overdue} مهام متأخرة**. ${overdue ? "أكمل أقدم درس متأخر أولًا، ثم عد إلى خطة اليوم." : "جدولك محدث — حافظ على السلسلة بأهم درس اليوم."}`,
+    weakest: (name, pct, done, total) =>
+      `مادتك الأقل إنجازًا هي **${name}** (**${pct}%**، ${done}/${total} درسًا). افتح Subjects واختر أول درس متبقٍ؛ يمكنني تدريسه من الأساسيات.`,
+    behind: (overdue) =>
+      `لديك **${overdue} مهام متأخرة**. استخدم **Rebalance schedule** مرة واحدة؛ سينقل العمل غير المكتمل للأمام دون لمس الدروس المكتملة.`,
+    behindNone: "لا توجد مهام متأخرة. التزم بالخطة ولا تضف عملًا إضافيًا.",
+  },
+};
+
+/** Script-based intent patterns per language for instant replies. */
+const INSTANT_INTENTS: Record<string, { today: RegExp; progress: RegExp; weakest: RegExp; behind: RegExp }> = {
+  hi: {
+    today: /(आज|आज के लिए|आज का).*(पढ़|क्या कर|योजना|प्लान|शेड्यूल)|क्या पढ़|पढ़ना है|पढ़ूं/,
+    progress: /(प्रोग्रेस|प्रगति|कैसा चल|कैसी चल|प्रदर्शन|पढ़ाई कैसी)/,
+    weakest: /(सबसे कमजोर|सबसे कमज़ोर|कमजोर विषय|कमज़ोर विषय|कौन सा विषय कमजोर)/,
+    behind: /(पीछे|बकाया|कितने बकाया|कैच अप)/,
+  },
+  bn: {
+    today: /(আজ|আজকের).*(পড়|পড়ব|কী করব|পরিকল্পনা|প্ল্যান)|কী পড়|পড়ব|পড়া উচিত/,
+    progress: /(অগ্রগতি|প্রগ্রেস|কেমন চলছে|পড়াশোনা কেমন)/,
+    weakest: /(সবচেয়ে দুর্বল|দুর্বল বিষয়|কোন বিষয় দুর্বল)/,
+    behind: /(পিছিয়ে|বাকি|কতগুলো বাকি)/,
+  },
+  ta: {
+    today: /(இன்று|இன்றைய).*(படிக்க|படிக்கலாம்|செய்ய|திட்டம்|பிளான்)|என்ன படிக்க|படிக்க வேண்டும்/,
+    progress: /(முன்னேற்றம்|ப்ரோக்ரஸ்|எப்படி இருக்கிறது|படிப்பு எப்படி)/,
+    weakest: /(மிகவும் பலவீனமான|பலவீனமான பாடம்|எந்த பாடம் பலவீனம்)/,
+    behind: /(பின்தங்கி|நிலுவை|எத்தனை நிலுவை)/,
+  },
+  te: {
+    today: /(ఈరోజు|నేడు).*(చదవాలి|చదువు|ఏమి చేయాలి|ప్లాన్|ప్రణాళిక)|ఏమి చదవ|చదవాలి/,
+    progress: /(పురోగతి|ప్రోగ్రెస్|ఎలా ఉంది|చదువు ఎలా)/,
+    weakest: /(బలహీనమైన|ఏ సబ్జెక్టు బలహీనం|తక్కువ పూర్తి)/,
+    behind: /(వెనుకబడి|బాకీ|ఎన్ని బాకీ)/,
+  },
+  kn: {
+    today: /(ಇಂದು|ಇಂದಿನ).*(ಓದಬೇಕು|ಓದು|ಏನು ಮಾಡಬೇಕು|ಯೋಜನೆ|ಪ್ಲಾನ್)|ಏನು ಓದ|ಓದಬೇಕು/,
+    progress: /(ಪ್ರಗತಿ|ಪ್ರೋಗ್ರೆಸ್|ಹೇಗಿದೆ|ಓದು ಹೇಗೆ)/,
+    weakest: /(ದುರ್ಬಲ|ಯಾವ ವಿಷಯ ದುರ್ಬಲ|ಕಡಿಮೆ ಪೂರ್ಣ)/,
+    behind: /(ಹಿಂದೆ|ಬಾಕಿ|ಎಷ್ಟು ಬಾಕಿ)/,
+  },
+  ml: {
+    today: /(ഇന്ന്|ഇന്നത്തെ).*(പഠിക്കണം|പഠനം|എന്ത് ചെയ്യണം|പ്ലാൻ|പദ്ധതി)|എന്ത് പഠിക്ക|പഠിക്കണം/,
+    progress: /(പുരോഗതി|പ്രോഗ്രസ്|എങ്ങനെയുണ്ട്|പഠനം എങ്ങനെ)/,
+    weakest: /(ദുർബലമായ|ഏത് വിഷയം ദുർബലം|കുറഞ്ഞ പൂർത്തി)/,
+    behind: /(പിന്നിലാണ്|ബാക്കി|എത്ര ബാക്കി)/,
+  },
+  gu: {
+    today: /(આજે|આજનો).*(ભણવું|ભણવાનું|શું કરવું|યોજના|પ્લાન)|શું ભણ|ભણવું છે/,
+    progress: /(પ્રગતિ|પ્રોગ્રેસ|કેવી છે|ભણતર કેવું)/,
+    weakest: /(સૌથી નબળો|નબળો વિષય|કયો વિષય નબળો)/,
+    behind: /(પાછળ|બાકી|કેટલા બાકી)/,
+  },
+  pa: {
+    today: /(ਅੱਜ|ਅੱਜ ਦਾ).*(ਪੜ੍ਹਨਾ|ਪੜ੍ਹਾਈ|ਕੀ ਕਰਨਾ|ਯੋਜਨਾ|ਪਲਾਨ)|ਕੀ ਪੜ੍ਹ|ਪੜ੍ਹਨਾ ਹੈ/,
+    progress: /(ਤਰੱਕੀ|ਪ੍ਰੋਗਰੈੱਸ|ਕਿਵੇਂ ਹੈ|ਪੜ੍ਹਾਈ ਕਿਵੇਂ)/,
+    weakest: /(ਸਭ ਤੋਂ ਕਮਜ਼ੋਰ|ਕਮਜ਼ੋਰ ਵਿਸ਼ਾ|ਕਿਹੜਾ ਵਿਸ਼ਾ ਕਮਜ਼ੋਰ)/,
+    behind: /(ਪਿੱਛੇ|ਬਾਕੀ|ਕਿੰਨੇ ਬਾਕੀ)/,
+  },
+  or: {
+    today: /(ଆଜି|ଆଜିର).*(ପଢ଼ିବା|ପଢ଼ା|କଣ କରିବା|ଯୋଜନା|ପ୍ଲାନ)|କଣ ପଢ଼|ପଢ଼ିବା ଉଚିତ୍/,
+    progress: /(ପ୍ରଗତି|ପ୍ରୋଗ୍ରେସ|କେମିତି ଅଛି|ପଢ଼ା କେମିତି)/,
+    weakest: /(ସବୁଠାରୁ ଦୁର୍ବଳ|ଦୁର୍ବଳ ବିଷୟ|କେଉଁ ବିଷୟ ଦୁର୍ବଳ)/,
+    behind: /(ପଛରେ|ବାକି|କେତେ ବାକି)/,
+  },
+  ur: {
+    today: /(آج|آج کے).*(پڑھنا|پڑھائی|کیا کرنا|منصوبہ|پلان)|کیا پڑھ|پڑھنا ہے/,
+    progress: /(پیشرفت|پروگریس|کیسی ہے|پڑھائی کیسی)/,
+    weakest: /(سب سے کمزور|کمزور مضمون|کون سا مضمون کمزور)/,
+    behind: /(پیچھے|باقی|کتنے باقی)/,
+  },
+  ar: {
+    today: /(اليوم|لليوم).*(أدرس|أقرأ|ماذا أفعل|خطة|الخطة)|ماذا أدرس|أدرس اليوم/,
+    progress: /(تقدمي|تقدم|كيف حال دراستي|تقدمي الدراسي)/,
+    weakest: /(أضعف مادة|أضعف|ضعيف)/,
+    behind: /(متأخر|متأخرة|كم متأخر)/,
+  },
+};
+
+/** Same-language instant data replies. Returns null when the question is not
+ *  one of the four intents or is English (handled by instantTutorReply). */
+function localizedInstantReply(q: string, ctx: TutorContext): TutorReply | null {
+  const tag = detectLanguage(q);
+  const code = tag.slice(0, 2);
+  if (code === "en") return null;
+  const phrases = INSTANT_I18N[code];
+  const intents = INSTANT_INTENTS[code];
+  if (!phrases || !intents) return null;
+
+  const pending = ctx.today.filter((task) => task.status === "pending");
+  if (intents.today.test(q)) {
+    if (!pending.length) return { text: phrases.todayNone };
+    const list = pending.slice(0, 6)
+      .map((task, index) => `${index + 1}. **${task.title}** (${task.minutes} ${phrases.minUnit})`)
+      .join("\n");
+    return { text: `${phrases.todayIntro}${list}${phrases.todayCta}` };
+  }
+  if (intents.progress.test(q)) {
+    return { text: phrases.progress(ctx.progressPct, ctx.streak, ctx.hoursThisWeek, ctx.overdue) };
+  }
+  if (intents.weakest.test(q)) {
+    const weakest = [...ctx.subjects]
+      .filter((subject) => subject.total > 0)
+      .sort((a, b) => (a.done / a.total) - (b.done / b.total))[0];
+    if (weakest) {
+      const pct = Math.round((weakest.done / weakest.total) * 100);
+      return { text: phrases.weakest(weakest.name, pct, weakest.done, weakest.total) };
+    }
+  }
+  if (intents.behind.test(q)) {
+    return { text: ctx.overdue ? phrases.behind(ctx.overdue) : phrases.behindNone };
+  }
+  return null;
+}
+
 export function instantTutorReply(q: string, ctx: TutorContext): TutorReply | null {
+  const localized = localizedInstantReply(q, ctx);
+  if (localized) return localized;
   const n = q.toLowerCase();
   if (/(what|which).*(today|now)|today'?s (plan|task|study|load)|what should i (study|do)/.test(n)) {
     const pending = ctx.today.filter((task) => task.status === "pending");
