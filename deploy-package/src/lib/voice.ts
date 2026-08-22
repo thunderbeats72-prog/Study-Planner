@@ -1,40 +1,29 @@
 "use client";
 
-import { detectLanguage, shortLang } from "./language";
 import { mergeTranscriptSegments } from "./transcript";
-import {
-  EDGE_VOICES,
-  synthesiseEdgeSpeech,
-} from "./edgeTts";
 
 // ============================================================
-// SHIGUN VOICE — keyless neural speech, one speaker everywhere
-// - DEFAULT ENGINE: Microsoft Edge multilingual neural (NO API key):
-//   Ava (f1) · Emma (f2) · Andrew (m1). The same neural person speaks
-//   every language (Hindi, Hinglish, English, Tamil, …) — only the
-//   SSML xml:lang changes, never the voice name.
-// - Order: /api/voice (Edge, optional Gemini/Chirp when keys exist) →
-//   direct browser connection to the same Edge service (for networks
-//   the server cannot reach) → pinned device speechSynthesis, LAST
-//   resort only, same speaker for every language.
-// - Recognition is single-utterance and overlap-deduplicated.
-// - Every listen/playback has a generation token so late mobile callbacks
-//   cannot restart audio or submit an old transcript.
+// SHIGUN VOICE
+// - Recognition is single-utterance and overlap-deduplicated, which avoids
+//   cumulative WebKit/Android results being appended more than once.
+// - Replies use a pinned server voice (deterministic Chirp 3 HD when
+//   configured, otherwise a compatible Gemini TTS model). When cloud speech
+//   cannot start promptly, the closest available device voice continues the
+//   answer instead of leaving the learner with an unavailable-model error.
+// - Every listen/playback has a generation token. Late mobile callbacks from
+//   a cancelled session cannot restart audio or submit an old transcript.
 // ============================================================
 
-export type VoiceOption = { id: string; label: string; gender: "female" | "male"; hint: string };
+export type VoiceOption = { id: string; label: string; gender: "female" | "male" };
 
-export const VOICE_OPTIONS: VoiceOption[] = Object.values(EDGE_VOICES).map((voice) => ({
-  id: voice.id as string,
-  label: voice.label,
-  gender: voice.gender,
-  hint: voice.hint,
-}));
-
-export function resolveVoiceId(id: string | null | undefined): string {
-  if (id && VOICE_OPTIONS.some((voice) => voice.id === id)) return id;
-  return "f1";
-}
+export const VOICE_OPTIONS: VoiceOption[] = [
+  // Labels stay short: they render inside the fixed-width chat header select
+  // on phones, where long labels get clipped at larger system font sizes.
+  { id: "f1", label: "Kore", gender: "female" },
+  { id: "f2", label: "Aoede", gender: "female" },
+  { id: "m1", label: "Charon", gender: "male" },
+  { id: "device", label: "Device", gender: "female" },
+];
 
 export const SPEECH_RATE_OPTIONS = [
   { value: 1, label: "1×" },
@@ -43,7 +32,24 @@ export const SPEECH_RATE_OPTIONS = [
   { value: 1.45, label: "1.45×" },
 ] as const;
 
-export { LANGS } from "./language";
+/** Supported recognition languages: script ranges + BCP-47 tags. */
+export const LANGS: { code: string; bcp: string; range: RegExp }[] = [
+  { code: "hi", bcp: "hi-IN", range: /[\u0900-\u097F]/ },
+  { code: "bn", bcp: "bn-IN", range: /[\u0980-\u09FF]/ },
+  { code: "ta", bcp: "ta-IN", range: /[\u0B80-\u0BFF]/ },
+  { code: "te", bcp: "te-IN", range: /[\u0C00-\u0C7F]/ },
+  { code: "kn", bcp: "kn-IN", range: /[\u0C80-\u0CFF]/ },
+  { code: "gu", bcp: "gu-IN", range: /[\u0A80-\u0AFF]/ },
+  { code: "pa", bcp: "pa-IN", range: /[\u0A00-\u0A7F]/ },
+  { code: "ml", bcp: "ml-IN", range: /[\u0D00-\u0D7F]/ },
+  { code: "or", bcp: "or-IN", range: /[\u0B00-\u0B7F]/ },
+  { code: "ar", bcp: "ar-SA", range: /[\u0600-\u06FF]/ },
+  { code: "ru", bcp: "ru-RU", range: /[\u0400-\u04FF]/ },
+  { code: "zh", bcp: "zh-CN", range: /[\u4E00-\u9FFF]/ },
+  { code: "ja", bcp: "ja-JP", range: /[\u3040-\u30FF]/ },
+  { code: "ko", bcp: "ko-KR", range: /[\uAC00-\uD7AF]/ },
+  { code: "th", bcp: "th-TH", range: /[\u0E00-\u0E7F]/ },
+];
 
 const MAX_SPOKEN_CHARS = 24000;
 const DEFAULT_SPEECH_CHUNK_BYTES = 4200;
@@ -74,13 +80,18 @@ const BASE_SPEECH_HINTS = [
   "Explain in simple words",
 ];
 
-/** Pinned last-resort device voices. Same speaker for every language —
- *  the neural Edge voices above are the normal path; this robotic
- *  device fallback only speaks when every neural route is down. */
-const PINNED_NATIVE: Record<string, string[]> = {
-  f1: ["Ava Online", "Microsoft Ava", "Google UK English Female", "Microsoft Sonia", "Samantha", "Google US English", "Karen", "Victoria", "female"],
-  f2: ["Emma Online", "Microsoft Emma", "Google US English", "Microsoft Aria", "Samantha", "Victoria", "Karen", "female"],
-  m1: ["Andrew Online", "Microsoft Andrew", "Google UK English Male", "Microsoft Ryan", "Daniel", "Alex", "Google US English", "male"],
+/** Native fallback preferences. Cloud TTS uses the fixed names above. */
+const VOICE_PREFS: Record<string, Record<string, string[]>> = {
+  en: {
+    f1: ["Google UK English Female", "Microsoft Sonia", "Samantha", "female"],
+    f2: ["Google US English", "Microsoft Aria", "Victoria", "Karen", "female"],
+    m1: ["Google UK English Male", "Microsoft Ryan", "Daniel", "Alex", "male"],
+  },
+  hi: {
+    f1: ["Google हिन्दी", "Microsoft Swara", "Lekha", "hi-IN"],
+    f2: ["Microsoft Kalpana", "Google हिन्दी", "hi-IN"],
+    m1: ["Microsoft Hemant", "Google हिन्दी", "hi-IN"],
+  },
 };
 
 let cachedVoices: SpeechSynthesisVoice[] = [];
@@ -111,20 +122,25 @@ function loadVoices(): Promise<SpeechSynthesisVoice[]> {
   return voicesPromise!;
 }
 
-function pickPinnedNativeVoice(optionId: string): SpeechSynthesisVoice | null {
-  const prefs = PINNED_NATIVE[resolveVoiceId(optionId)] || PINNED_NATIVE.f1;
+function pickNativeVoice(optionId: string, lang: string): SpeechSynthesisVoice | null {
+  const prefs = VOICE_PREFS[lang]?.[optionId] || [];
   const voices = cachedVoices.length ? cachedVoices : window.speechSynthesis?.getVoices() || [];
   for (const preference of prefs) {
     const key = preference.toLowerCase();
     const hit = voices.find((voice) =>
-      voice.name.toLowerCase().includes(key) || (key.length > 4 && voice.lang.toLowerCase().includes(key)));
+      voice.name.toLowerCase().includes(key) || voice.lang.toLowerCase().includes(key));
     if (hit) return hit;
   }
-  const wantsFemale = optionId !== "m1";
-  const gendered = voices.find((voice) => wantsFemale
-    ? /female|woman|samantha|sonia|aria|karen|victoria/i.test(voice.name)
-    : /male|man|daniel|ryan|alex|david/i.test(voice.name));
-  return gendered || voices.find((voice) => voice.lang.toLowerCase().startsWith("en")) || voices[0] || null;
+  const languageVoices = voices.filter((voice) => voice.lang.toLowerCase().startsWith(lang));
+  if (languageVoices.length) {
+    const wantsFemale = optionId !== "m1";
+    const genderMatch = languageVoices.find((voice) => wantsFemale
+      ? /female|woman|swara|kalpana|lekha|heera/i.test(voice.name)
+      : /male|man|hemant|ravi/i.test(voice.name));
+    return genderMatch || languageVoices[0];
+  }
+  if (lang !== "en") return null;
+  return voices.find((voice) => voice.lang.startsWith("en")) || voices[0] || null;
 }
 
 export function voiceSupported(): { stt: boolean; tts: boolean } {
@@ -146,10 +162,25 @@ function cleanForSpeech(markdown: string): string {
     .slice(0, MAX_SPOKEN_CHARS);
 }
 
+function wordLang(word: string): string {
+  for (const language of LANGS) if (language.range.test(word)) return language.code;
+  return "en";
+}
+
 export function splitLanguageRuns(text: string): { lang: string; text: string }[] {
-  const trimmed = text.trim();
-  if (!trimmed) return [];
-  return [{ lang: shortLang(detectLanguage(trimmed)), text: trimmed }];
+  const words = text.split(/\s+/);
+  const runs: { lang: string; text: string }[] = [];
+  for (const word of words) {
+    const lang = wordLang(word);
+    const last = runs[runs.length - 1];
+    if (last && last.lang === lang) last.text += ` ${word}`;
+    else runs.push({ lang, text: word });
+  }
+  return runs.filter((run) => run.text.trim().length > 0);
+}
+
+function bcpFor(code: string): string {
+  return LANGS.find((language) => language.code === code)?.bcp || "en-IN";
 }
 
 function uniqueSpeechHints(hints: string[]): string[] {
@@ -228,7 +259,7 @@ type VoiceFetchResult = { clip: ClientAudioCache | null; errorMessage?: string }
 const clientAudioCache = new Map<string, ClientAudioCache>();
 const clientAudioInflight = new Map<string, Promise<VoiceFetchResult>>();
 const MAX_CLIENT_AUDIO_CACHE = 12;
-const VOICE_FETCH_TIMEOUT_MS = 16000;
+const VOICE_FETCH_TIMEOUT_MS = 18000;
 const DEFAULT_PLAYBACK_RATE = 1.15;
 const MIN_PLAYBACK_RATE = 0.85;
 const MAX_PLAYBACK_RATE = 1.5;
@@ -386,26 +417,37 @@ async function speakNative(
   await loadVoices();
   if (generation !== speechGeneration) return false;
 
-  const utterance = new SpeechSynthesisUtterance(text);
-  const voice = pickPinnedNativeVoice(voiceId);
-  // Native speech is a last resort. Pin its actual voice and locale rather than
-  // requesting a locale the selected device voice does not own; browsers silently
-  // substitute a different speaker when asked to do that.
-  if (voice) {
-    utterance.voice = voice;
-    utterance.lang = voice.lang;
-  } else {
-    utterance.lang = "en-IN";
-  }
-  const profile = voiceId === "m1"
-    ? { rate: 0.96, pitch: 0.86 }
-    : voiceId === "f2" ? { rate: 1.02, pitch: 1.04 } : { rate: 0.98, pitch: 0.96 };
-  utterance.rate = Math.min(1.6, profile.rate * playbackRate);
-  utterance.pitch = profile.pitch;
-  utterance.onend = () => { if (generation === speechGeneration) finish(); };
-  utterance.onerror = () => { if (generation === speechGeneration) finish(); };
-  window.speechSynthesis.speak(utterance);
-  start();
+  const runs = splitLanguageRuns(text);
+  let index = 0;
+  let playbackStarted = false;
+  const speakNext = () => {
+    // cancel() fires an error event on several mobile engines. The generation
+    // check prevents that stale callback from advancing the old utterance.
+    if (generation !== speechGeneration) return;
+    if (index >= runs.length) {
+      finish();
+      return;
+    }
+    const run = runs[index++];
+    const utterance = new SpeechSynthesisUtterance(run.text);
+    const voice = pickNativeVoice(voiceId, run.lang);
+    if (voice) {
+      utterance.voice = voice;
+      utterance.lang = voice.lang;
+    } else {
+      utterance.lang = bcpFor(run.lang);
+    }
+    const profile = voiceId === "m1"
+      ? { rate: 0.97, pitch: 0.78 }
+      : voiceId === "f2" ? { rate: 1.08, pitch: 1.12 } : { rate: 1, pitch: 1 };
+    utterance.rate = Math.min(1.8, profile.rate * (run.lang === "en" ? 1.04 : 1) * playbackRate);
+    utterance.pitch = profile.pitch;
+    utterance.onend = speakNext;
+    utterance.onerror = speakNext;
+    window.speechSynthesis.speak(utterance);
+    if (!playbackStarted) { playbackStarted = true; start(); }
+  };
+  speakNext();
   return true;
 }
 
@@ -441,26 +483,22 @@ export async function speak(
     return;
   }
 
-  const personaId = resolveVoiceId(voiceId);
-  // Voice identity is a product guarantee. We never switch to a browser/device
-  // speaker because it happens to support a different locale; if Ava cannot be
-  // reached, leave the answer readable and allow a clean retry instead. The
-  // long-answer path can opt in to the pinned device speaker (forceNative)
-  // after the neural service is down, so a lesson is never silently dropped.
-  if (options.forceNative) {
-    const label = VOICE_OPTIONS.find((voice) => voice.id === personaId)?.label || "selected voice";
-    const played = await speakNative(text, personaId, generation, start, finish, playbackRate);
-    if (played) return;
-    fail(`${label} is unavailable. Your reply is still available as text; tap play to retry the selected voice.`);
+  // A device voice can be selected directly. Named profiles use the studio
+  // voice first, then continue with the closest local voice if the service
+  // is unavailable rather than abandoning a spoken answer.
+  if (voiceId === "device" || options.forceNative) {
+    const nativeVoiceId = voiceId === "device" ? "f1" : voiceId;
+    if (await speakNative(text, nativeVoiceId, generation, start, finish, playbackRate)) return;
+    fail("Speech is not available in this browser. You can still read the answer here.");
     return;
   }
 
-  let errorMessage = "The selected neural voice is temporarily unavailable.";
-  const requestClip = async (): Promise<VoiceFetchResult> => {
+  let errorMessage = "The selected Shigun voice is temporarily unavailable.";
+  try {
     const controller = new AbortController();
     speechAbort = controller;
     let timedOut = false;
-    return new Promise<VoiceFetchResult>((resolve) => {
+    const fetched = await new Promise<VoiceFetchResult>((resolve) => {
       let settled = false;
       const settle = (result: VoiceFetchResult) => {
         if (settled) return;
@@ -471,20 +509,15 @@ export async function speak(
       const timeout = window.setTimeout(() => {
         timedOut = true;
         controller.abort();
-        settle({ clip: null, errorMessage: "The neural voice is taking too long to respond." });
+        settle({ clip: null, errorMessage: "The studio voice is taking too long to respond." });
       }, VOICE_FETCH_TIMEOUT_MS);
       controller.signal.addEventListener("abort", () => {
         if (!timedOut) settle({ clip: null });
       }, { once: true });
-      void fetchVoiceClip(text, personaId, controller.signal)
+      void fetchVoiceClip(text, voiceId, controller.signal)
         .then(settle)
         .catch(() => settle({ clip: null }));
     });
-  };
-
-  try {
-    const fetched = await requestClip();
-    if (generation !== speechGeneration) return;
     if (generation !== speechGeneration) return;
     if (fetched.clip) {
       const played = await playCloudAudio(
@@ -496,7 +529,9 @@ export async function speak(
         playbackRate
       );
       if (played) return;
-      errorMessage = "Neural audio could not start on this device.";
+      errorMessage = "Cloud audio could not start on this device.";
+    } else if (timedOut) {
+      errorMessage = "The studio voice is taking too long to respond.";
     } else if (fetched.errorMessage) {
       errorMessage = fetched.errorMessage;
     }
@@ -506,16 +541,16 @@ export async function speak(
     if (speechAbort?.signal.aborted || generation === speechGeneration) speechAbort = null;
   }
 
-  // Every TTS route has now failed: server Edge → browser-direct Edge →
-  // HTML/Web Audio. The pinned device speaker is the advertised LAST resort
-  // and the only way to keep a reply audible when the server's network cannot
-  // reach the Edge service. It still stays on the same persona's pinned voice
-  // (PINNED_NATIVE), never a random locale swap.
-  callbacks.onFallback?.("The neural voice is unavailable — using your device voice for this reply.");
-  const played = await speakNative(text, personaId, generation, start, finish, playbackRate);
-  if (played) return;
-  errorMessage = "Neither the neural voice nor the device voice could start.";
-  fail(`${errorMessage} The answer remains available as text. Tap play to retry the selected voice.`);
+  // A voice outage must not turn a spoken lesson into an error-only state.
+  // Preserve the requested gender/language as closely as the browser permits
+  // and continue immediately with the local speech engine instead.
+  if (generation === speechGeneration
+    && await speakNative(text, voiceId, generation, start, finish, playbackRate)) {
+    callbacks.onFallback?.("Studio voice is reconnecting — continuing with your device voice.");
+    return;
+  }
+
+  fail(`${errorMessage} The answer remains available as text.`);
 }
 
 export function stopSpeaking(): void {
@@ -526,7 +561,7 @@ export function stopSpeaking(): void {
 
 /* ============================================================
    LONG ANSWERS — full spoken delivery, flowing like one turn.
-   Neural TTS synthesises ~5000 bytes per request; a detailed
+   Cloud TTS synthesises ~5000 bytes per request; a detailed
    lesson easily exceeds that. speakLong() splits into the fewest
    chunks that fit, prefetches the next chunk while the current
    one plays, and chains them with no fetch gap in between.
@@ -600,8 +635,8 @@ function shouldRetrySpeechChunk(
   chunkText: string,
   currentMaxBytes: number
 ): boolean {
-  if (!resolveVoiceId(voiceId)) return false;
-  if (/blocked|tap the mic|not configured/i.test(errorMessage)) return false;
+  if (voiceId === "device") return false;
+  if (/blocked|tap the mic|configured|unavailable|taking too long|reconnecting|network|server/i.test(errorMessage)) return false;
   return currentMaxBytes > MIN_RETRY_CHUNK_BYTES && utf8Len(chunkText) > MIN_RETRY_CHUNK_BYTES;
 }
 
@@ -641,33 +676,24 @@ async function fetchVoiceClip(
   if (existing) return existing;
 
   const request = (async (): Promise<VoiceFetchResult> => {
-    let errorMessage = "The selected neural voice is temporarily unavailable.";
+    let errorMessage = "The selected Shigun voice is temporarily unavailable.";
     try {
       const response = await fetch("/api/voice", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ text: cleaned, voiceId: resolveVoiceId(voiceId) }),
+        body: JSON.stringify({ text: cleaned, voiceId }),
         signal,
       });
       if (response.ok) {
         const bytes = await response.arrayBuffer();
-        const contentType = response.headers.get("content-type") || "audio/mpeg";
+        const contentType = response.headers.get("content-type") || "audio/wav";
         return { clip: storeClientAudio(cacheKey, { bytes, contentType }) };
       }
       const payload = await response.json().catch(() => null) as { error?: string } | null;
       if (payload?.error) errorMessage = payload.error;
     } catch {
-      // Server unreachable — the direct browser connection below may
-      // still reach the keyless Edge neural service on its own.
+      // Fall through with the default message below.
     }
-
-    // Server route could not deliver (restricted server network, service
-    // hiccup). Connect DIRECTLY from the learner's browser to the same
-    // keyless Microsoft Edge neural service — still Ava / Emma / Andrew,
-    // still no API key, still the same person in every language.
-    const direct = await synthesizeEdgeDirect(cleaned, voiceId);
-    if (direct) return { clip: storeClientAudio(cacheKey, direct) };
-
     return { clip: null, errorMessage };
   })();
 
@@ -676,47 +702,6 @@ async function fetchVoiceClip(
     return await request;
   } finally {
     if (clientAudioInflight.get(cacheKey) === request) clientAudioInflight.delete(cacheKey);
-  }
-}
-
-/* Browser-direct Edge synthesis state. After a failure, wait out the
-   backoff before burning another connection attempt mid-conversation. */
-let edgeDirectDownUntil = 0;
-const EDGE_DIRECT_BACKOFF_MS = 120_000;
-const edgeDirectInflight = new Set<string>();
-
-async function synthesizeEdgeDirect(cleaned: string, voiceId: string): Promise<ClientAudioCache | null> {
-  if (typeof window === "undefined" || typeof WebSocket === "undefined") return null;
-  if (!globalThis.crypto?.subtle) return null; // needs a secure context
-  if (Date.now() < edgeDirectDownUntil) return null;
-  const dedupe = `${voiceId}\0${cleaned}`;
-  if (edgeDirectInflight.has(dedupe)) return null;
-
-  edgeDirectInflight.add(dedupe);
-  try {
-    const result = await synthesiseEdgeSpeech({
-      text: cleaned,
-      voiceId,
-      language: detectLanguage(cleaned),
-      timeoutMs: 9_000,
-    });
-    if ("bytes" in result && result.bytes.length) {
-      edgeDirectDownUntil = 0;
-      return {
-        bytes: result.bytes.buffer.slice(
-          result.bytes.byteOffset,
-          result.bytes.byteOffset + result.bytes.byteLength
-        ) as ArrayBuffer,
-        contentType: "audio/mpeg",
-      };
-    }
-    edgeDirectDownUntil = Date.now() + EDGE_DIRECT_BACKOFF_MS;
-    return null;
-  } catch {
-    edgeDirectDownUntil = Date.now() + EDGE_DIRECT_BACKOFF_MS;
-    return null;
-  } finally {
-    edgeDirectInflight.delete(dedupe);
   }
 }
 
@@ -752,12 +737,10 @@ export async function speakLong(
 
   let startedOnce = false;
   let completed = 0;
+  // If the studio provider fails once, do not make every remaining long-text
+  // part wait through the same timeout. The rest of this answer stays in the
+  // selected profile's closest device voice and keeps flowing.
   let continueLocally = false;
-  let localNoticeShown = false;
-  const personaId = resolveVoiceId(voiceId);
-  // Every chunk must use the selected neural persona. If the neural service
-  // goes down mid-lesson we switch the REST of the long answer to the pinned
-  // device speaker (one audible change) rather than silently dropping it.
   const start = () => {
     if (startedOnce || !isCurrent()) return;
     startedOnce = true;
@@ -771,21 +754,22 @@ export async function speakLong(
     // on-demand fetch in speak() then hits the cache and starts instantly,
     // so long lessons flow as one continuous narration instead of pausing
     // after every sentence.
-    if (!continueLocally) {
+    if (voiceId !== "device" && !continueLocally) {
+      // The current part owns the cancellable request. Prime only future
+      // parts, so stopping a slow first request can fall back immediately.
       for (let offset = 1; offset <= LONG_SPEECH_PREFETCH_COUNT; offset++) {
         const upcoming = queue[index + offset];
         if (!upcoming) break;
-        void prefetchVoice(upcoming.text, personaId);
+        void prefetchVoice(upcoming.text, voiceId);
       }
     }
     let settled = false;
     let failed = false;
     let errorMessage = "";
     await new Promise<void>((resolve) => {
-      void speak(current.text, personaId, {
+      void speak(current.text, voiceId, {
         onStart: start,
         onFallback: (message) => {
-          localNoticeShown = true;
           continueLocally = true;
           callbacks.onFallback?.(message);
         },
@@ -826,18 +810,8 @@ export async function speakLong(
     }
 
     if (failed) {
-      // A long answer must not stop after one bad chunk. If the neural chunk
-      // could not be delivered even after the native retry, skip that part
-      // and keep the rest of the lesson playing instead of turning silent.
-      continueLocally = true;
-      if (!localNoticeShown) {
-        localNoticeShown = true;
-        callbacks.onFallback?.("The neural voice hit a snag — continuing with your device voice.");
-      }
-      completed++;
-      callbacks.onProgress?.(completed, queue.length);
-      index++;
-      continue;
+      callbacks.onError?.(errorMessage);
+      return; // surface the error once; text remains readable
     }
 
     completed++;
@@ -858,25 +832,26 @@ export type ListenFinal = {
   cancelled?: boolean;
 };
 
-const LAST_LANG_KEY = "shigun-stt-lang-v2";
+const LAST_LANG_KEY = "shigun-stt-lang";
 
-/** English is the safe microphone default. We only retain a non-English STT
- * locale after actual non-Latin script is present; Latin transcripts are too
- * ambiguous to let an accidental recognition result change future turns. */
+/** The recognition language. Shigun assesses the language itself: it starts
+ *  from the last script the learner spoke and keeps learning as they talk —
+ *  there is no manual picker to get wrong. */
 export function preferredSttLang(): string {
   if (typeof window === "undefined") return "en-IN";
   return localStorage.getItem(LAST_LANG_KEY) || "en-IN";
 }
 
+/** Learn the language from the learner's own speech so the NEXT listen
+ *  already tunes recognition (and the reply script) to match. */
 export function learnSttLang(transcript: string): void {
-  if (typeof window === "undefined" || !transcript.trim()) return;
-  const language = detectLanguage(transcript);
-  if (language === "en-IN") {
-    localStorage.setItem(LAST_LANG_KEY, "en-IN");
-    return;
+  for (const language of LANGS) {
+    if (language.range.test(transcript)) {
+      localStorage.setItem(LAST_LANG_KEY, language.bcp);
+      return;
+    }
   }
-  // detectLanguage returns a non-English tag only from a strong script signal.
-  localStorage.setItem(LAST_LANG_KEY, language);
+  localStorage.setItem(LAST_LANG_KEY, "en-IN");
 }
 
 let micWarmed = false;

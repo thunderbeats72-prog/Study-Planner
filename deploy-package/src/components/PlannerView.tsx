@@ -10,7 +10,6 @@ import TaskClockButton from "./TaskClockButton";
 import { useBackClose } from "@/lib/useBackClose";
 
 type View = "list" | "calendar" | "kanban";
-type RenderTaskOptions = { showLessonBrief?: boolean };
 
 export default function PlannerView({
   state, onTaskStatus, onTaskUpdate, onSkipSubject, onFocusTask, activeTaskId, activeClockSeconds,
@@ -86,32 +85,30 @@ export default function PlannerView({
     return `${Number.isInteger(r) ? r : r.toFixed(1)}m`;
   };
 
-  const renderTask = (task: TaskRow, options: RenderTaskOptions = {}) => {
+  const renderTask = (task: TaskRow) => {
     const meta = KIND_META[task.kind] || KIND_META.learn;
     const subj = subjFor(task);
     const topic = topicFor(task);
-    const showLessonBrief = options.showLessonBrief !== false;
-    const canExpandLessonBrief = showLessonBrief && !!topic;
-    const open = canExpandLessonBrief && expanded === task.id;
+    const open = expanded === task.id;
     return (
       <div key={task.id}>
         <div className={`task-row${task.status === "done" ? " done" : ""}${activeTaskId === task.id ? " active-clock" : ""}${moreActionsId === task.id ? " expanded-actions" : ""}`}>
           <div className="task-dot" style={{ background: subj?.color || meta.color }} />
-          <div className="task-main" style={{ cursor: canExpandLessonBrief ? "pointer" : "default" }}
-            role={canExpandLessonBrief ? "button" : undefined}
-            tabIndex={canExpandLessonBrief ? 0 : undefined}
-            aria-expanded={canExpandLessonBrief ? open : undefined}
-            aria-label={canExpandLessonBrief ? `${open ? "Hide" : "Show"} lesson brief: ${task.title}` : undefined}
-            onClick={() => canExpandLessonBrief && setExpanded(open ? null : task.id)}
+          <div className="task-main" style={{ cursor: topic ? "pointer" : "default" }}
+            role={topic ? "button" : undefined}
+            tabIndex={topic ? 0 : undefined}
+            aria-expanded={topic ? open : undefined}
+            aria-label={topic ? `${open ? "Hide" : "Show"} lesson brief: ${task.title}` : undefined}
+            onClick={() => topic && setExpanded(open ? null : task.id)}
             onKeyDown={(e) => {
-              if (canExpandLessonBrief && (e.key === "Enter" || e.key === " ")) {
+              if (topic && (e.key === "Enter" || e.key === " ")) {
                 e.preventDefault();
                 setExpanded(open ? null : task.id);
               }
             }}>
             <div className="task-title">
               {task.title}
-              {canExpandLessonBrief && (
+              {topic && (
                 <span className={`brief-chev${open ? " open" : ""}`} aria-hidden="true"
                   title={open ? "Hide lesson brief" : "Show lesson brief"}>
                   <IconChevron size={12} />
@@ -162,7 +159,7 @@ export default function PlannerView({
             </div>
           </div>
         )}
-        {canExpandLessonBrief && open && topic && (
+        {open && topic && (
           <div ref={briefRef} className="glass-panel slide-in planner-lesson-brief" style={{ borderLeft: `3px solid ${subj?.color || "var(--accent)"}` }}>
             <div className="lesson-brief-heading">
               Lesson brief · {topic.unit} · {topic.depth || "Core"}
@@ -307,7 +304,7 @@ export default function PlannerView({
                     <div className="bar-fill" style={{ width: `${list.length ? (done / list.length) * 100 : 0}%` }} />
                   </div>
                 </div>
-                {list.map((task) => renderTask(task))}
+                {list.map(renderTask)}
               </div>
             );
           })}
@@ -386,7 +383,7 @@ export default function PlannerView({
               </div>
               <button className="btn btn-xs btn-secondary" onClick={() => setOpenDay(null)}><IconClose size={13} /></button>
             </div>
-            {dayTasks(openDay).map((task) => renderTask(task, { showLessonBrief: false }))}
+            {dayTasks(openDay).map(renderTask)}
             <button className="btn btn-secondary w-full mt-md" onClick={() => setOpenDay(null)}>Close</button>
           </div>
         </div>

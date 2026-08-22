@@ -6,56 +6,35 @@ import { buildContext, fullState, getOrCreateUser, getSettings, keyFrom } from "
 import {
   callLLM, localTutor, parseCommand, tutorSystemPrompt, activeProvider,
   extractLlmAction, languageCapabilityReply, instantTutorReply, commandReply,
-  voiceGenderFor, llmError,
+  voiceGenderFor,
 } from "@/lib/ai";
 import { regeneratePlan } from "@/lib/generate";
 import { mergeTranscriptSegments } from "@/lib/transcript";
-import { detectLanguage } from "@/lib/language";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
 type GroundingState = Awaited<ReturnType<typeof fullState>>;
 
-const CURRICULUM_GENERIC_TOKENS = new Set([
-  "what", "which", "should", "today", "now", "study", "explain", "answer", "question",
-  "topic", "topics", "subject", "subjects", "syllabus", "plan", "schedule", "give",
-  "detail", "simple", "words", "weak", "weakest", "progress", "how", "am", "i", "about",
-  "difference", "between", "meaning", "define", "definition", "elaborate", "teach",
-  "help", "need", "want", "make", "learn", "learning", "lesson", "lessons", "practice",
-]);
-
-function curriculumTokens(text: string): string[] {
-  return text.toLowerCase()
-    .split(/[^a-z0-9]+/)
-    .filter((token) => token.length >= 4 && !CURRICULUM_GENERIC_TOKENS.has(token));
-}
-
 function curriculumGrounding(question: string, state: GroundingState): string {
   const normalized = question.toLowerCase();
-  const queryTokens = new Set(curriculumTokens(question));
+  const queryTokens = new Set(
+    normalized.split(/[^a-z0-9]+/).filter((token) => token.length >= 4)
+  );
   const subjectById = new Map(state.subjects.map((subject) => [subject.id, subject]));
   const ranked = state.topics
     .map((topic) => {
       const title = topic.title.toLowerCase();
-      const exact = normalized.includes(title) ? 40 : 0;
-      const titleTokens = new Set(curriculumTokens(title));
-      const conceptTokens = new Set(curriculumTokens([
-        ...(topic.keyConcepts || []),
-        ...(topic.objectives || []),
-        topic.summary,
-      ].join(" ")));
-      const titleOverlap = [...titleTokens].filter((token) => queryTokens.has(token)).length;
-      const conceptOverlap = [...conceptTokens].filter((token) => queryTokens.has(token)).length;
+      const titleTokens = title.split(/[^a-z0-9]+/).filter((token) => token.length >= 4);
+      const exact = normalized.includes(title) ? 20 : 0;
+      const overlap = titleTokens.filter((token) => queryTokens.has(token)).length;
       const subject = subjectById.get(topic.subjectId);
-      const subjectHit = subject && normalized.includes(subject.name.toLowerCase()) ? 4 : 0;
-      const score = exact + titleOverlap * 4 + conceptOverlap * 2 + subjectHit;
-      const meaningful = exact > 0 || (titleOverlap + conceptOverlap) >= 2;
-      return { topic, subject, score, titleOverlap, conceptOverlap, meaningful };
+      const subjectHit = subject && normalized.includes(subject.name.toLowerCase()) ? 3 : 0;
+      return { topic, subject, score: exact + overlap + subjectHit };
     })
-    .filter((candidate) => candidate.meaningful && candidate.score >= 5)
-    .sort((a, b) => b.score - a.score || b.titleOverlap - a.titleOverlap)
-    .slice(0, 1);
+    .filter((candidate) => candidate.score >= 2)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 2);
 
   if (!ranked.length) return "";
   const lessons = ranked.map(({ topic, subject }) => {
@@ -123,10 +102,8 @@ export async function POST(req: Request) {
         role: m.role === "assistant" ? ("assistant" as const) : ("user" as const),
         content: m.content,
       }));
-      const spokenLang = detectLanguage(text);
       const systemPrompt = tutorSystemPrompt(ctx, { voiceGender })
         + curriculumGrounding(text, state)
-        + `\n\nDETECTED LEARNER LANGUAGE: ${spokenLang}. Answer in this language unless they clearly asked for another.`
         + (source === "voice"
           ? "\n\nVOICE TURN: Keep the opening reply to 80-140 spoken words UNLESS the learner asked for detail, a lesson, or an explanation — then answer in full depth; the app speaks long answers in consecutive parts. Lead with the answer; avoid long preambles."
           : "");
@@ -168,9 +145,6 @@ export async function POST(req: Request) {
     action: action || null,
     state: { ...fresh, messages: freshMsgs, context: buildContext(fresh) },
     replanned,
-    provider: activeProvider(),
-    source: activeProvider() ? "cloud" : "local",
-    aiError: llmError(),
   });
 }
 

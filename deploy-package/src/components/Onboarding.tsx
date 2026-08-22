@@ -230,10 +230,8 @@ export default function Onboarding({
             <label className="lbl">Your Name</label>
             <input className="ob-name-input" autoFocus value={name} placeholder="e.g. Rakshit"
               onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && next()} />
-            <div className="ob-hint ob-engine-hint">
-              {provider
-                ? `SHIGUN engine online — connected to ${provider}. The neural tutor voice is always key-free.`
-                : "SHIGUN hybrid engine online — curriculum synthesis runs locally and the neural tutor voice needs no API key."}
+            <div className="ob-hint">
+              {provider ? `SHIGUN engine online — connected to ${provider}.` : "SHIGUN hybrid engine online — curriculum synthesis runs locally, no API key needed."}
             </div>
           </>
         )}
