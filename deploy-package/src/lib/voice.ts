@@ -246,10 +246,6 @@ export type SpeechPlaybackOptions = {
   rate?: number;
   /** Internal long-answer guard: after a cloud outage, continue locally. */
   forceNative?: boolean;
-  /** Long-answer only: if the neural Edge chunks cannot be delivered, fall
-   *  back to the pinned device speaker so the rest of the lesson is still
-   *  spoken instead of the whole answer turning silent. */
-  allowNativeFallback?: boolean;
 };
 
 function playbackRateFor(options: SpeechPlaybackOptions = {}): number {
@@ -510,15 +506,15 @@ export async function speak(
     if (speechAbort?.signal.aborted || generation === speechGeneration) speechAbort = null;
   }
 
-  // Short replies keep the strict identity guarantee. Long answers opt in
-  // via allowNativeFallback so that a single unreachable chunk cannot turn
-  // the remainder of a lesson silent.
-  if (options.allowNativeFallback) {
-    callbacks.onFallback?.("The neural voice hit a snag — finishing this part on your device voice.");
-    const played = await speakNative(text, personaId, generation, start, finish, playbackRate);
-    if (played) return;
-    errorMessage = "Neither the neural voice nor the device voice could start.";
-  }
+  // Every TTS route has now failed: server Edge → browser-direct Edge →
+  // HTML/Web Audio. The pinned device speaker is the advertised LAST resort
+  // and the only way to keep a reply audible when the server's network cannot
+  // reach the Edge service. It still stays on the same persona's pinned voice
+  // (PINNED_NATIVE), never a random locale swap.
+  callbacks.onFallback?.("The neural voice is unavailable — using your device voice for this reply.");
+  const played = await speakNative(text, personaId, generation, start, finish, playbackRate);
+  if (played) return;
+  errorMessage = "Neither the neural voice nor the device voice could start.";
   fail(`${errorMessage} The answer remains available as text. Tap play to retry the selected voice.`);
 }
 
@@ -750,10 +746,7 @@ export async function speakLong(
   const isCurrent = () => token === longSpeakToken;
   if (queue.length <= 1) {
     longSpeakToken++; // speak() path owns cancellation from here
-    // A single still-long reply uses the same guarded native safety net as a
-    // multi-part lesson so it is not silently skipped when Edge is unreachable.
-    const singleLong = utf8Len(text) > INITIAL_SPEECH_CHUNK_BYTES;
-    await speak(text, voiceId, callbacks, singleLong ? { ...options, allowNativeFallback: true } : options);
+    await speak(text, voiceId, callbacks, options);
     return;
   }
 
@@ -808,7 +801,7 @@ export async function speakLong(
           errorMessage = message;
           resolve();
         },
-      }, { ...options, forceNative: options.forceNative || continueLocally, allowNativeFallback: true });
+      }, { ...options, forceNative: options.forceNative || continueLocally });
       // Safety poll: a mid-chunk stop bumps the token without speak()'s
       // finish() firing, and no engine is hang-proof — resolve either way.
       const softCap = Math.max(25000, (current.text.length / 11) * 1500);
