@@ -54,11 +54,108 @@ export function activeProvider(): string | null {
 /* ============================================================
    LLM CALLER — Gemini → Groq → OpenRouter Fallback Chain
 ============================================================ */
+let llmLastError: string | null = null;
+
+/** Last provider/model failure, surfaced to /api/chat meta so the app can
+ *  tell whether a bad model/key or a network outage caused the local fallback. */
+export function llmError(): string | null {
+  return llmLastError;
+}
+
+function recordLlmError(message: string): void {
+  llmLastError = message;
+}
+
+async function fetchText(url: string, init: RequestInit, timeoutMs: number): Promise<Response> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: ctrl.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** Gemini model candidates in preference order. The configured model is tried
+ *  first, then the stable/current models. This avoids a single bad
+ *  NEXT_PUBLIC_GEMINI_MODEL value silently killing the whole chain. */
+function geminiModels(): string[] {
+  const configured = getSafeKey("GEMINI_MODEL") || getSafeKey("NEXT_PUBLIC_GEMINI_MODEL");
+  const candidates = [
+    configured,
+    "gemini-2.5-flash",
+    "gemini-2.0-flash",
+    "gemini-flash-latest",
+    "gemini-2.5-pro",
+    "gemini-2.5-flash-lite",
+  ].filter((model): model is string => Boolean(model?.trim()));
+  return [...new Set(candidates)];
+}
+
+async function callGemini(
+  apiKey: string,
+  model: string,
+  system: string,
+  messages: ChatMsg[],
+  maxTokens: number,
+  timeoutMs: number
+): Promise<string | null> {
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
+  const headers = { "content-type": "application/json", "x-goog-api-key": apiKey };
+  const contents = messages.map((message) => ({
+    role: message.role === "assistant" ? "model" : "user",
+    parts: [{ text: message.content }],
+  }));
+
+  const attempts: Array<Record<string, unknown>> = [
+    {
+      systemInstruction: { parts: [{ text: system }] },
+      contents,
+      generationConfig: { maxOutputTokens: maxTokens },
+    },
+    // Some Gemini model versions reject systemInstruction; retry the same
+    // request with the system prompt folded into the first user turn.
+    {
+      contents: [
+        { role: "user", parts: [{ text: `${system}\n\n---\n\n${messages[0]?.content || ""}` }] },
+        ...contents.slice(1),
+      ],
+      generationConfig: { maxOutputTokens: maxTokens },
+    },
+  ];
+
+  for (const body of attempts) {
+    const response = await fetchText(endpoint, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+    }, timeoutMs).catch((error) => {
+      recordLlmError(`Gemini ${model}: ${error instanceof Error ? error.message : "network error"}`);
+      return null;
+    });
+    if (!response) return null;
+    if (response.ok) {
+      const json = await response.json().catch(() => null);
+      const text = json?.candidates?.[0]?.content?.parts
+        ?.map((part: { text?: string }) => part.text || "").join("") ?? null;
+      if (text?.trim()) return text.trim();
+    } else {
+      const err = await response.text().catch(() => "");
+      recordLlmError(`Gemini ${model}: HTTP ${response.status} ${err.slice(0, 160)}`);
+      if (response.status === 400) continue; // retry with inline-system shape
+      return null;
+    }
+  }
+  recordLlmError(`Gemini ${model}: no usable response`);
+  return null;
+}
+
 export async function callLLM(
   system: string,
   messages: ChatMsg[],
   maxTokens = 2500
 ): Promise<string | null> {
+  llmLastError = null;
   const geminiKey = getSafeKey("GEMINI_API_KEY") || getSafeKey("GOOGLE_API_KEY")
     || getSafeKey("NEXT_PUBLIC_GEMINI_API_KEY") || getSafeKey("NEXT_PUBLIC_GOOGLE_API_KEY");
   const groqKey = getSafeKey("GROQ_API_KEY") || getSafeKey("NEXT_PUBLIC_GROQ_API_KEY");
@@ -68,63 +165,52 @@ export async function callLLM(
     groqKey ? "groq" : null,
     openrouterKey ? "openrouter" : null,
   ].filter(Boolean) as Array<"gemini" | "groq" | "openrouter">;
-  const deadline = Date.now() + 12000; // one bounded budget for the whole chain
+
+  if (!providers.length) {
+    recordLlmError("no cloud AI key configured");
+    return null;
+  }
+
+  const deadline = Date.now() + 25000; // one bounded budget for the whole chain
 
   for (const provider of providers) {
-    const remaining = deadline - Date.now();
-    if (remaining < 500) break;
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), Math.min(7000, remaining));
-    let text: string | null = null;
-
     try {
       if (provider === "gemini" && geminiKey) {
-        const configured = getSafeKey("GEMINI_MODEL") || getSafeKey("NEXT_PUBLIC_GEMINI_MODEL");
-        const geminiModels = [...new Set([configured, "gemini-3.7-flash", "gemini-2.5-flash"].filter(Boolean))] as string[];
-        for (const model of geminiModels) {
-          if (Date.now() >= deadline) break;
-          const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
-            {
-              method: "POST",
-              signal: ctrl.signal,
-              headers: { "content-type": "application/json", "x-goog-api-key": geminiKey },
-              body: JSON.stringify({
-                systemInstruction: { parts: [{ text: system }] },
-                contents: messages.map((message) => ({
-                  role: message.role === "assistant" ? "model" : "user",
-                  parts: [{ text: message.content }],
-                })),
-                generationConfig: { maxOutputTokens: maxTokens },
-              }),
-            }
-          );
-          if (response.ok) {
-            const json = await response.json();
-            text = json?.candidates?.[0]?.content?.parts
-              ?.map((part: { text?: string }) => part.text || "").join("") ?? null;
-            if (text) break;
-          }
+        for (const model of geminiModels()) {
+          const remaining = deadline - Date.now();
+          if (remaining < 800) break;
+          const text = await callGemini(geminiKey, model, system, messages, maxTokens, Math.min(12000, remaining));
+          if (text) return text;
         }
       } else if (provider === "groq" && groqKey) {
-        const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        const remaining = deadline - Date.now();
+        if (remaining < 800) break;
+        const response = await fetchText("https://api.groq.com/openai/v1/chat/completions", {
           method: "POST",
-          signal: ctrl.signal,
           headers: { "content-type": "application/json", authorization: `Bearer ${groqKey}` },
           body: JSON.stringify({
             model: "llama-3.3-70b-versatile",
             max_tokens: maxTokens,
             messages: [{ role: "system", content: system }, ...messages],
           }),
+        }, Math.min(12000, remaining)).catch((error) => {
+          recordLlmError(`Groq: ${error instanceof Error ? error.message : "network error"}`);
+          return null;
         });
+        if (!response) continue;
         if (response.ok) {
-          const json = await response.json();
-          text = json?.choices?.[0]?.message?.content ?? null;
+          const json = await response.json().catch(() => null);
+          const text = json?.choices?.[0]?.message?.content ?? null;
+          if (text?.trim()) return text.trim();
+        } else {
+          const err = await response.text().catch(() => "");
+          recordLlmError(`Groq: HTTP ${response.status} ${err.slice(0, 160)}`);
         }
       } else if (provider === "openrouter" && openrouterKey) {
-        const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        const remaining = deadline - Date.now();
+        if (remaining < 800) break;
+        const response = await fetchText("https://openrouter.ai/api/v1/chat/completions", {
           method: "POST",
-          signal: ctrl.signal,
           headers: {
             "content-type": "application/json",
             authorization: `Bearer ${openrouterKey}`,
@@ -136,19 +222,23 @@ export async function callLLM(
             max_tokens: maxTokens,
             messages: [{ role: "system", content: system }, ...messages],
           }),
+        }, Math.min(12000, remaining)).catch((error) => {
+          recordLlmError(`OpenRouter: ${error instanceof Error ? error.message : "network error"}`);
+          return null;
         });
+        if (!response) continue;
         if (response.ok) {
-          const json = await response.json();
-          text = json?.choices?.[0]?.message?.content ?? null;
+          const json = await response.json().catch(() => null);
+          const text = json?.choices?.[0]?.message?.content ?? null;
+          if (text?.trim()) return text.trim();
+        } else {
+          const err = await response.text().catch(() => "");
+          recordLlmError(`OpenRouter: HTTP ${response.status} ${err.slice(0, 160)}`);
         }
       }
-    } catch {
-      // Try the next configured provider within the shared deadline.
-    } finally {
-      clearTimeout(timer);
+    } catch (error) {
+      recordLlmError(`${provider}: ${error instanceof Error ? error.message : "unknown error"}`);
     }
-
-    if (text?.trim()) return text.trim();
   }
   return null;
 }
@@ -326,6 +416,13 @@ export async function aiGenerateTopics(
 
 const LANGUAGE_CAPABILITY_RE = /\b(speak|talk|chat|communicate|reply|respond|answer|know|understand|handle)\b/i;
 
+/** A language word followed by a subject/domain noun is usually not a
+ *  language-capability question. "French Revolution", "Spanish history",
+ *  "Hindi literature" and "Bengali grammar" must go to the normal tutor,
+ *  not to the canned "I can speak French/Spanish/Hindi…" reply. */
+const LANGUAGE_TOPIC_PHRASE_RE =
+  /\b(bangla|bengali|hindi|marathi|tamil|telugu|kannada|malayalam|gujarati|punjabi|panjabi|odia|oriya|urdu|nepali|arabic|spanish|español|french|français|german|deutsch|portuguese|português|italian|italiano|russian|chinese|mandarin|japanese|korean|indonesian|bahasa|turkish|türkçe)\s+(revolution|revolutions|literature|history|grammar|course|exam|exams|class|classes|lesson|lessons|subject|subjects|syllabus|chapter|chapters|unit|units|paper|papers|test|tests|question|questions|poetry|fiction|novel|writing|vocabulary|cuisine|food|culture|war|empire|film|films|cinema|movie|movies|music|dance|actor|actress|people|country|civilisation|civilization|speaker|speakers|teacher|teachers|student|students|translation|transcript|literature)\b/i;
+
 /** Deterministic language-capability replies prevent the tutor from falsely
  * claiming it only supports English/Hindi. The cloud and local speech layers
  * both support these scripts, so the response is immediately usable aloud.
@@ -336,6 +433,7 @@ export function languageCapabilityReply(
   voiceGender: "female" | "male" = "female"
 ): string | null {
   if (!LANGUAGE_CAPABILITY_RE.test(query)) return null;
+  if (LANGUAGE_TOPIC_PHRASE_RE.test(query)) return null;
   const languages: Array<{ match: RegExp; reply: CapabilityReply }> = [
     {
       match: /\b(bangla|bengali)\b/i,
@@ -532,7 +630,7 @@ const MULTI = {
     /\b(band (karo|kar do)|rok (do|do na)|rokko|rok lo|khatam karo|bas karo)\b/i, // Hinglish
   ],
   start: [
-    /\b(clock ?in|start (the )?(timer|clock|focus|session|studying|study)|begin (studying|session|focus)|let'?s study|i'?m ready to study)\b/i,
+    /\b(clock ?in|start (the |my )?(timer|clock|focus|session|studying|study)|begin (the |my )?(timer|clock|focus|session|studying|study)|let'?s (start|study)|i'?m ready to study|start studying now|can you start (the )?study)\b/i,
     /(टाइमर (चालू|शुरू)|घड़ी (चालू|शुरू)|पढ़ाई (शुरू|चालू)|शुरू कर (दो|दें)|चालू कर (दो|दें))/,
     /(टाइमर सुरू|अभ्यास सुरू|सुरू करा|चालू करा)/, // Marathi
     /(টাইমার (চালু|শুরু)|পড়া (শুরু|চালু)|শুরু করো)/, // Bengali
@@ -759,8 +857,21 @@ export function commandReply(
   return reply;
 }
 
+/** Questions that ask "how/what/why" are not in-app commands. Without this
+ *  guard "How do I start studying?", "What is light?", or "Explain dark matter"
+ *  were hijacked by the timer/theme parsers and answered as if the user tapped
+ *  a button. Real commands (e.g. "start the timer", "dark mode please") still
+ *  pass through. */
+const HELP_QUESTION_RE =
+  /\b(how (do|does|can|could|would|should|to)|how'?s|why (do|does|is|are|would)|when (do|does|is|are)|what (is|are|does|do|was|were)|what'?s|explain|define|definition|meaning|difference (between|in)|should i|do i|can you explain|tell me about|help me understand|i want to know|how should i)\b/i;
+
+function looksLikeHelpQuestion(n: string): boolean {
+  return HELP_QUESTION_RE.test(n);
+}
+
 export function parseCommand(q: string): TutorReply["action"] | undefined {
   const n = q.toLowerCase().trim().replace(/[.!?]+$/, "");
+  if (looksLikeHelpQuestion(n)) return undefined;
 
   // ── Break / timer state transitions (checked BEFORE navigation so
   //    "resume", "end break", "pause" never get mis-routed) ──
@@ -787,7 +898,15 @@ export function parseCommand(q: string): TutorReply["action"] | undefined {
   if (/\b(zen|focus mode|full ?screen|distraction ?free|deep work mode)\b/.test(n)) return { type: "zen" };
   if (/\b(re-?plan|rebuild|regenerate|reschedule|re-?balance|redo my (plan|schedule)|fix my (plan|schedule)|update my plan)\b/.test(n)) return { type: "replan" };
 
-  if (n.includes("theme") || /\b(midnight|dark|obsidian|nebula|emerald|sunset|mint|silver|lavender|samsung|light|black)\b/.test(n)) {
+  // Theme commands must be explicit. "dark", "light", "black", etc. are also
+  // ordinary study words ("dark matter", "light waves", "black body"), so a
+  // theme word alone is never enough — it needs a mode/theme phrase or a
+  // theme-change action word.
+  const themeColor = /\b(midnight|dark|obsidian|nebula|emerald|sunset|mint|silver|lavender|samsung|light|black|white)\b/;
+  const themeSurface = /\b(theme|mode|background|appearance|wallpaper|skin)\b/;
+  const themeAction = /\b(set|change|switch|apply|turn|use|make|activate|try|choose|select|prefer|give|want|enable|disable|put|go)\b/;
+  const themePhrase = /(^|\s)(midnight|dark|obsidian|nebula|emerald|sunset|mint|silver|lavender|samsung|light|black|white)\s+(mode|theme|background|appearance|wallpaper|skin)/;
+  if (themePhrase.test(n) || (n.includes("theme") && themeColor.test(n) && themeAction.test(n)) || (themeSurface.test(n) && themeColor.test(n) && themeAction.test(n))) {
     // Payloads are the raw THEME IDS stored in settings.theme — the UI
     // applies them as `theme-${id}`, so never prefix "theme-" here.
     if (/(midnight|dark|black)/.test(n)) return { type: "theme", payload: "dark" };
@@ -838,6 +957,22 @@ export function instantTutorReply(q: string, ctx: TutorContext): TutorReply | nu
   return null;
 }
 
+/** Only run the Wikipedia/glossary search for clear factual lookup questions.
+ *  Open-ended, opinion, advice, or "what is the best/perfect…" questions must
+ *  not be answered by an unrelated encyclopedia page. */
+function isFactualLookupQuestion(q: string): boolean {
+  if (/how\b|\bwhy\b|\bshould\b|\bbest\b|\bperfect\b|\bideal\b|\brecommend\b|\badvice\b|\bopinion\b|\bthink\b|\bfeel\b|\bsolution\b|\bany war\b/i.test(q)) return false;
+  return /\b(what is|what's|define|definition of|meaning of|what does .* mean|explain)\b/i.test(q);
+}
+
+function openEndedFallback(q: string): string {
+  const n = q.toLowerCase();
+  if (/\b(perfect|best|ideal|solution)\b|\bany war\b|world peace/i.test(n)) {
+    return "That's an open-ended question, so I don't want to give a rushed one-line answer. Tell me the specific angle you need — for example the conflict/exam topic, the course chapter, or whether you want a definition, comparison, or study strategy — and I'll answer it directly.";
+  }
+  return "I need one more detail to give you the right answer. Tell me the specific topic or subject you mean, and I'll explain it properly rather than guess.";
+}
+
 export async function localTutor(
   q: string,
   ctx: TutorContext,
@@ -878,15 +1013,52 @@ export async function localTutor(
     if (aiResponse) return { text: aiResponse };
   }
 
-  const subjectHint = ctx.subjects.find((s) => n.includes(s.name.toLowerCase().split(" ")[0]))?.name;
-  const knowledge = await lookupKnowledge(q);
-  if (knowledge) return { text: teachFromKnowledge(knowledge, q, ctx.level, subjectHint) };
+  // Meta questions about Shigun's engine get an honest status answer instead
+  // of a glossary hit; concept questions ("what is AI") still use the lookup.
+  if (isSelfEngineQuestion(q)) {
+    return { text: selfEngineReply(ctx) };
+  }
+
+  if (isFactualLookupQuestion(q)) {
+    const subjectHint = ctx.subjects.find((s) => n.includes(s.name.toLowerCase().split(" ")[0]))?.name;
+    const knowledge = await lookupKnowledge(q);
+    if (knowledge) return { text: teachFromKnowledge(knowledge, q, ctx.level, subjectHint) };
+  }
 
   if (/^(hi|hello|hey|good (morning|afternoon|evening))/i.test(q.trim())) {
     return { text: "Hello! I can help with study planning, explanations, writing, calculations, ideas, and everyday questions. What would you like to explore?" };
   }
   if (/(thanks|thank you)/i.test(q)) return { text: "You’re welcome. What would you like to do next?" };
-  return { text: "I don’t have enough reliable context to answer that well yet. Share a little more detail and I’ll help directly — it does not need to be a study question." };
+  return { text: openEndedFallback(q) };
+}
+
+/** Meta questions about SHIGUN's own engine must be answered directly, not
+ *  run through the offline glossary. Without this guard "do you connected
+ *  with any ai?" was matched by the glossary term 'ai' and answered with the
+ *  definition of Artificial Intelligence instead of talking about Shigun. */
+const SELF_ENGINE_QUESTION_RE =
+  /\b(are you|is shigun|is this|what are you|who are you)\b|\b(do you|does shigun|is shigun)\s+(use|have|connect|run|work|connected|powered|operate)\b|\byou\s+(connected|using|running|powered|linked)\b|\bconnected\s+(to|with)\s+(any\s+)?(ai|llm|engine|model|provider)\b|\b(which|what)\s+(ai|llm|engine|model|provider)\s*(do\s+you|are\s+you|is\s+shigun|you\s+use)\b/i;
+
+function isSelfEngineQuestion(q: string): boolean {
+  // "What is AI?" / "Explain artificial intelligence" are real questions
+  // about the concept, not about Shigun, so they keep the glossary path.
+  if (/\b(what is|explain|define|definition of|meaning of)\s+(an?\s+)?(ai|artificial intelligence)\b/i.test(q)) return false;
+  return SELF_ENGINE_QUESTION_RE.test(q);
+}
+
+function selfEngineReply(ctx: TutorContext): string {
+  const provider = activeProvider();
+  const error = llmError();
+  const parts = [
+    `I'm Shigun, the built-in study coach in **${ctx.courseName}**.`,
+    "I run on Study Planner Pro's hybrid engine: the local planner and knowledge base are always available, and the cloud AI model is used on top when this server has a provider key.",
+  ];
+  if (provider) {
+    parts.push(`The cloud AI layer is configured (${provider}).${error ? ` This request couldn't reach it — ${error}.` : ""}`);
+  } else {
+    parts.push("No cloud AI key is configured on this server, so I'm answering from the built-in hybrid/local engine.");
+  }
+  return parts.join("\n\n");
 }
 
 /** Maps a selected voice profile id to its spoken grammatical gender. */

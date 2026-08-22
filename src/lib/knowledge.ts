@@ -22,6 +22,10 @@ const STOP = new Set([
   "did", "can", "you", "please", "give", "why", "when", "which", "with", "that", "this", "it",
   "i", "my", "concept", "topic", "meaning", "means", "simple", "words", "short", "notes",
   "difference", "between", "help", "understand", "understanding", "study", "learn", "teach",
+  // Conversational and filler words that make a Wikipedia/glossary search worse.
+  "got", "so", "mean", "lot", "too", "really", "like", "just", "ok", "okay", "hey", "hi",
+  "some", "thing", "anything", "something", "someone", "anyone", "now", "then",
+  "there", "here", "much", "many", "more", "most", "very", "also", "even", "only",
 ]);
 
 export function searchTerms(q: string): string {
@@ -31,7 +35,10 @@ export function searchTerms(q: string): string {
     .replace(/\s+/g, " ")
     .trim();
   const words = cleaned.split(" ").filter((w) => w.length > 1 && !STOP.has(w));
-  return (words.length ? words : cleaned.split(" ")).slice(0, 8).join(" ");
+  // De-duplicate repeated keywords ("buffer … buffer … buffer") and drop
+  // filler words so a search term is a real noun phrase, not a sentence.
+  const unique = Array.from(new Set(words));
+  return (unique.length ? unique : cleaned.split(" ")).slice(0, 8).join(" ");
 }
 
 export type Knowledge = {
@@ -52,8 +59,267 @@ type WikiExtract = {
   query?: { pages?: Record<string, { title?: string; extract?: string; pageid?: number }> };
 };
 
+/* ============================================================
+   OFFLINE GLOSSARY — answers that never need the network.
+   Wikipedia, and even the LLM/cloud, can be unreachable on
+   restricted networks. These curated entries keep SHIGUN useful
+   and specific for common study words and coursework terms.
+============================================================ */
+type LocalConcept = {
+  terms: string[];
+  title: string;
+  definition: string;
+  how: string[];
+  example?: string;
+  related?: string[];
+};
+
+const LOCAL_CONCEPTS: LocalConcept[] = [
+  {
+    terms: ["buffer"],
+    title: "Buffer",
+    definition: "A buffer is a temporary storage area that holds data while it is moving from one place to another.",
+    how: [
+      "Data is placed in the buffer first, then sent out when the receiving device or software is ready.",
+      "This smooths out speed differences, so a faster source is not forced to wait for a slower destination.",
+      "You see buffers in streaming video, audio playback, typing, and network data transfer.",
+    ],
+    example: "When a video pauses and shows \"buffering\", it is filling a small temporary store of video data before playing it smoothly.",
+    related: ["cache", "RAM"],
+  },
+  {
+    terms: ["cache"],
+    title: "Cache",
+    definition: "A cache is a small, fast temporary store that keeps recently used data close to where it will be needed.",
+    how: [
+      "The first request fetches and stores the data; later requests read it from the cache instead of repeating the work.",
+      "Caches trade a little memory for a large speed gain, which is why apps load faster after their first visit.",
+    ],
+    related: ["buffer", "RAM"],
+  },
+  {
+    terms: ["ram"],
+    title: "RAM (Random Access Memory)",
+    definition: "RAM is the fast working memory a computer uses while it is running programs.",
+    how: [
+      "It stores the data and instructions a program is currently using.",
+      "It is volatile: the contents disappear when the power is turned off.",
+    ],
+    related: ["buffer", "cache"],
+  },
+  {
+    terms: ["cpu", "processor"],
+    title: "CPU (Central Processing Unit)",
+    definition: "The CPU is the part of a computer that actually executes instructions.",
+    how: [
+      "It fetches an instruction, decodes what it means, executes it, then moves to the next one.",
+      "More instructions per second means a faster and more responsive system.",
+    ],
+    related: ["RAM"],
+  },
+  {
+    terms: ["algorithm"],
+    title: "Algorithm",
+    definition: "An algorithm is a step-by-step set of rules for solving a problem or completing a task.",
+    how: [
+      "A good algorithm has a clear input, a clear output, and a finite number of steps.",
+      "It is judged not only by correctness but also by how much time and memory it needs.",
+    ],
+    example: "A recipe is an everyday algorithm: take ingredients, follow ordered steps, get a finished dish.",
+  },
+  {
+    terms: ["artificial intelligence", "ai"],
+    title: "Artificial Intelligence",
+    definition: "Artificial intelligence is the ability of a machine or program to perform tasks that normally need human intelligence.",
+    how: [
+      "It uses patterns, data, and learned rules to make predictions, classify things, or generate text.",
+      "Simple AI can be rule-based; modern AI usually learns from large amounts of examples.",
+    ],
+    related: ["algorithm"],
+  },
+  {
+    terms: ["database"],
+    title: "Database",
+    definition: "A database is an organised collection of data that can be searched, updated, and managed efficiently.",
+    how: [
+      "Data is stored in tables with rows and columns, and queries retrieve exactly the needed records.",
+      "Indexes make common lookups fast, while constraints keep the data consistent.",
+    ],
+    related: ["algorithm"],
+  },
+  {
+    terms: ["neuron"],
+    title: "Neuron",
+    definition: "A neuron is a nerve cell that carries and processes information in the brain and nervous system.",
+    how: [
+      "It receives signals through dendrites, sends a signal along its axon, and releases chemicals at the synapse.",
+      "Learning and memory work by strengthening or weakening connections between neurons.",
+    ],
+    related: ["synapse", "memory"],
+  },
+  {
+    terms: ["synapse"],
+    title: "Synapse",
+    definition: "A synapse is the junction where a neuron communicates with the next cell.",
+    how: [
+      "Signals cross the gap chemically using neurotransmitters.",
+      "Repeated use strengthens the pathway, which is the biological basis of learning and habit.",
+    ],
+    related: ["neuron", "memory"],
+  },
+  {
+    terms: ["attention"],
+    title: "Attention",
+    definition: "Attention is the process of selectively focusing on some information while ignoring other information.",
+    how: [
+      "It is limited in capacity, so not everything in the environment can be processed at once.",
+      "Attention can be divided between tasks with difficulty, and it can be sustained for a limited time.",
+    ],
+    example: "In a lecture, your attention decides which spoken details are encoded into memory.",
+    related: ["perception"],
+  },
+  {
+    terms: ["perception"],
+    title: "Perception",
+    definition: "Perception is the process of interpreting sensory information so it becomes a meaningful experience.",
+    how: [
+      "The senses detect raw signals, then the brain organises and interprets them.",
+      "Context, past experience, and expectations can all change what you perceive.",
+    ],
+    related: ["attention"],
+  },
+  {
+    terms: ["classical conditioning"],
+    title: "Classical Conditioning",
+    definition: "Classical conditioning is learning in which a neutral stimulus comes to trigger a response after being paired with a stimulus that already triggers it.",
+    how: [
+      "A natural stimulus (like food) is repeatedly paired with a neutral one (like a bell).",
+      "After enough pairings, the neutral stimulus alone produces the learned response.",
+    ],
+    example: "Pavlov's dogs salivated to a bell after learning that the bell predicted food.",
+  },
+  {
+    terms: ["operant conditioning"],
+    title: "Operant Conditioning",
+    definition: "Operant conditioning is learning through the consequences of a behaviour.",
+    how: [
+      "Reinforcement increases the chance of repeating a behaviour.",
+      "Punishment decreases the chance, and the timing of the consequence matters.",
+    ],
+    example: "A study reward that follows each completed session is reinforcement for that habit.",
+  },
+  {
+    terms: ["cognitive psychology"],
+    title: "Cognitive Psychology",
+    definition: "Cognitive psychology is the study of mental processes such as attention, memory, language, problem solving, and decision making.",
+    how: [
+      "It treats the mind as an information-processing system.",
+      "Researchers use experiments, reaction times, and mental workload measures to infer hidden processes.",
+    ],
+    related: ["attention", "perception", "memory"],
+  },
+  {
+    terms: ["photosynthesis"],
+    title: "Photosynthesis",
+    definition: "Photosynthesis is the process by which green plants use light to make food from carbon dioxide and water.",
+    how: [
+      "Chlorophyll absorbs light energy in the leaves.",
+      "The energy is used to convert carbon dioxide and water into glucose, releasing oxygen.",
+    ],
+    related: ["cell"],
+  },
+  {
+    terms: ["cell"],
+    title: "Cell",
+    definition: "A cell is the basic unit of life; all living organisms are made of one or more cells.",
+    how: [
+      "Cells carry out essential jobs like taking in nutrients, releasing energy, and reproducing.",
+      "Different cell types become specialised for different tasks in complex organisms.",
+    ],
+    related: ["atom", "osmosis"],
+  },
+  {
+    terms: ["atom"],
+    title: "Atom",
+    definition: "An atom is the smallest unit of an element that keeps its chemical identity.",
+    how: [
+      "It contains protons and neutrons in the nucleus and electrons moving around it.",
+      "Atoms combine into molecules, and molecules make up most everyday substances.",
+    ],
+    related: ["molecule"],
+  },
+  {
+    terms: ["gravity"],
+    title: "Gravity",
+    definition: "Gravity is the force that pulls objects with mass toward each other.",
+    how: [
+      "On Earth it pulls every object downward, which is why dropped items fall.",
+      "It keeps planets in orbit around the Sun and shapes the tides.",
+    ],
+  },
+  {
+    terms: ["osmosis"],
+    title: "Osmosis",
+    definition: "Osmosis is the movement of water across a membrane from a weaker solution to a stronger solution.",
+    how: [
+      "The membrane lets water pass but blocks larger dissolved particles.",
+      "Water moves until the concentrations on both sides become balanced.",
+    ],
+    related: ["cell"],
+  },
+  {
+    terms: ["mitosis"],
+    title: "Mitosis",
+    definition: "Mitosis is the process by which one cell divides to form two identical daughter cells.",
+    how: [
+      "The cell copies its DNA, then separates those copies into two new nuclei.",
+      "The result is two cells with the same genetic information, used for growth and repair.",
+    ],
+    related: ["cell"],
+  },
+];
+
+function isMetaQuestion(q: string): boolean {
+  if (/\bwhat is|explain|define|definition of|meaning of\b/i.test(q)) return false;
+  return /\b(are you|is shigun|is this|what are you|who are you|do you|does shigun|is shigun)\b|\byou\s+(connected|using|running|powered|linked)\b|\bconnected\s+(to|with)\s+(any\s+)?(ai|llm|engine|model|provider)\b/i.test(q);
+}
+
+function localKnowledge(question: string): Knowledge | null {
+  const q = question.toLowerCase();
+  // Do not let a glossary word ("ai" inside "any ai") answer a meta question
+  // about Shigun/its engine.
+  if (isMetaQuestion(q)) return null;
+  let best: LocalConcept | null = null;
+  let bestScore = 0;
+  for (const concept of LOCAL_CONCEPTS) {
+    const score = concept.terms.reduce((total, term) =>
+      total + (q.includes(term) ? term.length : 0), 0);
+    if (score > bestScore) {
+      best = concept;
+      bestScore = score;
+    }
+  }
+  if (!best) return null;
+  const extract = [
+    best.definition,
+    ...best.how,
+    best.example ? `Example: ${best.example}` : "",
+  ].filter(Boolean).join(" ");
+  return {
+    title: best.title,
+    extract,
+    url: "",
+    related: best.related || [],
+  };
+}
+
 /** Search Wikipedia and return a rich extract for the best matching article. */
 export async function lookupKnowledge(question: string): Promise<Knowledge | null> {
+  // Offline glossary first: it is instant and works even when the server's
+  // network cannot reach Wikipedia or the cloud.
+  const local = localKnowledge(question);
+  if (local) return local;
+
   const term = searchTerms(question);
   if (!term) return null;
 
@@ -65,30 +331,41 @@ export async function lookupKnowledge(question: string): Promise<Knowledge | nul
   const hits = search?.query?.search || [];
   if (!hits.length) return null;
 
-  const best = hits[0];
-  const ex = await jget<WikiExtract>(
-    `https://en.wikipedia.org/w/api.php?action=query&prop=extracts&explaintext=1&exintro=0&exchars=2400&pageids=${best.pageid}&format=json&origin=*`
-  );
-  let extract = "";
-  const pages = ex?.query?.pages;
-  if (pages) {
-    const first = Object.values(pages)[0];
-    extract = (first?.extract || "").trim();
-  }
-  if (!extract) {
-    const sum = await jget<WikiSummary>(
-      `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(best.title.replace(/ /g, "_"))}`
+  const queryTerms = term.split(" ").filter((t) => t.length >= 4);
+  for (const best of hits.slice(0, 3)) {
+    const ex = await jget<WikiExtract>(
+      `https://en.wikipedia.org/w/api.php?action=query&prop=extracts&explaintext=1&exintro=0&exchars=2400&pageids=${best.pageid}&format=json&origin=*`
     );
-    extract = (sum?.extract || "").trim();
-  }
-  if (!extract || extract.length < 60) return null;
+    let extract = "";
+    const pages = ex?.query?.pages;
+    if (pages) {
+      const first = Object.values(pages)[0];
+      extract = (first?.extract || "").trim();
+    }
+    if (!extract) {
+      const sum = await jget<WikiSummary>(
+        `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(best.title.replace(/ /g, "_"))}`
+      );
+      extract = (sum?.extract || "").trim();
+    }
+    if (!extract || extract.length < 60) continue;
 
-  return {
-    title: best.title,
-    extract,
-    url: `https://en.wikipedia.org/wiki/${encodeURIComponent(best.title.replace(/ /g, "_"))}`,
-    related: hits.slice(1, 4).map((h) => h.title),
-  };
+    // Relevance gate: never present an unrelated encyclopedia page (e.g.
+    // "The Alabama Solution" for a question about a perfect war solution).
+    const haystack = `${best.title} ${extract}`.toLowerCase();
+    const matches = queryTerms.filter((t) => haystack.includes(t)).length;
+    const titleMatch = queryTerms.some((t) => best.title.toLowerCase().includes(t));
+    const relevant = titleMatch || matches >= Math.max(1, Math.min(2, queryTerms.length));
+    if (!relevant) continue;
+
+    return {
+      title: best.title,
+      extract,
+      url: `https://en.wikipedia.org/wiki/${encodeURIComponent(best.title.replace(/ /g, "_"))}`,
+      related: hits.slice(1, 4).map((h) => h.title),
+    };
+  }
+  return null;
 }
 
 function sentences(text: string): string[] {

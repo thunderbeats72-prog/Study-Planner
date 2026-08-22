@@ -444,9 +444,13 @@ export async function speak(
   const personaId = resolveVoiceId(voiceId);
   // Voice identity is a product guarantee. We never switch to a browser/device
   // speaker because it happens to support a different locale; if Ava cannot be
-  // reached, leave the answer readable and allow a clean retry instead.
+  // reached, leave the answer readable and allow a clean retry instead. The
+  // long-answer path can opt in to the pinned device speaker (forceNative)
+  // after the neural service is down, so a lesson is never silently dropped.
   if (options.forceNative) {
     const label = VOICE_OPTIONS.find((voice) => voice.id === personaId)?.label || "selected voice";
+    const played = await speakNative(text, personaId, generation, start, finish, playbackRate);
+    if (played) return;
     fail(`${label} is unavailable. Your reply is still available as text; tap play to retry the selected voice.`);
     return;
   }
@@ -502,9 +506,15 @@ export async function speak(
     if (speechAbort?.signal.aborted || generation === speechGeneration) speechAbort = null;
   }
 
-  // Do not use browser speechSynthesis as an automatic fallback. Browsers can
-  // replace Ava with a locale-specific system speaker without notice, which
-  // breaks identity consistency mid-answer.
+  // Every TTS route has now failed: server Edge → browser-direct Edge →
+  // HTML/Web Audio. The pinned device speaker is the advertised LAST resort
+  // and the only way to keep a reply audible when the server's network cannot
+  // reach the Edge service. It still stays on the same persona's pinned voice
+  // (PINNED_NATIVE), never a random locale swap.
+  callbacks.onFallback?.("The neural voice is unavailable — using your device voice for this reply.");
+  const played = await speakNative(text, personaId, generation, start, finish, playbackRate);
+  if (played) return;
+  errorMessage = "Neither the neural voice nor the device voice could start.";
   fail(`${errorMessage} The answer remains available as text. Tap play to retry the selected voice.`);
 }
 
@@ -742,10 +752,12 @@ export async function speakLong(
 
   let startedOnce = false;
   let completed = 0;
+  let continueLocally = false;
+  let localNoticeShown = false;
   const personaId = resolveVoiceId(voiceId);
-  // Every chunk must use the selected neural persona. We never downgrade a
-  // later chunk to a device voice, because that is an audible persona switch.
-  const continueLocally = false;
+  // Every chunk must use the selected neural persona. If the neural service
+  // goes down mid-lesson we switch the REST of the long answer to the pinned
+  // device speaker (one audible change) rather than silently dropping it.
   const start = () => {
     if (startedOnce || !isCurrent()) return;
     startedOnce = true;
@@ -772,7 +784,11 @@ export async function speakLong(
     await new Promise<void>((resolve) => {
       void speak(current.text, personaId, {
         onStart: start,
-        onFallback: (message) => callbacks.onFallback?.(message),
+        onFallback: (message) => {
+          localNoticeShown = true;
+          continueLocally = true;
+          callbacks.onFallback?.(message);
+        },
         onEnd: () => {
           if (settled) return;
           settled = true;
@@ -810,8 +826,18 @@ export async function speakLong(
     }
 
     if (failed) {
-      callbacks.onError?.(errorMessage);
-      return; // surface the error once; text remains readable
+      // A long answer must not stop after one bad chunk. If the neural chunk
+      // could not be delivered even after the native retry, skip that part
+      // and keep the rest of the lesson playing instead of turning silent.
+      continueLocally = true;
+      if (!localNoticeShown) {
+        localNoticeShown = true;
+        callbacks.onFallback?.("The neural voice hit a snag — continuing with your device voice.");
+      }
+      completed++;
+      callbacks.onProgress?.(completed, queue.length);
+      index++;
+      continue;
     }
 
     completed++;

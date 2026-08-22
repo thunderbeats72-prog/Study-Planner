@@ -22,7 +22,7 @@ const QUICKS = [
 const AUTO_SEND_CONFIDENCE = 0.72;
 
 export default function ChatPanel({
-  open, setOpen, messages, onSend, thinking, learner, speechHints = [],
+  open, setOpen, messages, onSend, thinking, provider, learner, speechHints = [],
 }: {
   open: boolean;
   setOpen: (v: boolean) => void;
@@ -211,12 +211,13 @@ export default function ChatPanel({
 
   const selectedVoice = VOICE_OPTIONS.find((voice) => voice.id === voiceId) || VOICE_OPTIONS[0];
   const live = listening || micWaking;
+  const providerTag = provider ? ` · ${provider}` : "";
   const status = micWaking ? "Mic…"
     : listening ? "Listening"
-    : voicePreparing ? selectedVoice.label
-    : speaking ? (speakProgress ? `${selectedVoice.label} · ${speakProgress.done}/${speakProgress.total}` : selectedVoice.label)
+    : voicePreparing ? `${selectedVoice.label}${providerTag}`
+    : speaking ? (speakProgress ? `${selectedVoice.label} · ${speakProgress.done}/${speakProgress.total}` : `${selectedVoice.label}${providerTag}`)
     : thinking ? "Thinking"
-    : selectedVoice.label;
+    : `${selectedVoice.label}${providerTag}`;
 
   return (
     <>
