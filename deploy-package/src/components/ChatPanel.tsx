@@ -33,15 +33,13 @@ export default function ChatPanel({
   const submitLock = useRef(false);
   useEffect(() => { if (!thinking) submitLock.current = false; }, [thinking]);
 
-  // Provider connectivity chip: fetched once per session so the learner can
-  // SEE whether Gemini/Groq/Grok/OpenRouter are actually configured before
-  // asking anything (previously the only signal was a failure toast).
+  // Fetch health once per open — only to know if cloud is up; never display provider names.
   useEffect(() => {
     if (!open || health) return;
     let alive = true;
-    api<HealthSnapshot>("/api/health", { timeoutMs: 10_000 })
+    api<HealthSnapshot>("/api/health", { timeoutMs: 8_000 })
       .then((snapshot) => { if (alive) setHealth(snapshot); })
-      .catch(() => { /* status chip falls back to the provider prop */ });
+      .catch(() => { /* fall back to provider prop */ });
     return () => { alive = false; };
   }, [open, health]);
 
@@ -49,8 +47,6 @@ export default function ChatPanel({
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages.length, thinking, open]);
 
-  // Focus the composer when the sheet opens on pointer devices (avoids
-  // popping the mobile keyboard on touch, where the FAB tap is recent).
   useEffect(() => {
     if (open && window.matchMedia?.("(hover: hover) and (pointer: fine)").matches) {
       inputRef.current?.focus();
@@ -77,19 +73,25 @@ export default function ChatPanel({
     try {
       await navigator.clipboard.writeText(m.content);
       setCopiedId(m.id);
-      setTimeout(() => setCopiedId((current) => (current === m.id ? null : current)), 1600);
-    } catch { /* clipboard blocked — silently ignore */ }
+      setTimeout(() => setCopiedId((cur) => (cur === m.id ? null : cur)), 1600);
+    } catch { /* clipboard blocked */ }
   };
 
-  const providers = health?.ai?.configuredProviders?.length
-    ? health.ai.configuredProviders
-    : provider
-      ? [provider]
-      : [];
+  // Cloud is active if the health endpoint confirms providers, or the page prop says so.
+  // We deliberately never expose which provider — clean UI, no vendor lock-in feel.
+  const isCloudActive = !!(
+    health?.ai?.configuredProviders?.length || provider
+  );
+
+  const statusText = thinking
+    ? "Thinking…"
+    : isCloudActive
+      ? "Ready"
+      : "Local mode";
 
   return (
     <>
-      <button className="ai-fab" onClick={() => setOpen(!open)} aria-label="AI tutor">
+      <button className="ai-fab" onClick={() => setOpen(!open)} aria-label="Open Shigun">
         {open ? <IconClose size={20} /> : <IconChat />}
       </button>
 
@@ -97,47 +99,54 @@ export default function ChatPanel({
       {open && (
         <div
           className={`ai-panel glass-panel${thinking ? " is-thinking" : ""}`}
-          role="dialog" aria-modal="true" aria-label="SHIGUN AI tutor chat"
+          role="dialog" aria-modal="true" aria-label="Shigun study coach"
           onKeyDown={(e) => { if (e.key === "Escape") setOpen(false); }}
         >
           <div className="ai-sheet-handle" aria-hidden="true" />
+
+          {/* ── Header ── */}
           <div className="ai-head">
             <div className="ai-head-main">
-              <div className="brand-logo-icon ai-avatar"><IconSpark size={16} /></div>
+              <div className="shigun-avatar" aria-hidden="true">
+                <IconSpark size={15} />
+                {isCloudActive && <span className="shigun-avatar-ring" />}
+              </div>
               <div className="ai-identity">
-                <div className="ai-title">Shigun <span>AI Tutor</span></div>
-                <div className={`ai-status${providers.length ? "" : " off"}`} aria-live="polite">
-                  {thinking
-                    ? "Working on your answer…"
-                    : providers.length
-                      ? `${providers.join(" + ")} live · local fallback ready`
-                      : "Local tutor mode — add an AI key for cloud answers"}
+                <div className="ai-title">Shigun</div>
+                <div className={`ai-status${isCloudActive ? "" : " off"}`} aria-live="polite">
+                  {statusText}
                 </div>
               </div>
-              <button className="ai-close" aria-label="Close chat" onClick={() => setOpen(false)}><IconClose size={17} /></button>
+              <button className="ai-close" aria-label="Close" onClick={() => setOpen(false)}>
+                <IconClose size={16} />
+              </button>
             </div>
           </div>
 
+          {/* ── Messages ── */}
           <div className="ai-msgs" role="log" aria-busy={thinking || undefined}>
             {!messages.length && learner && (
               <div className="companion-hello">
-                <div className="companion-orb"><IconSpark size={22} /></div>
+                <div className="companion-orb"><IconSpark size={20} /></div>
                 <h4 className="companion-title">
-                  {new Date().getHours() < 12 ? "Good morning" : new Date().getHours() < 17 ? "Good afternoon" : "Good evening"}, {learner.name.split(" ")[0]}
+                  {new Date().getHours() < 12 ? "Good morning" : new Date().getHours() < 17 ? "Good afternoon" : "Good evening"},{" "}
+                  {learner.name.split(" ")[0]}
                 </h4>
                 <p className="companion-sub">
                   {learner.todayTotal > 0 && learner.todayDone >= learner.todayTotal
-                    ? "Everything done for today — impressive."
+                    ? "All sessions done for today — great work."
                     : learner.todayTotal > 0
-                      ? `${learner.todayTotal - learner.todayDone} of ${learner.todayTotal} sessions left today · ${learner.daysLeft} days to your exam.`
-                      : `${learner.daysLeft} days to your exam · ${learner.progressPct}% of syllabus completed.`}
+                      ? `${learner.todayTotal - learner.todayDone} of ${learner.todayTotal} sessions left · ${learner.daysLeft}d to exam`
+                      : `${learner.daysLeft} days to exam · ${learner.progressPct}% complete`}
                 </p>
-                <p className="companion-hint">Ask me anything about your studies, plan, or subjects.</p>
+                <p className="companion-hint">Ask anything about your plan, subjects, or progress.</p>
               </div>
             )}
             {!messages.length && !learner && (
-              <div className="ai-msg bot">
-                Hi! I&apos;m Shigun. Ask me anything about your studies.
+              <div className="companion-hello">
+                <div className="companion-orb"><IconSpark size={20} /></div>
+                <h4 className="companion-title">Hi, I&apos;m Shigun</h4>
+                <p className="companion-hint">Your AI study coach. Ask me anything.</p>
               </div>
             )}
             {messages.map((m) => {
@@ -145,14 +154,15 @@ export default function ChatPanel({
               return (
                 <div key={m.id} className={`ai-message-row ${isUser ? "user" : "bot"}`}>
                   {!isUser && <div className="ai-mini-avatar" aria-hidden="true"><IconSpark size={11} /></div>}
-                  <div className={`ai-msg ${isUser ? "user" : "bot"}`}
+                  <div
+                    className={`ai-msg ${isUser ? "user" : "bot"}`}
                     title={new Date(m.createdAt).toLocaleString()}
-                    dangerouslySetInnerHTML={{ __html: isUser ? escapeHtml(m.content) : mdToHtml(m.content) }} />
+                    dangerouslySetInnerHTML={{ __html: isUser ? escapeHtml(m.content) : mdToHtml(m.content) }}
+                  />
                   {!isUser && (
                     <button
                       className={`ai-copy${copiedId === m.id ? " copied" : ""}`}
-                      aria-label={copiedId === m.id ? "Copied" : "Copy answer"}
-                      title={copiedId === m.id ? "Copied!" : "Copy answer"}
+                      aria-label={copiedId === m.id ? "Copied" : "Copy"}
                       onClick={() => void copyMessage(m)}
                     >
                       {copiedId === m.id ? <IconCheck size={12} /> : <IconCopy size={13} />}
@@ -166,23 +176,25 @@ export default function ChatPanel({
                 <div className="ai-mini-avatar" aria-hidden="true"><IconSpark size={11} /></div>
                 <div className="ai-msg bot">
                   <span className="thinking-dots"><i /><i /><i /></span>
-                  <span className="thinking-label">Thinking through your answer</span>
                 </div>
               </div>
             )}
             <div ref={endRef} />
           </div>
 
+          {/* ── Quick suggestions ── */}
           <div className="ai-quick" aria-label="Suggested questions">
-            <span className="ai-quick-label">Try</span>
-            {QUICKS.map((q) => <button key={q} onClick={() => send(q)} disabled={thinking}>{q}</button>)}
+            {QUICKS.map((q) => (
+              <button key={q} onClick={() => send(q)} disabled={thinking}>{q}</button>
+            ))}
           </div>
 
+          {/* ── Composer ── */}
           <div className="ai-input-row ai-composer">
             <textarea
               ref={inputRef}
               className="input-field ai-chat-input"
-              placeholder="Message Shigun…  (Shift+Enter for a new line)"
+              placeholder="Ask Shigun…"
               value={text}
               rows={1}
               aria-label="Message Shigun"
@@ -191,7 +203,14 @@ export default function ChatPanel({
                 if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
               }}
             />
-            <button className="btn btn-primary ai-send" aria-label="Send message" onClick={() => send()} disabled={thinking || !text.trim()}><IconSend /></button>
+            <button
+              className="btn btn-primary ai-send"
+              aria-label="Send"
+              onClick={() => send()}
+              disabled={thinking || !text.trim()}
+            >
+              <IconSend />
+            </button>
           </div>
         </div>
       )}
