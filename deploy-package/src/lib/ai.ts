@@ -13,6 +13,11 @@ import {
   type GeneratedTopic,
 } from "./curriculum";
 import { lookupKnowledge, teachFromKnowledge } from "./knowledge";
+import { detectLanguage, isMostlyEnglish } from "./language";
+
+function isMostlyEnglishQuery(q: string): boolean {
+  return isMostlyEnglish(q);
+}
 
 // Re-export the canonical topic shape so existing imports from "./ai" keep working.
 export type { GeneratedTopic, CurriculumSource } from "./curriculum";
@@ -63,13 +68,13 @@ export async function callLLM(
     groqKey ? "groq" : null,
     openrouterKey ? "openrouter" : null,
   ].filter(Boolean) as Array<"gemini" | "groq" | "openrouter">;
-  const deadline = Date.now() + 15000; // one bounded budget for the whole chain
+  const deadline = Date.now() + 12000; // one bounded budget for the whole chain
 
   for (const provider of providers) {
     const remaining = deadline - Date.now();
     if (remaining < 500) break;
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), Math.min(8500, remaining));
+    const timer = setTimeout(() => ctrl.abort(), Math.min(7000, remaining));
     let text: string | null = null;
 
     try {
@@ -735,7 +740,11 @@ export function commandReply(
   daysLeft?: number,
   voiceGender: "female" | "male" = "female"
 ): string {
-  const lang = SCRIPT_LANG_DETECT.find((entry) => entry.range.test(sourceText))?.code;
+  const detected = detectLanguage(sourceText);
+  const lang =
+    SCRIPT_LANG_DETECT.find((entry) => entry.range.test(sourceText))?.code
+    || (detected === "hi-IN" || detected === "mr-IN" || detected === "ne-NP" ? "hi" : undefined)
+    || (CONFIRMATIONS[detected.slice(0, 2)] ? detected.slice(0, 2) : undefined);
   const base =
     (lang && CONFIRMATIONS[lang]?.[action.type as keyof (typeof CONFIRMATIONS)["hi"]]) ||
     EN_CONFIRMATIONS[action.type] ||
@@ -796,6 +805,10 @@ export function parseCommand(q: string): TutorReply["action"] | undefined {
 }
 
 export function instantTutorReply(q: string, ctx: TutorContext): TutorReply | null {
+  // Non-English / Hinglish turns belong on the multilingual model path.
+  // An English canned answer after a Hindi question is what made language
+  // support feel broken.
+  if (!isMostlyEnglishQuery(q)) return null;
   const n = q.toLowerCase();
   if (/(what|which).*(today|now)|today'?s (plan|task|study|load)|what should i (study|do)/.test(n)) {
     const pending = ctx.today.filter((task) => task.status === "pending");
@@ -869,7 +882,11 @@ export async function localTutor(
   const knowledge = await lookupKnowledge(q);
   if (knowledge) return { text: teachFromKnowledge(knowledge, q, ctx.level, subjectHint) };
 
-  return { text: `Ask me to explain any concept from your subjects or say *"what should I study today?"*` };
+  if (/^(hi|hello|hey|good (morning|afternoon|evening))/i.test(q.trim())) {
+    return { text: "Hello! I can help with study planning, explanations, writing, calculations, ideas, and everyday questions. What would you like to explore?" };
+  }
+  if (/(thanks|thank you)/i.test(q)) return { text: "You’re welcome. What would you like to do next?" };
+  return { text: "I don’t have enough reliable context to answer that well yet. Share a little more detail and I’ll help directly — it does not need to be a study question." };
 }
 
 /** Maps a selected voice profile id to its spoken grammatical gender. */
@@ -898,6 +915,9 @@ a current-affairs study strategy if their course includes it).
 Learner: ${ctx.name}. Course: ${ctx.courseName}. Days Left: ${ctx.daysLeft} (exam: ${ctx.examDate}). Progress: ${ctx.progressPct}%.
 Streak: ${ctx.streak} days. This week: ${ctx.hoursThisWeek}h studied vs ${ctx.dailyHours * 7}h target. Overdue tasks: ${ctx.overdue}.
 Use these numbers when coaching — be specific, reference their actual data.
+You are also a helpful general conversational assistant: answer ordinary questions,
+brainstorming, writing, calculations, and day-to-day requests directly. Do not tell
+someone to ask only study questions. Keep app data in the background unless relevant.
 Teach step-by-step using clear markdown formatting.
 Voice: intelligent, concise, supportive, confident — like a calm senior tutor.
 Use at most one emoji per reply, and only when it genuinely helps; usually use none.
@@ -910,13 +930,13 @@ first-person verb endings and matching adjective agreement whenever you refer to
 yourself, so your grammar matches the voice the learner hears. Do not mention this
 rule in your reply — just speak with the correct forms.
 
-LANGUAGE: You are multilingual. Reply in the language/script the learner uses or explicitly
-requests, including Bengali/Bangla, Hindi, Marathi, Tamil, Telugu, Kannada, Malayalam,
-Gujarati, Punjabi, Odia, Urdu, Nepali, Arabic, Chinese, Japanese, Korean, Thai, Russian,
-Spanish, French, German, Portuguese, Italian, Indonesian, Turkish, and English. Never
-claim that you only support English or Hindi. If the learner writes an Indian language in
-Latin script, answer naturally in that language; use its native script when they
-explicitly ask whether you can speak it.
+LANGUAGE: You are multilingual. Reply in the SAME language/script the learner just used or
+explicitly requested, including Bengali/Bangla, Hindi, Marathi, Tamil, Telugu, Kannada,
+Malayalam, Gujarati, Punjabi, Odia, Urdu, Nepali, Arabic, Chinese, Japanese, Korean, Thai,
+Russian, Spanish, French, German, Portuguese, Italian, Indonesian, Turkish, Hinglish, and
+English. Never claim that you only support English or Hindi. If they write Hindi/Marathi
+in Latin script (Hinglish), answer in that mix; switch to native script when they ask
+whether you can speak it. Do not switch language mid-reply unless they ask you to.
 
 ANSWER DEPTH: match the depth to the request. Short factual questions get short answers.
 When the learner asks for an explanation, a lesson, or says anything like "in detail",

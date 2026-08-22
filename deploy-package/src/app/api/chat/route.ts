@@ -10,6 +10,7 @@ import {
 } from "@/lib/ai";
 import { regeneratePlan } from "@/lib/generate";
 import { mergeTranscriptSegments } from "@/lib/transcript";
+import { detectLanguage } from "@/lib/language";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -102,8 +103,10 @@ export async function POST(req: Request) {
         role: m.role === "assistant" ? ("assistant" as const) : ("user" as const),
         content: m.content,
       }));
+      const spokenLang = detectLanguage(text);
       const systemPrompt = tutorSystemPrompt(ctx, { voiceGender })
         + curriculumGrounding(text, state)
+        + `\n\nDETECTED LEARNER LANGUAGE: ${spokenLang}. Answer in this language unless they clearly asked for another.`
         + (source === "voice"
           ? "\n\nVOICE TURN: Keep the opening reply to 80-140 spoken words UNLESS the learner asked for detail, a lesson, or an explanation — then answer in full depth; the app speaks long answers in consecutive parts. Lead with the answer; avoid long preambles."
           : "");

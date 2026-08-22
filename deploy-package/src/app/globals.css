@@ -170,7 +170,7 @@ select.input-field{appearance:none;background-image:linear-gradient(45deg,transp
 .cal-cell.empty{background:transparent;cursor:default}
 .cal-cell.today{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-glow)}
 .cal-num{font-size:.74rem;font-weight:800;margin-bottom:5px}
-.cal-pill{font-size:.62rem;font-weight:700;padding:2px 5px;border-radius:var(--radius-sm);margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#fff}
+.cal-pill{font-size:.62rem;font-weight:700;padding:2px 6px;border-radius:var(--radius-sm);margin-bottom:3px;color:#fff;line-height:1.3;white-space:normal;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 
 /* kanban */
 .kanban{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
@@ -195,7 +195,7 @@ select.input-field{appearance:none;background-image:linear-gradient(45deg,transp
 .ob-card p{font-size:.88rem;color:var(--text-muted);font-weight:550;margin:0 0 20px;line-height:1.5}
 .ob-name-input,.ob-course-search{width:100%;padding:13px 16px;border-radius:var(--radius-md);border:1px solid var(--glass-border);background:var(--input-bg);color:var(--text-main);font-size:.95rem;font-weight:650;outline:none;font-family:inherit;margin-bottom:14px}
 .ob-name-input:focus,.ob-course-search:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow)}
-.ob-hint{font-size:.76rem;color:var(--text-dim);font-weight:600;margin-bottom:18px}
+.ob-hint{font-size:.76rem;color:var(--text-dim);font-weight:600;margin-bottom:18px;line-height:1.5;overflow-wrap:anywhere}
 .ob-level-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-bottom:20px}
 .ob-level-btn{padding:15px;border-radius:var(--radius-lg);border:1.5px solid var(--glass-border);background:var(--row-bg);color:var(--text-main);font-size:.88rem;font-weight:750;cursor:pointer;text-align:left;transition:all .2s ease;font-family:inherit}
 .ob-level-btn:hover{border-color:var(--accent);background:var(--row-hover)}
@@ -243,12 +243,12 @@ body.theme-dark .ai-panel,body.theme-obsidian .ai-panel,body.theme-nebula .ai-pa
   border-bottom:1px solid var(--glass-border);color:var(--text-main)}
 .ai-head::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:1.5px;
   background:linear-gradient(90deg,rgba(var(--ai-rgb),.55),rgba(var(--ai-rgb),.08) 70%,transparent)}
-.ai-status{font-size:.64rem;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--color-ai);display:inline-flex;align-items:center;gap:5px;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ai-status{font-size:.64rem;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--color-ai);display:inline-flex;align-items:center;gap:5px;max-width:100%;min-width:0;white-space:normal;overflow-wrap:anywhere;line-height:1.35}
 .ai-status::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--color-ai);animation:aiPulse 2.4s ease-in-out infinite}
 @keyframes aiPulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(var(--ai-rgb),.4)}50%{opacity:.6;box-shadow:0 0 0 4px rgba(var(--ai-rgb),0)}}
-.ai-msgs{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px}
+.ai-msgs{flex:1;overflow-y:auto;padding:18px 18px 20px;display:flex;flex-direction:column;gap:14px}
 /* Messages: user = indigo gradient; bot = clean elevated card with violet spine */
-.ai-msg{max-width:88%;padding:11px 15px;border-radius:var(--radius-lg);font-size:.85rem;line-height:1.6;font-weight:450;white-space:pre-wrap;word-break:break-word;animation:msgIn .3s var(--spring-soft) backwards}
+.ai-msg{max-width:88%;padding:12px 15px;border-radius:var(--radius-lg);font-size:.85rem;line-height:1.6;font-weight:450;white-space:pre-wrap;word-break:break-word;animation:msgIn .3s var(--spring-soft) backwards}
 @keyframes msgIn{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:none}}
 .ai-msg.user{align-self:flex-end;background:var(--accent-gradient);color:#fff;border-bottom-right-radius:5px;box-shadow:0 2px 8px var(--accent-glow)}
 .ai-msg.bot{align-self:flex-start;background:var(--surface);border:1px solid var(--glass-border);border-left:2.5px solid var(--color-ai);border-bottom-left-radius:5px;color:var(--text-main)}
@@ -271,9 +271,9 @@ body.theme-dark .ai-msg.bot,body.theme-obsidian .ai-msg.bot,body.theme-nebula .a
 .thinking-dots i{width:6px;height:6px;border-radius:50%;background:var(--color-ai);animation:think 1.2s ease-in-out infinite}
 .thinking-dots i:nth-child(2){animation-delay:.15s}.thinking-dots i:nth-child(3){animation-delay:.3s}
 @keyframes think{0%,60%,100%{opacity:.25;transform:translateY(0)}30%{opacity:1;transform:translateY(-3px)}}
-.ai-input-row{padding:12px 14px calc(12px + env(safe-area-inset-bottom));border-top:1px solid var(--glass-border);display:flex;gap:9px;background:var(--surface)}
-.ai-quick{display:flex;gap:6px;padding:4px 14px 12px;flex-wrap:wrap;background:var(--surface)}
-.ai-quick button{font-size:.7rem;font-weight:600;padding:6px 12px;border-radius:99px;background:transparent;border:1px solid var(--glass-border);color:var(--text-muted);cursor:pointer;font-family:inherit;transition:background .15s ease,color .15s ease,border-color .15s ease}
+.ai-input-row{padding:13px 16px calc(13px + env(safe-area-inset-bottom));border-top:1px solid var(--glass-border);display:flex;gap:10px;background:var(--surface)}
+.ai-quick{display:flex;gap:7px;padding:10px 16px 12px;flex-wrap:wrap;background:var(--surface);border-top:1px solid var(--glass-border)}
+.ai-quick button{font-size:.7rem;font-weight:600;padding:7px 13px;min-height:34px;border-radius:99px;background:transparent;border:1px solid var(--glass-border);color:var(--text-muted);cursor:pointer;font-family:inherit;transition:background .15s ease,color .15s ease,border-color .15s ease}
 .ai-quick button:hover{background:var(--color-ai-soft);color:var(--color-ai);border-color:rgba(var(--ai-rgb),.35)}
 body.theme-dark .ai-quick button:hover,body.theme-obsidian .ai-quick button:hover,body.theme-nebula .ai-quick button:hover{background:rgba(var(--ai-rgb),.14)}
 
@@ -1782,7 +1782,7 @@ body.mode-focused::before{animation:none;opacity:.4}
 .ok-text{color:var(--success-accent) !important}
 .intel-details{border-top:1px solid var(--glass-border);margin-top:10px;padding-top:12px}
 .intel-pace-row{display:flex;align-items:center;gap:9px;padding:5px 0;font-size:.82rem}
-.intel-pace-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.intel-pace-name{flex:1;min-width:0;font-weight:600;line-height:1.35;white-space:normal;overflow-wrap:anywhere}
 .intel-pace-val{font-size:.76rem;font-weight:650;color:var(--text-muted);flex-shrink:0}
 @media(max-width:640px){.intel-grid{grid-template-columns:1fr;gap:10px}}
 
@@ -1792,6 +1792,17 @@ body.mode-focused::before{animation:none;opacity:.4}
    sibling layout, letting Done/Skip overflow the card edge. Inside
    the modal, rows get a dedicated two-line layout with contained,
    wrapping actions. */
+/* The desktop glass sheen rule above sets overflow:hidden on every
+   glass panel. Restore the modal's scroll container after that rule;
+   without this, long lesson/task lists are clipped at the viewport edge. */
+.glass-panel.modal-box{
+  overflow-y:auto;
+  overflow-x:hidden;
+  overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+  scrollbar-gutter:stable;
+  touch-action:pan-y;
+}
 .modal-box .task-row{flex-wrap:wrap;row-gap:8px;overflow:hidden}
 .modal-box .task-main{flex:1 1 100%;min-width:0}
 .modal-box .task-row > .btn,.modal-box .task-row > .chip{flex:0 0 auto}
@@ -1852,7 +1863,7 @@ body.mode-focused::before{animation:none;opacity:.4}
 .voice-select:hover{border-color:rgba(var(--ai-rgb),.35);color:var(--text-main)}
 .voice-select:focus{border-color:var(--color-ai)}
 .voice-speed-select{max-width:62px;padding-left:6px;padding-right:6px}
-.voice-note{padding:6px 14px;font-size:.74rem;color:var(--color-ai);font-weight:650;background:var(--color-ai-soft)}
+.voice-note{margin:8px 12px 0;padding:7px 12px;font-size:.72rem;color:var(--color-ai);font-weight:650;background:var(--color-ai-soft);border:1px solid rgba(var(--ai-rgb),.22);border-radius:10px;line-height:1.45}
 .voice-replay{
   width:30px;height:30px;flex:0 0 30px;border-radius:10px;border:1px solid var(--glass-border);
   background:var(--surface);color:var(--text-muted);display:grid;place-items:center;cursor:pointer;
@@ -1862,7 +1873,7 @@ body.mode-focused::before{animation:none;opacity:.4}
 .voice-replay:active{transform:scale(.92)}
 .voice-replay.active{color:var(--color-ai);background:var(--color-ai-soft);border-color:rgba(var(--ai-rgb),.42)}
 .voice-replay:disabled{opacity:.42;cursor:not-allowed}
-.voice-err{padding:6px 14px;font-size:.74rem;color:var(--danger-accent);font-weight:600;background:var(--status-skipped-bg)}
+.voice-err{margin:8px 12px 0;padding:7px 12px;font-size:.72rem;color:var(--danger-accent);font-weight:600;background:var(--status-skipped-bg);border:1px solid rgba(224,82,82,.18);border-radius:10px;line-height:1.45}
 @media(max-width:640px){
   .voice-select{max-width:96px;font-size:.64rem;padding:0 8px}
   .voice-speed-select{max-width:56px;padding-left:4px;padding-right:4px}
@@ -2039,9 +2050,8 @@ html{scroll-behavior:smooth}
   .tracker-status{gap:8px}
   .tracker-status .pulse-dot{width:8px;height:8px}
   .tracker-state{font-size:.72rem;white-space:nowrap}
-  /* single line, ellipsis — the pill is tiny on phones, and the full
-     title is always available on the Focus/Planner pages */
-  .tracker-task{font-size:.6rem;-webkit-line-clamp:1}
+  /* two compact lines on phones — single-line clipped whole words */
+  .tracker-task{font-size:.62rem;-webkit-line-clamp:2}
   .tracker-time{font-size:.95rem}
   .tracker-actions{gap:5px;flex-wrap:nowrap}
   .tracker-actions .chip{display:none}
@@ -2133,7 +2143,7 @@ button,a,.nav-item,.vtab,.cal-cell,.chip,.task-row,.rate-btn,input,select{touch-
 .up-next:hover{border-color:var(--glass-border-hover);border-left-color:var(--accent)}
 .up-next-glow{position:absolute;inset:0;pointer-events:none;
   background:radial-gradient(60% 120% at 0% 50%,var(--accent-glow),transparent 60%);opacity:.5}
-.up-next-title{font-size:.95rem;font-weight:750;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.up-next-title{font-size:.95rem;font-weight:750;margin-top:3px;line-height:1.35;white-space:normal;overflow-wrap:anywhere}
 .up-next-sub{font-size:.72rem;color:var(--text-muted);margin-top:2px}
 .up-next-now{font-size:.6rem;font-weight:700;padding:2px 8px;border-radius:99px;
   background:var(--status-done-bg);color:var(--status-done-text);text-transform:none;letter-spacing:.2px;
@@ -2232,9 +2242,9 @@ button,a,.nav-item,.vtab,.cal-cell,.chip,.task-row,.rate-btn,input,select{touch-
 /* ── Voice: generous tap target + review hint strip ── */
 .voice-btn{width:44px;height:44px}
 .voice-hint{
-  padding:7px 14px;font-size:.74rem;font-weight:600;
+  margin:8px 12px 0;padding:7px 12px;font-size:.72rem;font-weight:600;
   color:var(--warning-accent);background:var(--status-pending-bg);
-  border-top:1px solid var(--glass-border);
+  border:1px solid rgba(229,154,36,.2);border-radius:10px;line-height:1.45;
 }
 .voice-hint + .ai-quick{border-top:none}
 @media(max-width:640px){
@@ -2408,7 +2418,7 @@ button,a,.nav-item,.vtab,.cal-cell,.chip,.task-row,.rate-btn,input,select{touch-
 @keyframes aiScrimIn{from{opacity:0}to{opacity:1}}
 .ai-avatar{width:36px!important;height:36px!important;min-width:36px;border-radius:12px!important}
 .ai-identity{flex:1;min-width:0}
-.ai-title{font-size:.91rem;font-weight:850;letter-spacing:-.2px;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ai-title{font-size:.91rem;font-weight:850;letter-spacing:-.2px;line-height:1.15;white-space:normal;overflow-wrap:anywhere}
 .ai-title span{font-weight:650;color:var(--text-muted)}
 .ai-close{
   width:38px;height:38px;flex:0 0 38px;border-radius:12px;border:1px solid var(--glass-border);
@@ -2438,7 +2448,7 @@ button,a,.nav-item,.vtab,.cal-cell,.chip,.task-row,.rate-btn,input,select{touch-
   background:var(--color-ai-soft);display:flex;align-items:center;gap:9px;color:var(--text-muted);
   font-size:.72rem;line-height:1.35;min-width:0;animation:voiceLiveIn .24s var(--spring-soft);
 }
-.voice-live>span:nth-child(2){flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.voice-live>span:nth-child(2){flex:1;min-width:0;white-space:normal;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.4}
 .voice-live strong{color:var(--color-ai)}
 .voice-live button{border:0;border-radius:9px;padding:6px 9px;background:var(--color-ai);color:#fff;font-family:inherit;font-size:.65rem;font-weight:700;cursor:pointer}
 .voice-wave{height:20px;display:flex;align-items:center;gap:2px;flex:0 0 auto}
@@ -2515,6 +2525,53 @@ button,a,.nav-item,.vtab,.cal-cell,.chip,.task-row,.rate-btn,input,select{touch-
 .ai-panel.is-preparing .ai-head::after{height:2px;background:linear-gradient(90deg,transparent,var(--color-ai),transparent);background-size:45% 100%;animation:aiThinkingSweep 1.1s ease-in-out infinite}
 @keyframes voicePrepareSpin{to{transform:rotate(360deg)}}
 @media(prefers-reduced-motion:reduce){.voice-btn.preparing svg,.ai-panel.is-preparing .ai-head::after{animation:none!important}}
+
+/* ═══ CHAT DECLUTTER — one identity strip, voice lives in a menu ═══ */
+.ai-head{padding:12px 14px;gap:10px}
+.ai-title span{display:none}
+.ai-head-actions{display:flex;align-items:center;gap:6px;margin-left:auto;flex-shrink:0}
+.ai-identity{min-width:0;flex:1}
+.ai-status{text-transform:none;letter-spacing:.2px;font-size:.68rem;font-weight:650}
+.voice-menu-wrap{position:relative}
+.voice-menu-btn{
+  width:30px;height:30px;border-radius:10px;border:1px solid var(--glass-border);
+  background:var(--surface);color:var(--text-muted);display:grid;place-items:center;cursor:pointer;
+}
+.voice-menu-btn:hover,.voice-menu-btn.open{color:var(--color-ai);border-color:rgba(var(--ai-rgb),.4);background:var(--color-ai-soft)}
+.voice-menu{
+  position:absolute;top:calc(100% + 8px);right:0;z-index:5;width:220px;padding:10px;
+  background:var(--surface-elevated);border:1px solid var(--glass-border);border-radius:14px;
+  box-shadow:0 12px 40px rgba(10,12,26,.18);
+}
+.voice-menu-label{font-size:.62rem;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--text-dim);padding:6px 6px 4px}
+.voice-menu-item{
+  width:100%;display:flex;flex-direction:column;align-items:flex-start;gap:1px;padding:8px 10px;margin-bottom:4px;
+  border:1px solid transparent;border-radius:10px;background:transparent;color:var(--text-main);
+  font-family:inherit;cursor:pointer;text-align:left;
+}
+.voice-menu-item span{font-size:.82rem;font-weight:750}
+.voice-menu-item small{font-size:.68rem;color:var(--text-muted);font-weight:550}
+.voice-menu-item.selected{background:var(--color-ai-soft);border-color:rgba(var(--ai-rgb),.28);color:var(--color-ai)}
+.voice-speed-row{display:flex;gap:6px;padding:4px 4px 6px}
+.voice-speed-chip{
+  flex:1;height:30px;border-radius:9px;border:1px solid var(--glass-border);background:var(--surface);
+  color:var(--text-muted);font-size:.68rem;font-weight:750;font-family:inherit;cursor:pointer;
+}
+.voice-speed-chip.selected{background:var(--color-ai);color:#fff;border-color:transparent}
+.ai-quick{padding:8px 12px 10px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+.ai-quick::-webkit-scrollbar{display:none}
+.ai-quick-label{display:none}
+.ai-panel.has-thread .ai-quick{display:none}
+.companion-hello{padding:28px 18px 18px}
+.companion-hint{display:none}
+.thinking-label{display:none}
+@media(max-width:640px){
+  .ai-head{padding:8px 12px 10px;gap:8px}
+  .voice-replay,.voice-menu-btn,.ai-close{width:36px;height:36px;flex-basis:36px;border-radius:11px}
+  .voice-menu{width:min(230px,calc(100vw - 28px))}
+  .ai-status{font-size:.62rem}
+  .voice-live{margin:6px 10px 0;padding:8px 10px}
+}
 
 
 /* ═══════════════════════════════════════════════════════════════
@@ -2593,4 +2650,95 @@ button,a,.nav-item,.vtab,.cal-cell,.chip,.task-row,.rate-btn,input,select{touch-
 @media(max-width:640px){
   .task-row > .btn.task-clock{min-height:32px}
   .task-row > .btn.task-clock.clock-live{font-weight:800}
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   BUILD v6 — CALM CHAT · NO DESKTOP ELLIPSIS · KEYLESS NEURAL VOICE
+   ───────────────────────────────────────────────────────────────
+   1) Chat panel: breathing room + clear hierarchy. The thread is
+      the hero; status/notice banners are quiet and contained; the
+      quick-reply rail is a grouped strip between thread and input.
+   2) Multi-word labels NEVER clip on desktop — wrapping replaces
+      single-line ellipsis everywhere there is room for it.
+   3) Mobile: comfortable 40px targets, single-column rhythm, safe
+      edges. (Voice is now keyless Edge neural — Ava/Emma/Andrew —
+      same person in every language; see src/lib/edgeTts.ts.)
+═══════════════════════════════════════════════════════════════ */
+
+/* ── Chat header: calmer, roomier identity strip ── */
+.ai-head{padding:14px 16px 13px;gap:10px}
+.ai-head-actions{gap:7px}
+.voice-menu-btn{width:34px;height:34px;border-radius:11px}
+.voice-replay{width:36px;height:36px;flex-basis:36px;border-radius:11px}
+.ai-close{width:36px;height:36px;flex-basis:36px;border-radius:11px}
+
+/* ── Thread stays the focal point ── */
+.ai-msgs{scroll-padding-bottom:18px}
+.ai-message-row{gap:8px}
+.ai-msg.bot{
+  background:color-mix(in srgb,var(--surface) 88%,rgba(var(--ai-rgb),.03));
+}
+
+/* ── Quick replies: one grouped, divided rail — never blends into
+      the thread; full labels scroll horizontally without clipping ── */
+.ai-quick{
+  flex:0 0 auto;display:flex;flex-wrap:nowrap;gap:7px;
+  padding:10px 16px 12px;overflow-x:auto;overflow-y:hidden;
+  scrollbar-width:none;scroll-snap-type:x proximity;
+  border-top:1px solid var(--glass-border);background:var(--surface);
+}
+.ai-quick::-webkit-scrollbar{display:none}
+.ai-quick button{
+  flex:0 0 auto;scroll-snap-align:start;white-space:nowrap;
+  min-height:36px;padding:8px 14px;font-size:.71rem;
+  background:var(--surface);box-shadow:0 1px 2px rgba(10,12,26,.04);
+}
+.voice-hint + .ai-quick,
+.voice-note + .ai-quick,
+.voice-err + .ai-quick{border-top:1px solid var(--glass-border)}
+
+/* ── Voice menu footer note (keyless promise, one speaker) ── */
+.voice-menu-foot{
+  margin-top:6px;padding:7px 8px 3px;border-top:1px solid var(--glass-border);
+  font-size:.62rem;font-weight:600;color:var(--text-dim);line-height:1.45;
+}
+.voice-menu{width:min(244px,calc(100vw - 28px))}
+
+/* ── Onboarding step 1: engine status aligned with the input ──
+      The dot + text row shares the input's left edge and spacing,
+      wraps cleanly, and stays subordinate to the heading/input. */
+.ob-engine-hint{
+  display:flex;align-items:center;gap:9px;
+  margin:-2px 0 18px;padding:0 1px;
+  font-size:.76rem;font-weight:600;color:var(--text-dim);
+  line-height:1.5;overflow-wrap:anywhere;
+}
+.ob-engine-hint::before{
+  content:"";width:7px;height:7px;flex:0 0 7px;border-radius:50%;
+  background:var(--success-accent);box-shadow:0 0 0 3px rgba(22,163,122,.16);
+}
+
+/* ── Live voice strip: roomier Done button ── */
+.voice-live button{min-height:34px;padding:7px 12px}
+
+/* ══ Mobile (≤640px): the calm, uncluttered version ══ */
+@media(max-width:640px){
+  .ai-head{padding:10px 12px 12px;gap:8px}
+  .voice-replay,.voice-menu-btn,.ai-close{width:40px;height:40px;flex-basis:40px;border-radius:12px}
+  /* status may wrap — never a mid-word clip on small screens */
+  .ai-status{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere}
+  .ai-title{overflow-wrap:anywhere}
+  .ai-msgs{padding:16px 14px 22px;gap:14px}
+  .ai-message-row{gap:7px}
+  .ai-quick{padding:9px 12px 11px;gap:7px}
+  .ai-quick button{min-height:38px;padding:8px 13px}
+  .voice-live{margin:8px 10px 0}
+  .voice-live button{min-height:36px}
+  .voice-note,.voice-err,.voice-hint{margin:8px 10px 0}
+  .voice-menu{width:min(244px,calc(100vw - 24px))}
+  .ob-card{padding:26px 20px}
+}
+@media(max-width:355px){
+  .voice-replay,.voice-menu-btn,.ai-close{width:38px;height:38px;flex-basis:38px}
 }

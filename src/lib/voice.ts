@@ -442,9 +442,12 @@ export async function speak(
   }
 
   const personaId = resolveVoiceId(voiceId);
+  // Voice identity is a product guarantee. We never switch to a browser/device
+  // speaker because it happens to support a different locale; if Ava cannot be
+  // reached, leave the answer readable and allow a clean retry instead.
   if (options.forceNative) {
-    if (await speakNative(text, personaId, generation, start, finish, playbackRate)) return;
-    fail("Speech is not available in this browser. You can still read the answer here.");
+    const label = VOICE_OPTIONS.find((voice) => voice.id === personaId)?.label || "selected voice";
+    fail(`${label} is unavailable. Your reply is still available as text; tap play to retry the selected voice.`);
     return;
   }
 
@@ -499,14 +502,10 @@ export async function speak(
     if (speechAbort?.signal.aborted || generation === speechGeneration) speechAbort = null;
   }
 
-  // Last resort only: same pinned persona, never a language-swapped speaker.
-  if (generation === speechGeneration
-    && await speakNative(text, personaId, generation, start, finish, playbackRate)) {
-    callbacks.onFallback?.(`${VOICE_OPTIONS.find((v) => v.id === personaId)?.label || "Ava"} is still speaking — the neural voice is reconnecting.`);
-    return;
-  }
-
-  fail(`${errorMessage} The answer remains available as text.`);
+  // Do not use browser speechSynthesis as an automatic fallback. Browsers can
+  // replace Ava with a locale-specific system speaker without notice, which
+  // breaks identity consistency mid-answer.
+  fail(`${errorMessage} The answer remains available as text. Tap play to retry the selected voice.`);
 }
 
 export function stopSpeaking(): void {
@@ -744,10 +743,9 @@ export async function speakLong(
   let startedOnce = false;
   let completed = 0;
   const personaId = resolveVoiceId(voiceId);
-  // Stay on the neural persona. Native is only used after two cloud misses
-  // in a row so a single timeout cannot swap Ava for the device speaker.
-  let cloudMisses = 0;
-  let continueLocally = false;
+  // Every chunk must use the selected neural persona. We never downgrade a
+  // later chunk to a device voice, because that is an audible persona switch.
+  const continueLocally = false;
   const start = () => {
     if (startedOnce || !isCurrent()) return;
     startedOnce = true;
@@ -774,13 +772,8 @@ export async function speakLong(
     await new Promise<void>((resolve) => {
       void speak(current.text, personaId, {
         onStart: start,
-        onFallback: (message) => {
-          cloudMisses++;
-          if (cloudMisses >= 2) continueLocally = true;
-          callbacks.onFallback?.(message);
-        },
+        onFallback: (message) => callbacks.onFallback?.(message),
         onEnd: () => {
-          cloudMisses = 0;
           if (settled) return;
           settled = true;
           resolve();
