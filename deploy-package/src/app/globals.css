@@ -3144,3 +3144,563 @@ svg{flex-shrink:0;vertical-align:middle}
   .mobile-header{padding-left:max(12px,env(safe-area-inset-left));padding-right:max(12px,env(safe-area-inset-right))}
   .sidebar{left:max(10px,env(safe-area-inset-left));right:max(10px,env(safe-area-inset-right))}
 }
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   v11 — PREMIUM RESPONSIVE SYSTEM
+   Appended last, so it wins the cascade over every section above.
+
+   Nothing above is deleted: every existing custom-property name and every
+   DOM class is preserved. This layer only re-times, re-scales and
+   re-materials what is already there.
+
+     0  Motion primitives — weighted physics, overshoot removed
+     1  Fluid type + fluid spacing via clamp()
+     2  Deep glassmorphism (.glass-panel / .cmdk) + sub-pixel inset hairlines
+     3  Luminous accents — OLED canvas, calibrated accent emission
+     4  App-like mobile dock — safe-area aware, thumb-reachable
+     5  44px touch-target floor + hit-area expansion
+     6  Pointer vs touch — hover can never stick; :active is king
+     7  Device calibration — Galaxy S24 · V15-class laptop · high-DPI desktop
+     8  Install readiness — display-mode: standalone
+═══════════════════════════════════════════════════════════════════════ */
+
+
+/* ──────────────────────────────────────────────────────────────────────
+   0 · MOTION PRIMITIVES
+   Redefining --spring / --spring-soft here re-times EVERY rule above that
+   already references them — no selector rewrites, no duplication.
+   The previous --spring was cubic-bezier(.32,1.25,.6,1): that 1.25 control
+   point is a 25% overshoot, which is exactly the "cheap bounce" to avoid.
+   Expo-out curves decelerate hard and land dead on the value.
+────────────────────────────────────────────────────────────────────── */
+:root{
+  --spring:cubic-bezier(.22,1,.36,1);        /* primary settle — zero overshoot */
+  --spring-soft:cubic-bezier(.16,1,.3,1);    /* long glide: panels & cascades   */
+  --spring-press:cubic-bezier(.4,0,.2,1);    /* press/release: in fast, out soft */
+  --spring-enter:cubic-bezier(.32,.72,0,1);  /* entries: gentle in, fast out     */
+
+  /* One shared press-depth vocabulary */
+  --press-sm:.97;
+  --press-md:.96;
+  --press-lg:.94;
+
+  /* Ergonomics + chrome metrics */
+  --tap:44px;                                                   /* Apple HIG / Material floor */
+  --header-h:calc(56px + env(safe-area-inset-top));
+  --dock-h:calc(70px + max(10px,env(safe-area-inset-bottom)));
+}
+
+/* The old .btn{transition-timing-function:cubic-bezier(.3,1.4,.5,1)} was the
+   single biggest source of rubber-banding anywhere in the system. Every
+   interactive element now shares one damped curve. */
+.btn,.ob-btn,.vtab,.nav-item,.rate-btn,.ai-quick button,.cmdk-item,
+.ob-level-btn,.ob-choice-btn,.ob-range-chip,.voice-btn,.voice-replay,
+.ai-close,.ai-copy,.toast-close,.sb-toggle,.cal-cell,.ai-send,.task-more,
+.ai-fab,.more-options-toggle{
+  transition-timing-function:var(--spring-press);
+}
+
+/* Press: scale(.96) on the way IN at 60ms (snappy), release eases back out
+   on the element's own duration (weighted). Two-speed = physical. */
+.btn:active{transform:scale(var(--press-md));transition-duration:.06s}
+.btn-primary:active{
+  transform:scale(var(--press-md));transition-duration:.06s;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.18),
+             0 0 0 1px color-mix(in srgb,var(--accent) 30%,transparent),
+             0 2px 12px -3px color-mix(in srgb,var(--accent) 50%,transparent);
+}
+.ob-btn:active{transform:scale(var(--press-md))}
+.vtab:active,.rate-btn:active,.ai-quick button:active{transform:scale(var(--press-lg))}
+.nav-item:active,.cmdk-item:active,.ob-level-btn:active,.ob-choice-btn:active,
+.ai-send:active{transform:scale(var(--press-md))}
+.voice-btn:active,.voice-replay:active,.ai-close:active,.toast-close:active,
+.sb-toggle:active{transform:scale(var(--press-lg))}
+.task-row:active{transform:scale(.992);background:var(--row-hover)}
+.kpi-card:active{transform:scale(var(--press-sm))}
+
+/* Entrances settle instead of flying: shorter travel, stagger untouched.
+   Re-declaring a @keyframes name replaces the earlier definition wholesale. */
+@keyframes pageIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+@keyframes rowIn{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+@keyframes panelIn{from{opacity:.001;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+
+/* ──────────────────────────────────────────────────────────────────────
+   1 · FLUID TYPE + FLUID SPACE
+   Continuous ramps, so nothing jumps at a breakpoint. Format is
+   clamp(phone-floor, preferred, desktop-ceiling); the preferred term is a
+   rem base + a vw slope, which keeps the ramp legible at 320px and 4K.
+────────────────────────────────────────────────────────────────────── */
+:root{
+  --fs-micro:clamp(.6rem,.575rem + .12vw,.68rem);
+  --fs-chip:clamp(.63rem,.6rem + .14vw,.72rem);
+  --fs-xs:clamp(.7rem,.67rem + .17vw,.8rem);
+  --fs-sm:clamp(.8rem,.76rem + .2vw,.9rem);
+  --fs-md:clamp(.9rem,.85rem + .25vw,1.02rem);
+  --fs-lg:clamp(1.02rem,.95rem + .34vw,1.22rem);
+  --fs-h1:clamp(1.32rem,1rem + 1.55vw,2.25rem);
+  --fs-kpi:clamp(1.5rem,1.25rem + 1.1vw,2.3rem);
+  --fs-timer:clamp(2.1rem,1.55rem + 2.5vw,3.1rem);
+
+  --sp-1:clamp(4px,.35vw + 3px,7px);
+  --sp-2:clamp(8px,.7vw + 5px,13px);
+  --sp-3:clamp(12px,1vw + 7px,19px);
+  --sp-4:clamp(13px,1.3vw + 8px,26px);
+  --sp-5:clamp(18px,1.7vw + 10px,34px);
+  --pad-shell:clamp(12px,2.2vw,26px);
+  --gap-grid:clamp(10px,.9vw + 5px,18px);
+}
+
+.page-title{font-size:var(--fs-h1);letter-spacing:-.032em}
+.page-subtitle{font-size:var(--fs-sm)}
+.lbl{font-size:var(--fs-micro)}
+.kpi-label{font-size:var(--fs-micro);letter-spacing:.09em}
+.kpi-value{font-size:var(--fs-kpi)}
+.kpi-sub{font-size:var(--fs-chip)}
+.day-date{font-size:var(--fs-md);font-weight:750}
+.day-meta{font-size:var(--fs-chip)}
+.task-title{font-size:var(--fs-sm);font-weight:700;line-height:1.34}
+.task-sub{font-size:var(--fs-xs)}
+/* 44px floor for the default button ONLY. A bare ".btn{min-height:44px}"
+   here would out-rank .btn-sm/.btn-xs (equal specificity, later in source)
+   and silently inflate every compact button on desktop. */
+.btn{font-size:var(--fs-sm)}
+.btn:not(.btn-sm):not(.btn-xs){min-height:44px}
+.btn-sm,.btn-xs{font-size:var(--fs-xs)}
+.chip{font-size:var(--fs-chip)}
+.tracker-time{font-size:clamp(1.02rem,.92rem + .5vw,1.3rem)}
+.tracker-state{font-size:var(--fs-xs)}
+.tracker-task{font-size:var(--fs-chip)}
+#t-digits{font-size:var(--fs-timer)}
+#t-label{font-size:var(--fs-micro)}
+.ob-card h1{font-size:var(--fs-lg)}
+.ob-card p{font-size:var(--fs-sm)}
+.empty-state-title{font-size:var(--fs-md)}
+.empty-state-sub{font-size:var(--fs-sm)}
+.intel-value{font-size:var(--fs-sm)}
+
+/* Spacing rhythm — one scale, applied consistently */
+.kpi-card,.dash-card{padding:var(--sp-4)}
+.day-block{padding:var(--sp-3);margin-bottom:var(--sp-2)}
+.kpi-grid,.dash-grid-2,.focus-grid-2,.kanban{gap:var(--gap-grid)}
+.kpi-grid{margin-bottom:var(--sp-3)}
+.dash-grid-2{margin-bottom:var(--sp-3)}
+.modal-box{padding:var(--sp-5)}
+/* On phones the modal is a bottom sheet: the fluid padding must not drop
+   the safe-area inset the earlier sheet rules supplied. */
+@media(max-width:640px){
+  .modal-box{padding:var(--sp-3) var(--sp-3) calc(var(--sp-3) + env(safe-area-inset-bottom))}
+}
+
+/* Desktop shell breathes with the viewport; the phone shell is handled
+   in §4 because it has to clear two fixed bars. */
+@media(min-width:861px){
+  .app-wrapper{gap:var(--gap-grid);padding:var(--pad-shell)}
+  .main-workspace{padding-bottom:clamp(48px,6vh,96px)}
+}
+
+
+/* ──────────────────────────────────────────────────────────────────────
+   2 · DEEP GLASSMORPHISM
+   Three things make glass read as glass rather than as a flat fill:
+   (a) a multi-stop translucent tint, (b) real backdrop refraction,
+   (c) sub-pixel INSET hairlines — a bright top edge and a dim bottom edge.
+   Static surfaces stay legible because the tint never drops below ~76%.
+────────────────────────────────────────────────────────────────────── */
+:root{
+  --glass-blur:blur(26px) saturate(180%);
+  --glass-tint-a:color-mix(in srgb,var(--surface) 88%,transparent);
+  --glass-tint-b:color-mix(in srgb,var(--surface) 76%,transparent);
+  --glass-edge-top:inset 0 1px 0 var(--lg-rim);
+  --glass-edge-bot:inset 0 -1px 0 var(--lg-rim-faint);
+  --glass-edge-side:inset 1px 0 0 var(--lg-rim-faint),inset -1px 0 0 var(--lg-rim-faint);
+  --glass-depth:0 1px 2px rgba(16,16,26,.04),
+                0 8px 20px -10px rgba(16,16,26,.10),
+                0 30px 60px -30px rgba(16,16,26,.16);
+}
+body.theme-dark,body.theme-obsidian,body.theme-nebula{
+  --glass-tint-a:color-mix(in srgb,var(--surface) 84%,transparent);
+  --glass-tint-b:color-mix(in srgb,var(--surface) 66%,transparent);
+  --glass-depth:0 1px 2px rgba(0,0,0,.5),
+                0 10px 26px -12px rgba(0,0,0,.62),
+                0 34px 70px -34px rgba(0,0,0,.72);
+}
+
+/* .ai-panel is excluded: it carries its own gradient-border identity and
+   must not be re-tinted by the shared panel material. */
+.glass-panel:not(.ai-panel){
+  border-color:color-mix(in srgb,var(--glass-border) 78%,transparent);
+  box-shadow:var(--glass-edge-top),var(--glass-edge-bot),var(--glass-edge-side),var(--glass-depth);
+}
+@supports ((backdrop-filter:blur(2px)) or (-webkit-backdrop-filter:blur(2px))){
+  .glass-panel:not(.ai-panel){
+    background:linear-gradient(168deg,var(--glass-tint-a) 0%,var(--glass-tint-b) 100%);
+    -webkit-backdrop-filter:var(--glass-blur);
+    backdrop-filter:var(--glass-blur);
+  }
+}
+@supports not ((backdrop-filter:blur(2px)) or (-webkit-backdrop-filter:blur(2px))){
+  .glass-panel:not(.ai-panel){background:var(--surface)}
+}
+
+/* Command palette: the most translucent surface in the app, because it
+   always floats over a dimmed scrim. */
+.cmdk{
+  border:1px solid color-mix(in srgb,var(--glass-border) 72%,transparent);
+  border-radius:20px;
+  background:linear-gradient(180deg,
+              color-mix(in srgb,var(--surface-solid) 84%,transparent) 0%,
+              color-mix(in srgb,var(--surface-solid) 70%,transparent) 100%);
+  -webkit-backdrop-filter:blur(38px) saturate(190%);
+  backdrop-filter:blur(38px) saturate(190%);
+  box-shadow:
+    inset 0 1px 0 var(--lg-rim),
+    inset 0 -1px 0 var(--lg-rim-faint),
+    0 2px 6px rgba(8,8,18,.10),
+    0 24px 60px -20px rgba(8,8,18,.34),
+    0 60px 120px -40px rgba(8,8,18,.30);
+}
+body.theme-dark .cmdk,body.theme-obsidian .cmdk,body.theme-nebula .cmdk{
+  background:linear-gradient(180deg,
+              color-mix(in srgb,var(--surface-elevated) 82%,transparent),
+              color-mix(in srgb,var(--surface-elevated) 64%,transparent));
+  border-color:color-mix(in srgb,var(--glass-border-hover) 70%,transparent);
+}
+
+/* Cost control: 26px of blur on a dozen stacked panels is wasted battery
+   on a phone. 14px is visually indistinguishable at that scale. */
+@media (hover:none) and (pointer:coarse), (max-width:820px){
+  :root{--glass-blur:blur(14px) saturate(165%)}
+  .cmdk{-webkit-backdrop-filter:blur(20px) saturate(175%);backdrop-filter:blur(20px) saturate(175%)}
+}
+/* Honour the OS-level "reduce transparency" switch */
+@media (prefers-reduced-transparency: reduce){
+  .glass-panel:not(.ai-panel),.cmdk,.vtabs,.sidebar{
+    background:var(--surface-solid);
+    -webkit-backdrop-filter:none;backdrop-filter:none;
+  }
+}
+
+
+/* ──────────────────────────────────────────────────────────────────────
+   3 · LUMINOUS ACCENTS
+   Dark canvases go to true OLED black (pixels off, not dark grey), and the
+   accent gets a measured emission: one contact ring + one soft bloom.
+   Nothing blooms past ~26px, which is where "glow" turns into "smudge".
+────────────────────────────────────────────────────────────────────── */
+body.theme-dark{--app-bg:#050506}
+body.theme-obsidian{--app-bg:#070A12}
+body.theme-nebula{--app-bg:#0A0616}
+
+:root{
+  --glow-accent:0 0 0 1px color-mix(in srgb,var(--accent) 24%,transparent),
+                0 2px 10px -3px color-mix(in srgb,var(--accent) 30%,transparent);
+  --glow-ai:0 0 22px -8px rgba(var(--ai-rgb),.42);
+}
+body.theme-dark,body.theme-obsidian,body.theme-nebula{
+  --glow-accent:0 0 0 1px color-mix(in srgb,var(--accent) 34%,transparent),
+                0 0 26px -6px color-mix(in srgb,var(--accent) 58%,transparent);
+  --glow-ai:0 0 30px -6px rgba(var(--ai-rgb),.58);
+  /* Lift the canvas gradient off pure black so the accent has room to glow */
+  --bg-gradient:radial-gradient(1100px 520px at 50% -14%,
+                color-mix(in srgb,var(--accent) 10%,transparent),transparent 66%);
+}
+
+/* Primary CTA emits in dark themes; it only rests in light ones. */
+body.theme-dark .btn-primary,body.theme-obsidian .btn-primary,body.theme-nebula .btn-primary{
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.16),
+             0 0 0 1px color-mix(in srgb,var(--accent) 28%,transparent),
+             0 6px 26px -8px color-mix(in srgb,var(--accent) 55%,transparent);
+}
+body.theme-dark .btn-primary:hover,body.theme-obsidian .btn-primary:hover,
+body.theme-nebula .btn-primary:hover{
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.2),
+             0 0 0 1px color-mix(in srgb,var(--accent) 36%,transparent),
+             0 8px 30px -8px color-mix(in srgb,var(--accent) 65%,transparent);
+}
+/* Active nav in the desktop rail: lit, not merely filled */
+body.theme-dark .nav-item.active,body.theme-obsidian .nav-item.active,
+body.theme-nebula .nav-item.active{
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.12),
+             0 4px 18px -8px color-mix(in srgb,var(--accent) 55%,transparent);
+}
+/* Focus ring is accent-tinted rather than a flat outline */
+:focus-visible{outline-color:color-mix(in srgb,var(--accent) 88%,transparent)}
+/* Live session keeps its green identity but gains depth */
+body.theme-dark .pulse-dot.live,body.theme-obsidian .pulse-dot.live,body.theme-nebula .pulse-dot.live{
+  box-shadow:0 0 0 3px rgba(34,197,94,.14),0 0 14px -2px rgba(34,197,94,.5);
+}
+
+
+/* ──────────────────────────────────────────────────────────────────────
+   4 · APP-LIKE MOBILE DOCK
+   The sidebar becomes a floating capsule pinned above the gesture bar.
+   It respects every safe-area edge, sits inside the natural thumb arc,
+   and the workspace reserves exactly its height — never more, never less.
+────────────────────────────────────────────────────────────────────── */
+@media(max-width:860px){
+  .sidebar{
+    position:fixed;top:auto;
+    bottom:max(10px,env(safe-area-inset-bottom));
+    left:max(10px,env(safe-area-inset-left));
+    right:max(10px,env(safe-area-inset-right));
+    width:auto;height:auto;
+    padding:7px;border-radius:24px;
+    background:color-mix(in srgb,var(--surface-elevated) 80%,transparent);
+    -webkit-backdrop-filter:blur(28px) saturate(185%);
+    backdrop-filter:blur(28px) saturate(185%);
+    border:1px solid color-mix(in srgb,var(--glass-border) 80%,transparent);
+    box-shadow:
+      inset 0 1px 0 var(--lg-rim),
+      inset 0 -1px 0 var(--lg-rim-faint),
+      0 -2px 12px rgba(10,12,26,.06),
+      0 20px 44px -20px rgba(10,12,26,.34);
+    z-index:100;
+  }
+  .nav-list{gap:2px}
+  /* 56px per destination: comfortably past the 44px floor, still one row */
+  .nav-item{
+    min-height:56px;border-radius:18px;gap:4px;padding:6px 4px;
+    -webkit-user-select:none;user-select:none;
+  }
+  .nav-item.active{
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.22),
+               0 4px 16px -6px color-mix(in srgb,var(--accent) 55%,transparent);
+  }
+  .mobile-header{height:var(--header-h);padding-top:env(safe-area-inset-top)}
+  /* Chrome clearance = header + dock, derived from the same tokens the
+     bars themselves use, so the two can never drift apart. */
+  .main-workspace{
+    padding-top:calc(var(--header-h) + 8px);
+    padding-bottom:calc(var(--dock-h) + 26px);
+  }
+  .app-wrapper{padding:0 var(--pad-shell) calc(var(--dock-h) + 24px);gap:0}
+  .tracker-bar{top:calc(var(--header-h) + 6px)}
+  .ai-fab{bottom:calc(var(--dock-h) + 14px)}
+  .toast{bottom:calc(var(--dock-h) + 14px)}
+}
+@media(max-width:640px){.tracker-bar{top:calc(var(--header-h) + 4px)}}
+
+
+/* ──────────────────────────────────────────────────────────────────────
+   5 · TOUCH TARGETS — 44×44 FLOOR
+   Two mechanisms, chosen deliberately:
+     (a) REAL height, for anything that is a primary control. Visual size
+         and hit area are the same thing.
+     (b) HIT-AREA EXPANSION, for compact secondary glyphs (close, copy,
+         replay) where growing the visible element would wreck its layout.
+         The glyph stays small; an invisible 44×44 box catches the tap.
+         Only valid on elements that do not clip their own overflow.
+
+   Status chips are <span> labels in this app, not controls, so they are
+   exempt — a 44px floor on a non-interactive label would add 22px of dead
+   space to every task row. Any chip that IS made interactive inherits
+   the full target automatically via the rule at the end of this block.
+────────────────────────────────────────────────────────────────────── */
+@media (hover:none) and (pointer:coarse){
+  .btn,.btn-sm,.btn-xs,.ob-btn,.rate-btn,.vtab,.ai-quick button,
+  .ob-range-chip,.cmdk-item,.ob-level-btn,.ob-choice-btn,
+  .task-row > .btn,.ob-course-item{min-height:var(--tap)}
+  /* .nav-item is deliberately NOT in the list above: §4 already gives the
+     phone dock a roomier 56px target, and a 44px rule written later would
+     quietly shrink it. The floor is only needed on the desktop rail. */
+  @media (min-width:861px){.nav-item{min-height:var(--tap)}}
+
+  /* Icon-only controls become true squares */
+  .voice-btn,.voice-replay,.ai-close,.ai-send,.sb-toggle,
+  .tracker-actions .btn-xs:last-child{
+    min-width:var(--tap);min-height:var(--tap);
+  }
+  .tracker-actions .btn-xs:last-child{width:var(--tap);flex-basis:var(--tap);aspect-ratio:1/1}
+
+  /* (b) hit-area expansion — no overflow:hidden on any of these */
+  .toast-close,.ai-copy,.voice-replay,.more-options-toggle,.ob-cancel-link{position:relative}
+  .toast-close::after,.ai-copy::after,.voice-replay::after,
+  .more-options-toggle::after,.ob-cancel-link::after{
+    content:"";position:absolute;top:50%;left:50%;
+    width:max(100%,var(--tap));height:max(100%,var(--tap));
+    transform:translate(-50%,-50%);
+  }
+
+  /* A chip that is ever made clickable gets the full floor for free */
+  button.chip,.chip[role="button"],.chip[tabindex]{
+    min-height:var(--tap);padding-left:14px;padding-right:14px;
+  }
+
+  /* Calendar cells are the whole tap target already; give them a floor too */
+  .cal-cell{min-height:max(48px,var(--tap))}
+}
+
+
+/* ──────────────────────────────────────────────────────────────────────
+   6 · POINTER vs TOUCH
+   A tapped :hover sticks on touch devices — the element stays lit after
+   the finger lifts, which is the classic "clunky website" tell. Every
+   unguarded hover rule above is returned to rest here, and the :active
+   states from §0 become the only feedback a finger ever sees.
+────────────────────────────────────────────────────────────────────── */
+@media (hover:none){
+  .btn:hover,.btn-primary:hover,.btn-secondary:hover,.btn-danger:hover,
+  .nav-item:hover,.task-row:hover,.kpi-card:hover,.cal-cell:hover,
+  .ob-level-btn:hover,.ob-choice-btn:hover,.ob-course-item:hover,.ob-feature:hover,
+  .ai-quick button:hover,.rate-btn:hover,.day-block:hover,.tilt-card:hover,
+  .glass-panel:hover,.streak-badge:hover,.voice-btn:hover,.voice-replay:hover,
+  .ai-close:hover,.toast-close:hover,.sb-toggle:hover,.ob-range-chip:hover,
+  .heat-cell:hover,.up-next:hover,.cmdk-item:hover,.tracker-bar:hover,
+  .ob-btn-primary:hover,.ob-btn-secondary:hover,.ai-fab:hover,
+  .input-field:hover:not(:focus){
+    transform:none;filter:none;
+  }
+
+  /* Backgrounds / colours back to rest */
+  .nav-item:hover{background:transparent;color:var(--text-muted)}
+  .nav-item.active:hover{background:var(--nav-active-bg);color:var(--nav-active-text)}
+  .nav-item:hover svg{transform:none}
+  .task-row:hover{background:var(--row-bg);border-color:transparent}
+  .task-row:hover .task-title{color:inherit}
+  .cal-cell:hover{border-color:transparent;background:var(--row-bg);box-shadow:none;z-index:auto}
+  .cal-cell.today:hover{border-color:var(--accent)}
+  .cal-cell:hover .cal-pill{transform:none}
+  .kpi-card:hover,.day-block:hover{
+    border-color:color-mix(in srgb,var(--glass-border) 78%,transparent);
+    box-shadow:var(--glass-edge-top),var(--glass-edge-bot),var(--glass-edge-side),var(--glass-depth);
+  }
+  .glass-panel:hover{border-color:color-mix(in srgb,var(--glass-border) 78%,transparent)}
+  .tracker-bar:hover{border-color:var(--glass-border)}
+  .btn-secondary:hover{background:var(--surface-solid);border-color:var(--glass-border-hover)}
+  .btn-danger:hover{box-shadow:inset 0 1px 0 rgba(255,255,255,.25)}
+  .btn-primary:hover{background-position:50% 0}
+  .ob-level-btn:hover{
+    border-color:var(--glass-border);
+    background:linear-gradient(180deg,var(--surface) 0%,var(--row-bg) 100%);
+  }
+  .ob-level-btn.selected:hover{border-color:var(--accent);background:var(--surface-solid)}
+  .ob-choice-btn:hover{border-color:var(--glass-border);background:var(--surface-solid)}
+  .ob-choice-btn.selected:hover{border-color:var(--accent)}
+  .ob-course-item:hover{border-color:transparent;background:var(--surface-solid)}
+  .ob-course-item.selected:hover{border-color:var(--accent)}
+  .ob-feature:hover{border-color:var(--glass-border);box-shadow:none}
+  .ob-range-chip:hover{border-color:var(--glass-border);background:var(--surface-solid);color:var(--text-muted)}
+  .ob-range-chip.active:hover{background:var(--accent-gradient);color:#fff;border-color:transparent}
+  .ob-btn-secondary:hover{background:var(--surface-solid)}
+  .ai-quick button:hover{background:var(--surface);color:var(--text-muted);border-color:var(--glass-border)}
+  .rate-btn:hover,.rate-again:hover,.rate-hard:hover,.rate-good:hover,.rate-easy:hover{
+    background:var(--row-bg);color:var(--text-main);
+  }
+  .heat-cell:hover{transform:none}
+  .voice-btn:hover{color:var(--text-muted);border-color:var(--glass-border)}
+  .voice-replay:hover{color:var(--text-muted);border-color:var(--glass-border)}
+  .voice-switch-btn:hover{background:rgba(var(--ai-rgb),.12)!important;color:var(--color-ai)!important}
+  .ai-close:hover{background:var(--surface);color:var(--text-muted)}
+  .toast-close:hover{background:transparent;color:var(--text-dim)}
+  .sb-toggle:hover{background:transparent;color:var(--text-muted);border-color:transparent}
+  .up-next:hover{border-color:var(--glass-border)}
+  .input-field:hover:not(:focus){border-color:var(--glass-border)}
+  .more-options-toggle:hover{color:var(--text-muted)}
+  .ai-fab:hover svg,.ai-input-row .btn-primary:hover svg{transform:none}
+  .ai-fab:hover{transform:none;animation:none}
+
+  /* Hover-driven palette swap on the command palette: only the keyboard
+     cursor (.active) may highlight a row on a touch device. */
+  .cmdk-item:hover:not(.active){background:transparent}
+  .cmdk-item:hover:not(.active) .cmdk-label{color:var(--text-main)}
+  .cmdk-item:hover:not(.active) .cmdk-hint{color:var(--text-dim)}
+
+  /* Touch gets stronger, faster press feedback to compensate */
+  .btn:active{transform:scale(var(--press-md));transition-duration:.06s}
+  .nav-item:active{background:var(--row-hover);color:var(--text-main)}
+  .nav-item.active:active{background:var(--accent-gradient);color:#fff}
+  .cmdk-item:active{background:var(--row-hover)}
+  .cal-cell:active{background:var(--row-hover);border-color:var(--accent)}
+  .ai-quick button:active{background:var(--accent-glow);color:var(--accent);border-color:var(--nav-active-border)}
+  .rate-btn:active{background:var(--nav-active-bg);color:var(--nav-active-text)}
+  .ob-course-item:active{background:var(--row-hover)}
+  .vtab:active{background:var(--row-hover)}
+}
+
+
+/* ──────────────────────────────────────────────────────────────────────
+   7 · DEVICE CALIBRATION
+   Real hardware, not abstract breakpoints:
+     · Galaxy S24 — 360×780 CSS px @3x, punch-hole, gesture bar
+     · Lenovo V15 — 15.6" 1366×768 / 1920×1080, mouse, short viewport
+     · High-DPI desktop — 2dppx+, hairlines must stay hairlines
+────────────────────────────────────────────────────────────────────── */
+
+/* ── Galaxy S24 class (360–412px, the tightest mainstream band) ── */
+@media(min-width:360px) and (max-width:412px){
+  .app-wrapper{
+    padding-left:max(12px,env(safe-area-inset-left));
+    padding-right:max(12px,env(safe-area-inset-right));
+  }
+  .kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+  .nav-item{font-size:.63rem;letter-spacing:-.01em}
+  .tracker-bar{border-radius:var(--radius-lg)}
+  .modal-box{border-radius:var(--radius-xl) var(--radius-xl) 0 0}
+  .page-header{gap:10px;margin-bottom:var(--sp-2)}
+}
+
+/* ── 15" laptop class (V15 / IdeaPad: mouse-driven, short viewport) ── */
+@media(min-width:1280px) and (max-width:1600px) and (min-height:650px) and (max-height:940px) and (hover:hover){
+  :root{--sidebar-w:248px}
+  .app-wrapper{gap:18px;padding:18px}
+  .kpi-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .main-workspace{padding-bottom:56px}
+}
+/* 1366×768 specifically — the tightest common laptop canvas there is */
+@media(min-width:1200px) and (max-width:1400px) and (max-height:800px){
+  .kpi-card{min-height:104px;padding:16px}
+  .dash-grid-2{gap:14px}
+  .tracker-bar{padding:10px 18px;margin-bottom:16px}
+  .page-header{margin-bottom:16px}
+}
+
+/* ── High-DPI desktop (Pure Pixel / Retina class, 2dppx and up) ── */
+@media(min-resolution:2dppx) and (min-width:1200px){
+  .glass-panel:not(.ai-panel),.task-row,.btn-secondary,.input-field,.cmdk,.sidebar{
+    border-width:.5px;
+  }
+  /* Hairline edges only — the side hairlines are sub-pixel noise at 2dppx */
+  .glass-panel:not(.ai-panel){
+    box-shadow:var(--glass-edge-top),var(--glass-edge-bot),var(--glass-depth);
+  }
+}
+/* Very wide desktop: content stays centred, type keeps its rhythm */
+@media(min-width:1800px){
+  .app-wrapper{max-width:1680px;margin-inline:auto}
+}
+
+
+/* ──────────────────────────────────────────────────────────────────────
+   8 · INSTALL READINESS (display-mode: standalone)
+   When launched from the home screen there is no browser chrome: the app
+   owns the entire viewport and must supply every safe area itself, and
+   pull-to-refresh must not fight the scrollers. This costs nothing in a
+   normal browser tab, where the block simply never matches.
+────────────────────────────────────────────────────────────────────── */
+@media (display-mode: standalone){
+  html,body{overscroll-behavior-y:none}
+  .sidebar,.mobile-header,.nav-item,.tracker-bar,.vtab,.cal-cell{
+    -webkit-user-select:none;user-select:none;
+  }
+  .mobile-header{height:calc(58px + env(safe-area-inset-top));padding-top:env(safe-area-inset-top)}
+  .main-workspace{padding-top:calc(66px + env(safe-area-inset-top))}
+  .tracker-bar{top:calc(64px + env(safe-area-inset-top))}
+  .ob-overlay{padding-top:max(24px,env(safe-area-inset-top))}
+  .zen-exit{top:max(18px,env(safe-area-inset-top))}
+  .ai-panel{top:calc(58px + env(safe-area-inset-top))!important}
+  .ai-msgs,.modal-box,.cmdk-list,.ob-course-list,.heatmap-scroll,.cal-scroll{
+    -webkit-overflow-scrolling:touch;overscroll-behavior:contain;
+  }
+}
+
+/* Landscape phones: the header is hidden and the dock is a slim row, so
+   the desktop chrome clearance from §4 would leave a dead band at the top
+   and a too-tall dock. Both are corrected here (this must stay last). */
+@media(max-width:900px) and (max-height:500px) and (orientation:landscape){
+  .main-workspace{padding-top:10px;padding-bottom:calc(var(--dock-h) + 18px)}
+  .sidebar{bottom:max(6px,env(safe-area-inset-bottom));padding:5px}
+  .nav-item{min-height:44px;border-radius:14px}
+  .tracker-bar{top:8px}
+}
