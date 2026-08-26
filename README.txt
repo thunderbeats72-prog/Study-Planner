@@ -101,6 +101,21 @@ instead of stopping on a “voice model unavailable” error; the chat shows a
 clear non-error notice. One failed long-answer part switches the remaining
 parts to that local voice, so every later part keeps flowing.
 
+v10 FIXES (this build)
+----------------------
+ - FULL UI RESTYLE ("ditto" of the Task Manager Pro design language):
+   new light design tokens (warm #F6F5FA canvas, violet-iris accent,
+   layered soft shadows, larger 8/12/16/22 radii), refined sidebar,
+   tracker bar, buttons (gradient + glow), inputs, cards and toasts.
+ - ONBOARDING REBUILT: the dot progress bar is now a labeled step rail
+   (You · Level · Course · Details · Syllabus · Style · Rhythm · Review)
+   with connectors and checkmarks; step 1 is a warm hero ("Set up a
+   study workspace that fits your day") with the three feature bullets
+   (Clear priorities / A realistic week / Private local data) and a
+   privacy footer line; buttons are Back / Continue.
+ - All six themes keep working; the rail and hero are token-driven, so
+   they adapt to every theme automatically.
+
 v8 FIXES (this build)
 ---------------------
  - GROQ CONNECTIVITY RESTORED. Groq retired llama-3.3-70b-versatile and

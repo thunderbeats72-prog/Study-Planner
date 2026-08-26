@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { api, addDays, today, dayDiff, prettyLong, type AppState } from "@/lib/client";
 import { countStudyDays, projectCompletionDate } from "@/lib/planner";
-import { IconCheck, IconLogo, IconSpark } from "./icons";
+import { IconCalendar, IconCheck, IconLock, IconLogo, IconTarget } from "./icons";
 
 type Level = { id: string; label: string; sub: string };
 type SeedSubject = { name: string; units: number; difficulty: string; color: string };
@@ -67,14 +67,14 @@ const BUFFER_PRESETS: SliderPreset[] = [
   { value: 10, label: "10" },
 ];
 const STEP_META: StepMeta[] = [
-  { key: "persona", label: "Your basics" },
-  { key: "level", label: "Level of study" },
-  { key: "course", label: "Course or exam" },
-  { key: "details", label: "Precision details" },
-  { key: "subjects", label: "Syllabus review" },
-  { key: "style", label: "Learning style" },
-  { key: "schedule", label: "Daily rhythm" },
-  { key: "review", label: "Final check" },
+  { key: "you", label: "You" },
+  { key: "level", label: "Level" },
+  { key: "course", label: "Course" },
+  { key: "details", label: "Details" },
+  { key: "subjects", label: "Syllabus" },
+  { key: "style", label: "Style" },
+  { key: "schedule", label: "Rhythm" },
+  { key: "review", label: "Review" },
 ];
 const STUDY_DAY_OPTIONS: ChoiceOption[] = [
   {
@@ -527,25 +527,49 @@ export default function Onboarding({
         </div>
 
         <div className="ob-progress" aria-label={`Step ${step} of ${total}`}>
-          {Array.from({ length: total }, (_, i) => i + 1).map((i) => (
-            <div key={i} className={`ob-dot${i === step ? " active" : i < step ? " done" : ""}`} />
-          ))}
+          {STEP_META.map((meta, i) => {
+            const n = i + 1;
+            const cls = n === step ? "current" : n < step ? "done" : "";
+            return (
+              <div key={meta.key} className={`ob-step${cls ? ` ${cls}` : ""}`} aria-current={n === step ? "step" : undefined}>
+                <span className="ob-step-node">{n < step ? <IconCheck size={11} /> : n}</span>
+                <span className="ob-step-label">{meta.label}</span>
+              </div>
+            );
+          })}
         </div>
 
         <div className="ob-card slide-in" key={step}>
         <div className="ob-card-head">
-          <div className="ob-step-kicker">Step {step} of {total} · {stepMeta.key}</div>
-          <div className="ob-step-caption">{stepMeta.label}</div>
+          <div className="ob-step-kicker">Step {step} of {total} · {stepMeta.label}</div>
         </div>
 
         {step === 1 && (
           <>
-            <h1>Let&apos;s set up your study workspace</h1>
-            <p>A plan that reads your syllabus, estimates the workload, and builds a daily routine around your real time — not a generic template.</p>
-            <div className="ob-feature-pills" aria-label="Planner capabilities">
-              <span className="ob-feature-pill"><IconSpark size={12} /> AI syllabus breakdown</span>
-              <span className="ob-feature-pill">ML pacing</span>
-              <span className="ob-feature-pill">Revision-aware schedule</span>
+            <h1>Set up a study workspace that fits your day</h1>
+            <p>Your planner, daily schedule and Shigun&apos;s answers will use only your course, dates and study history.</p>
+            <div className="ob-feature-list" aria-label="Planner capabilities">
+              <div className="ob-feature">
+                <span className="ob-feature-icon"><IconTarget size={14} /></span>
+                <div>
+                  <strong>Clear priorities</strong>
+                  <span>Your hardest and most urgent topics rise to the top automatically.</span>
+                </div>
+              </div>
+              <div className="ob-feature">
+                <span className="ob-feature-icon"><IconCalendar size={14} /></span>
+                <div>
+                  <strong>A realistic week</strong>
+                  <span>A schedule built from your real hours and rhythm — not a generic template.</span>
+                </div>
+              </div>
+              <div className="ob-feature">
+                <span className="ob-feature-icon"><IconLock size={14} /></span>
+                <div>
+                  <strong>Private local data</strong>
+                  <span>Your plan, progress and history stay yours — never shared or sold.</span>
+                </div>
+              </div>
             </div>
             <label className="lbl">What should we call you?</label>
             <input className="ob-name-input" autoFocus value={name} placeholder="e.g. Rakshit"
@@ -954,14 +978,13 @@ export default function Onboarding({
         {err && <div className="ob-error-banner">{err}</div>}
 
         <div className="ob-footer-strip mt-md">
-          <div className="ob-footnote">
-            {step === total
-              ? "The same AI and ML planning pipeline will generate your schedule from this setup."
-              : "This refresh changes the onboarding UI only — your planner logic and later settings workflow stay the same."}
+          <div className="ob-privacy">
+            <IconLock size={13} />
+            <span>Your workspace stays private — study data never leaves your account.</span>
           </div>
           <div className="ob-btn-row">
             {step > 1 && <button className="ob-btn ob-btn-secondary" onClick={back} disabled={busy || suggesting}>Back</button>}
-            {step < total && <button className="ob-btn ob-btn-primary" onClick={next} disabled={suggesting}>{suggesting ? "Assessing…" : step === 1 ? "Let's Start" : step === 4 ? "Assess & Continue" : "Continue"}</button>}
+            {step < total && <button className="ob-btn ob-btn-primary" onClick={next} disabled={suggesting}>{suggesting ? "Assessing…" : step === 4 ? "Assess & Continue" : "Continue"}</button>}
             {step === total && (
               <button className="ob-btn ob-btn-primary" onClick={launch} disabled={busy}>
                 {busy ? "Generating…" : isRerun ? "Wipe old plan & Generate New" : "Generate My AI Plan"}
