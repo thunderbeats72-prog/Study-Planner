@@ -2435,7 +2435,7 @@ button,a,.nav-item,.vtab,.cal-cell,.chip,.task-row,.rate-btn,input,select{touch-
    type rhythm — nothing stretches or breaks on huge canvases */
 @media(min-width:1800px){
   :root{--sidebar-w:280px}
-  .app-wrapper{max-width:1700px;gap:26px;padding:28px}
+  .app-wrapper{width:100%;max-width:1700px;margin-inline:auto;gap:26px;padding:28px}
   .main-workspace{padding-bottom:80px}
   .page-title{font-size:2.3rem}
   .kpi-grid{gap:20px}
@@ -2492,7 +2492,8 @@ button,a,.nav-item,.vtab,.cal-cell,.chip,.task-row,.rate-btn,input,select{touch-
 .curriculum-source div div{color:var(--text-muted);margin-top:2px}
 
 .lesson-detail{
-  margin:0 0 10px 32px;padding:16px;border:1px solid var(--glass-border);
+  /* Align the brief with the lesson title: row padding + index column + gap. */
+  margin:0 0 10px 48px;padding:16px;border:1px solid var(--glass-border);
   border-left:3px solid var(--accent);border-radius:0 var(--radius-md) var(--radius-md) 0;background:var(--row-bg);
   max-height:min(58vh,520px);overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;
   min-width:0;overflow-wrap:anywhere;word-break:break-word;
@@ -3122,11 +3123,35 @@ svg{flex-shrink:0;vertical-align:middle}
   .tracker-actions .btn-xs:last-child{width:34px;min-width:34px;aspect-ratio:1/1;padding:0;gap:0;font-size:0}
 }
 
-/* ── 5. Task rows on phones: colour dot lines up with line 1 ─────── */
+/* ── 5. Subject lesson rows: keep the title and actions on a stable grid ──
+   These rows use a different inner structure from planner task rows. Without
+   an explicit flex layout, long lesson titles competed with the action
+   buttons and made the row look vertically or horizontally misaligned. */
+.subject-lesson-row{align-items:flex-start;gap:12px}
+.subject-lesson-row > .task-info-top{
+  display:flex;align-items:flex-start;gap:10px;flex:1 1 auto;min-width:0;align-self:stretch;
+}
+.subject-lesson-row .task-info{flex:1 1 auto;min-width:0}
+.subject-lesson-row .task-actions{
+  display:flex;align-items:center;justify-content:flex-end;gap:8px;flex:0 0 auto;flex-wrap:wrap;align-self:center;
+}
+.subject-lesson-row .task-actions .btn{flex:0 0 auto}
+
+/* ── 6. Task rows on phones: colour dot lines up with line 1 ─────── */
 @media(max-width:640px){
   .task-row > .task-dot{left:12px;top:19px}
   .task-main{padding-left:22px}
   .brief-chev{margin-left:6px}
+
+  /* Lesson title first, actions second: the action group never squeezes
+     the title into a narrow column on phones. */
+  .subject-lesson-row{align-items:stretch;gap:10px 8px}
+  .subject-lesson-row > .task-info-top{
+    flex:1 1 100%;width:100%;min-width:100%;align-self:stretch;
+  }
+  .subject-lesson-row > .task-actions{
+    flex:1 1 100%;width:100%;min-width:100%;justify-content:flex-end;align-self:stretch;
+  }
 }
 
 /* ── 6. Chat sheet: header + composer icons optically centred ────── */
