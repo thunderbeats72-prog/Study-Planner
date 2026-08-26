@@ -188,15 +188,18 @@ select.input-field{appearance:none;background-image:linear-gradient(45deg,transp
 #t-label{font-size:.7rem;font-weight:800;text-transform:uppercase;letter-spacing:2px;color:var(--text-muted);margin-top:4px}
 
 /* ============ ONBOARDING ============ */
-.ob-overlay{position:fixed;inset:0;z-index:400;background:var(--app-bg);background-image:var(--bg-gradient);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;overflow-y:auto}
+/* flex-start + auto side margins on the shell: content centers when it fits
+   and scrolls correctly (top never clipped) when it's taller than the viewport */
+.ob-overlay{position:fixed;inset:0;z-index:400;background:var(--app-bg);background-image:var(--bg-gradient);display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:clamp(28px,6vh,56px) 24px 40px;overflow-y:auto}
+.ob-shell{margin-top:auto;margin-bottom:auto}
 
 /* Labeled step rail — “You · Level · Course · …” with connectors */
-.ob-progress{width:min(100%,680px);display:flex;align-items:center;margin-bottom:18px}
-.ob-step{flex:1;min-width:0;display:flex;align-items:center;gap:7px}
-.ob-step + .ob-step::before{content:"";flex:1;min-width:10px;height:2px;margin:0 8px;border-radius:99px;background:var(--glass-border);transition:background .3s ease}
+.ob-progress{width:min(100%,680px);display:flex;align-items:flex-start;margin-bottom:18px}
+.ob-step{position:relative;flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:5px;text-align:center}
+.ob-step + .ob-step::before{content:"";position:absolute;top:13px;left:-50%;right:50%;margin:0 15px;height:2px;border-radius:99px;background:var(--glass-border);transition:background .3s ease}
 .ob-step.done + .ob-step::before{background:color-mix(in srgb,var(--accent) 45%,var(--glass-border) 55%)}
 .ob-step-node{
-  width:26px;height:26px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;
+  width:28px;height:28px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;
   font-size:.68rem;font-weight:800;font-variant-numeric:tabular-nums;font-family:inherit;line-height:1;
   color:var(--text-dim);background:var(--surface-solid);border:1.5px solid var(--glass-border-hover);
   transition:background .25s ease,border-color .25s ease,color .25s ease,box-shadow .25s ease;
@@ -207,8 +210,8 @@ select.input-field{appearance:none;background-image:linear-gradient(45deg,transp
 }
 .ob-step.done .ob-step-node{background:var(--accent-glow);border-color:color-mix(in srgb,var(--accent) 45%,transparent);color:var(--accent)}
 .ob-step-label{
-  font-size:.66rem;font-weight:700;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-  transition:color .2s ease;
+  font-size:.62rem;font-weight:700;color:var(--text-dim);max-width:100%;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap;transition:color .2s ease;
 }
 .ob-step.current .ob-step-label{color:var(--accent);font-weight:800}
 .ob-step.done .ob-step-label{color:var(--text-muted)}
@@ -2379,19 +2382,6 @@ button,a,.nav-item,.vtab,.cal-cell,.chip,.task-row,.rate-btn,input,select{touch-
 .confirm-box .flex-row{gap:10px}
 .confirm-box .btn{flex:1 1 auto}
 
-/* ── Onboarding wipe banner (re-run mode) ── */
-.ob-wipe-banner{
-  position:fixed;top:0;left:0;right:0;z-index:600;
-  background:var(--status-pending-bg);color:var(--status-pending-text);
-  font-size:.78rem;font-weight:650;text-align:left;
-  padding:9px 16px calc(9px + env(safe-area-inset-top));
-}
-.ob-overlay:has(.ob-wipe-banner){padding-top:calc(66px + env(safe-area-inset-top))}
-.ob-wipe-banner strong{font-weight:800}
-@media(max-width:640px){
-  .ob-wipe-banner{font-size:.72rem;padding:8px 14px calc(8px + env(safe-area-inset-top))}
-}
-
 /* ── Cross-device robustness ──
    Tiny (320px) → phone (S24 ~384px) → tablet → desktop → 4K TV.
    Everything already flows; these rules tune the extremes. */
@@ -2984,7 +2974,8 @@ body.theme-dark .ob-card,body.theme-obsidian .ob-card,body.theme-nebula .ob-card
   .ob-progress{margin-bottom:14px}
   /* Compact rail on phones: numbers only, no labels */
   .ob-step-label{display:none}
-  .ob-step + .ob-step::before{min-width:6px;margin:0 6px}
+  .ob-step-node{width:24px;height:24px;font-size:.62rem}
+  .ob-step + .ob-step::before{top:11px;margin:0 11px}
   .ob-list-meta{font-size:.7rem}
   .ob-mini-stats{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
   .ob-mini-stat{padding:10px 8px}

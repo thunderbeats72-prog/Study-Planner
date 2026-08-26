@@ -511,12 +511,6 @@ export default function Onboarding({
 
   return (
     <div className="ob-overlay">
-      {isRerun && (
-        <div className="ob-wipe-banner">
-          <strong>Fresh start mode:</strong> when you finish, your previous course, schedule and logged
-          minutes are wiped and rebuilt from scratch.
-        </div>
-      )}
       <div className="ob-shell">
         <div className="ob-brand-bar">
           <div className="ob-brand-mark"><IconLogo size={20} /></div>
