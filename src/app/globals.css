@@ -244,7 +244,10 @@ select.input-field{appearance:none;background-image:linear-gradient(45deg,transp
   background:var(--accent-glow);color:var(--accent);display:flex;align-items:center;justify-content:center;
 }
 .ob-feature strong{display:block;font-size:.86rem;font-weight:800;margin-bottom:2px;color:var(--text-main)}
-.ob-feature span{display:block;font-size:.78rem;line-height:1.5;color:var(--text-muted);font-weight:600}
+/* Text only: scoped past the icon tile (also a span) — a bare ".ob-feature span"
+   out-specified ".ob-feature-icon" and forced display:block, which killed the
+   tile's flex centering and pinned each icon to its top-left corner. */
+.ob-feature div span{display:block;font-size:.78rem;line-height:1.5;color:var(--text-muted);font-weight:600}
 /* Privacy line under the wizard buttons */
 .ob-privacy{
   display:flex;align-items:center;justify-content:center;gap:8px;margin-top:16px;
