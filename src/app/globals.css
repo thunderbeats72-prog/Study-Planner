@@ -224,14 +224,20 @@ select.input-field{appearance:none;background-image:linear-gradient(45deg,transp
 }
 .ob-card-head{display:flex;flex-direction:column;gap:4px;margin-bottom:16px}
 .ob-step-kicker{font-size:.72rem;font-weight:850;letter-spacing:.8px;text-transform:uppercase;color:var(--accent)}
-.ob-card h1{font-size:clamp(1.5rem,2vw + 1rem,1.9rem);font-weight:800;letter-spacing:-.9px;margin:0 0 10px}
-.ob-card p{font-size:.9rem;color:var(--text-muted);font-weight:550;margin:0 0 22px;line-height:1.65;max-width:60ch}
+.ob-card h1{font-size:clamp(1.5rem,2vw + 1rem,1.9rem);font-weight:800;letter-spacing:-.9px;margin:0 0 10px;text-wrap:balance}
+.ob-card p{font-size:.9rem;color:var(--text-muted);font-weight:550;margin:0 0 22px;line-height:1.65;max-width:60ch;text-wrap:pretty}
 /* Warm feature checklist — mirrors the reference product's hero bullets */
 .ob-feature-list{display:flex;flex-direction:column;gap:9px;margin:0 0 22px}
 .ob-feature{
-  display:flex;align-items:flex-start;gap:12px;padding:11px 14px;
+  display:flex;align-items:flex-start;gap:12px;padding:12px 14px;
   border:1px solid var(--glass-border);border-radius:16px;
   background:linear-gradient(180deg,var(--surface) 0%,var(--row-bg) 100%);
+  transition:transform .18s var(--spring-soft),border-color .18s ease,box-shadow .18s ease;
+}
+.ob-feature:hover{
+  transform:translateY(-1px);
+  border-color:color-mix(in srgb,var(--accent) 38%,var(--glass-border));
+  box-shadow:0 6px 18px color-mix(in srgb,var(--accent) 10%,transparent);
 }
 .ob-feature-icon{
   width:26px;height:26px;border-radius:9px;flex-shrink:0;margin-top:1px;
@@ -282,35 +288,55 @@ select.input-field{appearance:none;background-image:linear-gradient(45deg,transp
   flex-shrink:0;padding:8px 12px;border-radius:999px;background:var(--accent-glow);color:var(--accent);
   font-size:.84rem;font-weight:800;letter-spacing:-.2px;box-shadow:inset 0 1px 0 rgba(255,255,255,.22);
 }
-.ob-range-input{
-  width:100%;appearance:none;-webkit-appearance:none;height:12px;border:none;outline:none;cursor:pointer;
+/* Registered property so the fill percentage ANIMATES smoothly when the
+   thumb moves or a preset chip jumps the value (gracefully instant in
+   older browsers). */
+@property --ob-range-fill{
+  syntax:"<percentage>";
+  inherits:true;
+  initial-value:0%;
+}
+.ob-range-card .ob-range-input{
+  width:100%;appearance:none;-webkit-appearance:none;height:18px;padding:0;border:none;outline:none;cursor:pointer;
   border-radius:999px;touch-action:pan-x;
-  background:linear-gradient(90deg,var(--accent) 0%,var(--accent-light) var(--ob-range-fill),var(--row-hover) var(--ob-range-fill),var(--row-hover) 100%);
-  box-shadow:inset 0 1px 2px rgba(10,12,26,.1);
+  background:linear-gradient(90deg,var(--accent) 0%,var(--accent-light) var(--ob-range-fill,0%),var(--row-hover) var(--ob-range-fill,0%),var(--row-hover) 100%);
+  box-shadow:inset 0 1px 3px color-mix(in srgb,var(--text-main) 14%,transparent);
+  transition:--ob-range-fill .22s cubic-bezier(.25,1,.4,1);
 }
-.ob-range-input::-webkit-slider-runnable-track{height:12px;border-radius:999px;background:transparent}
-.ob-range-input::-moz-range-track{height:12px;border-radius:999px;background:transparent}
-.ob-range-input::-webkit-slider-thumb{
-  -webkit-appearance:none;appearance:none;width:22px;height:22px;margin-top:-5px;border-radius:50%;
-  border:2px solid var(--accent);background:var(--surface-solid);
-  box-shadow:0 4px 16px var(--accent-glow),0 1px 2px rgba(10,12,26,.16);
+.ob-range-card .ob-range-input::-webkit-slider-runnable-track{height:18px;border-radius:999px;background:transparent}
+.ob-range-card .ob-range-input::-moz-range-track{height:18px;border-radius:999px;background:transparent}
+.ob-range-card .ob-range-input::-webkit-slider-thumb{
+  -webkit-appearance:none;appearance:none;width:26px;height:26px;margin-top:-4px;border-radius:50%;
+  border:2.5px solid var(--surface-solid);background:var(--accent-gradient);
+  box-shadow:0 1px 3px color-mix(in srgb,var(--text-main) 30%,transparent),0 3px 10px var(--accent-glow),0 8px 22px var(--accent-glow);
+  transition:transform .18s var(--spring-soft),box-shadow .18s ease;
 }
-.ob-range-input::-moz-range-thumb{
-  width:22px;height:22px;border-radius:50%;border:2px solid var(--accent);background:var(--surface-solid);
-  box-shadow:0 4px 16px var(--accent-glow),0 1px 2px rgba(10,12,26,.16);
+.ob-range-card .ob-range-input::-moz-range-thumb{
+  width:26px;height:26px;border-radius:50%;border:2.5px solid var(--surface-solid);background:var(--accent-gradient);
+  box-shadow:0 1px 3px color-mix(in srgb,var(--text-main) 30%,transparent),0 3px 10px var(--accent-glow),0 8px 22px var(--accent-glow);
+  transition:transform .18s var(--spring-soft),box-shadow .18s ease;
 }
-.ob-range-input:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 4px var(--color-primary-soft),0 4px 16px var(--accent-glow)}
-.ob-range-input:focus-visible::-moz-range-thumb{box-shadow:0 0 0 4px var(--color-primary-soft),0 4px 16px var(--accent-glow)}
+.ob-range-card .ob-range-input:hover::-webkit-slider-thumb{transform:scale(1.08);box-shadow:0 1px 3px color-mix(in srgb,var(--text-main) 30%,transparent),0 4px 12px var(--accent-glow),0 10px 26px var(--accent-glow)}
+.ob-range-card .ob-range-input:hover::-moz-range-thumb{transform:scale(1.08);box-shadow:0 1px 3px color-mix(in srgb,var(--text-main) 30%,transparent),0 4px 12px var(--accent-glow),0 10px 26px var(--accent-glow)}
+.ob-range-card .ob-range-input:active{cursor:grabbing}
+.ob-range-card .ob-range-input:active::-webkit-slider-thumb{transform:scale(1.16);box-shadow:0 0 0 7px var(--accent-glow),0 6px 16px var(--accent-glow),0 14px 34px var(--accent-glow)}
+.ob-range-card .ob-range-input:active::-moz-range-thumb{transform:scale(1.16);box-shadow:0 0 0 7px var(--accent-glow),0 6px 16px var(--accent-glow),0 14px 34px var(--accent-glow)}
+.ob-range-card .ob-range-input:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 4px var(--accent-glow),0 0 0 8px color-mix(in srgb,var(--accent) 30%,transparent),0 6px 16px var(--accent-glow)}
+.ob-range-card .ob-range-input:focus-visible::-moz-range-thumb{box-shadow:0 0 0 4px var(--accent-glow),0 0 0 8px color-mix(in srgb,var(--accent) 30%,transparent),0 6px 16px var(--accent-glow)}
 .ob-range-meta{display:flex;justify-content:space-between;gap:12px;margin-top:8px;font-size:.72rem;color:var(--text-dim);font-weight:700}
 .ob-range-presets{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
 .ob-range-chip{
-  padding:7px 10px;border-radius:999px;border:1px solid var(--glass-border);background:var(--surface-solid);
+  padding:8px 14px;border-radius:999px;border:1.5px solid var(--glass-border);background:var(--surface-solid);
   color:var(--text-muted);font-size:.74rem;font-weight:750;font-family:inherit;cursor:pointer;
-  transition:background .18s ease,border-color .18s ease,color .18s ease,transform .18s ease;
+  box-shadow:0 1px 2px color-mix(in srgb,var(--text-main) 6%,transparent);
+  transition:background .18s ease,border-color .18s ease,color .18s ease,transform .18s ease,box-shadow .18s ease;
 }
-.ob-range-chip:hover{border-color:var(--glass-border-hover);background:var(--surface-hover);color:var(--text-main)}
-.ob-range-chip.active{border-color:var(--accent);background:var(--nav-active-bg);color:var(--accent)}
-.ob-range-chip:active{transform:scale(.96)}
+.ob-range-chip:hover{border-color:color-mix(in srgb,var(--accent) 55%,var(--glass-border));background:var(--surface-hover);color:var(--accent);transform:translateY(-1px)}
+.ob-range-chip.active{
+  background:var(--accent-gradient);color:#fff;border-color:transparent;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.22),0 2px 4px color-mix(in srgb,var(--text-main) 18%,transparent),0 6px 16px var(--accent-glow);
+}
+.ob-range-chip:active{transform:scale(.94)}
 .ob-choice-card{
   padding:14px 15px;border-radius:var(--radius-lg);border:1px solid var(--glass-border);
   background:linear-gradient(180deg,var(--surface) 0%,var(--row-bg) 100%);box-shadow:var(--shadow-sm);
@@ -2906,18 +2932,18 @@ button,a,.nav-item,.vtab,.cal-cell,.chip,.task-row,.rate-btn,input,select{touch-
 .ob-level-btn small{line-height:1.45}
 .ob-course-list{
   max-height:290px;padding:4px;border-radius:18px;border:1px solid var(--glass-border);
-  background:linear-gradient(180deg,var(--row-bg) 0%,color-mix(in srgb,var(--row-bg) 82%,white 18%) 100%);
+  background:linear-gradient(180deg,var(--row-bg) 0%,color-mix(in srgb,var(--row-bg) 82%,var(--surface) 18%) 100%);
 }
 .ob-course-item{
   padding:13px 14px;border-radius:14px;border:1px solid transparent;background:var(--surface-solid);
-  box-shadow:0 1px 2px rgba(15,23,42,.03);
+  box-shadow:0 1px 2px color-mix(in srgb,var(--text-main) 5%,transparent);
 }
 .ob-course-item:hover{border-color:var(--glass-border-hover)}
 .ob-course-item.selected{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
 .ob-course-check{background:var(--surface);border-color:var(--glass-border)}
 .ob-subs-grid{
   max-height:320px;padding:4px;border-radius:18px;border:1px solid var(--glass-border);
-  background:linear-gradient(180deg,var(--row-bg),color-mix(in srgb,var(--row-bg) 84%,white 16%));
+  background:linear-gradient(180deg,var(--row-bg),color-mix(in srgb,var(--row-bg) 84%,var(--surface) 16%));
 }
 .ob-sub-row{padding:10px 12px;border-radius:16px;border:1px solid var(--glass-border);background:var(--surface-solid)}
 .ob-mini-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:0 0 14px}
@@ -2932,7 +2958,7 @@ button,a,.nav-item,.vtab,.cal-cell,.chip,.task-row,.rate-btn,input,select{touch-
 .ob-choice-btn{border-radius:16px}
 .ob-note-panel{
   padding:14px 16px;border:1px solid var(--glass-border);border-radius:16px;
-  background:linear-gradient(180deg,var(--row-bg),color-mix(in srgb,var(--row-bg) 72%,white 28%));
+  background:linear-gradient(180deg,var(--row-bg),color-mix(in srgb,var(--row-bg) 78%,var(--surface) 22%));
 }
 .ob-hint.ob-note-panel{margin-bottom:0}
 .ob-name-input,.ob-course-search,.ob-add-sub-input{
@@ -2966,7 +2992,17 @@ button,a,.nav-item,.vtab,.cal-cell,.chip,.task-row,.rate-btn,input,select{touch-
 }
 body.theme-dark .ob-card,body.theme-obsidian .ob-card,body.theme-nebula .ob-card{
   box-shadow:0 18px 48px rgba(0,0,0,.34),0 2px 10px rgba(0,0,0,.24);
+  border-color:color-mix(in srgb,var(--glass-border) 60%,rgba(255,255,255,.08));
 }
+/* Dark-theme feature rows: keep the soft gradient subtle, not gray-banded */
+body.theme-dark .ob-feature,body.theme-obsidian .ob-feature,body.theme-nebula .ob-feature{
+  background:linear-gradient(180deg,color-mix(in srgb,var(--surface) 88%,var(--row-bg)) 0%,var(--row-bg) 100%);
+}
+/* Dark-theme step rail: brighter connectors + label text so the rail reads clearly */
+body.theme-dark .ob-step + .ob-step::before,body.theme-obsidian .ob-step + .ob-step::before,body.theme-nebula .ob-step + .ob-step::before{
+  background:color-mix(in srgb,var(--glass-border-hover) 70%,transparent);
+}
+body.theme-dark .ob-step-label,body.theme-obsidian .ob-step-label,body.theme-nebula .ob-step-label{color:var(--text-muted)}
 @media(max-width:640px){
   .ob-shell{gap:12px}
   .ob-brand-bar{padding:0 2px}

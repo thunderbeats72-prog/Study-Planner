@@ -116,6 +116,25 @@ v10 FIXES (this build)
  - All six themes keep working; the rail and hero are token-driven, so
    they adapt to every theme automatically.
 
+v11 POLISH (this build)
+-----------------------
+ - STUDY-HOURS SLIDER REBUILT: 18px track with a smooth animated accent
+   gradient fill (registered @property --ob-range-fill, spring-ish
+   cubic-bezier fill transition) and a 26px gradient orb thumb with a
+   surface ring, layered glow, hover grow, active press halo and a clear
+   focus ring. The slider finally takes priority over the generic field
+   input styles (specificity fix), so the custom track actually renders.
+ - PRESET CHIPS: the active chip is now a filled accent gradient pill
+   with white text and a soft glow; hover lifts and tints chips with
+   the accent.
+ - ALL-THEME ONBOARDING: white-mix gradients replaced with token-driven
+   mixes (course list, subject grid, note panel), theme-safe shadows,
+   feature-row hover lift, and dark/obsidian/nebula overrides for card
+   borders, feature rows, rail connectors and labels. Verified by a
+   7-theme headless sweep: contrast, rail, chips and slider render
+   correctly in every theme (light, silver-lavender, mint, sunset,
+   dark, obsidian, nebula).
+
 v8 FIXES (this build)
 ---------------------
  - GROQ CONNECTIVITY RESTORED. Groq retired llama-3.3-70b-versatile and
