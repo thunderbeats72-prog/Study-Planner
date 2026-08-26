@@ -275,6 +275,11 @@ async function runTests() {
         status: 403, headers: { "content-type": "application/json" },
       });
     }
+    if (url.includes("generativelanguage")) {
+      return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: "Fallback answer" }] } }] }), {
+        status: 200, headers: { "content-type": "application/json" },
+      });
+    }
     return new Response(JSON.stringify({ choices: [{ message: { content: "Fallback answer" } }] }), {
       status: 200, headers: { "content-type": "application/json" },
     });

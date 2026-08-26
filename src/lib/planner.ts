@@ -13,6 +13,7 @@ export type PlanTopic = {
   estMinutes: number;
   difficulty: string;
   mastery?: number;
+  practice?: string;
 };
 
 export type PlanSubject = {
@@ -445,7 +446,7 @@ export function buildPlan(
       // placed (inside the loop below) — merely being "chosen" on a day
       // too full to fit a lesson must not reset a subject's staleness.
 
-      const learnBudget = Math.max(20, Math.min(remaining - 5, dailyLearnBudget));
+      const learnBudget = Math.max(15, remaining);
       const wsum = chosen.reduce((a, s) => a + (subjWeight.get(s.id) || 1), 0);
 
       const todaysTopics: PlanTopic[] = [];
@@ -453,26 +454,35 @@ export function buildPlan(
       for (const s of chosen) {
         // This subject's proportional slice of today's learn budget
         const rawSlot = (learnBudget * (subjWeight.get(s.id) || 1)) / wsum;
-        let slot = Math.max(20, Math.round(rawSlot));
+        let slot = Math.max(15, Math.round(rawSlot / 5) * 5);
 
         const q = queues.get(s.id)!;
         let placedForSubject = 0;
 
-        while (q.length && remaining >= 15) {
+        while (q.length && remaining >= 15 && (placedForSubject === 0 || slot >= 15)) {
           const t = q[0];
           // Compressed, rounded to 5-min boundary, floored at 15 min
           const rawMins = t.estMinutes * styleMul * compress;
-          const mins = Math.max(15, Math.round(rawMins / 5) * 5);
+          const baseMins = Math.max(15, Math.round(rawMins / 5) * 5);
 
-          // KEY CONSTRAINT: lessons must fit inside the subject's slot AND
-          // the day's remaining capacity. HOWEVER, every chosen subject is
-          // guaranteed its FIRST lesson of the day whenever the day itself
-          // has room. Without this guarantee, a proportional slot that is
-          // slightly smaller than one lesson (e.g. slot 41 min vs a 45-min
-          // lesson) would place nothing — producing entirely empty days at
-          // the start of the plan.
-          if (mins > remaining) break;
-          if (placedForSubject > 0 && mins > slot) break;
+          // Allocate minutes matching the subject's slot so the full daily study target is met
+          let mins = baseMins;
+          if (placedForSubject === 0) {
+            if (slot >= baseMins + 15 && q.length > 1) {
+              mins = baseMins;
+            } else {
+              mins = Math.min(remaining, Math.max(baseMins, slot));
+              mins = Math.max(15, Math.round(mins / 5) * 5);
+            }
+          } else {
+            mins = Math.min(remaining, Math.min(baseMins, slot));
+            mins = Math.max(15, Math.round(mins / 5) * 5);
+          }
+
+          if (mins > remaining) {
+            mins = Math.max(15, Math.floor(remaining / 5) * 5);
+          }
+          if (mins < 15 || mins > remaining) break;
 
           q.shift();
           slot -= mins;
@@ -498,30 +508,70 @@ export function buildPlan(
         }
       }
 
-      // ── 8d. Deliberate practice, not calendar-filling busywork ──
-      // The previous engine filled every spare minute with up to five
-      // "Mastery Cycle" tasks per day. A 76-lesson course could become 300+
-      // cards, hiding the actual curriculum. Spaced reviews already handle
-      // retrieval. The lesson brief already contains applied practice, so
-      // separate cards are created only when the learner explicitly chose a
-      // practice/mock-heavy plan, always tied to today's new lesson.
-      const practiceLimit = st.studyStyle === "practice" || st.planMode === "mock" ? 2 : 0;
-      const practiceTopics = todaysTopics.slice(0, practiceLimit);
-      for (const topic of practiceTopics) {
-        if (remaining < 25) break;
-        const subjectName = subjById.get(topic.subjectId)?.name || "Study";
-        const minutes = Math.min(remaining, st.studyStyle === "practice" ? 40 : 30);
-        remaining -= minutes;
-        tasks.push({
-          date,
-          subjectId: topic.subjectId,
-          topicId: topic.id,
-          kind: "practice",
-          title: `Apply — ${subjectName}: ${topic.title}`,
-          detail: "Immediate transfer practice: 6–10 graded questions, followed by a short error-log entry for every hesitation.",
-          plannedMinutes: minutes,
-          position: pos++,
-        });
+      // If remaining study time still exists (>= 20 min), place additional lessons if queues have work
+      if (remaining >= 20) {
+        const withPending = chosen.filter((s) => (queues.get(s.id) || []).length > 0);
+        for (const s of withPending) {
+          if (remaining < 20) break;
+          const q = queues.get(s.id)!;
+          if (!q.length) continue;
+          const t = q[0];
+          const rawMins = t.estMinutes * styleMul * compress;
+          const baseMins = Math.max(15, Math.round(rawMins / 5) * 5);
+          const mins = Math.min(remaining, baseMins);
+          if (mins < 15 || mins > remaining) continue;
+          q.shift();
+          remaining -= mins;
+          lastTouchedDay.set(s.id, d);
+          scheduledCount++;
+          lastLearnDate = date;
+          todaysTopics.push(t);
+          tasks.push({
+            date, subjectId: s.id, topicId: t.id, kind: "learn",
+            title: `${s.name}: ${t.title}`,
+            detail: `${t.unit} • ${t.difficulty}. Learn the concept, then attempt practice questions before marking done.`,
+            plannedMinutes: mins, position: pos++,
+          });
+          pushReview(d + 2, t, 1);
+          if (t.difficulty === "Hard" || t.subjectId === weakId) pushReview(d + 7, t, 2);
+        }
+      }
+
+      // ── 8d. Deliberate practice / application tasks to meet the daily study commitment ──
+      if (remaining >= 15 && todaysTopics.length > 0) {
+        const share = Math.max(15, Math.floor(remaining / Math.min(todaysTopics.length, 2) / 5) * 5);
+        for (const topic of todaysTopics) {
+          if (remaining < 15) break;
+          const minutes = Math.min(remaining, share);
+          remaining -= minutes;
+          const subjectName = subjById.get(topic.subjectId)?.name || "Study";
+          tasks.push({
+            date,
+            subjectId: topic.subjectId,
+            topicId: topic.id,
+            kind: "practice",
+            title: `Apply — ${subjectName}: ${topic.title}`,
+            detail: topic.practice || "Immediate transfer practice: 6–10 graded questions, followed by a short error-log entry for every hesitation.",
+            plannedMinutes: minutes,
+            position: pos++,
+          });
+        }
+      }
+
+      // Distribute any small remaining balance (5-10m) due to 5-min rounding across today's study tasks
+      if (remaining > 0) {
+        const dayTasks = tasks.filter((t) => t.date === date && (t.kind === "learn" || t.kind === "practice"));
+        if (dayTasks.length > 0) {
+          let r = remaining;
+          let idx = 0;
+          while (r >= 5) {
+            dayTasks[idx % dayTasks.length].plannedMinutes += 5;
+            r -= 5;
+            idx++;
+          }
+          if (r > 0) dayTasks[0].plannedMinutes += r;
+          remaining = 0;
+        }
       }
     }
 
@@ -613,6 +663,19 @@ export function buildPlan(
           detail: "Active recall + previous-year questions. Aim for speed and accuracy, not re-reading.",
           plannedMinutes: mins, position: pos++,
         });
+      }
+      if (remaining > 0) {
+        const dayRevTasks = tasks.filter((t) => t.date === date && t.kind === "revise");
+        if (dayRevTasks.length > 0) {
+          let r = remaining;
+          let i = 0;
+          while (r >= 5) {
+            dayRevTasks[i % dayRevTasks.length].plannedMinutes += 5;
+            r -= 5;
+            i++;
+          }
+          if (r > 0) dayRevTasks[0].plannedMinutes += r;
+        }
       }
     }
   }
