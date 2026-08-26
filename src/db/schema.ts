@@ -40,7 +40,7 @@ export const settings = pgTable(
   studyStyle: text("study_style").notNull().default("balanced"),
   weakSubject: text("weak_subject").notNull().default("none"),
   revisionWeeks: integer("revision_weeks").notNull().default(1),
-  theme: text("theme").notNull().default("silver-lavender"),
+  theme: text("theme").notNull().default("default"),
   pomodoro: integer("pomodoro").notNull().default(25),
   shortBreak: integer("short_break").notNull().default(5),
   longBreak: integer("long_break").notNull().default(15),

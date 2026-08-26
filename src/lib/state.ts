@@ -117,7 +117,7 @@ export function defaultFallbackState(userKey: string) {
       studyStyle: "balanced",
       weakSubject: "none",
       revisionWeeks: 1,
-      theme: "silver-lavender",
+      theme: "default",
       pomodoro: 25,
       shortBreak: 5,
       longBreak: 15,
