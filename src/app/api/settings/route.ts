@@ -15,7 +15,7 @@ export const maxDuration = 120;
 const STUDY_DAYS = ["all", "6days", "weekdays"] as const;
 const PLAN_MODES = ["syllabus", "revision", "mock"] as const;
 const STUDY_STYLES = ["balanced", "theory", "practice"] as const;
-const THEMES = ["silver-lavender", "mint", "sunset", "dark", "obsidian", "nebula"] as const;
+const THEMES = ["default", "silver-lavender", "mint", "sunset", "dark", "obsidian", "nebula"] as const;
 
 export async function PATCH(req: Request) {
   let body: Record<string, unknown>;

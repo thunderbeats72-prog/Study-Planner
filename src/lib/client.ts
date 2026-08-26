@@ -266,6 +266,7 @@ export const KIND_META: Record<string, { label: string; color: string }> = {
 };
 
 export const THEMES = [
+  { id: "default", label: "Default" },
   { id: "silver-lavender", label: "Silver Lavender" },
   { id: "mint", label: "Mint Fresh" },
   { id: "sunset", label: "Sunset" },

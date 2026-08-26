@@ -9,6 +9,7 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  allowedDevOrigins: ["*.e2b.app", "*.arena.site"],
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

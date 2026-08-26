@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { api, addDays, today, dayDiff, prettyLong, type AppState } from "@/lib/client";
 import { countStudyDays, projectCompletionDate } from "@/lib/planner";
-import { IconCheck } from "./icons";
+import { IconCheck, IconLogo, IconSpark } from "./icons";
 
 type Level = { id: string; label: string; sub: string };
 type SeedSubject = { name: string; units: number; difficulty: string; color: string };
@@ -11,8 +11,290 @@ type CurriculumSource = {
   title: string; publisher: string; type: string; url?: string; note?: string;
 };
 type CourseMeta = { id: string; name: string; level: string; subjects: SeedSubject[] };
+type StepMeta = { key: string; label: string };
+type SliderPreset = { value: number; label: string };
+
+type OnboardingSliderProps = {
+  label: string;
+  value: number;
+  valueLabel: string;
+  hint?: string;
+  min: number;
+  max: number;
+  step: number;
+  minLabel: string;
+  maxLabel: string;
+  onChange: (value: number) => void;
+  presets?: SliderPreset[];
+  fullWidth?: boolean;
+};
+
+type ChoiceOption = {
+  id: string;
+  label: string;
+  description: string;
+};
+
+type OnboardingChoiceGroupProps = {
+  label: string;
+  hint?: string;
+  value: string;
+  options: readonly ChoiceOption[];
+  onChange: (value: string) => void;
+  columns?: number;
+  fullWidth?: boolean;
+};
 
 const PALETTE = ["#6366f1", "#10b981", "#f59e0b", "#ef4444", "#06b6d4", "#ec4899", "#84cc16", "#8b5cf6"];
+const HOURS_PRESETS: SliderPreset[] = [
+  { value: 1, label: "1h" },
+  { value: 2, label: "2h" },
+  { value: 4, label: "4h" },
+  { value: 6, label: "6h" },
+  { value: 8, label: "8h" },
+];
+const SUBJECTS_PRESETS: SliderPreset[] = [
+  { value: 1, label: "1" },
+  { value: 2, label: "2" },
+  { value: 3, label: "3" },
+  { value: 4, label: "4" },
+];
+const BUFFER_PRESETS: SliderPreset[] = [
+  { value: 0, label: "0" },
+  { value: 3, label: "3" },
+  { value: 5, label: "5" },
+  { value: 7, label: "7" },
+  { value: 10, label: "10" },
+];
+const STEP_META: StepMeta[] = [
+  { key: "persona", label: "Your basics" },
+  { key: "level", label: "Level of study" },
+  { key: "course", label: "Course or exam" },
+  { key: "details", label: "Precision details" },
+  { key: "subjects", label: "Syllabus review" },
+  { key: "style", label: "Learning style" },
+  { key: "schedule", label: "Daily rhythm" },
+  { key: "review", label: "Final check" },
+];
+const STUDY_DAY_OPTIONS: ChoiceOption[] = [
+  {
+    id: "all",
+    label: "All 7 days",
+    description: "Fastest route to finish the syllabus.",
+  },
+  {
+    id: "6days",
+    label: "6 days",
+    description: "Keeps one weekly day off for recovery.",
+  },
+  {
+    id: "weekdays",
+    label: "Weekdays",
+    description: "Weekends stay free or flexible.",
+  },
+];
+const STYLE_OPTIONS: ChoiceOption[] = [
+  {
+    id: "balanced",
+    label: "Balanced",
+    description: "A steady mix of theory, recall, and practice.",
+  },
+  {
+    id: "theory",
+    label: "Theory heavy",
+    description: "More reading and concept coverage in each lesson.",
+  },
+  {
+    id: "practice",
+    label: "Practice heavy",
+    description: "More applied work, problem-solving, and drills.",
+  },
+];
+const REVISION_OPTIONS: ChoiceOption[] = [
+  {
+    id: "0",
+    label: "No block",
+    description: "Use all available time for regular progression.",
+  },
+  {
+    id: "1",
+    label: "1 week",
+    description: "A short final revision sprint before the exam.",
+  },
+  {
+    id: "2",
+    label: "2 weeks",
+    description: "Balanced revision time without slowing coverage too much.",
+  },
+  {
+    id: "3",
+    label: "3 weeks",
+    description: "Best when you want repeated revision close to the exam.",
+  },
+];
+const PLAN_MODE_OPTIONS: ChoiceOption[] = [
+  {
+    id: "syllabus",
+    label: "From scratch",
+    description: "Build the full syllabus from the ground up.",
+  },
+  {
+    id: "revision",
+    label: "Revision",
+    description: "Faster passes assuming you have studied once already.",
+  },
+  {
+    id: "mock",
+    label: "Mock heavy",
+    description: "More tests, fixes, and exam-style practice cycles.",
+  },
+];
+
+function compactNumber(value: number) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1).replace(/\.0$/, "");
+}
+
+function formatHours(value: number) {
+  const whole = Math.floor(value);
+  const minutes = Math.round((value - whole) * 60);
+  if (!minutes) return `${compactNumber(value)} hour${value === 1 ? "" : "s"}`;
+  if (!whole) return `${minutes} min`;
+  return `${whole}h ${minutes}m`;
+}
+
+function formatHoursCompact(value: number) {
+  return `${compactNumber(value)}h`;
+}
+
+function studyDaysPerWeek(mode: string) {
+  if (mode === "weekdays") return 5;
+  if (mode === "6days") return 6;
+  return 7;
+}
+
+function studyHourHint(hours: number, studyDaysMode: string) {
+  const weeklyHours = Math.round(hours * studyDaysPerWeek(studyDaysMode) * 10) / 10;
+  const rhythm = hours <= 1.5
+    ? "Gentle pace"
+    : hours <= 3.5
+      ? "Sustainable pace"
+      : hours <= 6.5
+        ? "Strong daily rhythm"
+        : "Intensive push";
+  return `${rhythm} · about ${compactNumber(weeklyHours)}h/week`;
+}
+
+function subjectsPerDayHint(count: number) {
+  if (count <= 1) return "Deep focus on one subject each day.";
+  if (count === 2) return "Balanced variety without too much switching.";
+  if (count <= 4) return "Good for mixed revision and syllabus coverage.";
+  return "Fast rotation — useful close to exams.";
+}
+
+function bufferDaysHint(days: number) {
+  if (days <= 0) return "No spare recovery days — every study day counts.";
+  if (days <= 3) return "Lean buffer for small delays and busy days.";
+  if (days <= 7) return "Healthy safety net for revision and catch-up.";
+  return "Plenty of recovery room before the deadline.";
+}
+
+function OnboardingSlider({
+  label,
+  value,
+  valueLabel,
+  hint,
+  min,
+  max,
+  step,
+  minLabel,
+  maxLabel,
+  onChange,
+  presets = [],
+  fullWidth = false,
+}: OnboardingSliderProps) {
+  const fillPct = max === min ? 0 : ((value - min) / (max - min)) * 100;
+  const sliderStyle = { "--ob-range-fill": `${fillPct}%` } as React.CSSProperties;
+
+  return (
+    <div className={`ob-field${fullWidth ? " ob-field-span-full" : ""}`}>
+      <div className="ob-range-card">
+        <div className="ob-range-head">
+          <div>
+            <label>{label}</label>
+            {hint && <div className="ob-range-hint">{hint}</div>}
+          </div>
+          <div className="ob-range-value">{valueLabel}</div>
+        </div>
+        <input
+          className="ob-range-input"
+          type="range"
+          min={min}
+          max={max}
+          step={step}
+          value={value}
+          onChange={(e) => onChange(Number(e.target.value))}
+          style={sliderStyle}
+        />
+        <div className="ob-range-meta">
+          <span>{minLabel}</span>
+          <span>{maxLabel}</span>
+        </div>
+        {!!presets.length && (
+          <div className="ob-range-presets">
+            {presets.map((preset) => {
+              const active = Math.abs(value - preset.value) < Math.max(step / 2, 0.01);
+              return (
+                <button
+                  key={`${label}-${preset.value}`}
+                  type="button"
+                  className={`ob-range-chip${active ? " active" : ""}`}
+                  onClick={() => onChange(preset.value)}
+                >
+                  {preset.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function OnboardingChoiceGroup({
+  label,
+  hint,
+  value,
+  options,
+  onChange,
+  columns = 1,
+  fullWidth = false,
+}: OnboardingChoiceGroupProps) {
+  return (
+    <div className={`ob-field${fullWidth ? " ob-field-span-full" : ""}`}>
+      <div className="ob-choice-card">
+        <label>{label}</label>
+        {hint && <div className="ob-range-hint">{hint}</div>}
+        <div
+          className={`ob-choice-grid${columns > 1 ? " compact-choices" : ""}`}
+          style={columns > 1 ? ({ "--ob-choice-cols": String(columns) } as React.CSSProperties) : undefined}
+        >
+          {options.map((option) => (
+            <button
+              key={`${label}-${option.id}`}
+              type="button"
+              className={`ob-choice-btn${value === option.id ? " selected" : ""}`}
+              onClick={() => onChange(option.id)}
+            >
+              <strong>{option.label}</strong>
+              <span>{option.description}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function Onboarding({
   onDone, isRerun = false, initialName = "", onCancel,
@@ -60,6 +342,7 @@ export default function Onboarding({
   const [sdays, setSdays] = useState("all");
   const [buffer, setBuffer] = useState(5);
   const [planMode, setPlanMode] = useState("syllabus");
+  const stepMeta = STEP_META[step - 1] || STEP_META[0];
 
   useEffect(() => {
     api<{ levels: Level[]; levelCourses: Record<string, string[]>; courses: CourseMeta[]; aiProvider: string | null }>(
@@ -144,6 +427,7 @@ export default function Onboarding({
   }, 0);
   const capacity = availDays * hrs * 60 * 0.78;
   const feasible = capacity >= estMinutes;
+  const estHours = Math.round((estMinutes / 60) * 10) / 10;
   // Use the scheduler's canonical study-day-aware projection. The old wizard
   // added raw calendar days and could promise a date the generated plan did
   // not match when weekends were disabled.
@@ -233,35 +517,55 @@ export default function Onboarding({
           minutes are wiped and rebuilt from scratch.
         </div>
       )}
-      <div className="ob-progress">
-        {Array.from({ length: total }, (_, i) => i + 1).map((i) => (
-          <div key={i} className={`ob-dot${i === step ? " active" : i < step ? " done" : ""}`} />
-        ))}
-      </div>
+      <div className="ob-shell">
+        <div className="ob-brand-bar">
+          <div className="ob-brand-mark"><IconLogo size={20} /></div>
+          <div className="ob-brand-copy">
+            <div className="ob-brand-name">Study Planner Pro</div>
+            <div className="ob-brand-tag">Plan · focus · finish</div>
+          </div>
+        </div>
 
-      <div className="ob-card slide-in" key={step}>
+        <div className="ob-progress" aria-label={`Step ${step} of ${total}`}>
+          {Array.from({ length: total }, (_, i) => i + 1).map((i) => (
+            <div key={i} className={`ob-dot${i === step ? " active" : i < step ? " done" : ""}`} />
+          ))}
+        </div>
+
+        <div className="ob-card slide-in" key={step}>
+        <div className="ob-card-head">
+          <div className="ob-step-kicker">Step {step} of {total} · {stepMeta.key}</div>
+          <div className="ob-step-caption">{stepMeta.label}</div>
+        </div>
+
         {step === 1 && (
           <>
-            <h1>Welcome to Study Planner Pro</h1>
-            <p>Your AI study architect. In 7 quick steps I&apos;ll read your syllabus, break it into lessons and build a day-by-day plan you can actually follow.</p>
-            <label className="lbl">Your Name</label>
+            <h1>Let&apos;s set up your study workspace</h1>
+            <p>A plan that reads your syllabus, estimates the workload, and builds a daily routine around your real time — not a generic template.</p>
+            <div className="ob-feature-pills" aria-label="Planner capabilities">
+              <span className="ob-feature-pill"><IconSpark size={12} /> AI syllabus breakdown</span>
+              <span className="ob-feature-pill">ML pacing</span>
+              <span className="ob-feature-pill">Revision-aware schedule</span>
+            </div>
+            <label className="lbl">What should we call you?</label>
             <input className="ob-name-input" autoFocus value={name} placeholder="e.g. Rakshit"
               onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && next()} />
-            <div className="ob-hint">
-              {provider ? `SHIGUN is configured for ${provider}, with an automatic local fallback.` : "Local curriculum engine ready. Add a server-side AI key for full cloud-generated lessons."}
+            <div className="ob-hint ob-note-panel">
+              {provider ? `Cloud AI is ready via ${provider}. If it ever fails, the local planner and fallback tutoring still keep the workflow working.` : "Local planner is ready. Add a server-side AI key later if you want cloud-generated syllabus support too."}
             </div>
           </>
         )}
 
         {step === 2 && (
           <>
-            <h1>What are you studying?</h1>
-            <p>From nursery to doctoral research — pick where you are and I&apos;ll adapt the depth, pacing and language.</p>
+            <h1>Choose your study level</h1>
+            <p>From nursery to doctoral research, this tells the planner how deep the syllabus should go and how the language should be tuned.</p>
             <div className="ob-level-grid">
               {levels.map((l) => (
                 <button key={l.id} className={`ob-level-btn${level === l.id ? " selected" : ""}`}
                   onClick={() => { setLevel(l.id); setCourse(""); setSubs([]); }}>
-                  {l.label}<br /><small style={{ fontWeight: 500, color: "var(--text-dim)" }}>{l.sub}</small>
+                  <span className="ob-level-title">{l.label}</span>
+                  <small>{l.sub}</small>
                 </button>
               ))}
             </div>
@@ -270,33 +574,36 @@ export default function Onboarding({
 
         {step === 3 && (
           <>
-            <h1>Your Course / Exam</h1>
-            <p>Select your programme. I&apos;ll auto-load its subjects and syllabus structure.</p>
+            <h1>Find your course or exam</h1>
+            <p>Pick a known programme or type your own. The planner will use it to assemble the right subject structure before scheduling begins.</p>
             <input className="ob-course-search" placeholder="Search any course or exam..." value={search}
               onChange={(e) => setSearch(e.target.value)} />
+            <div className="ob-list-meta">
+              <span>{visibleCourses.length} match{visibleCourses.length === 1 ? "" : "es"}</span>
+              <span>{search.trim() ? "Filtered from the full catalog" : "Suggested for your selected level"}</span>
+            </div>
             <div className="ob-course-list">
               {visibleCourses.map((c) => (
-                <div key={c.id} className={`ob-course-item${course === c.id ? " selected" : ""}`} onClick={() => pickCourse(c.id)}>
+                <button type="button" key={c.id} className={`ob-course-item${course === c.id ? " selected" : ""}`} onClick={() => pickCourse(c.id)}>
                   <div className="ob-course-check">{course === c.id && <IconCheck size={11} />}</div>
-                  {c.name}
-                </div>
+                  <span>{c.name}</span>
+                </button>
               ))}
               {search.trim().length > 1 && (
-                <div className="ob-course-item" style={{ borderColor: "var(--accent)" }}
-                  onClick={() => suggestFor(search)}>
+                <button type="button" className="ob-course-item ob-course-item-accent" onClick={() => suggestFor(search)}>
                   <div className="ob-course-check" />
-                  {suggesting ? "Building your syllabus…" : <>Use <strong>&ldquo;{search.trim()}&rdquo;</strong> — AI will build the subject list</>}
-                </div>
+                  <span>{suggesting ? "Building your syllabus…" : <>Use <strong>&ldquo;{search.trim()}&rdquo;</strong> — AI will build the subject list</>}</span>
+                </button>
               )}
-              <div className={`ob-course-item${course === "custom" ? " selected" : ""}`}
+              <button type="button" className={`ob-course-item${course === "custom" ? " selected" : ""}`}
                 onClick={() => { setCourse("custom"); setCustomName(search.trim()); setSubs([]); }}>
                 <div className="ob-course-check">{course === "custom" && <IconCheck size={11} />}</div>
-                Not listed? Let the AI build it from scratch
-              </div>
+                <span>Not listed? Let the AI build it from scratch</span>
+              </button>
             </div>
 
             {course === "custom" && (
-              <div className="slide-in" style={{ marginBottom: 14 }}>
+              <div className="slide-in ob-note-panel" style={{ marginBottom: 14 }}>
                 <label className="lbl">Course / exam title</label>
                 <div className="ob-add-sub-row">
                   <input className="ob-add-sub-input" autoFocus placeholder="e.g. MBA in Marketing from NMIMS CDOE"
@@ -320,8 +627,8 @@ export default function Onboarding({
 
         {step === 4 && (
           <>
-            <h1>Tell me the specifics</h1>
-            <p>These details let me assess the <em>exact</em> syllabus — the right papers, board pattern and specialisation — instead of a generic list.</p>
+            <h1>Add the details that make it accurate</h1>
+            <p>These answers help the planner assess the <em>exact</em> syllabus — the right papers, board pattern, stream, and attempt context — instead of a generic version.</p>
             <div className="ob-schedule-grid" style={{ gridTemplateColumns: "1fr" }}>
               {isDegree && (
                 <>
@@ -405,18 +712,23 @@ export default function Onboarding({
                   value={goalText} onChange={(e) => setGoalText(e.target.value)} />
               </div>
             </div>
-            <div className="ob-hint" style={{ marginTop: 4 }}>
-              {suggesting ? "Assessing your exact syllabus…" : "When you continue, I'll assess these details and build the precise subject list."}
+            <div className="ob-hint ob-note-panel" style={{ marginTop: 4 }}>
+              {suggesting ? "Assessing your exact syllabus…" : "When you continue, I’ll use these details to build the precise subject list before scheduling starts."}
             </div>
           </>
         )}
 
         {step === 5 && (
           <>
-            <h1>Review Your Subjects</h1>
+            <h1>Review the syllabus structure</h1>
             <p>{course && course !== "custom"
-              ? "Suggested syllabus loaded. Adjust the number of units — each unit becomes a scheduled lesson."
-              : "Add your subjects. Each unit becomes an individually scheduled lesson."}</p>
+              ? "We loaded a suggested syllabus. Fine-tune the units here — each unit turns into a scheduled lesson in your plan."
+              : "Add the subjects you want included. Each unit becomes an individually scheduled lesson."}</p>
+            <div className="ob-mini-stats" aria-label="Syllabus stats">
+              <div className="ob-mini-stat"><strong>{subs.length}</strong><span>subjects</span></div>
+              <div className="ob-mini-stat"><strong>{totalUnits}</strong><span>lesson units</span></div>
+              <div className="ob-mini-stat"><strong>{compactNumber(estHours)}</strong><span>est. hours</span></div>
+            </div>
             <div className="ob-subs-grid">
               {subs.map((s, i) => (
                 <div className="ob-sub-row" key={i}>
@@ -472,75 +784,121 @@ export default function Onboarding({
 
         {step === 6 && (
           <>
-            <h1>How do you learn best?</h1>
-            <p>This tunes how much time each lesson gets and where the extra weight goes.</p>
-            <div className="ob-schedule-grid" style={{ gridTemplateColumns: "1fr" }}>
-              <div className="ob-field">
-                <label>Weakest Subject (gets extra time)</label>
-                <select value={weak} onChange={(e) => setWeak(e.target.value)}>
-                  <option value="-1">None / not sure</option>
-                  {subs.map((s, i) => <option key={i} value={String(i)}>{s.name}</option>)}
-                </select>
+            <h1>Tell me how you want to learn</h1>
+            <p>These choices only tune pacing and emphasis. The AI lesson generation and scheduler logic stay the same underneath.</p>
+            <div className="ob-schedule-grid">
+              <div className="ob-field ob-field-span-full">
+                <div className="ob-choice-card">
+                  <label>Weakest Subject</label>
+                  <div className="ob-range-hint">If one subject needs extra reinforcement, the planner can give it more attention.</div>
+                  <select value={weak} onChange={(e) => setWeak(e.target.value)}>
+                    <option value="-1">None / not sure</option>
+                    {subs.map((s, i) => <option key={i} value={String(i)}>{s.name}</option>)}
+                  </select>
+                </div>
               </div>
-              <div className="ob-field">
-                <label>Study Style</label>
-                <select value={style} onChange={(e) => setStyle(e.target.value)}>
-                  <option value="balanced">Balanced — all-round</option>
-                  <option value="theory">Theory heavy</option>
-                  <option value="practice">Practice heavy</option>
-                </select>
-              </div>
-              <div className="ob-field">
-                <label>Pre-Exam Revision Block</label>
-                <select value={revision} onChange={(e) => setRevision(e.target.value)}>
-                  <option value="1">Last 1 week</option>
-                  <option value="2">Last 2 weeks</option>
-                  <option value="3">Last 3 weeks</option>
-                  <option value="0">No revision block</option>
-                </select>
-              </div>
-              <div className="ob-field">
-                <label>Plan Mode</label>
-                <select value={planMode} onChange={(e) => setPlanMode(e.target.value)}>
-                  <option value="syllabus">Syllabus — from scratch</option>
-                  <option value="revision">Revision — studied once</option>
-                  <option value="mock">Mock-heavy — test &amp; fix</option>
-                </select>
-              </div>
+
+              <OnboardingChoiceGroup
+                label="Study Style"
+                hint="Choose the learning mix that feels most natural to you."
+                value={style}
+                options={STYLE_OPTIONS}
+                onChange={setStyle}
+                columns={3}
+                fullWidth
+              />
+
+              <OnboardingChoiceGroup
+                label="Revision Block"
+                hint="Reserve time near the end for a dedicated revision phase."
+                value={revision}
+                options={REVISION_OPTIONS}
+                onChange={setRevision}
+                columns={2}
+                fullWidth
+              />
+
+              <OnboardingChoiceGroup
+                label="Plan Mode"
+                hint="This changes how the schedule distributes time across lessons."
+                value={planMode}
+                options={PLAN_MODE_OPTIONS}
+                onChange={setPlanMode}
+                columns={3}
+                fullWidth
+              />
             </div>
           </>
         )}
 
         {step === 7 && (
           <>
-            <h1>Your Schedule</h1>
-            <p>Be honest about the hours. A plan you follow beats a plan that looks impressive.</p>
+            <h1>Set your study rhythm</h1>
+            <p>Use direct controls to shape a schedule that feels clean, realistic, and easy to follow day after day.</p>
             <div className="ob-schedule-grid">
               <div className="ob-field"><label>Start Date</label>
                 <input type="date" value={start} onChange={(e) => setStart(e.target.value)} /></div>
               <div className="ob-field"><label>Exam / Target Date</label>
                 <input type="date" value={exam} onChange={(e) => setExam(e.target.value)} /></div>
-              <div className="ob-field"><label>Daily Study Hours</label>
-                <select value={hrs} onChange={(e) => setHrs(Number(e.target.value))}>
-                  {[1,2,3,4,5,6,7,8,9,10,11,12].map((h) => <option key={h} value={h}>{h} hour{h > 1 ? "s" : ""}</option>)}
-                </select></div>
-              <div className="ob-field"><label>Subjects per Day</label>
-                <select value={spd} onChange={(e) => setSpd(Number(e.target.value))}>
-                  {[1,2,3,4,5,6].map((n) => <option key={n} value={n}>{n} subject{n > 1 ? "s" : ""}/day</option>)}
-                </select></div>
-              <div className="ob-field"><label>Study Days</label>
-                <select value={sdays} onChange={(e) => setSdays(e.target.value)}>
-                  <option value="all">All 7 days</option>
-                  <option value="6days">6 days (Sunday off)</option>
-                  <option value="weekdays">Weekdays only</option>
-                </select></div>
-              <div className="ob-field"><label>Buffer Days</label>
-                <input type="number" min={0} max={30} value={buffer} onChange={(e) => setBuffer(Number(e.target.value))} /></div>
+
+              <OnboardingSlider
+                label="Daily Study Hours"
+                value={hrs}
+                valueLabel={`${formatHoursCompact(hrs)}/day`}
+                hint={studyHourHint(hrs, sdays)}
+                min={0.5}
+                max={14}
+                step={0.5}
+                minLabel="30 min"
+                maxLabel="14h"
+                presets={HOURS_PRESETS}
+                onChange={setHrs}
+                fullWidth
+              />
+
+              <OnboardingSlider
+                label="Subjects per Day"
+                value={spd}
+                valueLabel={`${spd} subject${spd > 1 ? "s" : ""}`}
+                hint={subjectsPerDayHint(spd)}
+                min={1}
+                max={6}
+                step={1}
+                minLabel="1 subject"
+                maxLabel="6 subjects"
+                presets={SUBJECTS_PRESETS}
+                onChange={setSpd}
+              />
+
+              <OnboardingChoiceGroup
+                label="Study Days"
+                hint="Choose how many days per week you realistically want to study."
+                value={sdays}
+                options={STUDY_DAY_OPTIONS}
+                onChange={setSdays}
+                columns={3}
+                fullWidth
+              />
+
+              <OnboardingSlider
+                label="Buffer Days"
+                value={buffer}
+                valueLabel={`${buffer} day${buffer === 1 ? "" : "s"}`}
+                hint={bufferDaysHint(buffer)}
+                min={0}
+                max={30}
+                step={1}
+                minLabel="0 days"
+                maxLabel="30 days"
+                presets={BUFFER_PRESETS}
+                onChange={setBuffer}
+                fullWidth
+              />
             </div>
-            <div style={{ background: "var(--row-bg)", border: "1px solid var(--glass-border)", padding: 16, borderRadius: 12, textAlign: "center" }}>
-              <div style={{ fontSize: ".68rem", fontWeight: 800, textTransform: "uppercase", color: "var(--text-muted)", letterSpacing: 1 }}>Projected Syllabus Completion</div>
-              <div style={{ fontSize: "1.7rem", fontWeight: 800, marginTop: 4 }}>{prettyLong(projected)}</div>
-              <div style={{ fontSize: ".82rem", fontWeight: 650, marginTop: 4, color: feasible ? "var(--success-accent)" : "var(--danger-accent)" }}>
+            <div className="ob-projection-card">
+              <div className="ob-projection-label">Projected Syllabus Completion</div>
+              <div className="ob-projection-date">{prettyLong(projected)}</div>
+              <div className={`ob-projection-note ${feasible ? "ok" : "warn"}`}>
                 {feasible
                   ? `Comfortable — ${availDays} days available, ${Math.round(estMinutes / 60)}h of content.`
                   : `Tight — needs ~${Math.round(estMinutes / 60)}h but you only have ~${Math.round(capacity / 60)}h. I'll compress lessons.`}
@@ -551,44 +909,72 @@ export default function Onboarding({
 
         {step === 8 && (
           <>
-            <h1>Ready to build your plan</h1>
-            <p>The AI engine will break every subject into ordered lessons, sequence them by difficulty, weave in spaced-recall checkpoints and weekly tests, then map it all to your calendar.</p>
-            <div style={{ marginBottom: 18 }}>
-              <div className="ob-summary-row"><span>Learner</span><span>{name}</span></div>
-              <div className="ob-summary-row"><span>Programme</span><span>{resolvedCourseName}</span></div>
-              {specialisation.trim() && <div className="ob-summary-row"><span>Specialisation</span><span>{specialisation}</span></div>}
-              {institution.trim() && <div className="ob-summary-row"><span>Institution</span><span>{institution}</span></div>}
-              <div className="ob-summary-row"><span>Subjects</span><span>{subs.length}</span></div>
-              <div className="ob-summary-row"><span>Lessons to generate</span><span>{totalUnits}</span></div>
-              <div className="ob-summary-row"><span>Window</span><span>{prettyLong(start)} → {prettyLong(exam)}</span></div>
-              <div className="ob-summary-row"><span>Daily commitment</span><span>{hrs}h · {spd} subjects/day</span></div>
-              <div className="ob-summary-row"><span>Revision block</span><span>{revision === "0" ? "None" : `Last ${revision} week(s)`}</span></div>
-              <div className="ob-summary-row"><span>Buffer days</span><span>{buffer}</span></div>
-            </div>
-            {busy && (
-              <div style={{ background: "var(--accent-glow)", padding: 14, borderRadius: 12, fontSize: ".84rem", fontWeight: 650, marginBottom: 16 }}>
-                SHIGUN is analysing your syllabus and sequencing {totalUnits} lessons… this takes a few seconds.
+            <h1>Review your setup</h1>
+            <p>Everything below is still editable. When you continue, the planner uses the same AI and ML pipeline as before — only the onboarding presentation has changed.</p>
+            <div className="ob-review-grid">
+              <div className="ob-review-card">
+                <div className="ob-review-title">Plan snapshot</div>
+                <div className="ob-summary-row"><span>Learner</span><span>{name}</span></div>
+                <div className="ob-summary-row"><span>Programme</span><span>{resolvedCourseName}</span></div>
+                {specialisation.trim() && <div className="ob-summary-row"><span>Specialisation</span><span>{specialisation}</span></div>}
+                {institution.trim() && <div className="ob-summary-row"><span>Institution</span><span>{institution}</span></div>}
+                <div className="ob-summary-row"><span>Subjects</span><span>{subs.length}</span></div>
+                <div className="ob-summary-row"><span>Lesson units</span><span>{totalUnits}</span></div>
+                <div className="ob-summary-row"><span>Estimated content</span><span>{compactNumber(estHours)}h</span></div>
+                <div className="ob-summary-row"><span>Window</span><span>{prettyLong(start)} → {prettyLong(exam)}</span></div>
+                <div className="ob-summary-row"><span>Daily commitment</span><span>{formatHours(hrs)} · {spd} subjects/day</span></div>
+                <div className="ob-summary-row"><span>Study days</span><span>{STUDY_DAY_OPTIONS.find((option) => option.id === sdays)?.label || "All 7 days"}</span></div>
+                <div className="ob-summary-row"><span>Revision block</span><span>{revision === "0" ? "None" : `Last ${revision} week(s)`}</span></div>
+                <div className="ob-summary-row"><span>Buffer days</span><span>{buffer}</span></div>
               </div>
-            )}
+
+              <div className="ob-review-card">
+                <div className="ob-review-title">What happens next</div>
+                <div className="ob-review-check"><span className="ob-review-check-icon"><IconCheck size={12} /></span><div>Break each subject into sequenced lessons with prerequisites and key concepts.</div></div>
+                <div className="ob-review-check"><span className="ob-review-check-icon"><IconCheck size={12} /></span><div>Balance the schedule using your hours, study days, weak subjects, and revision buffer.</div></div>
+                <div className="ob-review-check"><span className="ob-review-check-icon"><IconCheck size={12} /></span><div>Generate a calendar you can re-plan later without losing the underlying learning logic.</div></div>
+                <div className="ob-review-pulse">
+                  <strong>{feasible ? "Looks comfortable" : "This plan will be tight"}</strong>
+                  <span>
+                    {feasible
+                      ? `${availDays} study days available for about ${compactNumber(estHours)} hours of content.`
+                      : `You have about ${Math.round(capacity / 60)} usable hours for roughly ${compactNumber(estHours)} hours of content, so the scheduler will compress where needed.`}
+                  </span>
+                </div>
+                {busy && (
+                  <div className="ob-review-loading">
+                    SHIGUN is analysing your syllabus and sequencing {totalUnits} lessons… this takes a few seconds.
+                  </div>
+                )}
+              </div>
+            </div>
           </>
         )}
 
-        {err && <div style={{ color: "var(--danger-accent)", fontSize: ".8rem", fontWeight: 700, marginBottom: 12 }}>{err}</div>}
+        {err && <div className="ob-error-banner">{err}</div>}
 
-        <div className="ob-btn-row mt-md">
-          {step > 1 && <button className="ob-btn ob-btn-secondary" onClick={back} disabled={busy || suggesting}>Back</button>}
-          {step < total && <button className="ob-btn ob-btn-primary" onClick={next} disabled={suggesting}>{suggesting ? "Assessing…" : step === 1 ? "Let's Start" : step === 4 ? "Assess & Continue" : "Continue"}</button>}
-          {step === total && (
-            <button className="ob-btn ob-btn-primary" onClick={launch} disabled={busy}>
-              {busy ? "Generating…" : isRerun ? "Wipe old plan & Generate New" : "Generate My AI Plan"}
-            </button>
-          )}
+        <div className="ob-footer-strip mt-md">
+          <div className="ob-footnote">
+            {step === total
+              ? "The same AI and ML planning pipeline will generate your schedule from this setup."
+              : "This refresh changes the onboarding UI only — your planner logic and later settings workflow stay the same."}
+          </div>
+          <div className="ob-btn-row">
+            {step > 1 && <button className="ob-btn ob-btn-secondary" onClick={back} disabled={busy || suggesting}>Back</button>}
+            {step < total && <button className="ob-btn ob-btn-primary" onClick={next} disabled={suggesting}>{suggesting ? "Assessing…" : step === 1 ? "Let's Start" : step === 4 ? "Assess & Continue" : "Continue"}</button>}
+            {step === total && (
+              <button className="ob-btn ob-btn-primary" onClick={launch} disabled={busy}>
+                {busy ? "Generating…" : isRerun ? "Wipe old plan & Generate New" : "Generate My AI Plan"}
+              </button>
+            )}
+          </div>
         </div>
         {isRerun && onCancel && (
           <button className="ob-cancel-link" onClick={onCancel} disabled={busy}>
             Cancel — keep my current plan
           </button>
         )}
+        </div>
       </div>
     </div>
   );

@@ -1236,8 +1236,8 @@ export function parseCommand(q: string): TutorReply["action"] | undefined {
   if (/\b(re-?plan|rebuild|regenerate|reschedule|re-?balance|redo my (plan|schedule)|fix my (plan|schedule)|update my plan)\b/.test(n)) return { type: "replan" };
 
   const themeIntent = n.includes("theme")
-    || /\b(dark|light|midnight|obsidian|nebula|mint|sunset|lavender|emerald) mode\b/.test(n)
-    || /\b(switch to|change to|use|set|enable)\b.*\b(dark|light|midnight|obsidian|nebula|mint|sunset|lavender|emerald|silver|samsung)\b/.test(n);
+    || /\b(dark|light|default|midnight|obsidian|nebula|mint|sunset|lavender|emerald) mode\b/.test(n)
+    || /\b(switch to|change to|use|set|enable)\b.*\b(dark|light|default|midnight|obsidian|nebula|mint|sunset|lavender|emerald|silver|samsung|clean|white)\b/.test(n);
   if (themeIntent) {
     // Payloads are the raw THEME IDS stored in settings.theme — the UI
     // applies them as `theme-${id}`, so never prefix "theme-" here.
@@ -1246,7 +1246,7 @@ export function parseCommand(q: string): TutorReply["action"] | undefined {
     if (/(nebula)/.test(n)) return { type: "theme", payload: "nebula" };
     if (/(emerald|mint)/.test(n)) return { type: "theme", payload: "mint" };
     if (/(sunset|champagne)/.test(n)) return { type: "theme", payload: "sunset" };
-    if (/(bright|lighter|light|samsung|clean|white)/.test(n)) return { type: "theme", payload: "silver-lavender" };
+    if (/(default|bright|lighter|light|samsung|clean|white)/.test(n)) return { type: "theme", payload: "default" };
     if (/(silver|lavender)/.test(n)) return { type: "theme", payload: "silver-lavender" };
     // Vague requests ("something nicer/brighter/cooler") fall through to
     // the LLM, which understands intent and replies with [[action:theme:x]].
@@ -1697,11 +1697,11 @@ APP CONTROL — SHIGUN directly controls this app. When the learner requests an 
 [[action:navigate:planner]]  [[action:navigate:dashboard]]  [[action:navigate:subjects]]
 [[action:navigate:settings]]  [[action:navigate:focus]]
 [[action:theme:dark]]  [[action:theme:obsidian]]  [[action:theme:nebula]]
-[[action:theme:mint]]  [[action:theme:sunset]]  [[action:theme:silver-lavender]]
+[[action:theme:mint]]  [[action:theme:sunset]]  [[action:theme:default]]  [[action:theme:silver-lavender]]
 [[action:startTimer]]  [[action:stopTimer]]  [[action:pause]]  [[action:resume]]
 [[action:break]]  [[action:zen]]  [[action:replan]]
-Theme aliases: midnight/dark/black → dark | lavender/silver/light → silver-lavender |
-emerald → mint | champagne → sunset | "default/previous" → silver-lavender.
+Theme aliases: default/light/clean/white → default | lavender/silver → silver-lavender |
+emerald → mint | champagne → sunset | midnight/dark/black → dark | "previous" → silver-lavender.
 Rules: emit ONE tag max, only when the learner clearly requests that specific action.
 Never claim you cannot control themes, timers, navigation or replanning — you always can.
 For pure study questions, emit no tag.`;
@@ -1728,7 +1728,7 @@ export function extractLlmAction(reply: string): {
   const text = reply.slice(0, finalTag.index).trim();
 
   const NAV = new Set(["planner", "dashboard", "subjects", "settings", "focus"]);
-  const THEMES_SET = new Set(["dark", "obsidian", "nebula", "mint", "sunset", "silver-lavender"]);
+  const THEMES_SET = new Set(["default", "dark", "obsidian", "nebula", "mint", "sunset", "silver-lavender"]);
   const BARE = new Set(["startTimer", "stopTimer", "pause", "resume", "break", "zen", "replan"]);
 
   if (type === "navigate" && payload && NAV.has(payload)) return { text, action: { type, payload } };
