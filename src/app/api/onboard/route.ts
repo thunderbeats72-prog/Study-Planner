@@ -5,6 +5,7 @@ import { eq, sql } from "drizzle-orm";
 import { buildContext, dateFrom, fullState, getOrCreateUser, keyFrom } from "@/lib/state";
 import { aiGenerateTopics, type GeneratedTopic } from "@/lib/ai";
 import { buildPlan, type PlanSettings } from "@/lib/planner";
+import { learnWeekdays, weekdayLoadFactor } from "@/lib/ml";
 import { checkRateLimit } from "@/lib/rateLimit";
 import {
   assertDateWindow, enumValue, finiteNumber, isoDate, readJsonObject,
@@ -192,6 +193,13 @@ export async function POST(req: Request) {
     const finalSettings = { ...planSettings, weakSubject };
     await tx.update(settings).set(finalSettings).where(eq(settings.userId, user.id));
 
+    const existingTasks = await tx.select().from(tasks).where(eq(tasks.userId, user.id));
+    const historyRows = existingTasks.map((t) => ({
+      subjectId: t.subjectId, topicId: t.topicId, date: t.date, kind: t.kind,
+      status: t.status, plannedMinutes: t.plannedMinutes, actualMinutes: t.actualMinutes,
+    }));
+    const weekdays = learnWeekdays(historyRows);
+
     const result = buildPlan(
       insertedSubjects.map((subject) => ({
         id: subject.id, name: subject.name, difficulty: subject.difficulty, color: subject.color,
@@ -199,8 +207,10 @@ export async function POST(req: Request) {
       insertedTopics.map((topic) => ({
         id: topic.id, subjectId: topic.subjectId, title: topic.title, unit: topic.unit,
         estMinutes: topic.estMinutes, difficulty: topic.difficulty, mastery: topic.mastery,
+        practice: topic.practice,
       })),
-      finalSettings
+      finalSettings,
+      { dayFactor: (date) => weekdayLoadFactor(weekdays, date) }
     );
     stats = result.stats;
     const plannedRows = result.tasks.map((task) => ({ ...task, userId: user.id }));

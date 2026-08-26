@@ -146,7 +146,7 @@ export default function PlannerView({
             }}>
             {task.status === "done" ? "Undo" : "Done"}
           </button>
-          {task.status !== "skipped" && (
+          {task.status !== "skipped" && task.status !== "done" && (
             <button className="btn btn-xs btn-secondary" title="Skip"
               onClick={() => onTaskStatus(task.id, "skipped")}>Skip</button>
           )}

@@ -61,7 +61,7 @@ export default function SubjectsView({
                   <div className="slide-in" style={{ marginTop: 16 }}>
                     {list.map((tp, i) => (
                       <React.Fragment key={tp.id}>
-                        <div className="task-row">
+                        <div className="task-row subject-lesson-row">
                           <div className="task-info-top">
                             <div style={{ fontSize: ".76rem", fontWeight: 800, color: "var(--text-dim)", width: 24, marginTop: 2 }}>{i + 1}</div>
                             <div className="task-info">
@@ -81,7 +81,7 @@ export default function SubjectsView({
                           </div>
                         </div>
                         {openLesson === tp.id && (
-                          <div className="lesson-detail slide-in">
+                          <div className="lesson-detail subject-lesson-detail slide-in">
                             <p className="lesson-summary">{tp.summary}</p>
                             {!!tp.prerequisites?.length && (
                               <div className="lesson-detail-block">

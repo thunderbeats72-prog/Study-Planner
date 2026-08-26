@@ -102,6 +102,7 @@ export async function regeneratePlan(userId: number, settingsRow: {
       subjectId: t.subjectId,
       title: t.title,
       unit: t.unit,
+      practice: t.practice,
       // ML pace adjustment: subject-level pace refined by topic-cluster
       // evidence ("Testing of Hypothesis" may be slower for this user
       // than the rest of Quant Methods). Neutral ×1.0 until data exists.

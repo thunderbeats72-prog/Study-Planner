@@ -448,6 +448,10 @@ export default function Dashboard({
                 onClick={() => onTaskStatus(task.id, task.status === "done" ? "pending" : "done")}>
                 {task.status === "done" ? "Undo" : "Done"}
               </button>
+              {task.status !== "skipped" && task.status !== "done" && (
+                <button className="btn btn-xs btn-secondary" title="Skip"
+                  onClick={() => onTaskStatus(task.id, "skipped")}>Skip</button>
+              )}
             </div>
           );
         })}
