@@ -69,3 +69,9 @@ export const IconCopy = ({ size = 13 }: P) => (
 export const IconSignal = ({ size = 14 }: P) => (
   <svg {...base(size)}><path d="M2 20h.01M7 20v-4M12 20v-8M17 20V8M22 20V4" /></svg>
 );
+export const IconLock = ({ size = 14 }: P) => (
+  <svg {...base(size)}><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
+);
+export const IconTarget = ({ size = 14 }: P) => (
+  <svg {...base(size)}><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="6" /><circle cx="12" cy="12" r="2" /></svg>
+);

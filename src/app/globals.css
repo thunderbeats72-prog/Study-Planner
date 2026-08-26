@@ -2351,22 +2351,27 @@ button,a,.nav-item,.vtab,.cal-cell,.chip,.task-row,.rate-btn,input,select{touch-
 .sb-toggle:active{transform:scale(.92)}
 .sb-toggle svg{transition:transform .3s var(--spring-soft)}
 
-/* ── Collapsed rail: icons only ── */
-.app-wrapper.sb-collapsed .sidebar{width:78px;padding-left:10px;padding-right:10px}
-.app-wrapper.sb-collapsed .sb-toggle{position:static;margin:0 auto 12px}
-.app-wrapper.sb-collapsed .sb-toggle svg{transform:rotate(180deg)}
-.app-wrapper.sb-collapsed .brand-header{justify-content:center;padding:0 0 14px}
-.app-wrapper.sb-collapsed .brand-text{display:none}
-.app-wrapper.sb-collapsed .brand-header{display:flex}
-.app-wrapper.sb-collapsed .nav-list{gap:6px;margin-top:6px}
-.app-wrapper.sb-collapsed .nav-item{justify-content:center;padding:11px 0;gap:0}
-.app-wrapper.sb-collapsed .nav-item span{display:none}
-.app-wrapper.sb-collapsed .nav-item svg{width:20px;height:20px}
-.app-wrapper.sb-collapsed .sidebar-foot{display:none}
-/* icon-only nav keeps its pill geometry centred */
-.app-wrapper.sb-collapsed .nav-item.active::before{display:none}
-@media(min-width:861px) and (max-width:1100px){
-  .app-wrapper.sb-collapsed .sidebar{width:68px}
+/* ── Collapsed rail: icons only — DESKTOP ONLY.
+   On phones the sidebar IS the bottom dock; the collapse preference
+   (saved from a desktop session) must never strip the dock labels or
+   resize its icons — that read as misaligned bare icons on mobile. ── */
+@media(min-width:861px){
+  .app-wrapper.sb-collapsed .sidebar{width:78px;padding-left:10px;padding-right:10px}
+  .app-wrapper.sb-collapsed .sb-toggle{position:static;margin:0 auto 12px}
+  .app-wrapper.sb-collapsed .sb-toggle svg{transform:rotate(180deg)}
+  .app-wrapper.sb-collapsed .brand-header{justify-content:center;padding:0 0 14px}
+  .app-wrapper.sb-collapsed .brand-text{display:none}
+  .app-wrapper.sb-collapsed .brand-header{display:flex}
+  .app-wrapper.sb-collapsed .nav-list{gap:6px;margin-top:6px}
+  .app-wrapper.sb-collapsed .nav-item{justify-content:center;padding:11px 0;gap:0}
+  .app-wrapper.sb-collapsed .nav-item span{display:none}
+  .app-wrapper.sb-collapsed .nav-item svg{width:20px;height:20px}
+  .app-wrapper.sb-collapsed .sidebar-foot{display:none}
+  /* icon-only nav keeps its pill geometry centred */
+  .app-wrapper.sb-collapsed .nav-item.active::before{display:none}
+  @media(min-width:861px) and (max-width:1100px){
+    .app-wrapper.sb-collapsed .sidebar{width:68px}
+  }
 }
 /* On mobile the sidebar IS the bottom dock — the collapse toggle is hidden */
 @media(max-width:860px){
@@ -3056,4 +3061,86 @@ body.theme-dark .ob-card,body.theme-obsidian .ob-card,body.theme-nebula .ob-card
   .ob-btn-row{width:100%;justify-content:stretch}
   .ob-btn{min-width:0}
   .ob-privacy{max-width:none;justify-content:center}
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   v9 — ICON ALIGNMENT + MOBILE COMPATIBILITY PASS
+   (appended last so it wins the cascade over the sections above)
+═══════════════════════════════════════════════════════════════ */
+
+/* ── 1. Icons never squash, never drift ────────────────────────────
+   SVGs are flex items inside buttons, chips, the tracker bar and the
+   mobile dock; under tight widths flex used to squeeze them, which
+   read as "the icons are not aligned". Every icon now keeps its exact
+   pixel size and sits on the optical middle of its container. */
+svg{flex-shrink:0;vertical-align:middle}
+.btn svg,.chip svg,.nav-item svg,.streak-badge svg,.tracker-bar svg,
+.toast-icon svg,.voice-btn svg,.ai-copy svg,.ai-close svg,.ai-send svg,
+.ai-fab svg,.shigun-avatar svg,.ai-mini-avatar svg,.companion-orb svg,
+.ob-step-node svg,.ob-course-check svg,.ob-feature-icon svg,
+.ob-review-check-icon svg,.ob-brand-mark svg,.brand-logo-icon svg,
+.confirm-icon svg,.empty-state-icon svg{display:block;flex:0 0 auto}
+
+/* ── 2. Mobile dock: each icon perfectly centred over its label ──── */
+@media(max-width:860px){
+  .sidebar .nav-item{
+    flex-direction:column;justify-content:center;align-items:center;
+    text-align:center;gap:4px;padding:6px 4px;min-width:0;
+  }
+  .sidebar .nav-item svg{width:22px;height:22px;margin:0 auto}
+  .sidebar .nav-item span{
+    display:block;width:100%;line-height:1.25;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  /* The active item used to float 3px above its siblings, which made
+     the dock icons look misaligned. All items now share one baseline;
+     the gradient pill still marks the active tab. */
+  .sidebar .nav-item.active{transform:none}
+}
+/* Landscape phones: icon + label side by side so the dock stays slim */
+@media(max-width:900px) and (max-height:500px) and (orientation:landscape){
+  .sidebar .nav-item{flex-direction:row;gap:6px;padding:4px 6px;min-height:44px}
+  .sidebar .nav-item svg{margin:0}
+  .sidebar .nav-item span{width:auto;overflow:visible}
+}
+
+/* ── 3. Mobile header: brand mark + streak flame on one centred line */
+.mobile-header{align-items:center}
+.mobile-header .flex-row{min-width:0}
+.mobile-header .brand-logo-icon{flex-shrink:0}
+.mobile-header .streak-badge{flex-shrink:0;display:inline-flex;align-items:center}
+@media(max-width:430px){
+  .mobile-header{padding-left:10px;padding-right:10px}
+  .mobile-header .streak-badge{font-size:.62rem;padding:3px 8px;gap:5px}
+}
+
+/* ── 4. Tracker bar: icon buttons stay centred, never off-grid ───── */
+.tracker-actions .btn-xs{display:inline-flex;align-items:center;justify-content:center}
+.tracker-actions .btn-xs svg{width:14px;height:14px}
+@media(max-width:640px){
+  /* Zen becomes a true square icon button — no leftover text gap */
+  .tracker-actions .btn-xs:last-child{width:34px;min-width:34px;aspect-ratio:1/1;padding:0;gap:0;font-size:0}
+}
+
+/* ── 5. Task rows on phones: colour dot lines up with line 1 ─────── */
+@media(max-width:640px){
+  .task-row > .task-dot{left:12px;top:19px}
+  .task-main{padding-left:22px}
+  .brief-chev{margin-left:6px}
+}
+
+/* ── 6. Chat sheet: header + composer icons optically centred ────── */
+.ai-head-main{align-items:center}
+.shigun-avatar svg,.ai-mini-avatar svg{display:block}
+
+/* ── 7. Small-phone dock breathing room ──────────────────────────── */
+@media(max-width:360px){
+  .sidebar .nav-item{gap:3px;padding:5px 2px}
+  .sidebar .nav-item svg{width:20px;height:20px}
+}
+
+/* ── 8. Ultra-wide safe areas: dock + header never touch the notch ─ */
+@media(max-width:860px){
+  .mobile-header{padding-left:max(12px,env(safe-area-inset-left));padding-right:max(12px,env(safe-area-inset-right))}
+  .sidebar{left:max(10px,env(safe-area-inset-left));right:max(10px,env(safe-area-inset-right))}
 }
