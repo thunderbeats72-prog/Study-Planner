@@ -312,7 +312,7 @@ export async function applyCompletionMastery(
   await tx
     .update(topics)
     .set(topicPatch)
-    .where(and(eq(topics.id, topic.id), eq(topics.userId, topic.userId)));
+    .where(and(eq(topics.id, topic.id), eq(topics.userId, updated.userId)));
 }
 
 export async function clearPlan(userId: number) {

@@ -3,6 +3,40 @@
 
 ---
 
+## v18 — DEPLOY BUNDLE RESYNC + CHECKPOINT NORMALIZATION + README TRUTH (this session)
+
+Root cause found for "I mentioned this before and it's still not resolved":
+the drag-and-drop deploy bundle had drifted far behind `src/`.
+
+1. **`deploy-package/` resynced** — it was pre-v15 (missing `completion.ts`,
+   `routeGuard.ts`, `demoState.ts`, `icon.svg`, all v15–v18 UI/API fixes).
+   Deploying it shipped stale behaviour. It is now a byte-exact mirror of
+   `src/` (`diff -rq src deploy-package/src` is empty), and
+   `deploy-package/README.txt` is a copy of the root README. After every
+   future session that touches `src/`, re-sync the bundle.
+2. **Checkpoint titles never show "#0"** — new shared helper
+   `normalizeCheckpointTitle()` in `src/lib/client.ts` (handles
+   `Weekly Checkpoint Test #0`, `Weekly Checkpoint · Test #0`, unspaced
+   later numbers → canonical `Weekly Checkpoint · Test #N`, 1-based).
+   Dashboard.tsx and PlannerView.tsx both use it (duplicated regexes
+   removed). Tests: test-suite section "5c. Weekly Checkpoint Title
+   Normalization" (124/124 pass).
+3. **README AI docs now match the app** — root README.txt no longer tells
+   users to set GROQ/XAI/OpenRouter keys or use the removed Settings →
+   AI Connectivity panel; it documents the real 5-provider chain
+   (Cerebras → Mistral → SambaNova → Cohere → Gemini), local ML engine,
+   and the live health endpoints. Added a "v18 FIXES" section.
+4. **Latent bug fixed** — `applyCompletionMastery` in `src/lib/state.ts`
+   updated topics with `eq(topics.userId, topic.userId)` (column compared
+   to itself) instead of the task's userId.
+5. **`.env.example`** now documents the preview-only `SPP_DEMO_DATA=1` flag.
+
+Note: no PostgreSQL is available in the sandbox; the app was exercised in
+`SPP_DEMO_DATA=1` demo mode (dev server, port 3000). All checks green:
+typecheck, lint (0 warnings), 124/124 tests, `npm run build:app`.
+
+---
+
 ## CONTEXT (what was already done in the merged session)
 
 The following changes were made and merged. Do NOT redo them — just verify they are present:
@@ -235,6 +269,19 @@ These run 100% on the server from your own logged data. Adding an AI key makes S
 ---
 
 ## FILES CHANGED IN THIS SESSION (for reference)
+
+v18 session (deploy resync + checkpoint normalization + docs):
+```
+deploy-package/src/**             ← byte-exact re-sync from src/ (was stale pre-v15)
+deploy-package/README.txt         ← copy of root README
+src/lib/client.ts                 ← NEW normalizeCheckpointTitle helper
+src/components/Dashboard.tsx      ← uses shared checkpoint normalizer
+src/components/PlannerView.tsx    ← uses shared checkpoint normalizer
+src/lib/state.ts                  ← applyCompletionMastery userId fix
+scripts/test-suite.ts             ← "5c. Weekly Checkpoint Title Normalization"
+README.txt                        ← AI config section corrected + v18 section
+.env.example                      ← SPP_DEMO_DATA documented
+```
 
 Previous session:
 ```

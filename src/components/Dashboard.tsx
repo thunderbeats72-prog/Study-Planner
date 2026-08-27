@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { api, addDays, dayDiff, mdToHtml, prettyLong, today, KIND_META, type AppState } from "@/lib/client";
+import { api, addDays, dayDiff, mdToHtml, prettyLong, today, KIND_META, normalizeCheckpointTitle, type AppState } from "@/lib/client";
 import { mmss } from "@/lib/useTimer";
 import { IconSpark } from "./icons";
 import TaskEditor, { type TaskPatch } from "./TaskEditor";
@@ -460,10 +460,7 @@ export default function Dashboard({
           const isCheckpoint = task.title.toLowerCase().includes("checkpoint") || (task.kind === "mock" && !task.subjectId);
           const kindLabel = isCheckpoint ? "Checkpoint" : meta.label;
           const dotColor = subj?.color || (isCheckpoint ? "var(--color-primary)" : meta.color);
-          const formattedTitle = isCheckpoint
-            ? task.title.replace(/Weekly Checkpoint(?: Test)? #?0\b/i, "Weekly Checkpoint · Test #1")
-                        .replace(/Weekly Checkpoint Test #(\d+)/i, "Weekly Checkpoint · Test #$1")
-            : task.title;
+          const formattedTitle = isCheckpoint ? normalizeCheckpointTitle(task.title) : task.title;
           return (
             <div key={task.id} className={`task-row clean-list${task.status === "done" ? " done" : ""}${activeTaskId === task.id ? " active-clock" : ""}${moreActionsId === task.id ? " expanded-actions" : ""}`}>
               <div className="task-dot" style={{ background: dotColor }} />

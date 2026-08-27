@@ -12,7 +12,7 @@ import { detectLanguage } from "../src/lib/language";
 import { wikiLangFor, searchTerms, teachFromKnowledge, isRelevantKnowledge } from "../src/lib/knowledge";
 import { appendChatTurn, isFallbackUser } from "../src/lib/chatTurn";
 import { mergeTranscriptSegments } from "../src/lib/transcript";
-import { mdToHtml } from "../src/lib/client";
+import { mdToHtml, normalizeCheckpointTitle } from "../src/lib/client";
 import { buildPlan, countStudyDays, projectCompletionDate } from "../src/lib/planner";
 import { cbseCatalogFor, nmimsSem1Subjects } from "../src/lib/curriculum";
 import { finiteNumber, isIsoDate } from "../src/lib/validation";
@@ -417,6 +417,28 @@ async function runTests() {
   check(nextPendingTask(dayTasks, "2026-08-27", 2)?.id === 3, "Next task follows schedule order after the exclusion");
   check(nextPendingTask(dayTasks, "2026-08-28", null)?.id === 4, "Next-day tasks are found by their own date");
   check(nextPendingTask(dayTasks, "2026-08-29", null) === null, "No pending task returns null");
+
+  console.log("\n--- 5c. Weekly Checkpoint Title Normalization ---");
+  check(
+    normalizeCheckpointTitle("Weekly Checkpoint Test #0") === "Weekly Checkpoint · Test #1",
+    "Legacy space-form #0 normalizes to Test #1"
+  );
+  check(
+    normalizeCheckpointTitle("Weekly Checkpoint · Test #0") === "Weekly Checkpoint · Test #1",
+    "Dotted legacy #0 normalizes to Test #1"
+  );
+  check(
+    normalizeCheckpointTitle("Weekly Checkpoint Test #3") === "Weekly Checkpoint · Test #3",
+    "Unspaced later numbers keep their count and gain the dot"
+  );
+  check(
+    normalizeCheckpointTitle("Weekly Checkpoint · Test #4") === "Weekly Checkpoint · Test #4",
+    "Canonical dotted form is already stable"
+  );
+  check(
+    normalizeCheckpointTitle("Recall: Photosynthesis") === "Recall: Photosynthesis",
+    "Non-checkpoint titles are never touched"
+  );
 
   console.log("\n--- 6. Curriculum Ground Truth ---");
   check(nmimsSem1Subjects().length === 6, "NMIMS Semester 1 ground truth has 6 subjects");

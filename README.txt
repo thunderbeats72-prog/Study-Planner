@@ -49,24 +49,29 @@ LOCAL DEVELOPMENT
 
 AI CONFIGURATION & DIAGNOSTICS
 ------------------------------
-Use GEMINI_API_KEY, GROQ_API_KEY, XAI_API_KEY (Grok) and/or OPENROUTER_API_KEY.
-Never put a secret in a NEXT_PUBLIC_* variable. Providers fail over inside one
-bounded request — Gemini → Groq → Grok → OpenRouter — and each provider now has
-a MODEL FALLBACK CHAIN, because model IDs retire (Groq shut down
-llama-3.3-70b-versatile and llama-3.1-8b-instant on 2026-08-16, which silently
-killed deployments pinned to them; the default is now openai/gpt-oss-120b).
-The last provider/model that answered is remembered and tried first.
+Use CEREBRAS_API_KEY, MISTRAL_API_KEY, SAMBANOVA_API_KEY, COHERE_API_KEY
+and/or GEMINI_API_KEY. Never put a secret in a NEXT_PUBLIC_* variable.
+You do NOT need all five — even one key works. Providers fail over inside one
+bounded request in priority order: Cerebras → Mistral → SambaNova → Cohere →
+Gemini — and each provider has its own MODEL FALLBACK CHAIN, because model IDs
+retire. The last provider/model that answered is remembered and tried first.
+Old GROQ_API_KEY / XAI_API_KEY / OPENROUTER_API_KEY values are ignored — those
+providers have been removed from the app (delete them or leave them, it makes
+no difference). The local ML engine (FSRS-lite, pace models, skip-risk,
+weekday propensity, focus hours, Ebbinghaus decay) answers plan/progress
+questions even with zero keys.
 GET  /api/health   — database status + configured provider names + last result.
 GET  /api/ai-status — same snapshot, cache-free.
 POST /api/ai-status — LIVE probe: one tiny real request to every configured
                      provider, reporting ok / latency / HTTP status / reason
                      (rejected key, retired model, rate limit, timeout, network
-                     block). The same test is available in-app under
-                     Settings → AI Connectivity → “Run connectivity test”.
-The chat header also shows which providers are live. If every cloud fails, the
-local Wikipedia-backed tutor (now with progressive multi-probe search) answers
-instead of an apology, and the toast explains exactly which provider failed why.
-Optional tuning: AI_TIMEOUT_MS (default 24000) and AI_PROVIDER_ORDER.
+                     block).
+The chat header shows Ready when cloud tutoring is available, Local mode
+otherwise. If every cloud fails, the local Wikipedia-backed tutor (now with
+progressive multi-probe search) answers instead of an apology, and the toast
+explains exactly which provider failed why.
+Optional tuning: AI_TIMEOUT_MS (default 24000) and AI_PROVIDER_ORDER (a
+comma-separated subset or reorder of the five providers).
 Gemini 3.1 TTS uses Google's current Interactions API and automatically falls
 back to the device voice under a shared timeout.
 
@@ -100,6 +105,28 @@ start promptly, the answer continues in the closest available device voice
 instead of stopping on a “voice model unavailable” error; the chat shows a
 clear non-error notice. One failed long-answer part switches the remaining
 parts to that local voice, so every later part keeps flowing.
+
+v18 FIXES (this build)
+----------------------
+ - DEPLOY-PACKAGE RESYNCED AGAIN: the drag-and-drop deploy folder had
+   drifted far behind src/ (it predated the study-clock auto-completion,
+   the one-per-row planner list, the sidebar rail, the rebuilt mobile
+   top bar and the DB-less route guard). Deploying it shipped months of
+   stale behaviour — exactly the "I reported this and it's still not
+   fixed" symptom. It is again a byte-exact mirror of src/, and the
+   bundle README now matches the live app.
+ - WEEKLY CHECKPOINT TITLES NEVER SHOW "#0": checkpoint-title
+   normalisation is now one shared helper (src/lib/client.ts →
+   normalizeCheckpointTitle) used by both the Overview and the Planner.
+   Every legacy form — "Weekly Checkpoint Test #0", "Weekly Checkpoint
+   · Test #0", unspaced later numbers — renders as the canonical
+   "Weekly Checkpoint · Test #N" (1-based). Covered by test-suite
+   section 5c.
+ - README AI DOCS MATCH THE APP: the guide no longer sends you to set
+   GROQ/XAI/OpenRouter keys or a removed Settings → AI Connectivity
+   panel. It documents the real five-provider chain (Cerebras →
+   Mistral → SambaNova → Cohere → Gemini), the local ML engine, and
+   the health endpoints that actually exist.
 
 v16 UI POLISH (this build)
 --------------------------

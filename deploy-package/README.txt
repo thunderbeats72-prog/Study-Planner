@@ -49,24 +49,29 @@ LOCAL DEVELOPMENT
 
 AI CONFIGURATION & DIAGNOSTICS
 ------------------------------
-Use GEMINI_API_KEY, GROQ_API_KEY, XAI_API_KEY (Grok) and/or OPENROUTER_API_KEY.
-Never put a secret in a NEXT_PUBLIC_* variable. Providers fail over inside one
-bounded request — Gemini → Groq → Grok → OpenRouter — and each provider now has
-a MODEL FALLBACK CHAIN, because model IDs retire (Groq shut down
-llama-3.3-70b-versatile and llama-3.1-8b-instant on 2026-08-16, which silently
-killed deployments pinned to them; the default is now openai/gpt-oss-120b).
-The last provider/model that answered is remembered and tried first.
+Use CEREBRAS_API_KEY, MISTRAL_API_KEY, SAMBANOVA_API_KEY, COHERE_API_KEY
+and/or GEMINI_API_KEY. Never put a secret in a NEXT_PUBLIC_* variable.
+You do NOT need all five — even one key works. Providers fail over inside one
+bounded request in priority order: Cerebras → Mistral → SambaNova → Cohere →
+Gemini — and each provider has its own MODEL FALLBACK CHAIN, because model IDs
+retire. The last provider/model that answered is remembered and tried first.
+Old GROQ_API_KEY / XAI_API_KEY / OPENROUTER_API_KEY values are ignored — those
+providers have been removed from the app (delete them or leave them, it makes
+no difference). The local ML engine (FSRS-lite, pace models, skip-risk,
+weekday propensity, focus hours, Ebbinghaus decay) answers plan/progress
+questions even with zero keys.
 GET  /api/health   — database status + configured provider names + last result.
 GET  /api/ai-status — same snapshot, cache-free.
 POST /api/ai-status — LIVE probe: one tiny real request to every configured
                      provider, reporting ok / latency / HTTP status / reason
                      (rejected key, retired model, rate limit, timeout, network
-                     block). The same test is available in-app under
-                     Settings → AI Connectivity → “Run connectivity test”.
-The chat header also shows which providers are live. If every cloud fails, the
-local Wikipedia-backed tutor (now with progressive multi-probe search) answers
-instead of an apology, and the toast explains exactly which provider failed why.
-Optional tuning: AI_TIMEOUT_MS (default 24000) and AI_PROVIDER_ORDER.
+                     block).
+The chat header shows Ready when cloud tutoring is available, Local mode
+otherwise. If every cloud fails, the local Wikipedia-backed tutor (now with
+progressive multi-probe search) answers instead of an apology, and the toast
+explains exactly which provider failed why.
+Optional tuning: AI_TIMEOUT_MS (default 24000) and AI_PROVIDER_ORDER (a
+comma-separated subset or reorder of the five providers).
 Gemini 3.1 TTS uses Google's current Interactions API and automatically falls
 back to the device voice under a shared timeout.
 
@@ -100,6 +105,127 @@ start promptly, the answer continues in the closest available device voice
 instead of stopping on a “voice model unavailable” error; the chat shows a
 clear non-error notice. One failed long-answer part switches the remaining
 parts to that local voice, so every later part keeps flowing.
+
+v18 FIXES (this build)
+----------------------
+ - DEPLOY-PACKAGE RESYNCED AGAIN: the drag-and-drop deploy folder had
+   drifted far behind src/ (it predated the study-clock auto-completion,
+   the one-per-row planner list, the sidebar rail, the rebuilt mobile
+   top bar and the DB-less route guard). Deploying it shipped months of
+   stale behaviour — exactly the "I reported this and it's still not
+   fixed" symptom. It is again a byte-exact mirror of src/, and the
+   bundle README now matches the live app.
+ - WEEKLY CHECKPOINT TITLES NEVER SHOW "#0": checkpoint-title
+   normalisation is now one shared helper (src/lib/client.ts →
+   normalizeCheckpointTitle) used by both the Overview and the Planner.
+   Every legacy form — "Weekly Checkpoint Test #0", "Weekly Checkpoint
+   · Test #0", unspaced later numbers — renders as the canonical
+   "Weekly Checkpoint · Test #N" (1-based). Covered by test-suite
+   section 5c.
+ - README AI DOCS MATCH THE APP: the guide no longer sends you to set
+   GROQ/XAI/OpenRouter keys or a removed Settings → AI Connectivity
+   panel. It documents the real five-provider chain (Cerebras →
+   Mistral → SambaNova → Cohere → Gemini), the local ML engine, and
+   the health endpoints that actually exist.
+
+v16 UI POLISH (this build)
+--------------------------
+ - TRUE LIST VIEWS: Planner day blocks and the Overview's "Today's Study
+   Load" are real lists again — rows span the panel edge to edge, divided
+   by clean hairlines instead of each row wearing its own card border,
+   shadow and rounded corners.
+ - ALIGNED ROW CONTROLS: every task row's buttons share one height, the
+   clock button keeps a stable width so the CTA column never jumps, and
+   Done owns the right edge. On phones the visible actions (Done · Clock
+   in/out · ⋯) form one even, full-width 3-column bar, with Edit / Skip
+   subject / Skip revealed by ⋯ wrapping into tidy rows underneath.
+ - CALENDAR COLOUR EVERYWHERE: each calendar day with tasks is softly
+   tinted with its first subject's colour, and on phones the coloured
+   topic pills are visible again (they used to be hidden entirely, which
+   left a plain number grid) — the month now reads at a glance on any
+   device, and tapping a day still opens the full task sheet.
+ - FOCUS + CLOCK IN ONE TAP: "Start Focus" now also starts the study
+   clock (attaching the first pending task of the day when possible), and
+   Zen mode's primary button is "Start Focus + Clock" — no more juggling
+   two timers. Breaks (short/long) never touch the clock; Pause and
+   Clock Out stay independent.
+ - BRANDED FAVICON: the browser tab now shows the Study Planner Pro
+   logo (the layered chevron mark on the gradient tile) instead of the
+   default globe — `src/app/icon.svg`, served automatically by Next.js.
+
+v15 STUDY CLOCK AUTO-COMPLETE (this build)
+------------------------------------------
+ - DONE WITHOUT THE DONE BUTTON: the study clock watches every task's
+   planned minutes. The moment your logged time reaches the plan — a
+   15-minute recall after 15+ minutes, a 45-minute lesson after 45+ — the
+   task is marked complete automatically. No more studying for 28 minutes
+   on a 15-minute recall and still seeing it "pending".
+ - NOTIFIED, THEN NEXT: completion fires a success toast ("…complete —
+   28m logged ≥ 15m planned") and, while the clock is still running on
+   that task, the clock rolls itself forward to the next pending task, so
+   every minute you keep studying lands on the right lesson. If the task
+   was the last of the day, it says so. Nothing is re-marked once a task
+   is done or skipped, and the mastery/memory-model bookkeeping is shared
+   with the manual Done flow, so both paths behave identically.
+ - WORKS OFFLINE TOO: the same logic lives in the server's session-log
+   route, so auto-completion applies to every minute that syncs from the
+   device queue, not just live ticks.
+
+v14 LIQUID GLASS DELUXE (this build)
+------------------------------------
+ - MATERIAL TIERS, NOT BLUR EVERYWHERE: cards (tier 1) paint their glass as
+   background LAYERS — pointer specular → gloss → gradient accent edge →
+   corner wash → tint body — at a 90%/84% tint floor (88%/80% on dark
+   themes) so text never loses contrast. Only genuinely floating layers
+   (tracker bar, command palette, toasts, chat sheet, sidebar dock) get the
+   refractive rim: a masked, blurred ring inside the edge that bends the
+   content sliding underneath it. Phones thin the rim to 7px and drop every
+   float to a single 14px blur budget; the docked desktop sidebar skips it.
+ - ONE POINTER LIGHT: a single delegated rAF listener feeds --spec-x/-y into
+   whatever panel the cursor is over (and --px/--py into a button), so the
+   specular pool and the press glow are one lighting system instead of five
+   hover gradients. Coarse pointers never pay for it.
+ - LIQUID NAV: the active-destination pill is measured in JS and travels and
+   resizes between items (spring on transform/width/height) instead of five
+   backgrounds blinking; it follows the collapsed rail, the phone dock,
+   rotation and font scaling. `.lg-nav-ready` is only set after a real box
+   was measured, so if the effect never runs the previous look is untouched.
+ - SCROLL-AWARE CHROME: the sticky bar is opaque at the top of the page and
+   frosts to ~86% tint + 20px blur over the first 76px of scroll
+   (animation-timeline: scroll — zero JS, zero scroll listeners); below-fold
+   panels reveal themselves on their own view timeline; the canvas mesh
+   parallaxes one cell behind the page.
+ - GRADIENT LANGUAGE: the accent edge is now one class
+   (`accent-edge` + `--edge`) replacing four different inline borderLeft
+   recipes; washes (`--wash-accent|ai|success`) replace flat tint fills;
+   gradient hairlines under section titles, day heads and the phone header
+   draw a real 1px contact instead of a solid rgba line.
+ - ALIGNMENT + PADDING: one card rhythm everywhere via `.section-card`,
+   `.section-head`, `.section-title`, `.panel-lead`, `.stat-big` and the
+   `--sp-1..5` scale; ~60 inline style declarations across the six views
+   became semantic classes (only genuinely data-driven values — a colour, a
+   bar width, a chevron angle — are still inline).
+ - RESPONSIVE FOR ALL DEVICES: KPI/subject/kanban grids are intrinsically
+   sized (`auto-fit` + `min(…, 100%)`), cards answer their OWN width through
+   `container: card / inline-size` (2-up KPI and a wider progress bar inside
+   a narrow sheet, 3-up on wide panels), the 861–1180px band restores the
+   two-column dash when the rail is collapsed, the Planner goes 2-up at
+   ≥1120px and 3-up at ≥1600px, heat cells and the day progress bar scale per
+   breakpoint, and touch gets `min-height:var(--tap)` controls with the press
+   glow, sheen, specular pool and hover lift switched off.
+ - RESPONSIVE FINISH: safe-area padding for notched phones in landscape,
+   `100dvh`, `overscroll-behavior` and `touch-action:manipulation`, an
+   `env()`-aware PWA dock height, hover-only affordances (chevrons, row
+   actions) permanently shown on touch, and a 2-up KPI row at ≤479px that
+   goes 1-up below 340px.
+ - GUARDED AS ALWAYS: every modern feature sits behind `@supports`
+   (mask-composite, animation-timeline, interpolate-size, backdrop-filter),
+   `@media (hover:hover)` or `@media (prefers-reduced-motion: no-preference)`;
+   `prefers-reduced-motion`, `prefers-reduced-transparency`,
+   `prefers-contrast`, `forced-colors` and print all get explicit exits.
+   All seven themes and both `mode-focused` / `mode-young` densities keep
+   working — the whole layer is appended CSS, no earlier rule was edited and
+   no data, scheduling or AI behaviour changed (101/101 logic tests pass).
 
 v10 FIXES (this build)
 ----------------------

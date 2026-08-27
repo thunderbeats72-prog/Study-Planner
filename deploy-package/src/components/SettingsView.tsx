@@ -4,6 +4,18 @@ import React, { useState } from "react";
 import { THEMES, type AppState } from "@/lib/client";
 import { IconSpark } from "./icons";
 
+/* Swatch previews for the theme picker — each dot shows the theme's
+   canvas→accent duotone so the choice reads at a glance. */
+const THEME_SWATCH: Record<string, string> = {
+  default: "linear-gradient(135deg,#F6F5FA 18%,#7D6DF0 60%,#5D4DE0)",
+  "silver-lavender": "linear-gradient(135deg,#F3F3F8 18%,#968EE9 60%,#6F63D8)",
+  mint: "linear-gradient(135deg,#F4FAF7 18%,#34D399 60%,#0FA37F)",
+  sunset: "linear-gradient(135deg,#FBF6F1 18%,#FB923C 60%,#DC5E0C)",
+  dark: "linear-gradient(135deg,#0E0E10 18%,#9494F5 60%,#6E6EF0)",
+  obsidian: "linear-gradient(135deg,#0B0F1A 18%,#4CC5F9 60%,#22A8E6)",
+  nebula: "linear-gradient(135deg,#100B20 18%,#B168F8 60%,#9333EA)",
+};
+
 export default function SettingsView({
   state, onPatch, onRestart, busy,
 }: {
@@ -35,8 +47,8 @@ export default function SettingsView({
 
       <div className="grid-fit-300">
         {/* ── Left column: Schedule Engine ── */}
-        <div className="glass-panel tilt-card" style={{ padding: 22 }}>
-          <h3 style={{ fontSize: ".95rem", fontWeight: 800, margin: "0 0 16px" }}>Schedule Engine</h3>
+        <div className="glass-panel tilt-card section-card">
+          <h3 className="section-title">Schedule Engine</h3>
 
           <div className="mb-md"><label className="lbl">Your Name</label>
             <input className="input-field" value={local.name} onChange={(e) => set("name", e.target.value)} /></div>
@@ -104,15 +116,16 @@ export default function SettingsView({
         <div className="flex-col gap-md">
 
           {/* Appearance */}
-          <div className="glass-panel tilt-card" style={{ padding: 22 }}>
-            <h3 style={{ fontSize: ".95rem", fontWeight: 800, margin: "0 0 16px" }}>Appearance</h3>
-            <div className="grid-2" style={{ gap: 9 }}>
+          <div className="glass-panel tilt-card section-card">
+            <h3 className="section-title">Appearance</h3>
+            <div className="grid-2 theme-grid">
               {THEMES.map((th) => (
                 <button
                   key={th.id}
                   className={`btn ${s.theme === th.id ? "btn-primary" : "btn-secondary"}`}
                   onClick={() => onPatch({ theme: th.id })}
                 >
+                  <span className="theme-dot" aria-hidden style={{ background: THEME_SWATCH[th.id] }} />
                   {th.label}
                 </button>
               ))}
@@ -120,8 +133,8 @@ export default function SettingsView({
           </div>
 
           {/* Timer */}
-          <div className="glass-panel tilt-card" style={{ padding: 22 }}>
-            <h3 style={{ fontSize: ".95rem", fontWeight: 800, margin: "0 0 16px" }}>Timer</h3>
+          <div className="glass-panel tilt-card section-card">
+            <h3 className="section-title">Timer</h3>
             <div className="mb-md"><label className="lbl">Focus length (min)</label>
               <input type="number" min={5} max={120} className="input-field" defaultValue={s.pomodoro}
                 onBlur={(e) => onPatch({ pomodoro: Number(e.target.value) })} /></div>
@@ -134,10 +147,10 @@ export default function SettingsView({
           </div>
 
           {/* Engine Status — clean, no provider names */}
-          <div className="glass-panel tilt-card" style={{ padding: 22 }}>
-            <h3 style={{ fontSize: ".95rem", fontWeight: 800, margin: "0 0 12px" }}>Engine Status</h3>
-            <div style={{ fontSize: ".82rem", color: "var(--text-muted)", lineHeight: 1.8, fontWeight: 600 }}>
-              <div>Shigun AI: <strong style={{ color: state.aiProvider ? "var(--success-accent)" : "var(--text-main)" }}>{engineStatus}</strong></div>
+          <div className="glass-panel tilt-card section-card">
+            <h3 className="section-title">Engine Status</h3>
+            <div className="engine-status">
+              <div>Shigun AI: <strong className={state.aiProvider ? "is-live" : ""}>{engineStatus}</strong></div>
               <div>Lessons generated: <strong>{state.topics.length}</strong></div>
               <div>Scheduled tasks: <strong>{state.tasks.length}</strong></div>
               <div>Sessions logged: <strong>{state.sessions.length}</strong></div>

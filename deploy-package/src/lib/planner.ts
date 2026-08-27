@@ -373,7 +373,7 @@ export function buildPlan(
         remaining -= mins;
         tasks.push({
           date, subjectId: null, topicId: null, kind: "mock",
-          title: `Weekly Checkpoint Test #${Math.floor(d / 7)}`,
+          title: `Weekly Checkpoint · Test #${Math.floor(d / 7) + 1}`,
           detail:
             "Mixed test on everything covered in the last 7 study days. Time it strictly, then log every mistake in your error notebook.",
           plannedMinutes: mins, position: pos++,

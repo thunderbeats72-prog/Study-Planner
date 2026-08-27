@@ -265,6 +265,23 @@ export const KIND_META: Record<string, { label: string; color: string }> = {
   buffer: { label: "Buffer", color: "#64748b" },
 };
 
+/**
+ * Canonical form for weekly checkpoint titles.
+ *
+ * Older scheduler builds wrote `Weekly Checkpoint Test #0` (zero-based,
+ * no middle dot) and a few intermediate variants exist in real databases
+ * (e.g. `Weekly Checkpoint · Test #0`). Any of those should render as
+ * `Weekly Checkpoint · Test #1` — the same 1-based, dotted form the
+ * current scheduler emits — so no user ever sees a "Test #0" again.
+ * Anything that is not a checkpoint title is returned untouched.
+ */
+export function normalizeCheckpointTitle(title: string): string {
+  const match = title.match(/^Weekly Checkpoint\s*(?:·\s*)?(?:Test\s*)?#(\d+)\s*$/i);
+  if (!match) return title;
+  const number = Math.max(1, Number(match[1]));
+  return `Weekly Checkpoint · Test #${number}`;
+}
+
 export const THEMES = [
   { id: "default", label: "Default" },
   { id: "silver-lavender", label: "Silver Lavender" },

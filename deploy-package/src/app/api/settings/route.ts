@@ -8,6 +8,7 @@ import {
   assertDateWindow, booleanValue, enumValue, finiteNumber, isoDate,
   readJsonObject, textValue, validationPayload,
 } from "@/lib/validation";
+import { withDbGuard } from "@/lib/routeGuard";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -17,7 +18,9 @@ const PLAN_MODES = ["syllabus", "revision", "mock"] as const;
 const STUDY_STYLES = ["balanced", "theory", "practice"] as const;
 const THEMES = ["default", "silver-lavender", "mint", "sunset", "dark", "obsidian", "nebula"] as const;
 
-export async function PATCH(req: Request) {
+export const PATCH = withDbGuard(patchSettings);
+
+async function patchSettings(req: Request) {
   let body: Record<string, unknown>;
   try { body = await readJsonObject(req, 16_000); }
   catch (error) {
