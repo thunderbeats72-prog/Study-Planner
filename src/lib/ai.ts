@@ -340,6 +340,13 @@ export function llmHealthSnapshot(): LlmHealth {
   };
 }
 
+function isChatModel(id: string): boolean {
+  // Reject known non-chat / reranker / embedding IDs that users sometimes
+  // paste into COHERE_MODEL / MISTRAL_MODEL by mistake.
+  const bad = /rerank|embed|classify|search|retrieval/i;
+  return !bad.test(id);
+}
+
 function modelsFor(id: ProviderId): string[] {
   const spec = PROVIDERS[id];
   const configured = envValue(spec.modelEnv);
@@ -347,8 +354,8 @@ function modelsFor(id: ProviderId): string[] {
     ? aiGlobal.__studyPlannerPreferred?.model
     : null;
   const chain = [
-    ...(configured ? [configured] : []),
-    ...(sticky && sticky !== configured ? [sticky] : []),
+    ...(configured && isChatModel(configured) ? [configured] : []),
+    ...(sticky && sticky !== configured && isChatModel(sticky) ? [sticky] : []),
     ...spec.models,
   ];
   return [...new Set(chain.filter(Boolean))];

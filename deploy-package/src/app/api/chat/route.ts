@@ -152,7 +152,7 @@ function summarizeAttempts(attempts: { provider: string; model: string; status: 
   const chain = attempts
     .map((attempt) => `${attempt.provider}(${attempt.model}): ${attempt.error || attempt.status || "unknown"}`)
     .join(" · ");
-  const tail = " The local tutor answered instead — run Settings → AI Connectivity for a live diagnosis.";
+  const tail = " Check deployment keys (CEREBRAS_API_KEY, MISTRAL_API_KEY, SAMBANOVA_API_KEY, COHERE_API_KEY, GEMINI_API_KEY) or POST /api/ai-status for a live diagnosis.";
   if (first.error === "auth") {
     return `The ${first.provider} API key was rejected (${first.status ?? "auth"}). Check the key in your deployment environment.${tail}`;
   }
