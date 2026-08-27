@@ -51,6 +51,11 @@ html,body{padding:0;margin:0}
 /* Real phones: block Android/Chrome text-size inflation from blowing up
    nowrap labels and fixed-width controls (breaks layout at large font sizes). */
 html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+/* Anchor/programmatic scrolls glide instead of jumping (reduced-motion
+   users get instant jumps via the global override further down). */
+@media (prefers-reduced-motion: no-preference){
+  html{scroll-behavior:smooth}
+}
 body{
   font-family:var(--font-inter),-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
   background:var(--app-bg);background-image:var(--bg-gradient);background-attachment:fixed;
@@ -3985,9 +3990,19 @@ body.theme-switching{animation:themeBlink .7s ease}
 }
 @keyframes textShine{0%,55%,100%{background-position:120% 0}25%{background-position:-40% 0}}
 
-/* 4 · Theme flip becomes a real cross-fade where the browser supports it */
+/* 4 · Theme flip becomes a real cross-fade where the browser supports it.
+     The cross-fade must be the ONLY animation: while it runs, page.tsx puts
+     `.theme-switching` on <html> to freeze every per-element colour
+     transition — otherwise the .4–.5s colour fades keep playing inside the
+     incoming snapshot and stack with the cross-fade (a blurry double-morph). */
 ::view-transition-old(root),::view-transition-new(root){
-  animation-duration:.55s;animation-timing-function:ease;
+  animation-duration:.35s;animation-timing-function:cubic-bezier(.4,0,.2,1);
+}
+.theme-switching,
+.theme-switching *,
+.theme-switching *::before,
+.theme-switching *::after{
+  transition:none !important;
 }
 
 /* 5 · Confetti bits (position/colour/animation set inline by page.tsx) */

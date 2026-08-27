@@ -126,26 +126,59 @@ export default function Home() {
     return () => window.clearTimeout(timer);
   }, [loadInitialState]);
 
+  const themeSetting = state ? state.settings.theme || "default" : null;
+  const themeLevel = state?.user.level || "";
   useEffect(() => {
-    // Theme + age-adaptive presentation mode.
-    const theme = state?.settings.theme ? `theme-${state.settings.theme}` : "";
-    const level = state?.user.level || "";
+    // Theme + age-adaptive presentation mode. Waits for state so the
+    // server-rendered `theme-default` never flashes off before data lands.
+    if (themeSetting === null) return;
+    const theme = `theme-${themeSetting}`;
+    const level = themeLevel;
     const mode =
       level === "nursery" || level === "school"
         ? "mode-young"
         : level === "pg" || level === "phd" || level === "professional"
           ? "mode-focused"
           : "";
-    const next = [theme, mode].filter(Boolean).join(" ");
+    const wanted = [theme, mode].filter(Boolean);
+    const body = document.body;
+    // Swap only the theme-/mode- classes so unrelated body classes
+    // (e.g. `focus-live` while the clock runs) are never wiped out.
+    const apply = () => {
+      for (const cls of Array.from(body.classList)) {
+        if (/^(theme-|mode-)/.test(cls) && !wanted.includes(cls)) body.classList.remove(cls);
+      }
+      for (const cls of wanted) body.classList.add(cls);
+    };
+    const current = Array.from(body.classList).filter((c) => /^(theme-|mode-)/.test(c));
+    const unchanged = current.length === wanted.length && wanted.every((c) => current.includes(c));
+    const firstPaint = !body.dataset.themeReady;
+    body.dataset.themeReady = "1";
+    if (unchanged) return;
     // v13: where the View Transitions API exists, the theme flip becomes a
-    // real cross-fade instead of an instant repaint.
-    const doc = document as Document & { startViewTransition?: (cb: () => void) => unknown };
-    if (doc.startViewTransition && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      doc.startViewTransition(() => { document.body.className = next; });
+    // real cross-fade instead of an instant repaint. Skipped on the very
+    // first paint (nothing to cross-fade from) and under reduced motion.
+    // While the cross-fade runs, `.theme-switching` freezes per-element CSS
+    // colour transitions so the view transition is the ONLY animation —
+    // otherwise the two fades stack and the flip looks like a weird
+    // double-morph instead of one clean dissolve.
+    const doc = document as Document & {
+      startViewTransition?: (cb: () => void) => { finished?: Promise<unknown> } | undefined;
+    };
+    if (!firstPaint && doc.startViewTransition && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      const root = document.documentElement;
+      root.classList.add("theme-switching");
+      const vt = doc.startViewTransition(apply);
+      const done = () => root.classList.remove("theme-switching");
+      if (vt && vt.finished && typeof vt.finished.then === "function") {
+        vt.finished.then(done, done);
+      } else {
+        window.setTimeout(done, 500);
+      }
     } else {
-      document.body.className = next;
+      apply();
     }
-  }, [state?.settings.theme, state?.user.level]);
+  }, [themeSetting, themeLevel]);
 
   /* v12 — global click micro-interactions: every small click gets a soft
      spring pulse (its icon pops with it) and CTAs grow a ripple at the
@@ -157,6 +190,19 @@ export default function Home() {
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
     const coarse = window.matchMedia("(pointer: coarse)");
     const SPRING = "cubic-bezier(.22,1,.36,1)";
+    /* WAAPI pulses must COMPOSE with the element's own CSS transforms
+       (hover lift on CTAs, :active press scale, rotated/spinning icons) —
+       replace-mode used to hijack the transform for the pulse's duration
+       and then snap back, which read as a glitch on every CTA click.
+       `composite:"add"` layers the pulse on top instead; browsers that
+       reject the option fall back to the old replace behaviour. */
+    const pulse = (target: Element, frames: Keyframe[], opts: KeyframeAnimationOptions) => {
+      try {
+        target.animate(frames, { ...opts, composite: "add" });
+      } catch {
+        try { target.animate(frames, opts); } catch { /* no-op */ }
+      }
+    };
     /* v13: a tiny confetti burst celebrates completions at the pointer */
     const CONFETTI = ["--accent", "--success-accent", "--warning-accent", "--color-ai"];
     const burst = (x: number, y: number) => {
@@ -181,6 +227,7 @@ export default function Home() {
           { duration: 650 + Math.random() * 350, easing: "cubic-bezier(.16,1,.3,1)" },
         );
         anim.onfinish = () => p.remove();
+        anim.oncancel = () => p.remove();
       }
     };
     const onClick = (e: MouseEvent) => {
@@ -190,10 +237,16 @@ export default function Home() {
       if (reduce.matches) return;
       const el = t.closest(PRESSABLE);
       if (!(el instanceof HTMLElement)) return;
+      const rect = el.getBoundingClientRect();
+      // Keyboard "clicks" report (0,0) — anchor effects to the element then.
+      const fromKeyboard = e.detail === 0 || (e.clientX === 0 && e.clientY === 0);
+      const px = fromKeyboard ? rect.left + rect.width / 2 : e.clientX;
+      const py = fromKeyboard ? rect.top + rect.height / 2 : e.clientY;
       const label = (el.textContent || "").trim();
-      if (label === "Done" || el.matches(".rate-btn")) burst(e.clientX, e.clientY);
+      if (label === "Done" || el.matches(".rate-btn")) burst(px, py);
       const soft = el.matches(".task-row, .kpi-card");
-      el.animate(
+      pulse(
+        el,
         [
           { transform: "scale(1)" },
           { transform: soft ? "scale(1.012)" : "scale(1.045)", offset: 0.35 },
@@ -201,14 +254,18 @@ export default function Home() {
         ],
         { duration: soft ? 500 : 620, easing: SPRING },
       );
-      el.querySelector("svg")?.animate(
-        [
-          { transform: "scale(.82)" },
-          { transform: "scale(1.14)", offset: 0.55 },
-          { transform: "scale(1)" },
-        ],
-        { duration: 520, easing: SPRING },
-      );
+      const icon = el.querySelector("svg");
+      if (icon) {
+        pulse(
+          icon,
+          [
+            { transform: "scale(.82)" },
+            { transform: "scale(1.14)", offset: 0.55 },
+            { transform: "scale(1)" },
+          ],
+          { duration: 520, easing: SPRING },
+        );
+      }
       const host = el.matches(RIPPLE_HOST) ? el : el.closest(RIPPLE_HOST);
       if (host instanceof HTMLElement) {
         const r = host.getBoundingClientRect();
@@ -216,8 +273,8 @@ export default function Home() {
         const span = document.createElement("span");
         span.className = "fx-ripple";
         span.style.width = span.style.height = `${size}px`;
-        span.style.left = `${e.detail === 0 ? r.width / 2 : e.clientX - r.left}px`;
-        span.style.top = `${e.detail === 0 ? r.height / 2 : e.clientY - r.top}px`;
+        span.style.left = `${px - r.left}px`;
+        span.style.top = `${py - r.top}px`;
         host.appendChild(span);
         const anim = span.animate(
           [
@@ -227,10 +284,29 @@ export default function Home() {
           { duration: 750, easing: "cubic-bezier(.16,1,.3,1)" },
         );
         anim.onfinish = () => span.remove();
+        anim.oncancel = () => span.remove();
+      }
+    };
+    /* The CSS press-glow (.btn:active::after) blooms at var(--px)/var(--py);
+       nothing ever set those vars, so it always flashed at the CENTER while
+       the JS ripple bloomed at the pointer — two misaligned flashes on one
+       press. Wire the vars up on pointerdown so both effects share origin. */
+    const onDown = (e: PointerEvent) => {
+      const t = e.target;
+      if (!(t instanceof Element)) return;
+      const host = t.closest(".btn");
+      if (host instanceof HTMLElement) {
+        const r = host.getBoundingClientRect();
+        host.style.setProperty("--px", `${(e.clientX - r.left).toFixed(1)}px`);
+        host.style.setProperty("--py", `${(e.clientY - r.top).toFixed(1)}px`);
       }
     };
     document.addEventListener("click", onClick);
-    return () => document.removeEventListener("click", onClick);
+    document.addEventListener("pointerdown", onDown, { passive: true });
+    return () => {
+      document.removeEventListener("click", onClick);
+      document.removeEventListener("pointerdown", onDown);
+    };
   }, []);
 
   /* v13 — cursor spotlight: an accent pool tracks the mouse over cards.
