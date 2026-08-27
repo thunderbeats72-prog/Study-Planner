@@ -3,7 +3,79 @@
 
 ---
 
-## v18 — DEPLOY BUNDLE RESYNC + CHECKPOINT NORMALIZATION + README TRUTH (this session)
+## v19 — COLLAPSED RAIL: ONE HIGHLIGHT · SIDEBAR-SIZED ⌘K HINT · MOBILE APP BAR CONTRACT (this session)
+
+Three visual bugs, all styling/structure (no behaviour, data or routing changes):
+
+1. **Collapsed rail showed two “active” states.** `.brand-logo-icon` is painted
+   with the same `--accent-gradient` the active nav pill uses (plus a spinning
+   conic halo via `::before`), so in the 78px icon rail the brand tile read as a
+   second selected tab above the real one. New v19 CSS: inside
+   `.app-wrapper.sb-collapsed` the mark becomes neutral (`--row-bg` fill,
+   `--text-muted` glyph, 1px `--glass-border` rim, no glow, halo off),
+   transitioning on the rail’s own `--rail-dur`/`--rail-ease` so it fades with
+   the labels. A reserved `border:1px solid transparent` on the base rule means
+   the rim never nudges the glyph. Expanded view keeps the gradient tile
+   (branding, next to the wordmark). Both brand marks are now
+   `aria-hidden="true"` — they are presentational; the clipped `.brand-text`
+   carries the accessible name.
+2. **The ⌘K hint cropped and overflowed the rail.** It was
+   `position:fixed;bottom:14px;left:14px` *outside* `.app-wrapper`, sized by its
+   own text (~183px), so it ignored the 78px rail and hung over the workspace.
+   Markup moved it to the last row inside `<aside class="sidebar">`
+   (`.cmdk-tip` → `<kbd class="cmdk-tip-key">` + `<span class="cmdk-tip-text">`),
+   so the rail’s width IS the hint’s width and `.sidebar{overflow:hidden}`
+   guarantees containment. The sentence wraps (`white-space:normal;
+   overflow-wrap:anywhere`) instead of chopping in narrow sidebars; in the rail
+   it clips away (`max-width:190px→0`, fade, `translateX`) and the compact key
+   chip centres. The chip shows the real modifier for the platform —
+   `useAppleKeyboard()` via `useSyncExternalStore` (⌘ on the server snapshot,
+   ⌃ on non-Apple clients) because `react-hooks/set-state-in-effect` forbids
+   `setState` in an effect and a lazy `useState` would mismatch hydration. The
+   sentence stays in the DOM for AT. This layer owns `display`, so the
+   `max-width:860px` and `display-mode:standalone` hides are restated (Zen’s
+   `display:none !important` still wins).
+3. **Mobile top bar had no contract of its own.** Its layout was whatever won
+   among eight older `.mobile-header` blocks (padding flip-flopping
+   10/12/14/16px, `display:flex` borrowed from a rule that also had to avoid
+   resurrecting the bar on landscape phones, unbounded streak chip). v19 states
+   it in one block at `max-width:860px`: `display:flex` +
+   `justify-content:space-between` + `align-items:center` + `gap:12px` +
+   `box-sizing:border-box`, `.mh-brand{display:flex;align-items:center;gap:12px;
+   flex:1 1 auto;min-width:0}` wrapping logo + `.mh-titles`, hard bounds on both
+   ends (`flex:0 0 26px` + `max-width/max-height:26px` for the logo tile;
+   `flex:0 0 auto`, `min-height:26px`, `max-width:44vw`, `white-space:nowrap`,
+   `line-height:1` for the streak chip), and
+   `padding:env(safe-area-inset-top) max(16px,env(safe-area-inset-right)) 0
+   max(16px,env(safe-area-inset-left))`. The landscape-phone `display:none`
+   exception is restated *after* the block, since this layer now owns display.
+
+Files changed:
+```
+src/app/globals.css    ← appended “v19” layer (§1 rail brand mark, §2 ⌘K hint,
+                          §3 mobile app bar, §4 reduced-motion / forced-colors /
+                          prefers-contrast guards)
+src/app/page.tsx       ← .cmdk-tip moved inside the sidebar (kbd + text spans),
+                          useAppleKeyboard()/cmdGlyph helper, aria-hidden on both
+                          decorative brand marks
+docs/design/v19-rail-hint-appbar.md   ← NEW design note (cause → fix, tables)
+README.txt             ← “v19 COLLAPSED-RAIL + MOBILE BAR FIXES (this build)”
+deploy-package/**      ← byte-exact re-sync from src/ (see rule below)
+```
+
+**Verification trick worth reusing:** with no browser in the sandbox, the cascade
+was checked by parsing `globals.css` (media-query evaluation + specificity + source
+order) and by grepping the *production* CSS bundle (`.next/static/chunks/*.css`) to
+confirm the v19 declarations win against every earlier layer. Keep doing that for
+style-only changes: `grep -o '\.mobile-header{[^}]*}' .next/static/chunks/*.css`
+prints the whole cascade in order, so the winner is the last line.
+
+All checks green: `npm run typecheck`, `npm run lint` (0 warnings), `npm test`
+(131/131), `npm run build:app`.
+
+---
+
+## v18 — DEPLOY BUNDLE RESYNC + CHECKPOINT NORMALIZATION + README TRUTH
 
 Root cause found for "I mentioned this before and it's still not resolved":
 the drag-and-drop deploy bundle had drifted far behind `src/`.

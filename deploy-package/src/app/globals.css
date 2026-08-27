@@ -5950,3 +5950,190 @@ body.mode-young .section-title::after{width:46px;height:3px;bottom:-8px}
 @media(max-width:900px) and (max-height:500px) and (orientation:landscape){
   .main-workspace{padding-top:10px;padding-bottom:calc(var(--dock-h) + 18px)}
 }
+
+
+/* ════════════════════════════════════════════════════════════════════
+   v19 — COLLAPSED RAIL: ONE HIGHLIGHT · SIDEBAR-SIZED ⌘K HINT ·
+         MOBILE APP BAR FLEX CONTRACT
+   Appended last so it wins the cascade over every earlier layer.
+   Design notes: docs/design/v19-rail-hint-appbar.md
+════════════════════════════════════════════════════════════════════ */
+
+/* ──────────────────────────────────────────────────────────────
+   1 · THE BRAND MARK IS NOT A TAB
+   The rail has exactly ONE highlighted element: the measured liquid
+   pill on the active route (`.nav-list::before`). The brand tile used
+   to be painted with the very same `--accent-gradient` fill (plus a
+   spinning conic halo), so collapsed it read as a second selected tab
+   stacked above the real one. In the rail the mark goes quiet — neutral
+   surface, muted glyph, hairline rim, no glow, no halo — and it rides
+   the same --rail-dur/--rail-ease curve as the labels so the swap is
+   part of the collapse, not a pop.
+   The expanded sidebar keeps the gradient tile: there the wordmark sits
+   beside it, so it reads as branding, never as a nav state.
+────────────────────────────────────────────────────────────── */
+/* Scoped to the sidebar on purpose: the AI panel reuses .brand-logo-icon for
+   its own mark, and that one must not gain a rim or a rail transition. */
+.sidebar .brand-logo-icon{
+  border:1px solid transparent;   /* the rim is reserved, so the rail swap never nudges the glyph */
+  transition:background var(--rail-dur,.4s) var(--rail-ease,ease),
+             color var(--rail-dur,.4s) var(--rail-ease,ease),
+             border-color var(--rail-dur,.4s) var(--rail-ease,ease),
+             box-shadow var(--rail-dur,.4s) var(--rail-ease,ease);
+}
+@media(min-width:861px){
+  .app-wrapper.sb-collapsed .brand-logo-icon{
+    background:var(--row-bg);
+    color:var(--text-muted);
+    border-color:var(--glass-border);
+    box-shadow:none;
+  }
+  .app-wrapper.sb-collapsed .brand-logo-icon::before{animation:none;opacity:0}
+}
+
+/* ──────────────────────────────────────────────────────────────
+   2 · THE ⌘K HINT IS A ROW OF THE SIDEBAR, NOT A STRIP PINNED TO
+       THE VIEWPORT CORNER
+   The hint used to be `position:fixed;bottom:14px;left:14px` with a
+   width driven by its own text. The rail shrinks to 78px; the hint did
+   not, so it hung out of the sidebar over the workspace and cut words in
+   half. It is now an ordinary flex row at the foot of the sidebar: the
+   rail's own width IS the hint's width, so it shrinks with the rail, is
+   clipped by the sidebar instead of escaping it, and swaps the sentence
+   for a compact key chip on the way in — the same clip-and-fade
+   choreography the nav labels and the brand text already use.
+────────────────────────────────────────────────────────────── */
+.cmdk-tip{
+  position:static;inset:auto;float:none;z-index:auto;
+  display:flex;align-items:center;gap:6px;
+  width:100%;min-width:0;max-width:100%;
+  margin:12px 0 0;padding:0 2px;
+  font-size:.66rem;font-weight:700;line-height:1.3;text-align:left;
+  color:var(--text-dim);
+  background:transparent;border:0;border-radius:0;box-shadow:none;
+  opacity:1;pointer-events:none;
+  overflow:hidden;              /* nothing escapes the rail, ever */
+  text-overflow:ellipsis;
+  transition:gap var(--rail-dur,.4s) var(--rail-ease,ease),opacity .2s ease;
+}
+/* Narrow sidebar? The sentence takes a second line — wrapping, never a
+   crop (same rule the course name follows one row above it). */
+.cmdk-tip-text{
+  flex:1 1 auto;min-width:0;max-width:190px;opacity:1;
+  white-space:normal;overflow-wrap:anywhere;
+  transition:max-width var(--rail-dur,.4s) var(--rail-ease,ease),
+             opacity .2s ease .12s,transform .3s var(--rail-ease,ease) .08s;
+}
+/* The key chip only has something to say once the rail is too narrow for
+   the sentence: it rides in on the same curve and takes its place. */
+.cmdk-tip-key{
+  flex:0 0 auto;max-width:0;opacity:0;
+  display:inline-flex;align-items:center;justify-content:center;
+  height:18px;margin:0;padding:0;overflow:hidden;white-space:nowrap;
+  border:1px solid transparent;border-radius:var(--radius-sm);
+  background:var(--row-bg);color:var(--text-dim);
+  font-size:.62rem;font-weight:800;line-height:1;
+  transition:max-width var(--rail-dur,.4s) var(--rail-ease,ease),
+             opacity .16s ease,padding var(--rail-dur,.4s) var(--rail-ease,ease),
+             border-color var(--rail-dur,.4s) var(--rail-ease,ease);
+}
+/* The hint is desktop chrome: this layer owns `display` for the tip, so the
+   two places that must not show it are restated here — on phones the sidebar
+   is the bottom dock, where a hint about a key nobody has would eat a slot,
+   and an installed window has no desktop chrome to explain. */
+@media(max-width:860px){
+  .cmdk-tip{display:none}
+}
+@media(display-mode:standalone){
+  .cmdk-tip{display:none}
+}
+/* On a short window the expanded sidebar's footer card can be taller than the
+   space left under the nav, and the rail clips what it can't fit. A half-cut
+   hint is worse than none, so the *expanded* hint steps out below 700px; the
+   rail (98px of chrome + 30px here) always has room and keeps its chip. */
+@media(min-width:861px) and (max-height:700px){
+  .app-wrapper:not(.sb-collapsed) .cmdk-tip{display:none}
+}
+@media(min-width:861px){
+  .app-wrapper.sb-collapsed .cmdk-tip{gap:0;justify-content:center;padding:0}
+  .app-wrapper.sb-collapsed .cmdk-tip-text{
+    display:block;flex:0 0 0px;width:0;max-width:0;margin:0;padding:0;
+    opacity:0;overflow:hidden;transform:translateX(-8px);
+    transition:max-width var(--rail-dur,.4s) var(--rail-ease,ease),
+               width var(--rail-dur,.4s) var(--rail-ease,ease),
+               opacity .13s ease,transform .2s ease;
+  }
+  .app-wrapper.sb-collapsed .cmdk-tip-key{
+    max-width:70px;opacity:1;padding:0 6px;border-color:var(--glass-border);
+    transition-delay:.1s;
+  }
+}
+
+/* ──────────────────────────────────────────────────────────────
+   3 · MOBILE APP BAR — AN EXPLICIT FLEX CONTRACT
+   The bar used to inherit its layout from whichever of four older
+   `@media(max-width:860px)` blocks happened to win, which is how it ended
+   up crowding the logo into the title, letting the streak chip push the
+   page name off, and sitting flush against curved screen edges. It now
+   states its own contract so nothing else has to be relied on:
+     · the container is a flex row — `space-between`, `align-items:center`
+     · logo + page title are ONE group (`.mh-brand`) on a 12px gap
+     · the logo tile and the streak chip are hard-bounded: `flex:0 0 …`
+       plus max-width/max-height, so they never stretch, swell or squash
+     · 16px of horizontal edge padding, raised to the safe area on notched
+       devices so nothing hugs the hardware
+────────────────────────────────────────────────────────────── */
+@media(max-width:860px){
+  .mobile-header{
+    display:flex;align-items:center;justify-content:space-between;
+    gap:12px;box-sizing:border-box;
+    height:var(--header-h);
+    padding:env(safe-area-inset-top) max(16px,env(safe-area-inset-right)) 0 max(16px,env(safe-area-inset-left));
+  }
+  /* Left group: mark + titles, sharing one baseline rhythm. */
+  .mh-brand{display:flex;align-items:center;gap:12px;flex:1 1 auto;min-width:0}
+  .mh-titles{display:flex;flex-direction:column;justify-content:center;gap:1px;min-width:0}
+  /* Bounded, non-fluid: the tile is 26×26 at every phone width. */
+  .mobile-header .brand-logo-icon{
+    width:26px;height:26px;max-width:26px;max-height:26px;
+    flex:0 0 26px;flex-shrink:0;flex-grow:0;border-radius:8px;
+  }
+  .mobile-header .brand-logo-icon svg{width:14px;height:14px;flex:0 0 auto}
+  /* A spinning conic halo has no business in a 46px bar. */
+  .mobile-header .brand-logo-icon::before{animation:none;opacity:0}
+  /* Right group: the status chip holds its own size and never wraps. */
+  .mobile-header .mh-streak{
+    display:inline-flex;align-items:center;justify-content:center;
+    flex:0 0 auto;flex-shrink:0;flex-grow:0;
+    min-height:26px;max-width:44vw;padding:0 9px;gap:4px;
+    line-height:1;white-space:nowrap;
+    font-size:.64rem;font-weight:800;
+    border:1px solid color-mix(in srgb,var(--accent) 22%,transparent);
+    border-radius:99px;
+  }
+  .mobile-header .mh-streak svg{width:11px;height:11px;flex:0 0 auto}
+}
+/* This layer now owns `display`, so the landscape-phone exception has to be
+   restated here: below 500px of height the bar is gone entirely and the dock
+   is a slim row. */
+@media(max-width:900px) and (max-height:500px) and (orientation:landscape){
+  .mobile-header{display:none}
+}
+
+/* ──────────────────────────────────────────────────────────────
+   4 · GUARDS — mirror the v15/v17 accessibility contracts for the
+       elements this layer touches
+────────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce){
+  .sidebar .brand-logo-icon,.cmdk-tip,.cmdk-tip-text,.cmdk-tip-key{transition:none !important}
+}
+@media (forced-colors: active){
+  /* Nothing here survives on its fill colour alone, so the rim carries it. */
+  .app-wrapper.sb-collapsed .brand-logo-icon{background:Canvas;border-color:CanvasText;color:CanvasText}
+  .cmdk-tip-key{background:Canvas;border-color:CanvasText;color:CanvasText;box-shadow:none}
+  .mobile-header .mh-streak{border-color:CanvasText}
+}
+@media (prefers-contrast: more){
+  .app-wrapper.sb-collapsed .brand-logo-icon{border-color:var(--glass-border-hover)}
+  .cmdk-tip{color:var(--text-muted)}
+}
