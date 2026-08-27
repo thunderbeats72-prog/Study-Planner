@@ -3225,7 +3225,7 @@ svg{flex-shrink:0;vertical-align:middle}
 
   /* Ergonomics + chrome metrics */
   --tap:44px;                                                   /* Apple HIG / Material floor */
-  --header-h:calc(56px + env(safe-area-inset-top));
+  --header-h:calc(46px + env(safe-area-inset-top));
   --dock-h:calc(70px + max(10px,env(safe-area-inset-bottom)));
 }
 
@@ -3523,15 +3523,15 @@ body.theme-dark .pulse-dot.live,body.theme-obsidian .pulse-dot.live,body.theme-n
   /* Chrome clearance = header + dock, derived from the same tokens the
      bars themselves use, so the two can never drift apart. */
   .main-workspace{
-    padding-top:calc(var(--header-h) + 8px);
+    padding-top:calc(var(--header-h) + 6px);
     padding-bottom:calc(var(--dock-h) + 26px);
   }
   .app-wrapper{padding:0 var(--pad-shell) calc(var(--dock-h) + 24px);gap:0}
-  .tracker-bar{top:calc(var(--header-h) + 6px)}
+  .tracker-bar{top:calc(var(--header-h) + 4px)}
   .ai-fab{bottom:calc(var(--dock-h) + 14px)}
   .toast{bottom:calc(var(--dock-h) + 14px)}
 }
-@media(max-width:640px){.tracker-bar{top:calc(var(--header-h) + 4px)}}
+@media(max-width:640px){.tracker-bar{top:calc(var(--header-h) + 2px)}}
 
 
 /* ──────────────────────────────────────────────────────────────────────
@@ -5736,7 +5736,7 @@ body.mode-young .section-title::after{width:46px;height:3px;bottom:-8px}
                padding var(--rail-dur) var(--rail-ease);
     will-change:width;
   }
-  .app-wrapper.sb-collapsed .sidebar{padding-left:12px;padding-right:12px}
+  .app-wrapper.sb-collapsed .sidebar{width:78px !important;padding-left:12px;padding-right:12px}
 
   /* Brand block: the text column clips to zero instead of disappearing. */
   .brand-header{transition:padding var(--rail-dur) var(--rail-ease),gap var(--rail-dur) var(--rail-ease)}
@@ -5744,16 +5744,19 @@ body.mode-young .section-title::after{width:46px;height:3px;bottom:-8px}
     display:block;flex:1 1 auto;min-width:0;max-width:190px;overflow:hidden;
     opacity:1;transform:none;
     transition:max-width var(--rail-dur) var(--rail-ease),
+               width var(--rail-dur) var(--rail-ease),
                opacity .2s ease .12s,transform .3s var(--rail-ease) .08s;
   }
   .app-wrapper.sb-collapsed .sidebar .brand-text{
-    display:block;max-width:0;opacity:0;transform:translateX(-10px);
+    display:block;min-width:0;max-width:0;width:0;opacity:0;overflow:hidden;
+    margin:0;padding:0;flex:0 0 0px;transform:translateX(-10px);
     transition:max-width var(--rail-dur) var(--rail-ease),
+               width var(--rail-dur) var(--rail-ease),
                opacity .13s ease,transform .2s ease;
   }
   .app-wrapper.sb-collapsed .brand-header{
     /* room for the toggle, which now lives centred at the top of the rail */
-    justify-content:center;gap:0;padding:46px 0 14px;
+    justify-content:center;gap:0;padding:48px 0 14px;
   }
 
   /* Nav labels: clip + fade in step with the width, icons re-centre. */
@@ -5764,15 +5767,18 @@ body.mode-young .section-title::after{width:46px;height:3px;bottom:-8px}
   }
   .sidebar .nav-item svg{flex:0 0 auto}
   .sidebar .nav-item span{
-    display:block;max-width:190px;overflow:hidden;white-space:nowrap;
+    display:block;min-width:0;max-width:190px;overflow:hidden;white-space:nowrap;
     opacity:1;transform:none;
     transition:max-width var(--rail-dur) var(--rail-ease),
+               width var(--rail-dur) var(--rail-ease),
                opacity .2s ease .12s,transform .3s var(--rail-ease) .08s;
   }
-  .app-wrapper.sb-collapsed .sidebar .nav-item{gap:0;padding-left:0;padding-right:0;justify-content:center}
+  .app-wrapper.sb-collapsed .sidebar .nav-item{gap:0;padding-left:0;padding-right:0;justify-content:center;width:100%}
   .app-wrapper.sb-collapsed .sidebar .nav-item span{
-    display:block;max-width:0;opacity:0;transform:translateX(-10px);
+    display:block;min-width:0;max-width:0;width:0;opacity:0;overflow:hidden;
+    margin:0;padding:0;flex:0 0 0px;transform:translateX(-10px);
     transition:max-width var(--rail-dur) var(--rail-ease),
+               width var(--rail-dur) var(--rail-ease),
                opacity .13s ease,transform .2s ease;
   }
   .app-wrapper.sb-collapsed .nav-list{gap:6px}
@@ -5786,12 +5792,13 @@ body.mode-young .section-title::after{width:46px;height:3px;bottom:-8px}
   /* Toggle: glides from the header corner to the centre of the rail. */
   .sb-toggle{
     transition:right var(--rail-dur) var(--rail-ease),
+               left var(--rail-dur) var(--rail-ease),
                top var(--rail-dur) var(--rail-ease),
                background .15s ease,color .15s ease,border-color .15s ease,
                transform .15s var(--spring);
   }
   .app-wrapper.sb-collapsed .sb-toggle{
-    position:absolute;top:2px;right:calc(50% - 20px);left:auto;margin:0;
+    position:absolute;top:14px;left:0;right:0;margin:0 auto;width:40px;height:40px;
   }
   .sb-toggle svg{transition:transform var(--rail-dur) var(--rail-ease)}
 
@@ -5819,70 +5826,71 @@ body.mode-young .section-title::after{width:46px;height:3px;bottom:-8px}
 }
 
 /* ─────────────────────────────────────────────────────────────
-   3 · MOBILE TOP BAR — REBUILT
-   The old bar was a logo, a wordmark that collided with the flame chip
-   and nothing else: no sense of place, uneven optical centring, a hard
-   shadow. It is now a proper app bar — icon tile, the current section
-   in display type with the product name as a quiet eyebrow, and one
-   right-aligned status chip on a frosted surface.
+   3 · MOBILE TOP BAR — REBUILT & COMPACT
+   Clean, proportional app bar — 26px icon tile, current section in
+   tight display type with quiet eyebrow above, and right-aligned
+   status chip on a frosted surface. Sized comfortably without
+   consuming excessive vertical viewport space.
 ───────────────────────────────────────────────────────────── */
+.tracker-exam-chip .exam-chip-short{display:none}
 @media(max-width:860px){
   .mobile-header{
     /* NB: no `display` here — landscape phones hide the bar entirely and
        this layer must not resurrect it. */
-    align-items:center;justify-content:space-between;gap:12px;
+    align-items:center;justify-content:space-between;gap:10px;
     height:var(--header-h);
-    padding-top:env(safe-area-inset-top);
-    padding-bottom:0;
-    background:color-mix(in srgb,var(--surface-elevated) 88%,transparent);
-    -webkit-backdrop-filter:blur(22px) saturate(180%);
-    backdrop-filter:blur(22px) saturate(180%);
+    padding:env(safe-area-inset-top) 12px 0 12px;
+    background:color-mix(in srgb,var(--surface-elevated) 90%,transparent);
+    -webkit-backdrop-filter:blur(20px) saturate(180%);
+    backdrop-filter:blur(20px) saturate(180%);
     border-bottom:1px solid color-mix(in srgb,var(--glass-border) 85%,transparent);
   }
-  .mh-brand{display:flex;align-items:center;gap:10px;min-width:0;flex:1 1 auto}
-  .mobile-header .brand-logo-icon{width:30px;height:30px;border-radius:10px;flex:0 0 auto}
-  .mh-titles{display:flex;flex-direction:column;justify-content:center;min-width:0;gap:1px}
+  .mh-brand{display:flex;align-items:center;gap:8px;min-width:0;flex:1 1 auto}
+  .mobile-header .brand-logo-icon{width:26px;height:26px;border-radius:8px;flex:0 0 auto}
+  .mh-titles{display:flex;flex-direction:column;justify-content:center;min-width:0;gap:0}
+  .mh-wordmark{
+    font-size:.52rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+    line-height:1;color:var(--text-dim);margin-bottom:2px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
   .mh-page{
-    font-family:var(--font-display);font-size:1rem;font-weight:750;
+    font-family:var(--font-display);font-size:.88rem;font-weight:750;
     letter-spacing:-.02em;line-height:1.15;color:var(--text-main);
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   }
-  .mh-wordmark{
-    font-size:.58rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;
-    line-height:1.2;color:var(--text-dim);
-    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-  }
   .mh-streak{
-    flex:0 0 auto;font-size:.68rem;font-weight:800;padding:6px 11px;
+    flex:0 0 auto;font-size:.64rem;font-weight:800;padding:3px 8px;gap:4px;
     font-variant-numeric:tabular-nums;
     border:1px solid color-mix(in srgb,var(--accent) 22%,transparent);
   }
-  .mh-streak svg{width:12px;height:12px}
+  .mh-streak svg{width:11px;height:11px}
 }
 @media(max-width:380px){
-  .mh-page{font-size:.92rem}
+  .mh-page{font-size:.82rem}
   .mh-wordmark{display:none}
-  .mh-titles{gap:0}
 }
 
 /* ─────────────────────────────────────────────────────────────
    4 · PHONE CHROME — STATUS BAR, PAGE HEADER, CONTROLS
 ───────────────────────────────────────────────────────────── */
 @media(max-width:640px){
-  /* Study-clock strip: two clean rows (status + time, then actions)
-     instead of a pill that wrapped into a lopsided blob. */
+  /* Study-clock strip: compact, sleek two-row card */
   .tracker-bar{
-    display:flex;flex-direction:column;align-items:stretch;gap:10px;
-    padding:11px 13px;border-radius:20px;margin-bottom:14px;
+    display:flex;flex-direction:column;align-items:stretch;gap:7px;
+    padding:8px 12px;border-radius:16px;margin-bottom:12px;
   }
-  .tracker-bar .tracker-status{display:flex;align-items:center;gap:10px;width:100%;min-width:0}
+  .tracker-bar .tracker-status{display:flex;align-items:center;gap:8px;width:100%;min-width:0}
   .tracker-labels{flex:1 1 auto;min-width:0}
-  .tracker-state{font-size:.66rem;letter-spacing:.04em;text-transform:uppercase;font-weight:800;color:var(--text-dim)}
-  .tracker-task{font-size:.78rem;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .tracker-bar .tracker-time{margin-left:auto;flex:0 0 auto;font-variant-numeric:tabular-nums;font-size:1.05rem;font-weight:800}
-  .tracker-bar .tracker-actions{display:flex;flex-wrap:wrap;gap:6px;width:100%}
-  .tracker-bar .tracker-actions .chip{flex:0 0 auto;align-self:center}
-  .tracker-bar .tracker-actions .btn{flex:1 1 84px;min-height:34px}
+  .tracker-state{font-size:.62rem;letter-spacing:.04em;text-transform:uppercase;font-weight:800;color:var(--text-dim);line-height:1.1}
+  .tracker-task{font-size:.74rem;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2}
+  .tracker-bar .tracker-time{margin-left:auto;flex:0 0 auto;font-variant-numeric:tabular-nums;font-size:.95rem;font-weight:800}
+  .tracker-bar .tracker-actions{display:flex;flex-wrap:wrap;gap:5px;width:100%;align-items:center}
+  .tracker-bar .tracker-actions .chip{flex:0 0 auto;align-self:center;font-size:.6rem;padding:2px 7px}
+  .tracker-bar .tracker-actions .btn{flex:1 1 70px;min-height:28px;padding:3px 8px;font-size:.72rem}
+
+  /* Exam chip: short format on mobile so action row never overflows */
+  .tracker-exam-chip .exam-chip-full{display:none}
+  .tracker-exam-chip .exam-chip-short{display:inline}
 
   /* Page header: one column, generous type, controls full width. */
   .page-header{flex-direction:column;align-items:stretch;gap:12px;margin-bottom:14px}
@@ -5902,6 +5910,22 @@ body.mode-young .section-title::after{width:46px;height:3px;bottom:-8px}
   .planner-days .task-row{padding:11px 13px}
   .day-date{font-size:.88rem;letter-spacing:-.01em}
   .day-meta{font-size:.68rem;margin-top:2px}
+}
+
+/* ─────────────────────────────────────────────────────────────
+   5 · TASK ROW DESKTOP COLUMN ALIGNMENT
+   Aligns the status chips and button columns across all rows in a day,
+   preventing weekly checkpoint or single-subject rows from drifting.
+───────────────────────────────────────────────────────────── */
+@media(min-width:641px){
+  .planner-days .task-row{flex-wrap:nowrap;display:flex;align-items:center;gap:12px}
+  .planner-days .task-row .task-main{flex:1 1 auto;min-width:0}
+  .planner-days .task-row > .chip{flex-shrink:0;min-width:68px;text-align:center;justify-content:center;margin-inline-start:auto}
+  .planner-days .task-row .task-row-actions{flex-shrink:0;min-width:350px;justify-content:flex-end;display:flex;align-items:center;gap:6px}
+  .planner-days .task-row .task-row-actions > .task-primary{margin-inline-start:0}
+  .task-row.clean-list{display:flex;align-items:center;gap:12px}
+  .task-row.clean-list .task-main{flex:1 1 auto;min-width:0}
+  .task-row.clean-list .task-row-actions{flex-shrink:0;min-width:350px;justify-content:flex-end}
 }
 
 /* Dock breathing room: the last row of a list must clear the capsule. */

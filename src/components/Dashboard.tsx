@@ -457,20 +457,34 @@ export default function Dashboard({
         {todayTasks.map((task) => {
           const meta = KIND_META[task.kind] || KIND_META.learn;
           const subj = state.subjects.find((s) => s.id === task.subjectId);
+          const isCheckpoint = task.title.toLowerCase().includes("checkpoint") || (task.kind === "mock" && !task.subjectId);
+          const kindLabel = isCheckpoint ? "Checkpoint" : meta.label;
+          const dotColor = subj?.color || (isCheckpoint ? "var(--color-primary)" : meta.color);
+          const formattedTitle = isCheckpoint
+            ? task.title.replace(/Weekly Checkpoint(?: Test)? #?0\b/i, "Weekly Checkpoint · Test #1")
+                        .replace(/Weekly Checkpoint Test #(\d+)/i, "Weekly Checkpoint · Test #$1")
+            : task.title;
           return (
             <div key={task.id} className={`task-row clean-list${task.status === "done" ? " done" : ""}${activeTaskId === task.id ? " active-clock" : ""}${moreActionsId === task.id ? " expanded-actions" : ""}`}>
-              <div className="task-dot" style={{ background: subj?.color || meta.color }} />
+              <div className="task-dot" style={{ background: dotColor }} />
               <div className="task-main">
-                <div className="task-title">{task.title}</div>
+                <div className="task-title">{formattedTitle}</div>
                 <div className="task-sub">
-                  {meta.label} · {task.plannedMinutes} min{taskLogged(task.id) ? ` · ${fmtMin(taskLogged(task.id))} logged` : task.actualMinutes ? ` · ${task.actualMinutes}m logged` : ""}
+                  <span className="chip chip-kind chip-tight">{kindLabel}</span> · {task.plannedMinutes} min
+                  {isCheckpoint ? " · All Subjects · Comprehensive Review" : ""}
+                  {taskLogged(task.id) ? ` · ${fmtMin(taskLogged(task.id))} logged` : task.actualMinutes ? ` · ${task.actualMinutes}m logged` : ""}
                   {activeTaskId === task.id && activeClockSeconds ? ` · live +${Math.floor(activeClockSeconds / 60)}m ${activeClockSeconds % 60}s` : ""}
                 </div>
               </div>
               <div className="task-row-actions">
-              <button className="btn btn-xs btn-secondary" onClick={() => setEditingTaskId(task.id)}>Edit</button>
               {subj && task.status !== "skipped" && (
-                <button className="btn btn-xs btn-secondary" onClick={() => onSkipSubject(subj.id, task.date)}>Skip subject</button>
+                <button className="btn btn-xs btn-secondary task-skip-subj" title="Skip all tasks for this subject today"
+                  onClick={() => onSkipSubject(subj.id, task.date)}>Skip subject</button>
+              )}
+              <button className="btn btn-xs btn-secondary" onClick={() => setEditingTaskId(task.id)}>Edit</button>
+              {task.status !== "skipped" && task.status !== "done" && (
+                <button className="btn btn-xs btn-secondary" title="Skip"
+                  onClick={() => onTaskStatus(task.id, "skipped")}>Skip</button>
               )}
               <TaskClockButton taskId={task.id} activeTaskId={activeTaskId} sessionActive={clockSessionActive}
                 onFocusTask={onFocusTask} onClockOut={onClockOut} />
@@ -480,10 +494,6 @@ export default function Dashboard({
                 onClick={() => onTaskStatus(task.id, task.status === "done" ? "pending" : "done")}>
                 {task.status === "done" ? "Undo" : "Done"}
               </button>
-              {task.status !== "skipped" && task.status !== "done" && (
-                <button className="btn btn-xs btn-secondary" title="Skip"
-                  onClick={() => onTaskStatus(task.id, "skipped")}>Skip</button>
-              )}
               </div>
             </div>
           );
