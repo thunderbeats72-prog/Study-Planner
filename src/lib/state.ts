@@ -188,6 +188,13 @@ export async function fullState(userKey: string) {
     return { user, ...rest, topics: enrichedTopics };
   } catch (error) {
     console.warn("DB unavailable during fullState; using fallback state:", error instanceof Error ? error.message : error);
+    // Sandbox/preview escape hatch: with SPP_DEMO_DATA=1 and no database, the
+    // UI is served a deterministic sample plan so the interface can be
+    // reviewed. Never active in a normal deployment.
+    if (process.env.SPP_DEMO_DATA === "1") {
+      const { demoFallbackState } = await import("./demoState");
+      return demoFallbackState(userKey);
+    }
     return defaultFallbackState(userKey);
   }
 }

@@ -5686,3 +5686,243 @@ body.mode-young .section-title::after{width:46px;height:3px;bottom:-8px}
 
 /* Zen linked-mode hint under the action buttons */
 .zen-hint{font-size:.8rem;color:rgba(255,255,255,.62);font-weight:550;max-width:46ch;text-align:center;margin-top:2px;line-height:1.5}
+
+/* ════════════════════════════════════════════════════════════════
+   v17 — TRUE ONE-PER-ROW PLANNER LIST · SMOOTH SIDEBAR RAIL ·
+         REBUILT MOBILE TOP BAR AND PHONE CHROME
+   Appended last so it wins the cascade over every earlier layer.
+   Design notes: docs/design/v17-list-rail-mobile.md
+════════════════════════════════════════════════════════════════ */
+
+/* ─────────────────────────────────────────────────────────────
+   1 · PLANNER LIST VIEW IS A LIST — ONE DAY PER ROW
+   v11 turned `.planner-days` into a 2-up (and 3-up ≥1600px) grid, so
+   "List" rendered as side-by-side columns of days. A list reads top to
+   bottom: one day block per row, full width, at every viewport.
+───────────────────────────────────────────────────────────── */
+.planner-days{
+  display:flex;flex-direction:column;gap:var(--gap-grid);
+  grid-template-columns:none;align-items:stretch;
+}
+.planner-days > .day-block{width:100%;max-width:none;margin-bottom:0}
+/* The two historical grid breakpoints, explicitly neutralised. */
+@media(min-width:1120px){
+  .planner-days{display:flex;flex-direction:column;grid-template-columns:none}
+}
+@media(min-width:1600px){
+  .planner-days{display:flex;flex-direction:column;grid-template-columns:none}
+}
+/* Long days stay readable: the rows never stretch past a comfortable
+   measure on ultrawide screens, but the block itself still spans. */
+@media(min-width:1500px){
+  .planner-days .day-block > .day-head,
+  .planner-days .task-row{padding-inline:clamp(var(--sp-3),2.2vw,34px)}
+}
+
+/* ─────────────────────────────────────────────────────────────
+   2 · SIDEBAR COLLAPSE / EXPAND — ONE CHOREOGRAPHED MOTION
+   Before: labels, brand text and the footer card were switched with
+   `display:none`, so they popped out one frame before the width even
+   started moving, and the toggle teleported from the corner to the
+   centre. Now every part of the rail travels on the same easing:
+   the text clips + fades, the icons re-centre, the footer folds, and
+   the toggle glides. Desktop only — on phones the sidebar is the dock.
+───────────────────────────────────────────────────────────── */
+@media(min-width:861px){
+  :root{--rail-dur:.4s;--rail-ease:cubic-bezier(.32,.72,0,1)}
+
+  .sidebar{
+    transition:width var(--rail-dur) var(--rail-ease),
+               padding var(--rail-dur) var(--rail-ease);
+    will-change:width;
+  }
+  .app-wrapper.sb-collapsed .sidebar{padding-left:12px;padding-right:12px}
+
+  /* Brand block: the text column clips to zero instead of disappearing. */
+  .brand-header{transition:padding var(--rail-dur) var(--rail-ease),gap var(--rail-dur) var(--rail-ease)}
+  .sidebar .brand-text{
+    display:block;flex:1 1 auto;min-width:0;max-width:190px;overflow:hidden;
+    opacity:1;transform:none;
+    transition:max-width var(--rail-dur) var(--rail-ease),
+               opacity .2s ease .12s,transform .3s var(--rail-ease) .08s;
+  }
+  .app-wrapper.sb-collapsed .sidebar .brand-text{
+    display:block;max-width:0;opacity:0;transform:translateX(-10px);
+    transition:max-width var(--rail-dur) var(--rail-ease),
+               opacity .13s ease,transform .2s ease;
+  }
+  .app-wrapper.sb-collapsed .brand-header{
+    /* room for the toggle, which now lives centred at the top of the rail */
+    justify-content:center;gap:0;padding:46px 0 14px;
+  }
+
+  /* Nav labels: clip + fade in step with the width, icons re-centre. */
+  .sidebar .nav-item{
+    transition:background .16s ease,color .16s ease,box-shadow .16s ease,
+               gap var(--rail-dur) var(--rail-ease),
+               padding var(--rail-dur) var(--rail-ease);
+  }
+  .sidebar .nav-item svg{flex:0 0 auto}
+  .sidebar .nav-item span{
+    display:block;max-width:190px;overflow:hidden;white-space:nowrap;
+    opacity:1;transform:none;
+    transition:max-width var(--rail-dur) var(--rail-ease),
+               opacity .2s ease .12s,transform .3s var(--rail-ease) .08s;
+  }
+  .app-wrapper.sb-collapsed .sidebar .nav-item{gap:0;padding-left:0;padding-right:0;justify-content:center}
+  .app-wrapper.sb-collapsed .sidebar .nav-item span{
+    display:block;max-width:0;opacity:0;transform:translateX(-10px);
+    transition:max-width var(--rail-dur) var(--rail-ease),
+               opacity .13s ease,transform .2s ease;
+  }
+  .app-wrapper.sb-collapsed .nav-list{gap:6px}
+
+  /* The measured liquid pill tracks the rail instead of racing it: the
+     ResizeObserver re-measures every frame of the width transition, so a
+     short duration here makes the pill *follow* rather than overshoot. */
+  .app-wrapper.sb-anim .nav-list::before,
+  .app-wrapper.sb-anim .nav-list::after{transition-duration:.18s}
+
+  /* Toggle: glides from the header corner to the centre of the rail. */
+  .sb-toggle{
+    transition:right var(--rail-dur) var(--rail-ease),
+               top var(--rail-dur) var(--rail-ease),
+               background .15s ease,color .15s ease,border-color .15s ease,
+               transform .15s var(--spring);
+  }
+  .app-wrapper.sb-collapsed .sb-toggle{
+    position:absolute;top:2px;right:calc(50% - 20px);left:auto;margin:0;
+  }
+  .sb-toggle svg{transition:transform var(--rail-dur) var(--rail-ease)}
+
+  /* Footer card folds away instead of vanishing mid-frame. */
+  .sidebar-foot{
+    overflow:hidden;max-height:min(360px,46vh);opacity:1;transform:none;
+    transition:max-height var(--rail-dur) var(--rail-ease),
+               padding-top .3s var(--rail-ease),
+               opacity .22s ease .08s,transform .3s var(--rail-ease);
+  }
+  .app-wrapper.sb-collapsed .sidebar-foot{
+    display:block;max-height:0;padding-top:0;opacity:0;
+    transform:translateY(12px);pointer-events:none;
+    transition:max-height var(--rail-dur) var(--rail-ease),
+               padding-top .3s var(--rail-ease),
+               opacity .13s ease,transform .2s ease;
+  }
+  .sidebar-foot > .glass-panel{animation:none}
+}
+
+/* Motion-sensitive users get the state change with no travel. */
+@media (prefers-reduced-motion: reduce){
+  .sidebar,.sidebar .nav-item,.sidebar .nav-item span,.sidebar .brand-text,
+  .sidebar-foot,.sb-toggle,.sb-toggle svg,.brand-header{transition:none !important}
+}
+
+/* ─────────────────────────────────────────────────────────────
+   3 · MOBILE TOP BAR — REBUILT
+   The old bar was a logo, a wordmark that collided with the flame chip
+   and nothing else: no sense of place, uneven optical centring, a hard
+   shadow. It is now a proper app bar — icon tile, the current section
+   in display type with the product name as a quiet eyebrow, and one
+   right-aligned status chip on a frosted surface.
+───────────────────────────────────────────────────────────── */
+@media(max-width:860px){
+  .mobile-header{
+    /* NB: no `display` here — landscape phones hide the bar entirely and
+       this layer must not resurrect it. */
+    align-items:center;justify-content:space-between;gap:12px;
+    height:var(--header-h);
+    padding-top:env(safe-area-inset-top);
+    padding-bottom:0;
+    background:color-mix(in srgb,var(--surface-elevated) 88%,transparent);
+    -webkit-backdrop-filter:blur(22px) saturate(180%);
+    backdrop-filter:blur(22px) saturate(180%);
+    border-bottom:1px solid color-mix(in srgb,var(--glass-border) 85%,transparent);
+  }
+  .mh-brand{display:flex;align-items:center;gap:10px;min-width:0;flex:1 1 auto}
+  .mobile-header .brand-logo-icon{width:30px;height:30px;border-radius:10px;flex:0 0 auto}
+  .mh-titles{display:flex;flex-direction:column;justify-content:center;min-width:0;gap:1px}
+  .mh-page{
+    font-family:var(--font-display);font-size:1rem;font-weight:750;
+    letter-spacing:-.02em;line-height:1.15;color:var(--text-main);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .mh-wordmark{
+    font-size:.58rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;
+    line-height:1.2;color:var(--text-dim);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .mh-streak{
+    flex:0 0 auto;font-size:.68rem;font-weight:800;padding:6px 11px;
+    font-variant-numeric:tabular-nums;
+    border:1px solid color-mix(in srgb,var(--accent) 22%,transparent);
+  }
+  .mh-streak svg{width:12px;height:12px}
+}
+@media(max-width:380px){
+  .mh-page{font-size:.92rem}
+  .mh-wordmark{display:none}
+  .mh-titles{gap:0}
+}
+
+/* ─────────────────────────────────────────────────────────────
+   4 · PHONE CHROME — STATUS BAR, PAGE HEADER, CONTROLS
+───────────────────────────────────────────────────────────── */
+@media(max-width:640px){
+  /* Study-clock strip: two clean rows (status + time, then actions)
+     instead of a pill that wrapped into a lopsided blob. */
+  .tracker-bar{
+    display:flex;flex-direction:column;align-items:stretch;gap:10px;
+    padding:11px 13px;border-radius:20px;margin-bottom:14px;
+  }
+  .tracker-bar .tracker-status{display:flex;align-items:center;gap:10px;width:100%;min-width:0}
+  .tracker-labels{flex:1 1 auto;min-width:0}
+  .tracker-state{font-size:.66rem;letter-spacing:.04em;text-transform:uppercase;font-weight:800;color:var(--text-dim)}
+  .tracker-task{font-size:.78rem;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tracker-bar .tracker-time{margin-left:auto;flex:0 0 auto;font-variant-numeric:tabular-nums;font-size:1.05rem;font-weight:800}
+  .tracker-bar .tracker-actions{display:flex;flex-wrap:wrap;gap:6px;width:100%}
+  .tracker-bar .tracker-actions .chip{flex:0 0 auto;align-self:center}
+  .tracker-bar .tracker-actions .btn{flex:1 1 84px;min-height:34px}
+
+  /* Page header: one column, generous type, controls full width. */
+  .page-header{flex-direction:column;align-items:stretch;gap:12px;margin-bottom:14px}
+  .page-title{font-size:1.42rem;line-height:1.12;letter-spacing:-.5px}
+  .page-subtitle{font-size:.76rem;line-height:1.5;margin-top:5px}
+  .page-header > .flex-row,.planner-tools{width:100%;display:flex;flex-wrap:wrap;gap:8px}
+  .planner-tools .vtabs{flex:1 1 100%}
+  .planner-tools .filter-select{flex:1 1 100%;max-width:none;width:100%}
+  .planner-tools > .btn{flex:1 1 100%;width:100%}
+
+  /* Day cards: heading and progress bar share one baseline. */
+  .planner-days .day-block > .day-head{
+    display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    padding:12px 13px 11px;
+  }
+  .planner-days .day-head .daybar{flex:1 1 100%;margin:0}
+  .planner-days .task-row{padding:11px 13px}
+  .day-date{font-size:.88rem;letter-spacing:-.01em}
+  .day-meta{font-size:.68rem;margin-top:2px}
+}
+
+/* Dock breathing room: the last row of a list must clear the capsule. */
+@media(max-width:860px){
+  .main-workspace{padding-bottom:calc(var(--dock-h) + 30px)}
+}
+
+/* ── Guards · mirror the v14/v15 accessibility contracts ── */
+@media (prefers-reduced-transparency: reduce){
+  .mobile-header{
+    background:var(--surface-elevated);
+    -webkit-backdrop-filter:none;backdrop-filter:none;
+  }
+}
+@media (forced-colors: active){
+  .mobile-header{background:Canvas;-webkit-backdrop-filter:none;backdrop-filter:none}
+  .mh-wordmark,.mh-page{color:CanvasText}
+}
+
+/* Landscape phones keep their own tighter clearance (the dock is a slim row
+   there, and the header is hidden entirely). */
+@media(max-width:900px) and (max-height:500px) and (orientation:landscape){
+  .main-workspace{padding-top:10px;padding-bottom:calc(var(--dock-h) + 18px)}
+}
