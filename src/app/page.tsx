@@ -704,6 +704,24 @@ export default function Home() {
     else startSmartClock();
   };
 
+  // Linked focus start (used by Zen): one tap starts the focus timer AND the
+  // study clock, so entering Zen no longer means juggling two separate
+  // controls. Breaks keep the clock untouched (they are rest, not study).
+  const startFocusWithClock = useCallback(() => {
+    if (!timer.running) timer.start();
+    if (clock.onBreak) {
+      clock.endBreak();
+      notify("Break ended — study clock resumed with your focus timer.", "success");
+      return;
+    }
+    if (!clock.sessionActive) {
+      startSmartClock();
+    } else if (!clock.running) {
+      clock.resume();
+      notify("Study clock resumed with your focus timer.", "success");
+    }
+  }, [clock, notify, startSmartClock, timer]);
+
   const focusTask = (taskId: number) => {
     const task = state?.tasks.find((x) => x.id === taskId);
     // Already recording THIS task → never restart the clock (that used to
@@ -1035,7 +1053,9 @@ export default function Home() {
               onAskTutor={askTutor} replanning={busy} onReplan={replan} />
           )}
           {page === "focus" && (
-            <FocusView state={state} timer={timer} clock={clock} onCompleteTask={(id) => setTaskStatus(id, "done")} onZen={() => setZen(true)} />
+            <FocusView state={state} timer={timer} clock={clock} onCompleteTask={(id) => setTaskStatus(id, "done")}
+              onZen={() => setZen(true)}
+              onClockLink={(msg) => notify(msg, "success")} />
           )}
           {page === "subjects" && (
             <SubjectsView state={state} onAdd={addSubject} onEdit={editSubject} onDelete={deleteSubject} busy={busy} onAskTutor={askTutor} />
@@ -1063,17 +1083,24 @@ export default function Home() {
             Study clock: {clock.running ? "recording" : clock.onBreak ? "on break" : clock.sessionActive ? "paused" : "not clocked in"} · {mmss(clock.elapsed)}
           </div>
           <div className="flex-row gap-md zen-actions">
-            <button className="btn btn-primary" onClick={timer.toggle}>{timer.running ? "Pause Focus" : "Start Focus"}</button>
-            {!clock.sessionActive
-              ? <button className="btn btn-secondary" onClick={startSmartClock}>Clock In</button>
-              : <>
-                  <button className="btn btn-secondary" onClick={pauseOrResume}>
-                    {clock.running ? "Pause Clock" : "Resume Clock"}
-                  </button>
-                  <button className="btn btn-danger" onClick={clockOutNow}>Clock Out</button>
-                </>}
+            <button className="btn btn-primary" onClick={() => (timer.running ? timer.pause() : startFocusWithClock())}>
+              {timer.running ? "Pause Focus" : "Start Focus + Clock"}
+            </button>
+            {clock.sessionActive && (
+              <>
+                <button className="btn btn-secondary" onClick={pauseOrResume}>
+                  {clock.running ? "Pause Clock" : "Resume Clock"}
+                </button>
+                <button className="btn btn-danger" onClick={clockOutNow}>Clock Out</button>
+              </>
+            )}
             <button className="btn btn-secondary" onClick={() => setZen(false)}>Exit Zen</button>
           </div>
+          {!timer.running && !clock.sessionActive && (
+            <p className="zen-hint">
+              “Start Focus + Clock” begins your focus timer and study clock together — one tap, no juggling.
+            </p>
+          )}
         </div>
       )}
 

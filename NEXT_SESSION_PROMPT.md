@@ -32,6 +32,47 @@ The following changes were made and merged. Do NOT redo them — just verify the
 
 ---
 
+## v16 — UI POLISH: TRUE LISTS, ALIGNED BUTTONS, CALENDAR COLOUR, FOCUS+CLOCK LINK (this session)
+
+Four UX gaps were fixed together:
+
+1. **List view is a list again** — `src/app/globals.css` (appended "v16" section):
+   - Planner day blocks: `.planner-days .day-block` padding moved to the day
+     head; `.planner-days .task-row` rows are edge-to-edge with hairline
+     separators (`last-row` class removes the final divider — set from
+     `PlannerView.tsx` via `renderTask(task, { lastRow })`).
+   - Dashboard "Today's Study Load": `.task-row.clean-list` is horizontal
+     again (was a stack of bordered cards with a dashed divider).
+2. **Aligned row controls** — `.task-row-actions` uniform 30px buttons, fixed
+   clock-button width (`min-width:88px`), Done pinned right; on ≤640px the
+   action bar is a 3-column grid (Done · Clock · ⋯) with `order:-2/-1` and
+   expanded actions wrapping below.
+3. **Calendar colour** — `PlannerView.tsx` sets `--cell-tint` per cell from
+   the first task's subject colour; CSS tints `.cal-cell.has-tasks`; the
+   ≤640px rule that hid `.cal-pill` is overridden so phones show coloured
+   topic pills too.
+4. **Focus ↔ clock link** — `FocusView.tsx` `toggleTimerLinked()`: starting a
+   focus block also starts the study clock (attaches the first pending task
+   of the day), breaks never touch the clock, new `onClockLink` prop surfaces
+   a toast. `page.tsx` Zen mode: primary button is now "Start Focus + Clock"
+   (`startFocusWithClock`), with the redundant standalone Clock In removed
+   and a `.zen-hint` explaining the combined action.
+5. **Branded favicon** — new `src/app/icon.svg` (gradient tile + layered
+   chevrons matching `IconLogo`); Next.js serves it as the tab icon.
+
+Files changed:
+```
+src/app/globals.css            ← appended v16 section (list rows, buttons, calendar, zen hint)
+src/components/PlannerView.tsx ← last-row flag + calendar --cell-tint
+src/components/Dashboard.tsx   ← (no change; .clean-list restyled via CSS)
+src/components/FocusView.tsx   ← toggleTimerLinked + onClockLink prop + copy
+src/app/page.tsx               ← startFocusWithClock, Zen restructure, onClockLink wiring
+src/app/icon.svg               ← NEW branded favicon
+README.txt                     ← v16 section
+```
+
+---
+
 ## v15 — STUDY CLOCK AUTO-COMPLETE (merged in this session)
 
 Tasks are now marked **done automatically** the moment the minutes logged for
