@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { api, ApiError, prettyLong, today, type AppState, type MessageRow } from "@/lib/client";
 import { mmss, useFocusTimer, useStudyClock, type ClockApi, type TimerMode } from "@/lib/useTimer";
 import { nextPendingTask, type CompletedTaskInfo } from "@/lib/completion";
@@ -72,6 +72,21 @@ function savedSessionQueue(raw: string | null): PendingSessionLog[] {
   } catch { return []; }
 }
 
+/** The ⌘K hint's compact rail form has to name the modifier the learner
+ *  actually presses: ⌘ on Apple keyboards, ⌃ (Ctrl) on everything else.
+ *  `useSyncExternalStore` is React's own platform-detection pattern — the
+ *  server snapshot and the first hydration paint both answer "Apple", the
+ *  client corrects immediately afterwards, and no effect or state is
+ *  involved, so the markup can never desynchronise from the DOM. */
+const noStoreSubscription = () => () => {};
+function isApplePlatform(): boolean {
+  if (typeof navigator === "undefined") return true;
+  return /Mac|iPhone|iPad|iPod/i.test(`${navigator.userAgent || ""} ${navigator.platform || ""}`);
+}
+function useAppleKeyboard(): boolean {
+  return useSyncExternalStore(noStoreSubscription, isApplePlatform, () => true);
+}
+
 export default function Home() {
   const [state, setState] = useState<AppState | null>(null);
   const [loading, setLoading] = useState(true);
@@ -117,6 +132,10 @@ export default function Home() {
   const [railAnimating, setRailAnimating] = useState(false);
   const railTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => { if (railTimer.current) clearTimeout(railTimer.current); }, []);
+  /* The collapsed rail has no room for a sentence, so the ⌘K hint shows a key
+     glyph there — and it has to be the glyph this learner actually presses:
+     ⌘ on Apple keyboards, ⌃ (Ctrl) on everything else. */
+  const cmdGlyph = useAppleKeyboard() ? "⌘" : "⌃";
   const toggleSidebar = () => {
     setRailAnimating(true);
     if (railTimer.current) clearTimeout(railTimer.current);
@@ -945,9 +964,11 @@ export default function Home() {
 
   return (
     <>
+      {/* One flex row: [ mark + titles ]  ←→  [ status chip ]. The group keeps
+          its own gap, and both ends are bounded so neither stretches. */}
       <header className="mobile-header">
         <div className="mh-brand">
-          <div className="brand-logo-icon brand-logo-sm"><IconLogo size={14} /></div>
+          <div className="brand-logo-icon brand-logo-sm" aria-hidden="true"><IconLogo size={14} /></div>
           <div className="mh-titles">
             <span className="mh-wordmark">Study Planner Pro</span>
             <span className="mh-page">{NAV.find((n) => n.id === page)?.label ?? "Study Planner Pro"}</span>
@@ -967,7 +988,9 @@ export default function Home() {
             <IconPanelLeft size={16} />
           </button>
           <div className="brand-header">
-            <div className="brand-logo-icon"><IconLogo /></div>
+            {/* Presentational mark: it never carries a nav state, so the only
+                highlighted thing in the rail is the active route's pill. */}
+            <div className="brand-logo-icon" aria-hidden="true"><IconLogo /></div>
             <div className="brand-text">
               <div className="brand-title">Study Planner Pro</div>
               <div className="brand-course">{state.user.courseName}</div>
@@ -1002,6 +1025,16 @@ export default function Home() {
                 Re-run Setup
               </button>
             </div>
+          </div>
+          {/* ⌘K hint. It lives *inside* the sidebar rather than pinned to the
+              viewport corner, so the rail's own width is the hint's width: it
+              shrinks, re-centres and stays clipped by the sidebar instead of
+              hanging out of it with a word cut in half. The sentence keeps its
+              place in the DOM (screen readers still get it) while the rail
+              swaps it for the compact key chip. */}
+          <div className="cmdk-tip">
+            <kbd className="cmdk-tip-key" aria-hidden="true">{cmdGlyph}K</kbd>
+            <span className="cmdk-tip-text">Press ⌘K / Ctrl-K for commands</span>
           </div>
         </aside>
 
@@ -1087,7 +1120,6 @@ export default function Home() {
         learner={{ name: state.user.name, daysLeft: ctx.daysLeft, progressPct: ctx.progressPct, streak: state.user.streak, todayDone, todayTotal }} />
 
       <CommandPalette commands={commands} />
-      <div className="cmdk-tip">Press ⌘K / Ctrl-K for commands</div>
 
       {zen && (
         <div className="zen">

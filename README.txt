@@ -106,8 +106,45 @@ instead of stopping on a “voice model unavailable” error; the chat shows a
 clear non-error notice. One failed long-answer part switches the remaining
 parts to that local voice, so every later part keeps flowing.
 
-v18 FIXES (this build)
-----------------------
+v19 COLLAPSED-RAIL + MOBILE BAR FIXES (this build)
+--------------------------------------------------
+ - ONE HIGHLIGHT IN THE COLLAPSED SIDEBAR: the brand tile used to be painted
+   with the very same --accent-gradient the active nav pill uses (plus a
+   spinning conic halo), so in the 78px icon rail it read as a second selected
+   tab stacked above the real one. Collapsed, the mark is now quiet — neutral
+   surface, muted glyph, hairline rim, no glow, halo off — riding the same
+   --rail-dur curve as the labels. Expanded, it keeps the gradient tile,
+   because there the wordmark sits beside it and it reads as branding. Only
+   the active route is highlighted now.
+ - ⌘K HINT NO LONGER CROPS OR OVERFLOWS: "Press ⌘K / Ctrl-K for commands"
+   was a position:fixed strip pinned to the viewport corner, as wide as its
+   text — the rail shrank to 78px and the hint did not, so it hung out over
+   the workspace with words cut in half. It is now an ordinary row at the foot
+   of the sidebar (width:100%, min-width:0, overflow:hidden), so the rail's
+   own width IS the hint's width. Narrow sidebar → the sentence wraps onto a
+   second line instead of being chopped; collapsed → the sentence clips away
+   and a compact key chip takes its place, centred. The chip names the real
+   modifier (⌘ on Apple keyboards, ⌃ elsewhere) via useSyncExternalStore, so
+   there is no hydration mismatch; the sentence stays in the DOM for screen
+   readers. Phones (the sidebar is the dock there) and installed windows keep
+   hiding it, as before.
+ - MOBILE TOP BAR: FLEX CONTRACT, NOT LEFTOVER CASCADE: the bar used to take
+   its layout from whichever of four older @media(max-width:860px) blocks
+   happened to win (padding flip-flopped 10/12/14px, display:flex came from a
+   rule that also had to avoid resurrecting it on landscape phones, and the
+   streak chip was unbounded against the page title). It now states the whole
+   contract in one place: display:flex + space-between + align-items:center on
+   the container, logo and page title as ONE group (.mh-brand) on a 12px gap,
+   the 26px logo tile and the streak chip hard-bounded (flex:0 0 …, max-width/
+   max-height, min-height:26px, nowrap) so neither stretches nor squashes on
+   narrow viewports, and padding: 0 16px raised to the safe area on notched
+   devices. The landscape-phone "no bar" rule is restated after it, since the
+   layer now owns display.
+ - Design notes: docs/design/v19-rail-hint-appbar.md. deploy-package/ re-synced
+   to a byte-exact mirror of src/ as usual.
+
+v18 FIXES
+---------
  - DEPLOY-PACKAGE RESYNCED AGAIN: the drag-and-drop deploy folder had
    drifted far behind src/ (it predated the study-clock auto-completion,
    the one-per-row planner list, the sidebar rail, the rebuilt mobile
