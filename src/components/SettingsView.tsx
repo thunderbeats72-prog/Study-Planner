@@ -4,6 +4,18 @@ import React, { useState } from "react";
 import { THEMES, type AppState } from "@/lib/client";
 import { IconSpark } from "./icons";
 
+/* Swatch previews for the theme picker — each dot shows the theme's
+   canvas→accent duotone so the choice reads at a glance. */
+const THEME_SWATCH: Record<string, string> = {
+  default: "linear-gradient(135deg,#F6F5FA 18%,#7D6DF0 60%,#5D4DE0)",
+  "silver-lavender": "linear-gradient(135deg,#F3F3F8 18%,#968EE9 60%,#6F63D8)",
+  mint: "linear-gradient(135deg,#F4FAF7 18%,#34D399 60%,#0FA37F)",
+  sunset: "linear-gradient(135deg,#FBF6F1 18%,#FB923C 60%,#DC5E0C)",
+  dark: "linear-gradient(135deg,#0E0E10 18%,#9494F5 60%,#6E6EF0)",
+  obsidian: "linear-gradient(135deg,#0B0F1A 18%,#4CC5F9 60%,#22A8E6)",
+  nebula: "linear-gradient(135deg,#100B20 18%,#B168F8 60%,#9333EA)",
+};
+
 export default function SettingsView({
   state, onPatch, onRestart, busy,
 }: {
@@ -113,6 +125,7 @@ export default function SettingsView({
                   className={`btn ${s.theme === th.id ? "btn-primary" : "btn-secondary"}`}
                   onClick={() => onPatch({ theme: th.id })}
                 >
+                  <span className="theme-dot" aria-hidden style={{ background: THEME_SWATCH[th.id] }} />
                   {th.label}
                 </button>
               ))}

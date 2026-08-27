@@ -139,6 +139,62 @@ export default function Home() {
     document.body.className = [theme, mode].filter(Boolean).join(" ");
   }, [state?.settings.theme, state?.user.level]);
 
+  /* v12 — global click micro-interactions: every small click gets a soft
+     spring pulse (its icon pops with it) and CTAs grow a ripple at the
+     pointer. Delegated once; WAAPI so it never fights the CSS animations. */
+  useEffect(() => {
+    const PRESSABLE =
+      "button, a, .vtab, .nav-item, .cal-cell, .cmdk-item, .task-row, .ob-range-chip, [role='button']";
+    const RIPPLE_HOST = ".btn, .ob-btn-primary, .ai-fab";
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const SPRING = "cubic-bezier(.22,1,.36,1)";
+    const onClick = (e: MouseEvent) => {
+      if (reduce.matches) return;
+      const t = e.target;
+      if (!(t instanceof Element)) return;
+      const el = t.closest(PRESSABLE);
+      if (!(el instanceof HTMLElement)) return;
+      const soft = el.matches(".task-row, .kpi-card");
+      el.animate(
+        [
+          { transform: "scale(1)" },
+          { transform: soft ? "scale(1.012)" : "scale(1.045)", offset: 0.35 },
+          { transform: "scale(1)" },
+        ],
+        { duration: soft ? 500 : 620, easing: SPRING },
+      );
+      el.querySelector("svg")?.animate(
+        [
+          { transform: "scale(.82)" },
+          { transform: "scale(1.14)", offset: 0.55 },
+          { transform: "scale(1)" },
+        ],
+        { duration: 520, easing: SPRING },
+      );
+      const host = el.matches(RIPPLE_HOST) ? el : el.closest(RIPPLE_HOST);
+      if (host instanceof HTMLElement) {
+        const r = host.getBoundingClientRect();
+        const size = Math.max(r.width, r.height) * 2.2;
+        const span = document.createElement("span");
+        span.className = "fx-ripple";
+        span.style.width = span.style.height = `${size}px`;
+        span.style.left = `${e.detail === 0 ? r.width / 2 : e.clientX - r.left}px`;
+        span.style.top = `${e.detail === 0 ? r.height / 2 : e.clientY - r.top}px`;
+        host.appendChild(span);
+        const anim = span.animate(
+          [
+            { transform: "translate(-50%,-50%) scale(0)", opacity: 0.55 },
+            { transform: "translate(-50%,-50%) scale(1)", opacity: 0 },
+          ],
+          { duration: 750, easing: "cubic-bezier(.16,1,.3,1)" },
+        );
+        anim.onfinish = () => span.remove();
+      }
+    };
+    document.addEventListener("click", onClick);
+    return () => document.removeEventListener("click", onClick);
+  }, []);
+
   const persistSessionQueue = useCallback(() => {
     try { localStorage.setItem(SESSION_QUEUE_KEY, JSON.stringify(sessionQueueRef.current || [])); }
     catch { /* in-memory queue still protects this page session */ }

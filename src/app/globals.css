@@ -3762,3 +3762,185 @@ body.theme-dark .pulse-dot.live,body.theme-obsidian .pulse-dot.live,body.theme-n
   .nav-item{min-height:44px;border-radius:14px}
   .tracker-bar{top:8px}
 }
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   v12 — AMBIENT CANVAS + CINEMATIC MOTION + CLICK MICRO-FX
+   Appended last, so it wins the cascade over every section above.
+   Nothing above is deleted; this layer only re-materials and re-times.
+
+     A · Ambient canvas — fine grid mesh + dual accent glow (reference
+         screenshot), themed end-to-end: loader → onboarding → app →
+         settings all share one canvas.
+     B · Silver Lavender finally gets its own token set (the theme id
+         existed in the picker but had zero CSS before this layer).
+     C · Slower, weightier motion — re-times entrances, hovers, presses,
+         sheets, toasts and the theme cross-fade.
+     D · Click micro-interactions — every small click pulses, CTAs grow
+         a ripple (ripple look lives here; the trigger is a tiny
+         delegated effect in page.tsx using the Web Animations API).
+═══════════════════════════════════════════════════════════════════ */
+
+
+/* ── A · AMBIENT CANVAS ──────────────────────────────────────────── */
+:root{
+  --grid-s:44px;
+  --grid-line:color-mix(in srgb,var(--accent) 9%,transparent);
+  --bg-gradient:
+    radial-gradient(1100px 520px at 16% -12%,color-mix(in srgb,var(--accent) 10%,transparent),transparent 70%),
+    radial-gradient(1000px 480px at 84% -14%,color-mix(in srgb,var(--color-ai) 9%,transparent),transparent 72%),
+    radial-gradient(1500px 820px at 50% 122%,color-mix(in srgb,var(--accent) 6%,transparent),transparent 76%);
+}
+
+/* Every themed body receives the layered wash, tinted by its own
+   accent. Same specificity as the earlier body.theme-* blocks and
+   later in source, so this --bg-gradient wins. */
+body[class*="theme-"]{
+  --bg-gradient:
+    radial-gradient(1100px 520px at 16% -12%,color-mix(in srgb,var(--accent) 10%,transparent),transparent 70%),
+    radial-gradient(1000px 480px at 84% -14%,color-mix(in srgb,var(--color-ai) 9%,transparent),transparent 72%),
+    radial-gradient(1500px 820px at 50% 122%,color-mix(in srgb,var(--accent) 6%,transparent),transparent 76%);
+}
+/* Hairline strength per family: whisper-faint on light canvases,
+   clearly legible on OLED — exactly like the reference shot. */
+body.theme-default,body.theme-silver-lavender,body.theme-mint,body.theme-sunset{
+  --grid-line:color-mix(in srgb,var(--accent) 8%,transparent);
+}
+body.theme-dark,body.theme-obsidian,body.theme-nebula{
+  --grid-line:color-mix(in srgb,var(--accent) 11%,transparent);
+}
+
+/* The mesh itself: a fixed layer painted above the body wash and
+   below all content, fading out toward the fold like the reference.
+   Lives on ::after — ::before already carries the slow aurora drift. */
+body::after{
+  content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:1;animation:none;
+  background:
+    linear-gradient(var(--grid-line) 1px,transparent 1px) 0 0/var(--grid-s) var(--grid-s),
+    linear-gradient(90deg,var(--grid-line) 1px,transparent 1px) 0 0/var(--grid-s) var(--grid-s);
+  -webkit-mask-image:linear-gradient(to bottom,rgba(0,0,0,.95),rgba(0,0,0,.45) 46%,transparent 92%);
+  mask-image:linear-gradient(to bottom,rgba(0,0,0,.95),rgba(0,0,0,.45) 46%,transparent 92%);
+}
+
+/* Onboarding + loader share the app canvas instead of repainting a
+   flat one on top of it — one continuous surface, end to end. */
+.ob-overlay,.loader-screen{background:transparent}
+
+
+/* ── B · SILVER LAVENDER TOKEN SET ───────────────────────────────── */
+body.theme-silver-lavender{
+  --color-ai:#8A80E8;--color-ai-soft:rgba(138,128,232,.10);--ai-rgb:138,128,232;--color-ai-bright:#A59DF0;
+  --app-bg:#F3F3F8;--surface:#FBFBFD;--surface-solid:#FBFBFD;--surface-elevated:#FDFDFF;--surface-hover:#F6F6FB;
+  --glass-border:#E4E4EF;--glass-border-hover:#D5D5E3;
+  --text-main:#23223A;--text-muted:#71708C;--text-dim:#ABAAC0;
+  --accent:#7A70E0;--accent-hover:#685CD2;--accent-light:#9A92EC;--accent-glow:rgba(122,112,224,.14);
+  --accent-gradient:linear-gradient(160deg,#968EE9,#6F63D8);
+  --nav-active-bg:#ECEBFA;--nav-active-text:#5A4ECB;--nav-active-border:rgba(122,112,224,.32);
+  --row-bg:#F3F3F9;--row-hover:#ECECF4;
+  --chart-bar:rgba(122,112,224,.55);--input-bg:#FDFDFF;
+}
+
+
+/* ── C · SLOWER, WEIGHTIER MOTION ────────────────────────────────── */
+:root{--anim-dur:.34s;--dur-fast:.2s;--dur-normal:.36s;--dur-complex:.5s}
+
+/* Theme change becomes a slow cross-fade rather than a blink-and-miss */
+body{transition:background-color .9s ease,color .6s ease}
+body.theme-switching{animation:themeBlink .7s ease}
+
+/* Buttons: hover lifts land softly; the press still snaps in fast but
+   the release now glides out on a longer curve. */
+.btn{
+  transition:transform .22s var(--spring-press),box-shadow .32s ease,background .24s ease,
+             background-position .45s ease,border-color .24s ease,color .24s ease,filter .26s ease;
+}
+.btn:active{transition-duration:.09s}
+@media(hover:hover){
+  .btn-primary:hover{transform:translateY(-2px)}
+  .btn-secondary:hover,.btn-danger:hover{transform:translateY(-1px)}
+}
+
+/* Entrances: everything settles ~2× slower than v11 */
+.glass-panel{animation:panelIn .6s var(--spring-soft) backwards}
+.main-workspace > :not(.tracker-bar){animation:pageIn .55s var(--spring-soft) backwards}
+.day-block{animation:pageIn .6s var(--spring-soft) backwards}
+.day-block .task-row,.modal-box .task-row{animation:rowIn .5s var(--spring-soft) backwards}
+.kpi-value{animation:tickUp .8s var(--spring-soft) backwards}
+.bar-fill{transition:width 1s cubic-bezier(.22,1,.36,1)}
+.prog-fill{animation:progGrow 1.2s var(--spring-soft) backwards}
+.kpi-card .bar-track .bar-fill{animation:progGrow 1.1s var(--spring-soft) backwards}
+.wk-bar,.bar-chart > div{animation:barGrow .85s var(--spring-soft) backwards}
+.heat-cell{animation:heatIn .5s var(--spring-soft) backwards}
+
+/* Sheets, palette, chat, toasts */
+.modal-box{animation:sheetUp .55s var(--spring-soft)}
+@media(max-width:640px){.modal-box{animation:sheetSlide .68s var(--spring-soft)}}
+.modal-box > *:nth-child(1){animation:rowIn .4s var(--spring-soft) .06s backwards}
+.modal-box > *:nth-child(2){animation:rowIn .4s var(--spring-soft) .12s backwards}
+.modal-box > *:nth-child(3){animation:rowIn .4s var(--spring-soft) .18s backwards}
+.cmdk{animation:cmdkPop .42s var(--spring-soft)}
+.cmdk-item{transition:background .24s ease,color .24s ease,transform .3s var(--spring)}
+.ai-panel.slide-in{animation:panelSpring .52s var(--spring-soft)}
+.ai-msg{animation:msgIn .45s var(--spring-soft) backwards}
+.ai-fab{transition:transform .38s var(--spring),box-shadow .38s ease,background .5s ease}
+.toast{animation:toastIn .55s var(--spring-soft) backwards}
+
+/* Navigation & small controls */
+.nav-item{transition:transform .34s var(--spring),background .3s ease,color .3s ease,box-shadow .32s ease}
+.nav-item svg{transition:transform .34s var(--spring)}
+.nav-item.active::before{animation:navPip .4s var(--spring-soft)}
+.vtab{transition:all .32s ease}
+.vtab.active::after{animation:tabInk .45s var(--spring-soft)}
+.cal-cell{transition:all .32s ease}
+.cal-grid .cal-cell{animation:calIn .5s var(--spring-soft) backwards}
+.task-row{transition:background .26s ease,border-color .26s ease,transform .45s var(--spring),box-shadow .4s ease}
+.input-field{transition:border-color .28s ease,box-shadow .28s ease}
+.chip{transition:background .4s ease,color .4s ease,transform .3s var(--spring)}
+
+/* Onboarding: the whole wizard breathes slower */
+.ob-card{animation:pageIn .65s var(--spring-soft)}
+.ob-step-node{transition:background .45s ease,border-color .45s ease,color .45s ease,box-shadow .45s ease}
+.ob-step + .ob-step::before{transition:background .6s ease}
+.ob-level-grid > *{animation:cardDeal .6s var(--spring) backwards}
+.ob-feature{transition:transform .3s var(--spring-soft),border-color .3s ease,box-shadow .3s ease}
+.ob-btn,.ob-btn-primary,.ob-btn-secondary{
+  transition:transform .24s var(--spring-press),box-shadow .34s ease,filter .26s ease,
+             background .26s ease,border-color .26s ease,color .26s ease;
+}
+
+
+/* ── D · CLICK MICRO-INTERACTIONS ────────────────────────────────── */
+/* Ripple hosts must clip the ripple; buttons carry no dropdowns, and
+   outlines/focus rings are not clipped by an element's own overflow. */
+.btn,.ob-btn,.ob-btn-primary{position:relative;overflow:hidden}
+.ai-fab{overflow:hidden}
+
+.fx-ripple{
+  position:absolute;border-radius:50%;pointer-events:none;
+  /* left/top + size + scale animation are set inline by page.tsx */
+  transform:translate(-50%,-50%) scale(0);
+  background:radial-gradient(circle,
+    color-mix(in srgb,var(--accent) 32%,transparent) 0%,
+    color-mix(in srgb,var(--accent) 15%,transparent) 45%,
+    transparent 70%);
+}
+/* On gradient surfaces the ripple reads as light, not tint */
+.btn-primary .fx-ripple,.ob-btn-primary .fx-ripple,.ai-fab .fx-ripple,
+.nav-item.active .fx-ripple,.cmdk-item.active .fx-ripple{
+  background:radial-gradient(circle,rgba(255,255,255,.5) 0%,rgba(255,255,255,.22) 45%,transparent 70%);
+}
+
+/* Settings theme picker: swatch dots */
+.theme-dot{
+  width:11px;height:11px;border-radius:50%;flex-shrink:0;
+  box-shadow:inset 0 1px 1px rgba(255,255,255,.45),0 1px 2px rgba(10,10,25,.2);
+  transition:transform .3s var(--spring);
+}
+.btn:hover .theme-dot{transform:scale(1.2)}
+
+/* The whole ambient layer honours reduced motion: the grid is static
+   (no animation to kill) but any future drift would go here. */
+@media (prefers-reduced-motion: reduce){
+  body::after{animation:none}
+  .fx-ripple{display:none}
+}
