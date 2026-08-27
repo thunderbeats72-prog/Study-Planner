@@ -65,9 +65,9 @@ export default function FocusView({
 
       {/* ---------------- STUDY CLOCK ---------------- */}
       <div className="glass-panel tilt-card" style={{ padding: 22, marginBottom: 16, borderLeft: "4px solid var(--success-accent)" }}>
-        <div className="day-head">
-          <div>
-            <h3 style={{ fontSize: ".95rem", fontWeight: 800, margin: 0 }}>Study Clock — time tracking</h3>
+        <div className="day-head flex flex-row justify-between items-center study-clock-header" style={{ display: "flex", flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+          <div className="flex flex-col study-clock-text-group" style={{ display: "flex", flexDirection: "column" }}>
+            <h3 className="study-clock-title" style={{ fontSize: ".95rem", fontWeight: 800, margin: "0 0 6px 0", textDecoration: "none", borderBottom: "none" }}>Study Clock — time tracking</h3>
             <div className="day-meta">
               {clock.running ? "Recording your study time" : clock.onBreak ? "On a break — clock paused" : clock.sessionActive ? "Paused — resume or clock out" : "Not clocked in"}
               {" · "}{loggedTodayLabel} min logged today
@@ -101,7 +101,7 @@ export default function FocusView({
           </div>
         </div>
 
-        <div className="flex-row gap-sm" style={{ flexWrap: "wrap" }}>
+        <div className="flex-row gap-sm clock-actions flex flex-wrap gap-3" style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem" }}>
           {!clock.sessionActive && (
             <button className="btn btn-primary" onClick={() => clock.clockIn()}>Clock In</button>
           )}

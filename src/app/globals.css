@@ -5063,3 +5063,88 @@ body.mode-young .section-title::after{width:46px;height:3px;bottom:-8px}
   .planner-days{display:block}
   body::after{animation:none}
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   STUDY CLOCK — MOBILE UI ALIGNMENT & RESPONSIVENESS FIX
+   Appended last to win cascade. Implements:
+   - Header: flex-row space-between center, inner flex-col
+   - Remove stray blue underline (section-title::after)
+   - Action row: flex-wrap + consistent gap
+   - Title/subtitle breathing room
+═══════════════════════════════════════════════════════════════ */
+
+/* Header container: explicit flex-row justify-between center */
+.study-clock-header,
+.day-head.study-clock-header{
+  display:flex !important;
+  flex-direction:row !important;
+  justify-content:space-between !important;
+  align-items:center !important;
+  gap:12px !important;
+  flex-wrap:wrap !important;
+}
+
+/* Text group: flex-col for title + subtitle */
+.study-clock-text-group{
+  display:flex !important;
+  flex-direction:column !important;
+  gap:2px !important;
+  min-width:0;
+  flex:1 1 auto;
+}
+
+/* Title: remove glitch underline + add bottom margin */
+.study-clock-title{
+  margin-bottom:6px !important;
+  text-decoration:none !important;
+  border-bottom:none !important;
+  background-image:none;
+}
+.study-clock-title::after,
+.study-clock-header .section-title::after,
+.day-head .study-clock-title::after,
+.day-head.study-clock-header .section-title::after{
+  content:none !important;
+  display:none !important;
+  width:0 !important;
+  height:0 !important;
+  background:none !important;
+  border:none !important;
+}
+
+/* Also guard generic day-head titles that previously had underline */
+.day-head .section-title::after{
+  display:none !important;
+  content:none !important;
+}
+
+/* Action row: wrap + gap so buttons stack gracefully on narrow screens */
+.clock-actions{
+  display:flex !important;
+  flex-wrap:wrap !important;
+  gap:0.75rem !important; /* gap-3 */
+  align-items:center !important;
+  justify-content:flex-start !important;
+}
+.clock-actions.gap-3{gap:0.75rem !important}
+.clock-actions.gap-2{gap:0.5rem !important}
+
+/* Mobile specific: ensure header stacks nicely but keeps timer readable */
+@media(max-width:640px){
+  .study-clock-header{
+    align-items:flex-start !important;
+  }
+  .study-clock-header .stat-big{
+    font-size:clamp(1.6rem,8vw,2.2rem) !important;
+    align-self:center;
+  }
+  .clock-actions{
+    gap:0.5rem !important; /* tighter on mobile but still breathing */
+    padding-top:12px !important;
+  }
+  .clock-actions .btn,
+  .clock-actions .chip{
+    flex:0 0 auto;
+  }
+}
+
