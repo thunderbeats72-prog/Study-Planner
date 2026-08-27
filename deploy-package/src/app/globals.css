@@ -3762,3 +3762,44 @@ body.theme-dark .pulse-dot.live,body.theme-obsidian .pulse-dot.live,body.theme-n
   .nav-item{min-height:44px;border-radius:14px}
   .tracker-bar{top:8px}
 }
+
+/* STUDY CLOCK FIX */
+.study-clock-header,
+.day-head.study-clock-header{
+  display:flex !important;
+  flex-direction:row !important;
+  justify-content:space-between !important;
+  align-items:center !important;
+  gap:12px !important;
+  flex-wrap:wrap !important;
+}
+.study-clock-text-group{
+  display:flex !important;
+  flex-direction:column !important;
+  gap:2px !important;
+  min-width:0;
+  flex:1 1 auto;
+}
+.study-clock-title{
+  margin-bottom:6px !important;
+  text-decoration:none !important;
+  border-bottom:none !important;
+}
+.study-clock-title::after,
+.study-clock-header .section-title::after,
+.day-head .study-clock-title::after{
+  content:none !important;
+  display:none !important;
+}
+.day-head .section-title::after{display:none !important;content:none !important}
+.clock-actions{
+  display:flex !important;
+  flex-wrap:wrap !important;
+  gap:0.75rem !important;
+  align-items:center !important;
+  justify-content:flex-start !important;
+}
+@media(max-width:640px){
+  .study-clock-header{align-items:flex-start !important}
+  .clock-actions{gap:0.5rem !important;padding-top:12px !important}
+}
