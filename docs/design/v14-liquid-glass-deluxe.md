@@ -10,6 +10,13 @@ the cascade), plus class-name hygiene in `src/app/page.tsx`,
 `Dashboard.tsx`, `FocusView.tsx`, `SubjectsView.tsx`, `SettingsView.tsx`,
 `PlannerView.tsx`, `Heatmap.tsx`.
 
+> **Status: implemented.** Sections 1–10 are the design as approved; **§11
+> reconciles it with the code as shipped** — renamed selectors, options
+> rejected during implementation and the two cascade fixes that turned out to
+> be necessary. The layer itself is the `v14 LIQUID GLASS DELUXE` block at the
+> end of `src/app/globals.css`; the user-facing summary is the matching block
+> in `README.txt`.
+
 ---
 
 ## 1. Baseline audit (what already exists, and what it costs)
