@@ -947,10 +947,10 @@ export default function Home() {
     <>
       <header className="mobile-header">
         <div className="mh-brand">
-          <div className="brand-logo-icon brand-logo-sm"><IconLogo size={16} /></div>
+          <div className="brand-logo-icon brand-logo-sm"><IconLogo size={14} /></div>
           <div className="mh-titles">
-            <span className="mh-page">{NAV.find((n) => n.id === page)?.label ?? "Study Planner Pro"}</span>
             <span className="mh-wordmark">Study Planner Pro</span>
+            <span className="mh-page">{NAV.find((n) => n.id === page)?.label ?? "Study Planner Pro"}</span>
           </div>
         </div>
         <span className="streak-badge mh-streak"><IconFlame /> {state.user.streak}d</span>
@@ -1021,7 +1021,10 @@ export default function Home() {
             </div>
             <div className="flex-row gap-sm tracker-actions">
               <span className="chip chip-kind">{todayDone}/{todayTotal} today</span>
-              <span className="chip chip-pending">{ctx.daysLeft}d to {prettyLong(state.settings.examDate)}</span>
+              <span className="chip chip-pending tracker-exam-chip">
+                <span className="exam-chip-full">{ctx.daysLeft}d to {prettyLong(state.settings.examDate)}</span>
+                <span className="exam-chip-short">{ctx.daysLeft}d to exam</span>
+              </span>
               {!clock.sessionActive && (
                 <button className="btn btn-xs btn-primary" onClick={startSmartClock}>Clock In</button>
               )}

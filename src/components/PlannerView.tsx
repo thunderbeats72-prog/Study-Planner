@@ -90,18 +90,28 @@ export default function PlannerView({
     const meta = KIND_META[task.kind] || KIND_META.learn;
     const subj = subjFor(task);
     const topic = topicFor(task);
+    const isCheckpoint = task.title.toLowerCase().includes("checkpoint") || (task.kind === "mock" && !task.subjectId);
+    const kindLabel = isCheckpoint ? "Checkpoint" : meta.label;
+    const dotColor = subj?.color || (isCheckpoint ? "var(--color-primary)" : meta.color);
+
+    // Normalize any legacy "#0" or unspaced checkpoint titles
+    const formattedTitle = isCheckpoint
+      ? task.title.replace(/Weekly Checkpoint(?: Test)? #?0\b/i, "Weekly Checkpoint · Test #1")
+                  .replace(/Weekly Checkpoint Test #(\d+)/i, "Weekly Checkpoint · Test #$1")
+      : task.title;
+
     const showLessonBrief = options.showLessonBrief !== false;
-    const canExpandLessonBrief = showLessonBrief && !!topic;
+    const canExpandLessonBrief = showLessonBrief && (!!topic || (isCheckpoint && !!task.detail));
     const open = canExpandLessonBrief && expanded === task.id;
     return (
       <div key={task.id}>
         <div className={`task-row${task.status === "done" ? " done" : ""}${activeTaskId === task.id ? " active-clock" : ""}${moreActionsId === task.id ? " expanded-actions" : ""}${options.lastRow ? " last-row" : ""}`}>
-          <div className="task-dot" style={{ background: subj?.color || meta.color }} />
+          <div className="task-dot" style={{ background: dotColor }} />
           <div className={`task-main${canExpandLessonBrief ? " is-expandable" : ""}`}
             role={canExpandLessonBrief ? "button" : undefined}
             tabIndex={canExpandLessonBrief ? 0 : undefined}
             aria-expanded={canExpandLessonBrief ? open : undefined}
-            aria-label={canExpandLessonBrief ? `${open ? "Hide" : "Show"} lesson brief: ${task.title}` : undefined}
+            aria-label={canExpandLessonBrief ? `${open ? "Hide" : "Show"} lesson brief: ${formattedTitle}` : undefined}
             onClick={() => canExpandLessonBrief && setExpanded(open ? null : task.id)}
             onKeyDown={(e) => {
               if (canExpandLessonBrief && (e.key === "Enter" || e.key === " ")) {
@@ -110,7 +120,7 @@ export default function PlannerView({
               }
             }}>
             <div className="task-title">
-              {task.title}
+              {formattedTitle}
               {canExpandLessonBrief && (
                 <span className={`brief-chev${open ? " open" : ""}`} aria-hidden="true"
                   title={open ? "Hide lesson brief" : "Show lesson brief"}>
@@ -119,19 +129,29 @@ export default function PlannerView({
               )}
             </div>
             <div className="task-sub">
-              <span className="chip chip-kind chip-tight">{meta.label}</span>
+              <span className="chip chip-kind chip-tight">{kindLabel}</span>
               {task.plannedMinutes} min
-              {topic ? ` · ${topic.unit} · ${topic.difficulty}` : ""}
+              {topic
+                ? ` · ${topic.unit} · ${topic.difficulty}`
+                : isCheckpoint
+                ? ` · All Subjects · Comprehensive Review`
+                : task.detail
+                ? ` · ${task.detail}`
+                : ""}
               {taskLogged(task.id) ? ` · ${fmtMin(taskLogged(task.id))} logged` : task.actualMinutes ? ` · ${task.actualMinutes}m logged` : ""}
               {activeTaskId === task.id && activeClockSeconds ? ` · live +${Math.floor(activeClockSeconds / 60)}m ${activeClockSeconds % 60}s` : ""}
             </div>
           </div>
           <span className={`chip chip-${task.status}`}>{task.status}</span>
           <div className="task-row-actions">
-            <button className="btn btn-xs btn-secondary" onClick={() => setEditingTaskId(task.id)}>Edit</button>
             {subj && task.status !== "skipped" && (
-              <button className="btn btn-xs btn-secondary" title="Skip all tasks for this subject today"
+              <button className="btn btn-xs btn-secondary task-skip-subj" title="Skip all tasks for this subject today"
                 onClick={() => onSkipSubject(subj.id, task.date)}>Skip subject</button>
+            )}
+            <button className="btn btn-xs btn-secondary" onClick={() => setEditingTaskId(task.id)}>Edit</button>
+            {task.status !== "skipped" && task.status !== "done" && (
+              <button className="btn btn-xs btn-secondary" title="Skip"
+                onClick={() => onTaskStatus(task.id, "skipped")}>Skip</button>
             )}
             <TaskClockButton taskId={task.id} activeTaskId={activeTaskId} sessionActive={clockSessionActive}
               onFocusTask={onFocusTask} onClockOut={onClockOut} />
@@ -147,10 +167,6 @@ export default function PlannerView({
               }}>
               {task.status === "done" ? "Undo" : "Done"}
             </button>
-            {task.status !== "skipped" && task.status !== "done" && (
-              <button className="btn btn-xs btn-secondary" title="Skip"
-                onClick={() => onTaskStatus(task.id, "skipped")}>Skip</button>
-            )}
           </div>
         </div>
         {ratingTaskId === task.id && task.status !== "done" && (
@@ -213,6 +229,25 @@ export default function PlannerView({
               </button>
               <button className="btn btn-xs btn-secondary" onClick={() => onAskTutor(`Create a graded practice set for "${topic.title}" based on this requirement: ${topic.practice || "5 practice questions with answers"}.`)}>
                 Practice questions
+              </button>
+            </div>
+          </div>
+        )}
+        {canExpandLessonBrief && open && !topic && task.detail && (
+          <div ref={briefRef} className="glass-panel slide-in planner-lesson-brief accent-edge" style={{ "--edge": "var(--accent)" } as React.CSSProperties}>
+            <div className="lesson-brief-heading">
+              Checkpoint brief · All Subjects · Comprehensive Review
+            </div>
+            <div className="lesson-brief-title">{formattedTitle}</div>
+            <div className="lesson-brief-meta">
+              <span className="chip chip-kind">All Subjects</span>
+              <span className="chip chip-kind chip-tight">Checkpoint</span>
+              <span>{task.plannedMinutes} min</span>
+            </div>
+            <div className="lesson-summary">{task.detail}</div>
+            <div className="flex-row gap-sm lesson-brief-actions">
+              <button className="btn btn-xs btn-primary" onClick={() => onAskTutor(`Generate a 5-question weekly checkpoint quiz covering all my subjects from the past week, with answers and explanations.`)}>
+                <IconSpark size={12} /> Generate Checkpoint Quiz
               </button>
             </div>
           </div>

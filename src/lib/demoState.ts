@@ -96,7 +96,7 @@ export function demoFallbackState(userKey: string) {
 
   let taskId = 0;
   type DemoTask = {
-    id: number; userId: number; date: string; subjectId: number; topicId: number;
+    id: number; userId: number; date: string; subjectId: number | null; topicId: number | null;
     kind: string; title: string; detail: string; plannedMinutes: number;
     actualMinutes: number; status: string; position: number;
   };
@@ -106,6 +106,23 @@ export function demoFallbackState(userKey: string) {
     const date = addDays(today, offset);
     const count = offset === 0 ? 4 : 3;
     for (let i = 0; i < count; i++) {
+      if (offset === 6 && i === 2) {
+        tasks.push({
+          id: ++taskId,
+          userId: 0,
+          date,
+          subjectId: null,
+          topicId: null,
+          kind: "mock",
+          title: "Weekly Checkpoint · Test #1",
+          detail: "Mixed test on everything covered in the last 7 study days. Time it strictly, then log every mistake in your error notebook.",
+          plannedMinutes: 40,
+          actualMinutes: 0,
+          status: "pending",
+          position: 2,
+        });
+        continue;
+      }
       const topic = topics[(Math.abs(offset) * 3 + i * 2) % topics.length];
       const subject = subjects.find((s) => s.id === topic.subjectId)!;
       const kind = KINDS[(offset + i + 3) % KINDS.length];
