@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { tasks, sessions, topics, subjects } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { dateFrom, getOrCreateUser, getSettings, keyFrom } from "@/lib/state";
+import { dateFrom, fullState, getOrCreateUser, getSettings, keyFrom } from "@/lib/state";
+import { demoDataEnabled } from "@/lib/demoState";
 import { diffDays } from "@/lib/planner";
 import {
   learnPace, paceFor, learnWeekdays, learnTimeOfDay, skipRisk,
@@ -29,16 +30,56 @@ async function getAnalytics(req: Request) {
     );
   }
   const key = keyFrom(req);
-  const user = await getOrCreateUser(key);
-  const st = await getSettings(user.id);
   const today = dateFrom(req);
 
-  const [allTasks, allSessions, allTopics, allSubjects] = await Promise.all([
-    db.select().from(tasks).where(eq(tasks.userId, user.id)),
-    db.select().from(sessions).where(eq(sessions.userId, user.id)),
-    db.select().from(topics).where(eq(topics.userId, user.id)),
-    db.select().from(subjects).where(eq(subjects.userId, user.id)),
-  ]);
+  // Rows used by the ML models below — the fields both the database rows and
+  // the preview demo rows share.
+  type TaskLike = {
+    id: number; subjectId: number | null; topicId: number | null; date: string; kind: string;
+    title: string; status: string; plannedMinutes: number; actualMinutes: number; position: number;
+  };
+  type SessionLike = { createdAt: Date | string; minutes: number; mode: string; date: string };
+  type TopicLike = {
+    id: number; status: string; difficulty: string; stability: number; lastReview: string | null;
+  };
+  type SubjectLike = { id: number; name: string; color: string };
+
+  let user: { streak: number };
+  let st: { dailyHours: number; examDate: string };
+  let allTasks: TaskLike[];
+  let allSessions: SessionLike[];
+  let allTopics: TopicLike[];
+  let allSubjects: SubjectLike[];
+
+  if (demoDataEnabled()) {
+    // Preview without a database: compute the same intelligence from the
+    // in-memory demo plan (topics carry no FSRS review cycle yet).
+    const demo = await fullState(key);
+    user = demo.user;
+    st = demo.settings;
+    allTasks = demo.tasks;
+    allSessions = demo.sessions;
+    allTopics = demo.topics.map((t) => ({
+      id: t.id, status: t.status, difficulty: t.difficulty,
+      stability: 0, lastReview: null,
+    }));
+    allSubjects = demo.subjects;
+  } else {
+    const dbUser = await getOrCreateUser(key);
+    const dbSettings = await getSettings(dbUser.id);
+    user = dbUser;
+    st = dbSettings;
+    const [dbTasks, dbSessions, dbTopics, dbSubjects] = await Promise.all([
+      db.select().from(tasks).where(eq(tasks.userId, dbUser.id)),
+      db.select().from(sessions).where(eq(sessions.userId, dbUser.id)),
+      db.select().from(topics).where(eq(topics.userId, dbUser.id)),
+      db.select().from(subjects).where(eq(subjects.userId, dbUser.id)),
+    ]);
+    allTasks = dbTasks;
+    allSessions = dbSessions;
+    allTopics = dbTopics;
+    allSubjects = dbSubjects;
+  }
 
   const history = allTasks.map((t) => ({
     subjectId: t.subjectId, topicId: t.topicId, date: t.date, kind: t.kind,

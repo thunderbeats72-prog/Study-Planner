@@ -5,6 +5,9 @@ import { and, eq } from "drizzle-orm";
 import { applyCompletionMastery, buildContext, dateFrom, fullState, getOrCreateUser, keyFrom } from "@/lib/state";
 import type { ReviewRating } from "@/lib/ml";
 import {
+  demoAddTask, demoDataEnabled, demoDeleteTask, demoPatchManyTasks, demoPatchTask,
+} from "@/lib/demoState";
+import {
   enumValue, finiteNumber, isoDate, positiveId, readJsonObject,
   textValue, validationPayload,
 } from "@/lib/validation";
@@ -32,6 +35,77 @@ async function patchTasks(req: Request) {
 
   const key = keyFrom(req);
   const user = await getOrCreateUser(key);
+
+  // ── Preview without a database ───────────────────────────────────────────
+  // The in-memory demo layer applies the same patches so Done / Undo / Skip /
+  // Edit / Skip-subject all behave in the preview exactly as they look in a
+  // real deployment (state round-trips through the same response shape).
+  if (demoDataEnabled()) {
+    const demo = await fullState(key);
+    const demoResponse = async () => {
+      const fresh = await fullState(key);
+      return NextResponse.json({ ...fresh, context: buildContext(fresh, dateFrom(req)) });
+    };
+
+    // Bulk skip: skip all pending tasks from one owned subject on one day.
+    if (body.skipSubjectId != null) {
+      let subjectId: number;
+      let date: string;
+      try {
+        subjectId = positiveId(body.skipSubjectId, "skipSubjectId") as number;
+        date = body.skipDate == null ? dateFrom(req) : isoDate(body.skipDate, "skipDate");
+      } catch (error) {
+        const payload = validationPayload(error);
+        return NextResponse.json({ error: payload.error, code: payload.code }, { status: payload.status });
+      }
+      const ids = demo.tasks
+        .filter((t) => t.subjectId === subjectId && t.date === date && t.status === "pending")
+        .map((t) => t.id);
+      if (!ids.length && !demo.subjects.some((s) => s.id === subjectId)) {
+        return NextResponse.json({ error: "Subject not found.", code: "SUBJECT_NOT_FOUND" }, { status: 404 });
+      }
+      demoPatchManyTasks(ids, { status: "skipped" });
+      return demoResponse();
+    }
+
+    let id: number;
+    try { id = positiveId(body.id, "id") as number; }
+    catch (error) {
+      const payload = validationPayload(error);
+      return NextResponse.json({ error: payload.error, code: payload.code }, { status: payload.status });
+    }
+
+    const previous = demo.tasks.find((t) => t.id === id);
+    if (!previous) return NextResponse.json({ error: "Task not found.", code: "TASK_NOT_FOUND" }, { status: 404 });
+
+    let patch: Partial<typeof previous>;
+    try {
+      patch = {};
+      if (body.status != null) patch.status = enumValue(body.status, "status", TASK_STATUSES);
+      if (body.actualMinutes != null) {
+        patch.actualMinutes = finiteNumber(body.actualMinutes, "actualMinutes", { min: 0, max: 100_000, integer: true });
+      }
+      if (body.date != null) patch.date = isoDate(body.date, "date");
+      if (body.title != null) patch.title = textValue(body.title, "title", { required: true, max: 300 });
+      if (body.detail != null) patch.detail = textValue(body.detail, "detail", { max: 4_000 });
+      if (body.plannedMinutes != null) {
+        patch.plannedMinutes = finiteNumber(body.plannedMinutes, "plannedMinutes", { min: 1, max: 720, integer: true });
+      }
+      if (Object.prototype.hasOwnProperty.call(body, "subjectId")) {
+        patch.subjectId = positiveId(body.subjectId, "subjectId", true);
+        patch.topicId = null;
+      }
+    } catch (error) {
+      const payload = validationPayload(error);
+      return NextResponse.json({ error: payload.error, code: payload.code }, { status: payload.status });
+    }
+    if (!Object.keys(patch).length) {
+      return NextResponse.json({ error: "No supported task changes were supplied.", code: "EMPTY_PATCH" }, { status: 400 });
+    }
+    demoPatchTask(id, patch);
+    return demoResponse();
+  }
+  // ── End of preview branch ────────────────────────────────────────────────
 
   // Bulk skip: skip all pending tasks from one owned subject on one day.
   if (body.skipSubjectId != null) {
@@ -182,6 +256,21 @@ async function postTasks(req: Request) {
     return NextResponse.json({ error: payload.error, code: payload.code }, { status: payload.status });
   }
 
+  // ── Preview without a database: add the task to the in-memory demo layer. ──
+  if (demoDataEnabled()) {
+    const demo = await fullState(key);
+    if (subjectId && !demo.subjects.some((s) => s.id === subjectId)) {
+      return NextResponse.json({ error: "Subject not found.", code: "SUBJECT_NOT_FOUND" }, { status: 404 });
+    }
+    demoAddTask({
+      date, title, detail, subjectId, topicId: null,
+      kind, plannedMinutes, actualMinutes: 0, status: "pending", position: 99,
+    });
+    const fresh = await fullState(key);
+    return NextResponse.json({ ...fresh, context: buildContext(fresh, dateFrom(req)) });
+  }
+  // ── End of preview branch ────────────────────────────────────────────────
+
   if (subjectId) {
     const owned = await db
       .select({ id: subjects.id })
@@ -209,6 +298,19 @@ async function deleteTasks(req: Request) {
     const payload = validationPayload(error);
     return NextResponse.json({ error: payload.error, code: payload.code }, { status: payload.status });
   }
+
+  // ── Preview without a database: remove from the in-memory demo layer. ────
+  if (demoDataEnabled()) {
+    const demo = await fullState(key);
+    if (!demo.tasks.some((t) => t.id === id)) {
+      return NextResponse.json({ error: "Task not found.", code: "TASK_NOT_FOUND" }, { status: 404 });
+    }
+    demoDeleteTask(id);
+    const fresh = await fullState(key);
+    return NextResponse.json({ ...fresh, context: buildContext(fresh, dateFrom(req)) });
+  }
+  // ── End of preview branch ────────────────────────────────────────────────
+
   const deleted = await db
     .delete(tasks)
     .where(and(eq(tasks.id, id), eq(tasks.userId, user.id)))

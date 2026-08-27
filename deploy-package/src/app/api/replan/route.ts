@@ -1,12 +1,16 @@
 import { NextResponse } from "next/server";
 import { buildContext, dateFrom, fullState, getOrCreateUser, getSettings, keyFrom } from "@/lib/state";
 import { regeneratePlan } from "@/lib/generate";
+import { demoDataEnabled } from "@/lib/demoState";
 import { checkRateLimit } from "@/lib/rateLimit";
+import { withDbGuard } from "@/lib/routeGuard";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
-export async function POST(req: Request) {
+export const POST = withDbGuard(postReplan);
+
+async function postReplan(req: Request) {
   const limit = checkRateLimit(req, "replan", 6, 60_000);
   if (!limit.allowed) {
     return NextResponse.json(
@@ -16,6 +20,14 @@ export async function POST(req: Request) {
   }
   const key = keyFrom(req);
   const localDate = dateFrom(req);
+
+  // ── Preview without a database: the demo plan is already balanced. ───────
+  if (demoDataEnabled()) {
+    const state = await fullState(key);
+    return NextResponse.json({ ...state, context: buildContext(state, localDate) });
+  }
+  // ── End of preview branch ────────────────────────────────────────────────
+
   const user = await getOrCreateUser(key);
   const settings = await getSettings(user.id);
   const stats = await regeneratePlan(user.id, settings, { fromToday: true, today: localDate });

@@ -5,10 +5,14 @@ import { and, asc, eq, gt } from "drizzle-orm";
 import { buildContext, dateFrom, fullState, getOrCreateUser, getSettings, keyFrom } from "@/lib/state";
 import { regeneratePlan } from "@/lib/generate";
 import { aiGenerateTopics, type GeneratedTopic } from "@/lib/ai";
+import {
+  demoAddSubject, demoDataEnabled, demoDeleteSubject, demoPatchSubject,
+} from "@/lib/demoState";
 import { checkRateLimit } from "@/lib/rateLimit";
 import {
   enumValue, finiteNumber, positiveId, readJsonObject, textValue, validationPayload,
 } from "@/lib/validation";
+import { withDbGuard } from "@/lib/routeGuard";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -35,7 +39,9 @@ async function stateResponse(
   return NextResponse.json({ ...state, context: buildContext(state, localDate), stats });
 }
 
-export async function POST(req: Request) {
+export const POST = withDbGuard(postSubjects);
+
+async function postSubjects(req: Request) {
   const limit = checkRateLimit(req, "subject-generate", 8, 10 * 60_000);
   if (!limit.allowed) {
     return NextResponse.json({ error: "Too many curriculum changes. Please wait and try again.", code: "RATE_LIMITED" }, {
@@ -64,6 +70,20 @@ export async function POST(req: Request) {
   }
 
   const key = keyFrom(req);
+
+  // ── Preview without a database: add to the in-memory demo curriculum. ────
+  if (demoDataEnabled()) {
+    const demo = await fullState(key);
+    if (demo.subjects.length >= 12) return NextResponse.json({ error: "A plan can contain at most 12 subjects." }, { status: 400 });
+    if (demo.subjects.some((subject) => subject.name.toLocaleLowerCase() === name.toLocaleLowerCase())) {
+      return NextResponse.json({ error: "That subject already exists.", code: "DUPLICATE_SUBJECT" }, { status: 409 });
+    }
+    demoAddSubject({ name, color, difficulty, units });
+    const fresh = await fullState(key);
+    return NextResponse.json({ ...fresh, context: buildContext(fresh, dateFrom(req)) });
+  }
+  // ── End of preview branch ────────────────────────────────────────────────
+
   const user = await getOrCreateUser(key);
   const existing = await db.select().from(subjects).where(eq(subjects.userId, user.id));
   if (existing.length >= 12) return NextResponse.json({ error: "A plan can contain at most 12 subjects." }, { status: 400 });
@@ -95,7 +115,9 @@ export async function POST(req: Request) {
   }
 }
 
-export async function PATCH(req: Request) {
+export const PATCH = withDbGuard(patchSubjects);
+
+async function patchSubjects(req: Request) {
   const limit = checkRateLimit(req, "subject-generate", 8, 10 * 60_000);
   if (!limit.allowed) {
     return NextResponse.json({ error: "Too many curriculum changes. Please wait and try again.", code: "RATE_LIMITED" }, {
@@ -110,19 +132,29 @@ export async function PATCH(req: Request) {
   }
 
   const key = keyFrom(req);
-  const user = await getOrCreateUser(key);
   let id: number;
   try { id = positiveId(body.id, "id") as number; }
   catch (error) {
     const payload = validationPayload(error);
     return NextResponse.json({ error: payload.error, code: payload.code }, { status: payload.status });
   }
-  const previous = (await db
-    .select()
-    .from(subjects)
-    .where(and(eq(subjects.id, id), eq(subjects.userId, user.id)))
-    .limit(1))[0];
-  if (!previous) return NextResponse.json({ error: "Subject not found.", code: "SUBJECT_NOT_FOUND" }, { status: 404 });
+
+  const user = await getOrCreateUser(key);
+  let previous: typeof subjects.$inferSelect;
+  if (demoDataEnabled()) {
+    // Preview without a database: read the subject from the demo curriculum.
+    const demo = await fullState(key);
+    const found = demo.subjects.find((s) => s.id === id);
+    if (!found) return NextResponse.json({ error: "Subject not found.", code: "SUBJECT_NOT_FOUND" }, { status: 404 });
+    previous = found as typeof subjects.$inferSelect;
+  } else {
+    previous = (await db
+      .select()
+      .from(subjects)
+      .where(and(eq(subjects.id, id), eq(subjects.userId, user.id)))
+      .limit(1))[0];
+    if (!previous) return NextResponse.json({ error: "Subject not found.", code: "SUBJECT_NOT_FOUND" }, { status: 404 });
+  }
 
   let name: string;
   let units: number;
@@ -145,10 +177,20 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: payload.error, code: payload.code }, { status: payload.status });
   }
 
-  const allSubjects = await db.select().from(subjects).where(eq(subjects.userId, user.id));
+  const allSubjects = demoDataEnabled()
+    ? (await fullState(key)).subjects
+    : await db.select().from(subjects).where(eq(subjects.userId, user.id));
   if (allSubjects.some((subject) => subject.id !== id && subject.name.toLocaleLowerCase() === name.toLocaleLowerCase())) {
     return NextResponse.json({ error: "That subject already exists.", code: "DUPLICATE_SUBJECT" }, { status: 409 });
   }
+
+  // ── Preview without a database: persist to the in-memory demo layer. ─────
+  if (demoDataEnabled()) {
+    demoPatchSubject(id, { name, units, difficulty, color });
+    const fresh = await fullState(key);
+    return NextResponse.json({ ...fresh, context: buildContext(fresh, dateFrom(req)) });
+  }
+  // ── End of preview branch ────────────────────────────────────────────────
 
   const curriculumChanged = name !== previous.name || units !== previous.units || difficulty !== previous.difficulty;
   const generated = curriculumChanged
@@ -186,7 +228,9 @@ export async function PATCH(req: Request) {
   return stateResponse(key, dateFrom(req), await regeneratePlan(user.id, settingsRow, { fromToday: true, today: dateFrom(req) }));
 }
 
-export async function DELETE(req: Request) {
+export const DELETE = withDbGuard(deleteSubjects);
+
+async function deleteSubjects(req: Request) {
   const key = keyFrom(req);
   const user = await getOrCreateUser(key);
   let id: number;
@@ -195,6 +239,18 @@ export async function DELETE(req: Request) {
     const payload = validationPayload(error);
     return NextResponse.json({ error: payload.error, code: payload.code }, { status: payload.status });
   }
+
+  // ── Preview without a database: remove from the in-memory demo layer. ────
+  if (demoDataEnabled()) {
+    const demo = await fullState(key);
+    if (!demo.subjects.some((s) => s.id === id)) {
+      return NextResponse.json({ error: "Subject not found.", code: "SUBJECT_NOT_FOUND" }, { status: 404 });
+    }
+    demoDeleteSubject(id);
+    const fresh = await fullState(key);
+    return NextResponse.json({ ...fresh, context: buildContext(fresh, dateFrom(req)) });
+  }
+  // ── End of preview branch ────────────────────────────────────────────────
 
   const deleted = await db.transaction(async (tx) => {
     const owned = await tx

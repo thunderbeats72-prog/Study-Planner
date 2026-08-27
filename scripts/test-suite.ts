@@ -12,11 +12,15 @@ import { detectLanguage } from "../src/lib/language";
 import { wikiLangFor, searchTerms, teachFromKnowledge, isRelevantKnowledge } from "../src/lib/knowledge";
 import { appendChatTurn, isFallbackUser } from "../src/lib/chatTurn";
 import { mergeTranscriptSegments } from "../src/lib/transcript";
-import { mdToHtml } from "../src/lib/client";
+import { mdToHtml, normalizeCheckpointTitle } from "../src/lib/client";
 import { buildPlan, countStudyDays, projectCompletionDate } from "../src/lib/planner";
 import { cbseCatalogFor, nmimsSem1Subjects } from "../src/lib/curriculum";
 import { finiteNumber, isIsoDate } from "../src/lib/validation";
 import { shouldAutoComplete, nextPendingTask } from "../src/lib/completion";
+import {
+  demoAddSession, demoAddTask, demoDeleteTask, demoFallbackState, demoPatchTask,
+  demoResetMutations, demoSessionMinutesForTask,
+} from "../src/lib/demoState";
 import React from "react";
 import TestRenderer, { act } from "react-test-renderer";
 import { useStudyClock, type ClockApi } from "../src/lib/useTimer";
@@ -417,6 +421,71 @@ async function runTests() {
   check(nextPendingTask(dayTasks, "2026-08-27", 2)?.id === 3, "Next task follows schedule order after the exclusion");
   check(nextPendingTask(dayTasks, "2026-08-28", null)?.id === 4, "Next-day tasks are found by their own date");
   check(nextPendingTask(dayTasks, "2026-08-29", null) === null, "No pending task returns null");
+
+  console.log("\n--- 5c. Weekly Checkpoint Title Normalization ---");
+  check(
+    normalizeCheckpointTitle("Weekly Checkpoint Test #0") === "Weekly Checkpoint · Test #1",
+    "Legacy space-form #0 normalizes to Test #1"
+  );
+  check(
+    normalizeCheckpointTitle("Weekly Checkpoint · Test #0") === "Weekly Checkpoint · Test #1",
+    "Dotted legacy #0 normalizes to Test #1"
+  );
+  check(
+    normalizeCheckpointTitle("Weekly Checkpoint Test #3") === "Weekly Checkpoint · Test #3",
+    "Unspaced later numbers keep their count and gain the dot"
+  );
+  check(
+    normalizeCheckpointTitle("Weekly Checkpoint · Test #4") === "Weekly Checkpoint · Test #4",
+    "Canonical dotted form is already stable"
+  );
+  check(
+    normalizeCheckpointTitle("Recall: Photosynthesis") === "Recall: Photosynthesis",
+    "Non-checkpoint titles are never touched"
+  );
+
+  console.log("\n--- 5d. Preview Demo Layer (in-memory mutations) ---");
+  {
+    const baseState = demoFallbackState("u_demo_test");
+    check(baseState.tasks.length === 28, "Demo plan has 28 tasks");
+    const pending = baseState.tasks.find((t) => t.status === "pending");
+    check(!!pending, "Demo plan contains pending tasks");
+    if (pending) {
+      demoAddSession({
+        subjectId: pending.subjectId, taskId: pending.id, date: pending.date,
+        minutes: pending.plannedMinutes + 5, mode: "clock", eventId: "evt-demo-test",
+        createdAt: new Date().toISOString(),
+      });
+      check(
+        demoSessionMinutesForTask(pending.id) >= pending.plannedMinutes,
+        "Demo session minutes accumulate for the task"
+      );
+      demoPatchTask(pending.id, { status: "done" });
+      check(
+        demoFallbackState("u_demo_test").tasks.find((t) => t.id === pending.id)?.status === "done",
+        "Demo task override survives state regeneration"
+      );
+      demoDeleteTask(pending.id);
+      check(
+        !demoFallbackState("u_demo_test").tasks.some((t) => t.id === pending.id),
+        "Demo task deletion survives state regeneration"
+      );
+    }
+    const added = demoAddTask({
+      date: "2026-08-28", subjectId: null, topicId: null, kind: "practice",
+      title: "Demo added task", detail: "Added in the preview.",
+      plannedMinutes: 30, actualMinutes: 0, status: "pending", position: 99,
+    });
+    check(
+      demoFallbackState("u_demo_test").tasks.some((t) => t.id === added.id),
+      "Demo added task appears in the next state"
+    );
+    demoResetMutations();
+    check(
+      demoFallbackState("u_demo_test").tasks.length === 28,
+      "Demo reset restores the baseline plan"
+    );
+  }
 
   console.log("\n--- 6. Curriculum Ground Truth ---");
   check(nmimsSem1Subjects().length === 6, "NMIMS Semester 1 ground truth has 6 subjects");

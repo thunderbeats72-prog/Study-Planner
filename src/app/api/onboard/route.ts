@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { users, settings, subjects, topics, tasks, sessions, messages } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { buildContext, dateFrom, fullState, getOrCreateUser, keyFrom } from "@/lib/state";
+import { demoResetMutations } from "@/lib/demoState";
 import { aiGenerateTopics, type GeneratedTopic } from "@/lib/ai";
 import { buildPlan, type PlanSettings } from "@/lib/planner";
 import { learnWeekdays, weekdayLoadFactor } from "@/lib/ml";
@@ -116,6 +117,17 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: payload.error, code: payload.code }, { status: payload.status });
   }
 
+  const key = keyFrom(req);
+
+  // ── Preview without a database: completing the wizard simply resets the
+  // in-memory demo plan (the "hard reset" the real route performs). ─────────
+  if (process.env.SPP_DEMO_DATA === "1") {
+    demoResetMutations();
+    const state = await fullState(key);
+    return NextResponse.json({ ...state, context: buildContext(state, dateFrom(req)) });
+  }
+  // ── End of preview branch ────────────────────────────────────────────────
+
   // Generate every curriculum BEFORE touching the existing plan. Limiting
   // concurrency avoids provider rate-limit bursts for 8–12 subject courses.
   let generated: GeneratedSubject[];
@@ -131,7 +143,6 @@ export async function POST(req: Request) {
     );
   }
 
-  const key = keyFrom(req);
   const user = await getOrCreateUser(key);
   let stats: ReturnType<typeof buildPlan>["stats"];
 

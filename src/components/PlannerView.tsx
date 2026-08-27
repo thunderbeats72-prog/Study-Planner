@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  addDays, dayDiff, fmtDate, KIND_META, parseDate, prettyDate, prettyLong, today, type AppState, type TaskRow,
+  addDays, dayDiff, fmtDate, KIND_META, normalizeCheckpointTitle, parseDate, prettyDate, prettyLong, today, type AppState, type TaskRow,
 } from "@/lib/client";
 import { IconSpark, IconClose, IconChevron } from "./icons";
 import TaskEditor, { type TaskPatch } from "./TaskEditor";
@@ -94,11 +94,8 @@ export default function PlannerView({
     const kindLabel = isCheckpoint ? "Checkpoint" : meta.label;
     const dotColor = subj?.color || (isCheckpoint ? "var(--color-primary)" : meta.color);
 
-    // Normalize any legacy "#0" or unspaced checkpoint titles
-    const formattedTitle = isCheckpoint
-      ? task.title.replace(/Weekly Checkpoint(?: Test)? #?0\b/i, "Weekly Checkpoint · Test #1")
-                  .replace(/Weekly Checkpoint Test #(\d+)/i, "Weekly Checkpoint · Test #$1")
-      : task.title;
+    // Normalize any legacy "#0" or unspaced checkpoint titles (shared helper)
+    const formattedTitle = isCheckpoint ? normalizeCheckpointTitle(task.title) : task.title;
 
     const showLessonBrief = options.showLessonBrief !== false;
     const canExpandLessonBrief = showLessonBrief && (!!topic || (isCheckpoint && !!task.detail));

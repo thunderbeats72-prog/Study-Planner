@@ -4,10 +4,12 @@ import { settings, subjects, users } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
 import { buildContext, dateFrom, fullState, getOrCreateUser, getSettings, keyFrom } from "@/lib/state";
 import { regeneratePlan } from "@/lib/generate";
+import { demoDataEnabled, demoPatchSettings, demoPatchUser } from "@/lib/demoState";
 import {
   assertDateWindow, booleanValue, enumValue, finiteNumber, isoDate,
   readJsonObject, textValue, validationPayload,
 } from "@/lib/validation";
+import { withDbGuard } from "@/lib/routeGuard";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -17,7 +19,9 @@ const PLAN_MODES = ["syllabus", "revision", "mock"] as const;
 const STUDY_STYLES = ["balanced", "theory", "practice"] as const;
 const THEMES = ["default", "silver-lavender", "mint", "sunset", "dark", "obsidian", "nebula"] as const;
 
-export async function PATCH(req: Request) {
+export const PATCH = withDbGuard(patchSettings);
+
+async function patchSettings(req: Request) {
   let body: Record<string, unknown>;
   try { body = await readJsonObject(req, 16_000); }
   catch (error) {
@@ -57,12 +61,17 @@ export async function PATCH(req: Request) {
       if (weak === "none") patch.weakSubject = "none";
       else {
         const id = finiteNumber(weak, "weakSubject", { min: 1, max: 2_147_483_647, integer: true });
-        const owned = await db
-          .select({ id: subjects.id })
-          .from(subjects)
-          .where(and(eq(subjects.id, id), eq(subjects.userId, user.id)))
-          .limit(1);
-        if (!owned.length) throw new Error("WEAK_SUBJECT_NOT_FOUND");
+        if (demoDataEnabled()) {
+          const demo = await fullState(key);
+          if (!demo.subjects.some((s) => s.id === id)) throw new Error("WEAK_SUBJECT_NOT_FOUND");
+        } else {
+          const owned = await db
+            .select({ id: subjects.id })
+            .from(subjects)
+            .where(and(eq(subjects.id, id), eq(subjects.userId, user.id)))
+            .limit(1);
+          if (!owned.length) throw new Error("WEAK_SUBJECT_NOT_FOUND");
+        }
         patch.weakSubject = String(id);
       }
     }
@@ -77,6 +86,15 @@ export async function PATCH(req: Request) {
     const payload = validationPayload(error);
     return NextResponse.json({ error: payload.error, code: payload.code }, { status: payload.status });
   }
+
+  // ── Preview without a database: persist to the in-memory demo layer. ─────
+  if (demoDataEnabled()) {
+    if (newName) demoPatchUser({ name: newName });
+    if (Object.keys(patch).length) demoPatchSettings(patch);
+    const state = await fullState(key);
+    return NextResponse.json({ ...state, context: buildContext(state, localDate) });
+  }
+  // ── End of preview branch ────────────────────────────────────────────────
 
   if (newName) await db.update(users).set({ name: newName }).where(eq(users.id, user.id));
   if (Object.keys(patch).length) {

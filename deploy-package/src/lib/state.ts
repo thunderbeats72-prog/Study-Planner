@@ -6,6 +6,10 @@ import { addDays, diffDays, todayStr } from "./planner";
 import type { TutorContext } from "./ai";
 import { advancedTopicMetadata } from "./curriculum";
 import { dateDistanceDays, isIsoDate } from "./validation";
+import { fsrsInit, fsrsReview, masteryDelta, type ReviewRating } from "./ml";
+
+/** Transaction handle type as produced by `db.transaction(cb)`. */
+export type DbTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 const USER_KEY_RE = /^u_[A-Za-z0-9_-]{12,120}$/;
 
@@ -31,36 +35,53 @@ export function dateFrom(req: Request): string {
 }
 
 export async function getOrCreateUser(userKey: string) {
-  const found = await db.select().from(users).where(eq(users.userKey, userKey)).limit(1);
-  if (found.length) return found[0];
+  try {
+    const found = await db.select().from(users).where(eq(users.userKey, userKey)).limit(1);
+    if (found.length) return found[0];
 
-  // Two API calls can be the first request from a new browser. The unique
-  // user_key constraint plus ON CONFLICT makes that race harmless.
-  const inserted = await db
-    .insert(users)
-    .values({ userKey })
-    .onConflictDoNothing({ target: users.userKey })
-    .returning();
-  const user = inserted[0] || (await db.select().from(users).where(eq(users.userKey, userKey)).limit(1))[0];
-  if (!user) throw new Error("Could not initialise learner account.");
-  await db
-    .insert(settings)
-    .values({ userId: user.id, startDate: todayStr(), examDate: addDays(todayStr(), 90) })
-    .onConflictDoNothing({ target: settings.userId });
-  return user;
+    // Two API calls can be the first request from a new browser. The unique
+    // user_key constraint plus ON CONFLICT makes that race harmless.
+    const inserted = await db
+      .insert(users)
+      .values({ userKey })
+      .onConflictDoNothing({ target: users.userKey })
+      .returning();
+    const user = inserted[0] || (await db.select().from(users).where(eq(users.userKey, userKey)).limit(1))[0];
+    if (!user) throw new Error("Could not initialise learner account.");
+    await db
+      .insert(settings)
+      .values({ userId: user.id, startDate: todayStr(), examDate: addDays(todayStr(), 90) })
+      .onConflictDoNothing({ target: settings.userId });
+    return user;
+  } catch (error) {
+    // Preview without a database: serve the demo learner instead of failing.
+    if (process.env.SPP_DEMO_DATA === "1") {
+      const { demoFallbackState } = await import("./demoState");
+      return (await demoFallbackState(userKey)).user;
+    }
+    throw error;
+  }
 }
 
 export async function getSettings(userId: number) {
-  const rows = await db.select().from(settings).where(eq(settings.userId, userId)).limit(1);
-  if (rows.length) return rows[0];
-  const inserted = await db
-    .insert(settings)
-    .values({ userId, startDate: todayStr(), examDate: addDays(todayStr(), 90) })
-    .onConflictDoNothing({ target: settings.userId })
-    .returning();
-  const row = inserted[0] || (await db.select().from(settings).where(eq(settings.userId, userId)).limit(1))[0];
-  if (!row) throw new Error("Could not initialise learner settings.");
-  return row;
+  try {
+    const rows = await db.select().from(settings).where(eq(settings.userId, userId)).limit(1);
+    if (rows.length) return rows[0];
+    const inserted = await db
+      .insert(settings)
+      .values({ userId, startDate: todayStr(), examDate: addDays(todayStr(), 90) })
+      .onConflictDoNothing({ target: settings.userId })
+      .returning();
+    const row = inserted[0] || (await db.select().from(settings).where(eq(settings.userId, userId)).limit(1))[0];
+    if (!row) throw new Error("Could not initialise learner settings.");
+    return row;
+  } catch (error) {
+    if (process.env.SPP_DEMO_DATA === "1") {
+      const { demoFallbackState } = await import("./demoState");
+      return (await demoFallbackState("u_demo_settings")).settings;
+    }
+    throw error;
+  }
 }
 
 async function latestMessages(userId: number, limit = 120) {
@@ -184,6 +205,13 @@ export async function fullState(userKey: string) {
     return { user, ...rest, topics: enrichedTopics };
   } catch (error) {
     console.warn("DB unavailable during fullState; using fallback state:", error instanceof Error ? error.message : error);
+    // Sandbox/preview escape hatch: with SPP_DEMO_DATA=1 and no database, the
+    // UI is served a deterministic sample plan so the interface can be
+    // reviewed. Never active in a normal deployment.
+    if (process.env.SPP_DEMO_DATA === "1") {
+      const { demoFallbackState } = await import("./demoState");
+      return demoFallbackState(userKey);
+    }
     return defaultFallbackState(userKey);
   }
 }
@@ -257,6 +285,51 @@ export async function recomputeStreak(userId: number, asOf = todayStr()) {
   const lastStudyDate = [...days].sort().at(-1) || null;
   await db.update(users).set({ streak, lastStudyDate }).where(eq(users.id, userId));
   return streak;
+}
+
+/**
+ * Shared "task became done" bookkeeping: apply the mastery gain (and, when a
+ * memory rating is supplied, the FSRS-lite stability update) to the task's
+ * linked topic. Used both by the manual Done flow (PATCH /api/tasks) and by
+ * the study clock's time-based auto-completion (POST /api/sessions), so the
+ * two paths never drift apart.
+ */
+export async function applyCompletionMastery(
+  tx: DbTx,
+  updated: { id: number; userId: number; topicId: number | null; kind: string },
+  today: string,
+  rating: ReviewRating | 0 = 0
+): Promise<void> {
+  if (!updated.topicId) return;
+  const topic = (await tx
+    .select()
+    .from(topics)
+    .where(and(eq(topics.id, updated.topicId), eq(topics.userId, updated.userId)))
+    .limit(1))[0];
+  if (!topic) return;
+
+  const gain = updated.kind === "learn" ? 55 : 20;
+  const topicPatch: Record<string, unknown> = {
+    mastery: Math.min(100, topic.mastery + gain),
+    status: updated.kind === "learn" ? "done" : topic.status,
+  };
+  if (rating) {
+    const elapsed = topic.lastReview
+      ? Math.max(0, Math.round((Date.parse(today) - Date.parse(topic.lastReview)) / 86_400_000))
+      : 0;
+    const next = topic.stability > 0
+      ? fsrsReview(topic.stability, topic.difficulty, elapsed, rating)
+      : { stability: fsrsInit(rating, topic.difficulty), intervalDays: 0 };
+    topicPatch.stability = next.stability;
+    topicPatch.lastReview = today;
+    topicPatch.mastery = rating === 1
+      ? Math.max(0, topic.mastery + masteryDelta(rating))
+      : Math.min(100, topic.mastery + gain + masteryDelta(rating));
+  }
+  await tx
+    .update(topics)
+    .set(topicPatch)
+    .where(and(eq(topics.id, topic.id), eq(topics.userId, updated.userId)));
 }
 
 export async function clearPlan(userId: number) {
