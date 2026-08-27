@@ -5018,8 +5018,10 @@ body.mode-young .section-title::after{width:46px;height:3px;bottom:-8px}
   border-image:linear-gradient(90deg,var(--accent),var(--color-ai)) 1;
 }
 
-/* Clean list format applied in Planner and Dashboard */
-.planner-list .task-row{flex-direction:column;align-items:stretch;gap:6px}
+/* Clean list format for the Dashboard task list only.
+   The planner rows intentionally do NOT stack: their action buttons are direct
+   children of .task-row (no .task-row-actions wrapper), so a flex-direction:column
+   there put the dot, title, status chip and every button on its own line. */
 .dashboard-tasks .task-row{flex-direction:column;align-items:stretch;gap:6px}
 
 /* Gradient text on section headings */
