@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import { today, type AppState } from "@/lib/client";
 import { mmss, type ClockApi, type TimerApi, type TimerMode } from "@/lib/useTimer";
 import { playSound, setVolume, stopSound, currentSound } from "@/lib/sound";
-import { IconExpand, IconVolume } from "./icons";
+import { IconCheck, IconClock, IconExpand, IconVolume } from "./icons";
 
 const SOUNDS = [
   { id: "none", label: "Sound Off" },
@@ -39,7 +39,11 @@ export default function FocusView({
 
   useEffect(() => { setVolume(vol); }, [vol]);
 
-  const pick = (id: string) => { setSound(id); if (id === "none") stopSound(); else playSound(id, vol); };
+  const pick = (id: string) => {
+    setSound(id);
+    if (id === "none") stopSound();
+    else playSound(id, vol);
+  };
 
   const pct = timer.mode === "stopwatch"
     ? (timer.seconds % 3600) / 3600
@@ -50,44 +54,77 @@ export default function FocusView({
   // 13.5 minutes logged displays as exactly "13.5 min logged today"
   const loggedToday = Math.round(loggedTodayRaw * 10) / 10;
   const loggedTodayLabel = Number.isInteger(loggedToday) ? String(loggedToday) : loggedToday.toFixed(1);
+  const clockState = clock.running ? "running" : clock.onBreak ? "break" : clock.sessionActive ? "paused" : "idle";
+  const clockStateLabel = clock.running
+    ? "Recording now"
+    : clock.onBreak
+      ? "On a break"
+      : clock.sessionActive
+        ? "Paused"
+        : "Ready to start";
+  const timerInProgress = timer.mode === "stopwatch"
+    ? timer.seconds > 0
+    : timer.seconds < timer.total;
+  const timerStateLabel = timer.running ? (timer.isBreak ? "BREAK" : "FOCUSED") : timerInProgress ? "PAUSED" : "READY";
+  const selectedSoundLabel = SOUNDS.find((x) => x.id === sound)?.label || "Sound Off";
 
   return (
-    <div className="fade-in">
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">Focus Studio</h1>
+    <div className="fade-in focus-view">
+      <div className="page-header focus-page-header">
+        <div className="focus-header-copy">
+          <div className="focus-eyebrow"><span className="focus-eyebrow-mark" /> Focus Studio</div>
+          <h1 className="page-title">A calmer way to study</h1>
           <p className="page-subtitle">
-            The <strong>clock</strong> records your studied time. The <strong>focus timer</strong> is a separate deep-work ritual — they run independently.
+            Record real study time with the clock, then use a separate focus timer to protect your attention.
           </p>
         </div>
-        <button className="btn btn-secondary" onClick={onZen}><IconExpand /> Zen Focus Mode</button>
+        <button className="btn btn-secondary focus-zen-button" type="button" onClick={onZen}>
+          <IconExpand /> Zen Focus Mode
+        </button>
       </div>
 
       {/* ---------------- STUDY CLOCK ---------------- */}
-      <div className="glass-panel tilt-card liquid-card section-card accent-edge accent-edge--success">
-        <div className="day-head flex flex-row justify-between items-center study-clock-header" style={{ display: "flex", flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-          <div className="flex flex-col study-clock-text-group" style={{ display: "flex", flexDirection: "column" }}>
-            <h3 className="section-title gradient-text study-clock-title" style={{ marginBottom: "6px", textDecoration: "none", borderBottom: "none" }}>Study Clock — time tracking</h3>
-            <div className="day-meta">
-              {clock.running ? "Recording your study time" : clock.onBreak ? "On a break — clock paused" : clock.sessionActive ? "Paused — resume or clock out" : "Not clocked in"}
-              {" · "}{loggedTodayLabel} min logged today
+      <section className="glass-panel tilt-card liquid-card section-card accent-edge accent-edge--success study-clock-panel" aria-labelledby="study-clock-title">
+        <div className="study-clock-header">
+          <div className="study-clock-text-group">
+            <div className="focus-card-eyebrow">
+              <IconClock size={14} /> Study clock
+              <span className={`clock-state-chip clock-state-chip--${clockState}`}>
+                <span className="clock-state-dot" /> {clockStateLabel}
+              </span>
+            </div>
+            <h2 id="study-clock-title" className="section-title study-clock-title">Track your real study time</h2>
+            <p className="study-clock-description">
+              The clock logs active minutes to your plan. Pauses and breaks stay out of your study total.
+            </p>
+            <div className="study-clock-status" role="status" aria-live="polite">
+              <span>{clockStateLabel}</span>
+              <span className="study-clock-status-separator" aria-hidden="true">·</span>
+              <strong>{loggedTodayLabel} min logged today</strong>
             </div>
           </div>
-          <div className="mono stat-big gradient-text shimmer-text">{mmss(clock.elapsed)}</div>
+          <div className="study-clock-display" aria-label={`Active study time ${mmss(clock.elapsed)}`}>
+            <span className="study-clock-display-label">Active time</span>
+            <span className="mono stat-big gradient-text shimmer-text">{mmss(clock.elapsed)}</span>
+          </div>
         </div>
 
         <div className="grid-2 clock-pickers">
-          <div>
-            <label className="lbl">Studying subject</label>
-            <select className="input-field" value={clock.subjectId ?? ""}
+          <div className="clock-field">
+            <label className="clock-field-label" htmlFor="clock-subject">
+              <span>Studying subject</span><span className="clock-field-hint">Optional</span>
+            </label>
+            <select id="clock-subject" className="input-field" value={clock.subjectId ?? ""}
               onChange={(e) => clock.setSubjectId(e.target.value ? Number(e.target.value) : null)}>
               <option value="">— none —</option>
               {state.subjects.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
             </select>
           </div>
-          <div>
-            <label className="lbl">Attach to today&apos;s task</label>
-            <select className="input-field" value={clock.taskId ?? ""} onChange={(e) => {
+          <div className="clock-field">
+            <label className="clock-field-label" htmlFor="clock-task">
+              <span>Attach to today&apos;s task</span><span className="clock-field-hint">Optional</span>
+            </label>
+            <select id="clock-task" className="input-field" value={clock.taskId ?? ""} onChange={(e) => {
               const v = e.target.value ? Number(e.target.value) : null;
               clock.setTaskId(v);
               const task = state.tasks.find((x) => x.id === v);
@@ -99,114 +136,153 @@ export default function FocusView({
           </div>
         </div>
 
-        <div className="flex-row gap-sm clock-actions flex flex-wrap gap-3" style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem" }}>
-          {!clock.sessionActive && (
-            <button className="btn btn-primary" onClick={() => clock.clockIn()}>Clock In</button>
-          )}
-          {clock.running && (
-            <>
-              <button className="btn btn-secondary" onClick={clock.pause}>Pause</button>
-              <button className="btn btn-secondary" onClick={clock.takeBreak}>Take a Break</button>
-              <button className="btn btn-danger" onClick={clock.clockOut}>Clock Out</button>
-            </>
-          )}
-          {!clock.running && !clock.onBreak && clock.sessionActive && (
-            <>
-              <button className="btn btn-primary" onClick={clock.resume}>Resume</button>
-              <button className="btn btn-danger" onClick={clock.clockOut}>Clock Out</button>
-            </>
-          )}
-          {clock.onBreak && (
-            <>
-              <button className="btn btn-primary" onClick={clock.endBreak}>Resume Studying</button>
-              <button className="btn btn-danger" onClick={clock.clockOut}>Clock Out</button>
-            </>
-          )}
+        <div className="clock-actions">
+          <div className="clock-action-buttons">
+            {!clock.sessionActive && (
+              <button className="btn btn-primary" type="button" onClick={() => clock.clockIn()}>Clock In</button>
+            )}
+            {clock.running && (
+              <>
+                <button className="btn btn-secondary" type="button" onClick={clock.pause}>Pause</button>
+                <button className="btn btn-secondary" type="button" onClick={clock.takeBreak}>Take a Break</button>
+                <button className="btn btn-danger" type="button" onClick={clock.clockOut}>Clock Out</button>
+              </>
+            )}
+            {!clock.running && !clock.onBreak && clock.sessionActive && (
+              <>
+                <button className="btn btn-primary" type="button" onClick={clock.resume}>Resume</button>
+                <button className="btn btn-danger" type="button" onClick={clock.clockOut}>Clock Out</button>
+              </>
+            )}
+            {clock.onBreak && (
+              <>
+                <button className="btn btn-primary" type="button" onClick={clock.endBreak}>Resume Studying</button>
+                <button className="btn btn-danger" type="button" onClick={clock.clockOut}>Clock Out</button>
+              </>
+            )}
+          </div>
           {clockTask && (
-            <>
-              <span className="chip chip-kind">{clockTask.actualMinutes}m / {clockTask.plannedMinutes}m</span>
-              <button className="btn btn-sm btn-primary" onClick={() => onCompleteTask(clockTask.id)}>Mark task complete</button>
-            </>
+            <div className="clock-task-actions">
+              <span className="chip chip-kind clock-task-chip">{clockTask.actualMinutes}m / {clockTask.plannedMinutes}m planned</span>
+              <button className="btn btn-sm btn-primary" type="button" onClick={() => onCompleteTask(clockTask.id)}>Mark task complete</button>
+            </div>
           )}
         </div>
-        <div className="panel-lead">
-          Minutes are written to the server every 60 seconds, so nothing is lost if you close the tab.
-        </div>
-      </div>
+        <p className="panel-lead clock-save-note">
+          Minutes sync to the server every 60 seconds, so your progress stays safe if you close the tab.
+        </p>
+      </section>
 
       {/* ---------------- FOCUS TIMER ---------------- */}
       <div className="focus-grid-2">
-        <div className="glass-panel tilt-card liquid-card flex-col section-card timer-panel">
-          <div className="timer-kicker shimmer-text">
-            Focus Timer · {timer.cycles} cycles done
+        <section className="glass-panel tilt-card liquid-card flex-col section-card timer-panel" aria-labelledby="focus-timer-title">
+          <div className="timer-panel-heading">
+            <div className="timer-panel-copy">
+              <div className="timer-kicker shimmer-text">Deep-work ritual</div>
+              <h2 id="focus-timer-title" className="timer-title">Focus Timer</h2>
+              <p className="timer-description">Choose a rhythm and stay with one task until the bell.</p>
+            </div>
+            <div className="timer-cycle-badge" aria-label={`${timer.cycles} cycles completed`}>
+              <strong>{timer.cycles}</strong><span>cycles</span>
+            </div>
           </div>
-          <div className="flex-row gap-sm mb-md mode-row">
+
+          <div className="timer-mode-heading">
+            <span>Choose a mode</span>
+            <span className="timer-mode-note">Clock runs independently</span>
+          </div>
+          <div className="mode-row" role="group" aria-label="Focus timer mode">
             {MODES.map((m) => (
-              <button key={m.id}
+              <button key={m.id} type="button"
                 className={`btn btn-sm ${timer.mode === m.id ? "btn-primary" : "btn-secondary"}`}
+                aria-pressed={timer.mode === m.id}
                 onClick={() => timer.setMode(m.id)}>{m.label}</button>
             ))}
           </div>
+
           {timer.mode === "custom" && (
-            <div className="flex-row gap-sm mb-md custom-min-row">
-              <label className="custom-min-label" htmlFor="custom-min">Minutes</label>
-              <input id="custom-min" type="number" className="input-field custom-min-input" min={1} max={180}
-                value={timer.customMin} onChange={(e) => timer.setCustomMin(Number(e.target.value) || 1)} />
+            <div className="custom-min-row">
+              <div className="custom-min-copy">
+                <label className="custom-min-label" htmlFor="custom-min">Custom length</label>
+                <span>Set the timer from 1 to 180 minutes.</span>
+              </div>
+              <div className="custom-min-control">
+                <input id="custom-min" aria-label="Custom timer length in minutes" type="number" className="input-field custom-min-input" min={1} max={180}
+                  value={timer.customMin} onChange={(e) => timer.setCustomMin(Number(e.target.value) || 1)} />
+                <span>min</span>
+              </div>
             </div>
           )}
 
-          <div className="timer-ring-wrap">
-            <svg viewBox="0 0 240 240">
-              <circle cx="120" cy="120" r="104" stroke="var(--row-bg)" strokeWidth="10" fill="transparent" />
-              <circle cx="120" cy="120" r="104" stroke={timer.isBreak ? "var(--success-accent)" : "var(--accent)"}
-                strokeWidth="10" fill="transparent" strokeDasharray={circ}
-                strokeDashoffset={circ * (1 - pct)} strokeLinecap="round"
-                style={{ transition: "stroke-dashoffset .4s linear" }} />
-            </svg>
-            <div className="timer-center">
-              <div id="t-digits" className="mono shimmer-text">{mmss(timer.seconds)}</div>
-              <div id="t-label">{timer.running ? (timer.isBreak ? "BREAK" : "FOCUSED") : "READY"}</div>
+          <div className="timer-stage">
+            <div className="timer-ring-wrap" role="timer" aria-label={`${mmss(timer.seconds)} ${timerStateLabel.toLowerCase()}`}>
+              <svg viewBox="0 0 240 240" aria-hidden="true">
+                <circle cx="120" cy="120" r="104" stroke="var(--row-bg)" strokeWidth="10" fill="transparent" />
+                <circle cx="120" cy="120" r="104" stroke={timer.isBreak ? "var(--success-accent)" : "var(--accent)"}
+                  strokeWidth="10" fill="transparent" strokeDasharray={circ}
+                  strokeDashoffset={circ * (1 - pct)} strokeLinecap="round"
+                  style={{ transition: "stroke-dashoffset .4s linear" }} />
+              </svg>
+              <div className="timer-center">
+                <div id="t-digits" className="mono shimmer-text">{mmss(timer.seconds)}</div>
+                <div id="t-label">{timerStateLabel}</div>
+              </div>
             </div>
           </div>
 
           <div className="flex-row gap-md timer-controls">
-            <button className="btn btn-primary btn-lg" onClick={timer.toggle}>
-              {timer.running ? "Pause" : timer.isBreak ? "Start Break" : "Start Focus"}
+            <button className="btn btn-primary btn-lg" type="button" onClick={timer.toggle}>
+              {timer.running ? "Pause" : timer.isBreak ? "Start Break" : timerInProgress ? "Resume Focus" : "Start Focus"}
             </button>
-            <button className="btn btn-secondary btn-lg" onClick={timer.reset}>Reset</button>
+            <button className="btn btn-secondary btn-lg" type="button" onClick={timer.reset}>Reset</button>
           </div>
-          <div className="panel-lead timer-footnote">
-            This timer only structures your session. It does <strong>not</strong> start or stop the study clock above.
-          </div>
-        </div>
+          <p className="panel-lead timer-footnote">
+            This timer structures your session; it does <strong>not</strong> start or stop the study clock above.
+          </p>
+        </section>
 
-        <div className="flex-col gap-md">
-          <div className="glass-panel tilt-card section-card">
-            <h3 className="section-title section-title--row">
-              <IconVolume /> Ambient Sounds
-            </h3>
-            <div className="flex-col gap-sm mb-md">
+        <div className="focus-side-column">
+          <section className="glass-panel tilt-card section-card ambient-panel" aria-labelledby="ambient-title">
+            <div className="focus-panel-heading">
+              <span className="focus-panel-icon"><IconVolume /></span>
+              <div>
+                <h2 id="ambient-title" className="section-title">Ambient sounds</h2>
+                <p className="focus-panel-description">A quiet layer behind your focus.</p>
+              </div>
+            </div>
+            <div className="sound-grid" role="group" aria-label="Ambient sound">
               {SOUNDS.map((x) => (
-                <button key={x.id} className={`btn btn-left ${sound === x.id ? "btn-primary" : "btn-secondary"}`}
-                  onClick={() => pick(x.id)}>{x.label}</button>
+                <button key={x.id} type="button" className={`sound-option ${sound === x.id ? "is-selected" : ""}`}
+                  aria-pressed={sound === x.id} onClick={() => pick(x.id)}>
+                  <span className="sound-option-label">{x.label}</span>
+                  <span className="sound-option-indicator" aria-hidden="true">{sound === x.id && <IconCheck size={13} />}</span>
+                </button>
               ))}
             </div>
-            <label className="vol-label">
-              <span>Volume</span><span>{Math.round(vol * 100)}%</span>
+            <label className="vol-label" htmlFor="ambient-volume">
+              <span>Volume</span><strong>{Math.round(vol * 100)}%</strong>
             </label>
-            <input type="range" className="vol-range" min={0} max={1} step={0.05} value={vol}
+            <input id="ambient-volume" type="range" className="vol-range" min={0} max={1} step={0.05} value={vol}
+              aria-label={`Ambient volume ${Math.round(vol * 100)} percent`}
               onChange={(e) => setVol(Number(e.target.value))} />
-          </div>
+            <div className="ambient-current"><span className="ambient-current-dot" /> {selectedSoundLabel}</div>
+          </section>
 
-          <div className="glass-panel tilt-card section-card">
-            <h3 className="section-title">Session Rules</h3>
+          <section className="glass-panel tilt-card section-card rules-panel" aria-labelledby="rules-title">
+            <div className="focus-panel-heading">
+              <span className="focus-panel-icon focus-panel-icon--soft"><IconCheck /></span>
+              <div>
+                <h2 id="rules-title" className="section-title">Session rules</h2>
+                <p className="focus-panel-description">Small boundaries, better sessions.</p>
+              </div>
+            </div>
             <ul className="rules-list">
-              <li>Phone in another room — not face down.</li>
-              <li>One task per session. Write it down first.</li>
-              <li>If you stall for 2 minutes, do the easiest sub-step.</li>
-              <li>Break = stand up + look far away. Not a screen.</li>
+              <li><span className="rule-icon"><IconCheck size={12} /></span><span>Phone in another room — not face down.</span></li>
+              <li><span className="rule-icon"><IconCheck size={12} /></span><span>One task per session. Write it down first.</span></li>
+              <li><span className="rule-icon"><IconCheck size={12} /></span><span>If you stall for 2 minutes, do the easiest sub-step.</span></li>
+              <li><span className="rule-icon"><IconCheck size={12} /></span><span>Break = stand up + look far away. Not a screen.</span></li>
             </ul>
-          </div>
+          </section>
         </div>
       </div>
     </div>
