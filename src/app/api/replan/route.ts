@@ -2,11 +2,14 @@ import { NextResponse } from "next/server";
 import { buildContext, dateFrom, fullState, getOrCreateUser, getSettings, keyFrom } from "@/lib/state";
 import { regeneratePlan } from "@/lib/generate";
 import { checkRateLimit } from "@/lib/rateLimit";
+import { withDbGuard } from "@/lib/routeGuard";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
-export async function POST(req: Request) {
+export const POST = withDbGuard(postReplan);
+
+async function postReplan(req: Request) {
   const limit = checkRateLimit(req, "replan", 6, 60_000);
   if (!limit.allowed) {
     return NextResponse.json(

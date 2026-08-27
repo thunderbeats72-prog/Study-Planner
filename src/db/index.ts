@@ -50,15 +50,43 @@ if (pool && process.env.NODE_ENV !== "production") {
 
 type Db = ReturnType<typeof drizzle>;
 
+/** The single sentinel thrown by the unavailable-database handle below.
+ *  Route guards match on this class (its message also contains "DATABASE_URL",
+ *  which the state route's legacy message check relies on). */
+export class DatabaseUnavailableError extends Error {
+  constructor() {
+    super("DATABASE_URL is not configured; the database is unavailable.");
+    this.name = "DatabaseUnavailableError";
+  }
+}
+
 /** A query-builder stand-in that rejects every call with a clear error, so
  *  any code path that touches the DB without a configured DATABASE_URL fails
- *  loudly but never crashes the module graph or the build. */
-function unavailableDb(): Db {
-  const unavailable = () =>
-    Promise.reject(new Error("DATABASE_URL is not configured; the database is unavailable."));
-  const handle: unknown = new Proxy(unavailable, {
-    get: () => handle,
-    apply: () => Promise.reject(new Error("DATABASE_URL is not configured; the database is unavailable.")),
+ *  loudly but never crashes the module graph or the build.
+ *
+ *  The handle mimics drizzle's promise-like query builders: every property
+ *  access and every call returns another awaitable handle, so a full chain
+ *  such as `db.select().from(users).where(...).limit(1)` only rejects once,
+ *  at the terminal `await`, with a DatabaseUnavailableError — never with a
+ *  confusing `TypeError: … .from is not a function` and never leaving an
+ *  orphaned rejected promise behind. */
+export function unavailableDb(): Db {
+  const rejection = () => Promise.reject(new DatabaseUnavailableError());
+  const handle: unknown = new Proxy(function unavailable() {}, {
+    get: (_target, prop) => {
+      if (prop === "then") {
+        return (onFulfilled?: unknown, onRejected?: unknown) =>
+          rejection().then(onFulfilled as never, onRejected as never);
+      }
+      if (prop === "catch") {
+        return (onRejected?: unknown) => rejection().catch(onRejected as never);
+      }
+      if (prop === "finally") {
+        return (onFinally?: () => void) => rejection().finally(onFinally);
+      }
+      return handle;
+    },
+    apply: () => handle,
   });
   return handle as Db;
 }

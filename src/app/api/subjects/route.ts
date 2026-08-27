@@ -9,6 +9,7 @@ import { checkRateLimit } from "@/lib/rateLimit";
 import {
   enumValue, finiteNumber, positiveId, readJsonObject, textValue, validationPayload,
 } from "@/lib/validation";
+import { withDbGuard } from "@/lib/routeGuard";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -35,7 +36,9 @@ async function stateResponse(
   return NextResponse.json({ ...state, context: buildContext(state, localDate), stats });
 }
 
-export async function POST(req: Request) {
+export const POST = withDbGuard(postSubjects);
+
+async function postSubjects(req: Request) {
   const limit = checkRateLimit(req, "subject-generate", 8, 10 * 60_000);
   if (!limit.allowed) {
     return NextResponse.json({ error: "Too many curriculum changes. Please wait and try again.", code: "RATE_LIMITED" }, {
@@ -95,7 +98,9 @@ export async function POST(req: Request) {
   }
 }
 
-export async function PATCH(req: Request) {
+export const PATCH = withDbGuard(patchSubjects);
+
+async function patchSubjects(req: Request) {
   const limit = checkRateLimit(req, "subject-generate", 8, 10 * 60_000);
   if (!limit.allowed) {
     return NextResponse.json({ error: "Too many curriculum changes. Please wait and try again.", code: "RATE_LIMITED" }, {
@@ -186,7 +191,9 @@ export async function PATCH(req: Request) {
   return stateResponse(key, dateFrom(req), await regeneratePlan(user.id, settingsRow, { fromToday: true, today: dateFrom(req) }));
 }
 
-export async function DELETE(req: Request) {
+export const DELETE = withDbGuard(deleteSubjects);
+
+async function deleteSubjects(req: Request) {
   const key = keyFrom(req);
   const user = await getOrCreateUser(key);
   let id: number;

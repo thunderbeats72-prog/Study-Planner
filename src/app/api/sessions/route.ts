@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { sessions, subjects, tasks } from "@/db/schema";
 import { and, eq, sql } from "drizzle-orm";
 import { buildContext, dateFrom, fullState, getOrCreateUser, keyFrom, recomputeStreak } from "@/lib/state";
+import { withDbGuard } from "@/lib/routeGuard";
 import {
   dateDistanceDays, enumValue, finiteNumber, isIsoDate, positiveId,
   readJsonObject, textValue, validationPayload,
@@ -12,7 +13,9 @@ export const dynamic = "force-dynamic";
 
 const SESSION_MODES = ["clock", "focus", "pomodoro", "stopwatch", "custom"] as const;
 
-export async function POST(req: Request) {
+export const POST = withDbGuard(postSessions);
+
+async function postSessions(req: Request) {
   let body: Record<string, unknown>;
   try { body = await readJsonObject(req, 8_000); }
   catch (error) {

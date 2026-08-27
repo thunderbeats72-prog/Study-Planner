@@ -449,6 +449,57 @@ async function runTests() {
   const unsafe = mdToHtml(`<img src=x onerror=alert(1)> [bad](javascript:alert(1))`);
   check(!unsafe.includes("<img") && !unsafe.includes('href="javascript:'), "Renderer blocks raw HTML and unsafe URL protocols");
 
+  console.log("\n--- 9. Unconfigured-Database Guard ---");
+  // Without DATABASE_URL the db handle must reject full drizzle-style chains
+  // with one clear sentinel error — never a confusing TypeError, and never an
+  // orphaned rejected promise (regression: `db.select(...).from is not a function`).
+  const { unavailableDb, DatabaseUnavailableError } = await import("../src/db");
+  const { users } = await import("../src/db/schema");
+  const { eq } = await import("drizzle-orm");
+  const { withDbGuard, isDatabaseConfigError } = await import("../src/lib/routeGuard");
+  // A fresh handle, independent of how earlier sections mutated DATABASE_URL.
+  const db = unavailableDb();
+  let chainedRejection: unknown = null;
+  try {
+    await db.select().from(users).where(eq(users.userKey, "u_testsuite")).limit(1);
+  } catch (error) { chainedRejection = error; }
+  check(chainedRejection instanceof DatabaseUnavailableError, "Chained select rejects with the DATABASE_URL sentinel");
+  check(isDatabaseConfigError(chainedRejection), "Guard classifies the sentinel as a config error");
+  let insertRejection: unknown = null;
+  try {
+    await db.insert(users).values({ userKey: "u_testsuite" }).onConflictDoNothing().returning();
+  } catch (error) { insertRejection = error; }
+  check(insertRejection instanceof DatabaseUnavailableError, "Chained insert rejects with the DATABASE_URL sentinel");
+  let transactionRan = false;
+  let transactionRejection: unknown = null;
+  try {
+    await db.transaction(async () => { transactionRan = true; });
+  } catch (error) { transactionRejection = error; }
+  check(transactionRejection instanceof DatabaseUnavailableError && !transactionRan, "Transaction rejects without invoking its callback");
+  let unhandled = false;
+  const onUnhandled = () => { unhandled = true; };
+  process.on("unhandledRejection", onUnhandled);
+  try {
+    try {
+      await db.update(users).set({ name: "x" }).where(eq(users.userKey, "u_testsuite"));
+      await db.delete(users).where(eq(users.userKey, "u_testsuite"));
+    } catch { /* expected sentinel rejections */ }
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  } finally {
+    process.off("unhandledRejection", onUnhandled);
+  }
+  check(!unhandled, "No orphaned rejections leak from the unavailable handle");
+  const guarded = withDbGuard(async () => { throw new DatabaseUnavailableError(); });
+  let guardedResponse: Response | null = null;
+  try { guardedResponse = await guarded(new Request("https://app.test/api/x")); } catch { /* not thrown */ }
+  check(guardedResponse?.status === 503, "withDbGuard converts the sentinel into a friendly 503");
+  const guardedBody = guardedResponse ? await guardedResponse.json() as { code?: string } : null;
+  check(guardedBody?.code === "DATABASE_UNAVAILABLE", "503 body carries the DATABASE_UNAVAILABLE code");
+  const passthrough = withDbGuard(async () => { throw new Error("a genuine bug"); });
+  let passthroughCode = 0;
+  try { await passthrough(new Request("https://app.test/api/x")); } catch { passthroughCode = 500; }
+  check(passthroughCode === 500, "Non-database errors are rethrown untouched");
+
   console.log("\n==================================================");
   console.log(`TEST SUITE RESULTS: ${passed} PASSED, ${failed} FAILED`);
   console.log("==================================================");
