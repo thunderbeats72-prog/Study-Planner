@@ -127,6 +127,13 @@ v18 FIXES (this build)
    panel. It documents the real five-provider chain (Cerebras →
    Mistral → SambaNova → Cohere → Gemini), the local ML engine, and
    the health endpoints that actually exist.
+ - PREVIEW MODE IS FULLY INTERACTIVE: with SPP_DEMO_DATA=1 and no
+   database, every API surface (study clock sessions with the same
+   auto-completion rule, task Done/Skip/Edit/Add/Delete, settings,
+   subjects, replan, setup wizard) now answers through an in-memory
+   demo layer instead of erroring — a preview visitor can exercise the
+   real flows end to end without PostgreSQL. Covered by test-suite
+   section 5d.
 
 v16 UI POLISH (this build)
 --------------------------

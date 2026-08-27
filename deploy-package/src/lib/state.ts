@@ -35,36 +35,53 @@ export function dateFrom(req: Request): string {
 }
 
 export async function getOrCreateUser(userKey: string) {
-  const found = await db.select().from(users).where(eq(users.userKey, userKey)).limit(1);
-  if (found.length) return found[0];
+  try {
+    const found = await db.select().from(users).where(eq(users.userKey, userKey)).limit(1);
+    if (found.length) return found[0];
 
-  // Two API calls can be the first request from a new browser. The unique
-  // user_key constraint plus ON CONFLICT makes that race harmless.
-  const inserted = await db
-    .insert(users)
-    .values({ userKey })
-    .onConflictDoNothing({ target: users.userKey })
-    .returning();
-  const user = inserted[0] || (await db.select().from(users).where(eq(users.userKey, userKey)).limit(1))[0];
-  if (!user) throw new Error("Could not initialise learner account.");
-  await db
-    .insert(settings)
-    .values({ userId: user.id, startDate: todayStr(), examDate: addDays(todayStr(), 90) })
-    .onConflictDoNothing({ target: settings.userId });
-  return user;
+    // Two API calls can be the first request from a new browser. The unique
+    // user_key constraint plus ON CONFLICT makes that race harmless.
+    const inserted = await db
+      .insert(users)
+      .values({ userKey })
+      .onConflictDoNothing({ target: users.userKey })
+      .returning();
+    const user = inserted[0] || (await db.select().from(users).where(eq(users.userKey, userKey)).limit(1))[0];
+    if (!user) throw new Error("Could not initialise learner account.");
+    await db
+      .insert(settings)
+      .values({ userId: user.id, startDate: todayStr(), examDate: addDays(todayStr(), 90) })
+      .onConflictDoNothing({ target: settings.userId });
+    return user;
+  } catch (error) {
+    // Preview without a database: serve the demo learner instead of failing.
+    if (process.env.SPP_DEMO_DATA === "1") {
+      const { demoFallbackState } = await import("./demoState");
+      return (await demoFallbackState(userKey)).user;
+    }
+    throw error;
+  }
 }
 
 export async function getSettings(userId: number) {
-  const rows = await db.select().from(settings).where(eq(settings.userId, userId)).limit(1);
-  if (rows.length) return rows[0];
-  const inserted = await db
-    .insert(settings)
-    .values({ userId, startDate: todayStr(), examDate: addDays(todayStr(), 90) })
-    .onConflictDoNothing({ target: settings.userId })
-    .returning();
-  const row = inserted[0] || (await db.select().from(settings).where(eq(settings.userId, userId)).limit(1))[0];
-  if (!row) throw new Error("Could not initialise learner settings.");
-  return row;
+  try {
+    const rows = await db.select().from(settings).where(eq(settings.userId, userId)).limit(1);
+    if (rows.length) return rows[0];
+    const inserted = await db
+      .insert(settings)
+      .values({ userId, startDate: todayStr(), examDate: addDays(todayStr(), 90) })
+      .onConflictDoNothing({ target: settings.userId })
+      .returning();
+    const row = inserted[0] || (await db.select().from(settings).where(eq(settings.userId, userId)).limit(1))[0];
+    if (!row) throw new Error("Could not initialise learner settings.");
+    return row;
+  } catch (error) {
+    if (process.env.SPP_DEMO_DATA === "1") {
+      const { demoFallbackState } = await import("./demoState");
+      return (await demoFallbackState("u_demo_settings")).settings;
+    }
+    throw error;
+  }
 }
 
 async function latestMessages(userId: number, limit = 120) {

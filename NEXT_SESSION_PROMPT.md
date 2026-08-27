@@ -30,10 +30,26 @@ the drag-and-drop deploy bundle had drifted far behind `src/`.
    updated topics with `eq(topics.userId, topic.userId)` (column compared
    to itself) instead of the task's userId.
 5. **`.env.example`** now documents the preview-only `SPP_DEMO_DATA=1` flag.
+6. **Preview mode made fully interactive** (v18b, same session): previously
+   `SPP_DEMO_DATA=1` only served the sample plan; every interactive route
+   (sessions, tasks, settings, subjects, replan, onboard) 500/503'd in the
+   preview, which is what the user's screenshots caught. `demoState.ts` now
+   keeps an in-memory mutation layer (task overrides, added/deleted tasks,
+   live session logs, settings/user/subject overrides) and every route has a
+   demo branch: POST /api/sessions runs the SAME auto-completion rule
+   (verified live: a 45-min learn task auto-completed at 45 logged minutes
+   with `completedTask` in the response), PATCH/POST/DELETE /api/tasks,
+   PATCH /api/settings, subjects POST/PATCH/DELETE, replan and onboard all
+   round-trip through the demo state. GET /api/analytics computes the real
+   ML intel from demo rows. Never import demoState into production paths —
+   every branch is gated by `demoDataEnabled()`.
 
 Note: no PostgreSQL is available in the sandbox; the app was exercised in
 `SPP_DEMO_DATA=1` demo mode (dev server, port 3000). All checks green:
-typecheck, lint (0 warnings), 124/124 tests, `npm run build:app`.
+typecheck, lint (0 warnings), 131/131 tests, `npm run build:app`.
+Caveat: `.env.local` must NOT contain the placeholder DATABASE_URL from
+`.env.example` — with it set, the app attempts real pg connections and the
+preview 500s (the bug found in the server logs).
 
 ---
 
