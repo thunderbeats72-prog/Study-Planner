@@ -101,6 +101,24 @@ instead of stopping on a “voice model unavailable” error; the chat shows a
 clear non-error notice. One failed long-answer part switches the remaining
 parts to that local voice, so every later part keeps flowing.
 
+v15 STUDY CLOCK AUTO-COMPLETE (this build)
+------------------------------------------
+ - DONE WITHOUT THE DONE BUTTON: the study clock watches every task's
+   planned minutes. The moment your logged time reaches the plan — a
+   15-minute recall after 15+ minutes, a 45-minute lesson after 45+ — the
+   task is marked complete automatically. No more studying for 28 minutes
+   on a 15-minute recall and still seeing it "pending".
+ - NOTIFIED, THEN NEXT: completion fires a success toast ("…complete —
+   28m logged ≥ 15m planned") and, while the clock is still running on
+   that task, the clock rolls itself forward to the next pending task, so
+   every minute you keep studying lands on the right lesson. If the task
+   was the last of the day, it says so. Nothing is re-marked once a task
+   is done or skipped, and the mastery/memory-model bookkeeping is shared
+   with the manual Done flow, so both paths behave identically.
+ - WORKS OFFLINE TOO: the same logic lives in the server's session-log
+   route, so auto-completion applies to every minute that syncs from the
+   device queue, not just live ticks.
+
 v14 LIQUID GLASS DELUXE (this build)
 ------------------------------------
  - MATERIAL TIERS, NOT BLUR EVERYWHERE: cards (tier 1) paint their glass as

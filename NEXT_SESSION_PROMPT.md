@@ -32,6 +32,40 @@ The following changes were made and merged. Do NOT redo them — just verify the
 
 ---
 
+## v15 — STUDY CLOCK AUTO-COMPLETE (merged in this session)
+
+Tasks are now marked **done automatically** the moment the minutes logged for
+them reach the planned time — no manual "Done" tap required (e.g. a 15-min
+recall studied for 28 min completes at the 15-min mark). This was the fix for:
+"the recall planned time was given 15min but I logged in for 28mins … if I have
+logged above 15 min it should be marked as complete and should notify me that
+this is done and after that it should come to next task."
+
+Where the logic lives:
+1. `src/lib/completion.ts` (NEW) — pure rule: `shouldAutoComplete(actual,
+   planned, status)` (pending + actual ≥ planned) and `nextPendingTask(tasks,
+   date, excludeId)` (the task the clock rolls into after a completion).
+2. `src/lib/state.ts` — `applyCompletionMastery(tx, updated, today, rating?)`
+   extracted from the tasks route (mastery gain + FSRS-lite update), now
+   shared by the manual Done flow and the auto-complete flow so they cannot
+   drift apart.
+3. `src/app/api/sessions/route.ts` — after summing session minutes and
+   updating `actualMinutes`, a pending task that has met its plan is flipped
+   to `done` via a conditional update (`where status = 'pending'`), so a
+   concurrent request can never double-apply mastery. The response includes
+   `completedTask: { id, title, plannedMinutes, actualMinutes } | null`.
+4. `src/app/page.tsx` — `drainSessionQueue` reads `completedTask`, shows a
+   success toast, and if the study clock is STILL running on that task calls
+   `clock.clockIn({ taskId: next.id })` to roll forward to the next pending
+   task so continued minutes are logged against the right lesson.
+
+Note for future sessions: auto-completion is generic (all task kinds, not just
+recalls), never re-marks done/skipped tasks, and works for queued offline
+session logs too. Tests live in `scripts/test-suite.ts` under
+"5b. Study-Clock Auto-Completion Rule".
+
+---
+
 ## IF SOMETHING NEEDS TO BE REDONE OR EXTENDED
 
 ### To add a new provider (e.g., Anthropic/Claude):
@@ -161,6 +195,7 @@ These run 100% on the server from your own logged data. Adding an AI key makes S
 
 ## FILES CHANGED IN THIS SESSION (for reference)
 
+Previous session:
 ```
 src/lib/ai.ts                    ← Main AI provider config + SHIGUN system prompt
 src/components/SettingsView.tsx  ← AI Connectivity section removed
@@ -168,4 +203,15 @@ src/components/ChatPanel.tsx     ← Cleaner SHIGUN interface
 src/components/icons.tsx         ← (unchanged)
 scripts/test-suite.ts            ← Test refs updated groq→cerebras
 .env.example                     ← Updated provider docs
+```
+
+v15 session (study-clock auto-complete):
+```
+src/lib/completion.ts            ← NEW: shouldAutoComplete + nextPendingTask rule
+src/lib/state.ts                 ← applyCompletionMastery shared helper
+src/app/api/sessions/route.ts    ← auto-complete on log + completedTask in response
+src/app/api/tasks/route.ts       ← reuses applyCompletionMastery (no behavior change)
+src/app/page.tsx                 ← toast + roll clock to next pending task
+scripts/test-suite.ts            ← "5b. Study-Clock Auto-Completion Rule" tests
+README.txt                       ← v15 section
 ```
