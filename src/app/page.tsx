@@ -110,7 +110,17 @@ export default function Home() {
     } catch { /* private mode */ }
     return false;
   });
+  /* While the rail is travelling, the whole sidebar carries `sb-anim`: the
+     measured nav pill shortens its own transition so it *tracks* the width
+     change (re-measured each frame by the ResizeObserver) instead of racing
+     ahead of it, which is what made the old collapse look broken. */
+  const [railAnimating, setRailAnimating] = useState(false);
+  const railTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (railTimer.current) clearTimeout(railTimer.current); }, []);
   const toggleSidebar = () => {
+    setRailAnimating(true);
+    if (railTimer.current) clearTimeout(railTimer.current);
+    railTimer.current = setTimeout(() => setRailAnimating(false), 520);
     setSidebarCollapsed((v) => {
       try { localStorage.setItem(SIDEBAR_KEY, v ? "0" : "1"); } catch { /* noop */ }
       return !v;
@@ -936,14 +946,17 @@ export default function Home() {
   return (
     <>
       <header className="mobile-header">
-        <div className="flex-row gap-sm">
+        <div className="mh-brand">
           <div className="brand-logo-icon brand-logo-sm"><IconLogo size={16} /></div>
-          <span className="brand-wordmark">Study Planner Pro</span>
+          <div className="mh-titles">
+            <span className="mh-page">{NAV.find((n) => n.id === page)?.label ?? "Study Planner Pro"}</span>
+            <span className="mh-wordmark">Study Planner Pro</span>
+          </div>
         </div>
-        <span className="streak-badge"><IconFlame /> {state.user.streak}d</span>
+        <span className="streak-badge mh-streak"><IconFlame /> {state.user.streak}d</span>
       </header>
 
-      <div className={`app-wrapper${sidebarCollapsed ? " sb-collapsed" : ""}`}>
+      <div className={`app-wrapper${sidebarCollapsed ? " sb-collapsed" : ""}${railAnimating ? " sb-anim" : ""}`}>
         <aside className="sidebar">
           <button
             className="sb-toggle"
