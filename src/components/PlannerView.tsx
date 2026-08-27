@@ -97,7 +97,7 @@ export default function PlannerView({
       <div key={task.id}>
         <div className={`task-row${task.status === "done" ? " done" : ""}${activeTaskId === task.id ? " active-clock" : ""}${moreActionsId === task.id ? " expanded-actions" : ""}`}>
           <div className="task-dot" style={{ background: subj?.color || meta.color }} />
-          <div className="task-main" style={{ cursor: canExpandLessonBrief ? "pointer" : "default" }}
+          <div className={`task-main${canExpandLessonBrief ? " is-expandable" : ""}`}
             role={canExpandLessonBrief ? "button" : undefined}
             tabIndex={canExpandLessonBrief ? 0 : undefined}
             aria-expanded={canExpandLessonBrief ? open : undefined}
@@ -119,7 +119,7 @@ export default function PlannerView({
               )}
             </div>
             <div className="task-sub">
-              <span className="chip chip-kind" style={{ marginRight: 6 }}>{meta.label}</span>
+              <span className="chip chip-kind chip-tight">{meta.label}</span>
               {task.plannedMinutes} min
               {topic ? ` · ${topic.unit} · ${topic.difficulty}` : ""}
               {taskLogged(task.id) ? ` · ${fmtMin(taskLogged(task.id))} logged` : task.actualMinutes ? ` · ${task.actualMinutes}m logged` : ""}
@@ -163,7 +163,7 @@ export default function PlannerView({
           </div>
         )}
         {canExpandLessonBrief && open && topic && (
-          <div ref={briefRef} className="glass-panel slide-in planner-lesson-brief" style={{ borderLeft: `3px solid ${subj?.color || "var(--accent)"}` }}>
+          <div ref={briefRef} className="glass-panel slide-in planner-lesson-brief accent-edge" style={{ "--edge": subj?.color || "var(--accent)" } as React.CSSProperties}>
             <div className="lesson-brief-heading">
               Lesson brief · {topic.unit} · {topic.depth || "Core"}
             </div>
@@ -182,7 +182,7 @@ export default function PlannerView({
               </div>
             )}
             {!!topic.keyConcepts?.length && (
-              <div className="lesson-concepts" style={{ marginBottom: 10 }}>
+              <div className="lesson-concepts">
                 {topic.keyConcepts.map((concept, i) => <span className="chip chip-kind" key={i}>{concept}</span>)}
               </div>
             )}
@@ -205,7 +205,7 @@ export default function PlannerView({
                 ))}
               </div>
             )}
-            <div className="flex-row gap-sm" style={{ flexWrap: "wrap", marginTop: 12 }}>
+            <div className="flex-row gap-sm lesson-brief-actions">
               <button className="btn btn-xs btn-primary" onClick={() => onAskTutor(`Explain "${topic.title}" from ${subj?.name || "my course"} step by step with an example. Address these outcomes: ${(topic.objectives || []).join("; ")}. Use the listed curriculum sources.`)}>
                 <IconSpark size={12} /> Teach me this
               </button>
@@ -239,7 +239,7 @@ export default function PlannerView({
             Lesson-wise adaptive schedule · {state.tasks.length} tasks · {state.topics.length} lessons mapped
           </p>
         </div>
-        <div className="flex-row gap-md" style={{ flexWrap: "wrap" }}>
+        <div className="flex-row gap-md planner-tools">
           <div className="vtabs">
             {(["list", "calendar", "kanban"] as View[]).map((v) => (
               <div key={v} className={`vtab${view === v ? " active" : ""}`} onClick={() => setView(v)}>
@@ -247,7 +247,7 @@ export default function PlannerView({
               </div>
             ))}
           </div>
-          <select className="input-field" style={{ width: "auto", height: 38 }} value={filter} onChange={(e) => setFilter(e.target.value)}>
+          <select className="input-field filter-select" value={filter} onChange={(e) => setFilter(e.target.value)}>
             <option value="all">All subjects</option>
             {state.subjects.map((s) => <option key={s.id} value={String(s.id)}>{s.name}</option>)}
           </select>
@@ -259,11 +259,11 @@ export default function PlannerView({
       </div>
 
       {overdue.length > 0 && (
-        <div className="glass-panel" style={{ padding: 16, marginBottom: 16, borderLeft: "4px solid var(--warning-accent)" }}>
-          <div style={{ fontSize: ".85rem", fontWeight: 750 }}>
+        <div className="glass-panel section-card accent-edge accent-edge--warning overdue-strip">
+          <div className="overdue-title">
             {overdue.length} task{overdue.length > 1 ? "s" : ""} from earlier days are still pending.
           </div>
-          <div style={{ fontSize: ".78rem", color: "var(--text-muted)", marginTop: 4, marginBottom: 10 }}>
+          <div className="panel-lead">
             Don&apos;t cram them into today — let the engine redistribute them across your remaining days.
           </div>
           <button className="btn btn-sm btn-primary" onClick={onReplan} disabled={replanning} aria-busy={replanning}>
@@ -274,7 +274,7 @@ export default function PlannerView({
       )}
 
       {view === "list" && (
-        <div>
+        <div className="planner-list">
           {!upcoming.length && (
             <div className="glass-panel">
               <div className="empty-state">
@@ -291,6 +291,7 @@ export default function PlannerView({
               </div>
             </div>
           )}
+          <div className="planner-days">
           {upcoming.map(([date, list]) => {
             const done = list.filter((x) => x.status === "done").length;
             const mins = list.reduce((a, x) => a + x.plannedMinutes, 0);
@@ -303,7 +304,7 @@ export default function PlannerView({
                     </div>
                     <div className="day-meta">{list.length} tasks · {mins} min · {done} done</div>
                   </div>
-                  <div className="bar-track" style={{ width: "min(120px, 30vw)" }}>
+                  <div className="bar-track daybar">
                     <div className="bar-fill" style={{ width: `${list.length ? (done / list.length) * 100 : 0}%` }} />
                   </div>
                 </div>
@@ -311,11 +312,12 @@ export default function PlannerView({
               </div>
             );
           })}
+          </div>
         </div>
       )}
 
       {view === "calendar" && (
-        <div className="glass-panel" style={{ padding: 18 }}>
+        <div className="glass-panel section-card cal-panel">
           <div className="day-head">
             <div className="day-date">{first.toLocaleDateString(undefined, { month: "long", year: "numeric" })}</div>
             <div className="flex-row gap-sm">
@@ -323,7 +325,7 @@ export default function PlannerView({
               <button className="btn btn-xs btn-secondary" onClick={() => setMonth((mm) => (mm.m === 11 ? { y: mm.y + 1, m: 0 } : { ...mm, m: mm.m + 1 }))}>Next ›</button>
             </div>
           </div>
-          <div className="cal-grid" style={{ marginBottom: 6 }}>
+          <div className="cal-grid cal-dow-row">
             {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => <div className="cal-dow" key={d}>{d}</div>)}
           </div>
           <div className="cal-grid">
@@ -337,7 +339,7 @@ export default function PlannerView({
                     const c = subjFor(task)?.color || (KIND_META[task.kind] || KIND_META.learn).color;
                     return <div key={task.id} className="cal-pill" style={{ background: c, opacity: task.status === "done" ? 0.45 : 1 }}>{task.title}</div>;
                   })}
-                  {list.length > 3 && <div style={{ fontSize: ".6rem", fontWeight: 700, color: "var(--text-muted)" }}>+{list.length - 3} more</div>}
+                  {list.length > 3 && <div className="cal-more">+{list.length - 3} more</div>}
                 </div>
               );
             })}
@@ -355,12 +357,12 @@ export default function PlannerView({
                 {list.map((task) => {
                   const c = subjFor(task)?.color || (KIND_META[task.kind] || KIND_META.learn).color;
                   return (
-                    <div className="task-row" key={task.id} style={{ alignItems: "flex-start" }}>
-                      <div className="task-dot" style={{ background: c, marginTop: 5 }} />
+                    <div className="task-row kanban-task" key={task.id}>
+                      <div className="task-dot" style={{ background: c }} />
                       <div className="task-main">
                         <div className="task-title">{task.title}</div>
                         <div className="task-sub">{prettyDate(task.date)} · {task.plannedMinutes}m</div>
-                        <div className="flex-row gap-sm" style={{ marginTop: 6 }}>
+                        <div className="flex-row gap-sm kanban-task-actions">
                           <button className="btn btn-xs btn-secondary" onClick={() => setEditingTaskId(task.id)}>Edit</button>
                           {col !== "done" && <button className="btn btn-xs btn-primary" onClick={() => onTaskStatus(task.id, "done")}>Done</button>}
                           {col !== "pending" && <button className="btn btn-xs btn-secondary" onClick={() => onTaskStatus(task.id, "pending")}>Reopen</button>}
@@ -369,7 +371,7 @@ export default function PlannerView({
                     </div>
                   );
                 })}
-                {!list.length && <div style={{ fontSize: ".78rem", color: "var(--text-dim)" }}>Nothing here.</div>}
+                {!list.length && <div className="panel-lead">Nothing here.</div>}
               </div>
             );
           })}
@@ -378,7 +380,7 @@ export default function PlannerView({
 
       {openDay && (
         <div className="modal-overlay" onClick={() => setOpenDay(null)}>
-          <div className="glass-panel modal-box" onClick={(e) => e.stopPropagation()}>
+          <div className="glass-panel modal-box day-modal" onClick={(e) => e.stopPropagation()}>
             <div className="day-head">
               <div>
                 <div className="day-date">{prettyLong(openDay)}</div>

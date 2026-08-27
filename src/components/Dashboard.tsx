@@ -194,8 +194,8 @@ export default function Dashboard({
             role={live ? "status" : undefined}
           >
             <div className="up-next-glow" />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div className="intel-label" style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+            <div className="up-next-main">
+              <div className="intel-label intel-label--row">
                 {live ? "Now recording" : "Up next"}
                 {live
                   ? <span className="up-next-live-chip">● {clockRunning ? "clock running" : clockOnBreak ? "on break" : "paused"}</span>
@@ -211,7 +211,7 @@ export default function Dashboard({
             {live ? (
               <div className="up-next-actions">
                 <div className="mono up-next-timer" aria-label="Session time">{mmss(activeClockSeconds ?? 0)}</div>
-                <div className="flex-row gap-sm" style={{ justifyContent: "flex-end" }}>
+                <div className="flex-row gap-sm up-next-actions-row">
                   {!clockOnBreak && (
                     <button className="btn btn-xs btn-secondary"
                       onClick={(e) => { e.stopPropagation(); onPauseOrResume(); }}>
@@ -260,8 +260,8 @@ export default function Dashboard({
         </div>
         <div className="glass-panel tilt-card kpi-card">
           <div className="kpi-label">Syllabus Progress</div>
-          <div className="kpi-value" style={{ color: "var(--accent)" }}>{progressAnim}%</div>
-          <div className="bar-track" style={{ marginTop: 8 }}>
+          <div className="kpi-value tone-accent">{progressAnim}%</div>
+          <div className="bar-track">
             <div className="bar-fill" style={{ width: `${ctx.progressPct}%` }} />
           </div>
         </div>
@@ -272,68 +272,65 @@ export default function Dashboard({
         </div>
         <div className="glass-panel tilt-card kpi-card">
           <div className="kpi-label">Consistency</div>
-          <div className="kpi-value" style={{ color: "var(--success-accent)" }}>{consistencyAnim}%</div>
+          <div className="kpi-value tone-success">{consistencyAnim}%</div>
           <div className="kpi-sub">{state.user.streak} day streak · {ctx.overdue} overdue</div>
         </div>
       </div>
 
       <div className="dash-grid-2">
         <div className="glass-panel tilt-card dash-card">
-          <h3 style={{ fontSize: ".88rem", fontWeight: 800, margin: "0 0 16px" }}>Weekly Study Volume</h3>
-          <div style={{ display: "flex", alignItems: "flex-end", gap: 10, height: 150 }}>
+          <h3 className="section-title">Weekly Study Volume</h3>
+          <div className="wk-chart">
             {week.map((w) => (
-              <div key={w.date} style={{ flex: 1, textAlign: "center" }}>
-                <div style={{ fontSize: ".66rem", fontWeight: 700, color: "var(--text-muted)", marginBottom: 4 }}>
-                  {w.hours || ""}
-                </div>
-                <div style={{
-                  height: `${Math.max(4, (w.hours / maxH) * 110)}px`,
-                  background: w.date === t ? "var(--accent-gradient)" : "var(--chart-bar)",
-                  borderRadius: 8, transition: "height .5s ease",
-                }} />
-                <div style={{ fontSize: ".67rem", fontWeight: 750, marginTop: 6, color: "var(--text-muted)" }}>{w.label}</div>
+              <div key={w.date} className={`wk-col${w.date === t ? " is-today" : ""}`}>
+                <div className="wk-val">{w.hours || ""}</div>
+                <div className="wk-bar"
+                  title={`${w.label} · ${w.hours}h`}
+                  style={{ "--pct": String(Math.min(1, (w.hours / maxH) * 0.86)) } as React.CSSProperties} />
+                <div className="wk-label">{w.label}</div>
               </div>
             ))}
           </div>
         </div>
-        <div className="glass-panel tilt-card dash-card" style={{ maxHeight: 260, overflowY: "auto" }}>
-          <h3 style={{ fontSize: ".88rem", fontWeight: 800, margin: "0 0 16px" }}>Subject Mastery</h3>
-          {ctx.subjects.map((s) => {
-            const pct = s.total ? Math.round((s.done / s.total) * 100) : 0;
-            const color = state.subjects.find((x) => x.id === s.id)?.color || "var(--accent)";
-            return (
-              <div key={s.id} style={{ marginBottom: 12 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: ".76rem", fontWeight: 700, marginBottom: 5 }}>
-                  <span>{s.name}</span><span style={{ color: "var(--text-muted)" }}>{s.done}/{s.total}</span>
+        <div className="glass-panel tilt-card dash-card mastery-panel">
+          <h3 className="section-title">Subject Mastery</h3>
+          <div className="mastery-list">
+            {ctx.subjects.map((s) => {
+              const pct = s.total ? Math.round((s.done / s.total) * 100) : 0;
+              const color = state.subjects.find((x) => x.id === s.id)?.color || "var(--accent)";
+              return (
+                <div key={s.id} className="mastery-row-wrap">
+                  <div className="mastery-row">
+                    <span className="mastery-name">{s.name}</span>
+                    <span className="mastery-count">{s.done}/{s.total}</span>
+                  </div>
+                  <div className="bar-track"><div className="bar-fill" style={{ width: `${pct}%`, background: color }} /></div>
                 </div>
-                <div className="bar-track"><div className="bar-fill" style={{ width: `${pct}%`, background: color }} /></div>
-              </div>
-            );
-          })}
-          {!ctx.subjects.length && <div style={{ fontSize: ".8rem", color: "var(--text-dim)" }}>No subjects yet.</div>}
+              );
+            })}
+          </div>
+          {!ctx.subjects.length && <div className="panel-lead">No subjects yet.</div>}
         </div>
       </div>
 
-      <div style={{ marginBottom: 18 }}>
-        <Heatmap state={state} />
-      </div>
+      <Heatmap state={state} />
 
-      <div className="glass-panel tilt-card" style={{ padding: 20, marginBottom: 18, borderLeft: "4px solid var(--accent)" }}>
-        <h3 style={{ fontSize: ".88rem", fontWeight: 800, margin: "0 0 10px", display: "flex", alignItems: "center", gap: 8 }}>
+      <div className="glass-panel tilt-card coach-card section-card accent-edge">
+        <h3 className="section-title section-title--row">
           <IconSpark size={15} /> SHIGUN Coaching Insights
         </h3>
         {loadingIns ? (
-          <div style={{ fontSize: ".84rem", color: "var(--text-muted)" }}>Analysing your data…</div>
+          <div className="panel-lead is-busy">Analysing your data…</div>
         ) : (
-          <div style={{ fontSize: ".85rem", lineHeight: 1.65, color: "var(--text-muted)", fontWeight: 550 }}
+          <div className="coach-body"
             dangerouslySetInnerHTML={{ __html: mdToHtml(insights) }} />
         )}
       </div>
 
       {intel && intel.readiness && (
-        <div className="glass-panel tilt-card intel-card" style={{ padding: 20, marginBottom: 18 }}>
-          <div className="day-head" style={{ marginBottom: 12 }}>
-            <h3 style={{ fontSize: ".88rem", fontWeight: 800, margin: 0 }}>Intelligence</h3>
+        <div className="glass-panel tilt-card intel-card section-card">
+          <div className="day-head">
+            <h3 className="section-title">Intelligence</h3>
             <span className="day-meta">learned from your own study data</span>
           </div>
 
@@ -399,10 +396,10 @@ export default function Dashboard({
             <div className="intel-details slide-in">
               {intel.pace.samples >= 3 ? (
                 <>
-                  <div className="intel-label" style={{ marginBottom: 8 }}>Your pace vs plan (learned from {intel.pace.samples} sessions)</div>
+                  <div className="intel-label intel-subhead intel-subhead--first">Your pace vs plan (learned from {intel.pace.samples} sessions)</div>
                   {intel.pace.bySubject.slice(0, 6).map((p) => (
                     <div key={p.id} className="intel-pace-row">
-                      <span className="task-dot" style={{ background: p.color, position: "static" }} />
+                      <span className="task-dot" style={{ background: p.color }} />
                       <span className="intel-pace-name">{p.name}</span>
                       <span className={`intel-pace-val ${p.pace > 1.15 ? "warn-text" : p.pace < 0.9 ? "ok-text" : ""}`}>
                         {p.pace > 1.05 ? `${Math.round((p.pace - 1) * 100)}% slower` : p.pace < 0.95 ? `${Math.round((1 - p.pace) * 100)}% faster` : "on pace"}
@@ -411,12 +408,12 @@ export default function Dashboard({
                   ))}
                 </>
               ) : (
-                <div style={{ fontSize: ".8rem", color: "var(--text-dim)" }}>
+                <div className="panel-lead">
                   Complete a few more sessions and the pace model will show which subjects run faster or slower for you.
                 </div>
               )}
-              <div className="intel-label" style={{ margin: "12px 0 4px" }}>Finish-time projection</div>
-              <div style={{ fontSize: ".8rem", color: "var(--text-muted)" }}>
+              <div className="intel-label intel-subhead">Finish-time projection</div>
+              <div className="panel-lead">
                 Best case ~{intel.readiness.optimisticDays}d · likely ~{intel.readiness.likelyDays}d · worst case ~{intel.readiness.pessimisticDays}d of study time remaining.
                 {intel.effectiveDailyMinutes && intel.effectiveDailyMinutes.activeDays >= 4 && (
                   <>
@@ -430,9 +427,9 @@ export default function Dashboard({
         </div>
       )}
 
-      <div className="glass-panel tilt-card" style={{ padding: 20 }}>
+      <div className="glass-panel tilt-card section-card">
         <div className="day-head">
-          <h3 style={{ fontSize: ".88rem", fontWeight: 800, margin: 0 }}>Today&apos;s Study Load</h3>
+          <h3 className="section-title">Today&apos;s Study Load</h3>
           <span className="day-meta">{doneToday}/{todayTasks.length} done · {totalPlannedMin} min planned</span>
         </div>
         {!todayTasks.length && (
