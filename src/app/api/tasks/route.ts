@@ -8,6 +8,7 @@ import {
   enumValue, finiteNumber, isoDate, positiveId, readJsonObject,
   textValue, validationPayload,
 } from "@/lib/validation";
+import { withDbGuard } from "@/lib/routeGuard";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +20,9 @@ async function responseState(key: string, localDate: string) {
   return NextResponse.json({ ...state, context: buildContext(state, localDate) });
 }
 
-export async function PATCH(req: Request) {
+export const PATCH = withDbGuard(patchTasks);
+
+async function patchTasks(req: Request) {
   let body: Record<string, unknown>;
   try { body = await readJsonObject(req, 16_000); }
   catch (error) {
@@ -175,7 +178,9 @@ export async function PATCH(req: Request) {
   return responseState(key, dateFrom(req));
 }
 
-export async function POST(req: Request) {
+export const POST = withDbGuard(postTasks);
+
+async function postTasks(req: Request) {
   let body: Record<string, unknown>;
   try { body = await readJsonObject(req, 16_000); }
   catch (error) {
@@ -219,7 +224,9 @@ export async function POST(req: Request) {
   return responseState(key, dateFrom(req));
 }
 
-export async function DELETE(req: Request) {
+export const DELETE = withDbGuard(deleteTasks);
+
+async function deleteTasks(req: Request) {
   const key = keyFrom(req);
   const user = await getOrCreateUser(key);
   let id: number;

@@ -4496,7 +4496,7 @@ body.theme-mint,body.theme-sunset,body.theme-silver-lavender,body.theme-default{
 .mastery-row{margin-bottom:5px}
 .mastery-row-wrap{min-width:0}
 .panel-lead{font-size:var(--fs-xs);color:var(--text-dim);line-height:1.6;font-weight:600;max-width:66ch;text-wrap:pretty;margin:0}
-.stat-big{font-size:var(--fs-kpi);font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.03em;line-height:1;flex:0 0 auto;align-self:flex-start;animation:valueIn .8s var(--spring-soft) backwards;text-shadow:0 0 24px var(--accent-glow)}
+.stat-big{font-size:var(--fs-kpi);font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.03em;line-height:1;flex:0 0 auto;align-self:center;padding-top:.06em;animation:valueIn .8s var(--spring-soft) backwards;text-shadow:0 0 24px var(--accent-glow)}
 /* Gradient accent edge, painted as a background layer: follows the radius,
    never fights an existing border, and replaces four different inline
    borderLeft recipes. */

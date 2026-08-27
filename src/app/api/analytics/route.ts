@@ -9,6 +9,7 @@ import {
   projectReadiness, retrievability, learnEffectiveDailyMinutes,
 } from "@/lib/ml";
 import { checkRateLimit } from "@/lib/rateLimit";
+import { withDbGuard } from "@/lib/routeGuard";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +18,9 @@ export const dynamic = "force-dynamic";
  * fresh from their history. Powers the Intelligence card on the
  * dashboard. All deterministic TypeScript; no LLM involved.
  */
-export async function GET(req: Request) {
+export const GET = withDbGuard(getAnalytics);
+
+async function getAnalytics(req: Request) {
   const limit = checkRateLimit(req, "analytics", 30, 60_000);
   if (!limit.allowed) {
     return NextResponse.json(
