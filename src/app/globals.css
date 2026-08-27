@@ -153,7 +153,7 @@ select.input-field{appearance:none;background-image:linear-gradient(45deg,transp
 
 .task-row{display:flex;align-items:center;gap:8px 10px;padding:11px 14px;border-radius:10px;background:var(--row-bg);border:1px solid transparent;margin-bottom:6px;transition:background .15s ease,border-color .15s ease;flex-wrap:wrap}
 .task-main{flex:1 1 220px;min-width:0}
-.task-row > .btn,.task-row > .chip{flex-shrink:0;flex-grow:0;white-space:nowrap;align-self:center}
+.task-row > .chip,.task-row-actions > .btn{flex-shrink:0;flex-grow:0;white-space:nowrap;align-self:center}
 .task-row:hover{background:var(--row-hover);border-color:var(--glass-border)}
 .task-row.done{opacity:.55}
 .task-row.done .task-title{text-decoration:line-through}
@@ -520,7 +520,7 @@ body.theme-dark .tracker-bar,body.theme-obsidian .tracker-bar,body.theme-nebula 
   .cal-cell{min-height:62px;padding:5px}
   .timer-ring-wrap{width:220px;height:220px}
   .task-row{flex-wrap:wrap;align-items:center}
-  .task-row > .btn,.task-row > .chip{flex-shrink:0;flex-grow:0}
+  .task-row > .chip,.task-row-actions > .btn{flex-shrink:0;flex-grow:0}
   textarea.input-field{resize:vertical;min-height:86px}
 }
 @media(max-width:640px){
@@ -549,7 +549,7 @@ body.theme-dark .tracker-bar,body.theme-obsidian .tracker-bar,body.theme-nebula 
   .task-row .task-title{font-size:.84rem;line-height:1.35}
   .task-row .task-sub{font-size:.68rem;line-height:1.5;margin-top:3px}
   .task-row > .chip{order:1;font-size:.58rem;padding:3px 8px;margin-right:auto}
-  .task-row > .btn{order:2;flex:0 0 auto;white-space:nowrap;padding:7px 11px;font-size:.7rem;min-height:30px}
+  .task-row-actions > .btn{flex:0 0 auto;white-space:nowrap;padding:7px 11px;font-size:.7rem;min-height:30px}
   .vtabs{width:100%;display:grid;grid-template-columns:repeat(3,1fr)}
   .vtab{text-align:center;padding:8px 6px}
   .page-header > .flex-row{width:100%}
@@ -584,7 +584,7 @@ body.theme-dark .tracker-bar,body.theme-obsidian .tracker-bar,body.theme-nebula 
   /* Narrow phones & enlarged system fonts: let long button labels wrap
      instead of overflowing or being cut off, while compact row controls stay one line. */
   .btn:not(.btn-xs):not(.btn-sm){white-space:normal}
-  .task-row > .btn,.btn-xs,.btn-sm{white-space:nowrap}
+  .task-row-actions > .btn,.btn-xs,.btn-sm{white-space:nowrap}
   /* Wizard selects: tighten padding/font so long option labels fit. */
   .ob-field input,.ob-field select{padding:11px 10px;font-size:.82rem}
   .ob-field label{letter-spacing:.4px}
@@ -1190,7 +1190,7 @@ img,svg,video,canvas{max-width:100%;height:auto}
   .kpi-card{padding:14px}
   .day-block{padding:12px 11px;margin-bottom:10px}
   .task-row{padding:11px 10px}
-  .task-row > .btn{padding:6px 9px;font-size:.67rem}
+  .task-row-actions > .btn{padding:6px 9px;font-size:.67rem}
   .cal-grid{gap:3px}
   .cal-cell{min-height:44px;padding:3px;border-radius:var(--radius-sm)}
   .cal-cell .cal-num{font-size:.68rem}
@@ -1732,7 +1732,7 @@ body.mode-focused .pulse-dot.live::after{animation:none;transition:none}
 /* Task action rows on phones: consistent order & spacing */
 @media(max-width:640px){
   .task-row > .chip{order:1;margin-right:auto}
-  .task-row > .btn{order:2}
+  .task-row-actions{order:2}
   .task-row .task-sub{display:flex;flex-wrap:wrap;gap:2px 6px;align-items:center}
 }
 
@@ -1888,10 +1888,10 @@ body.mode-focused::before{animation:none;opacity:.4}
 @media(max-width:640px){
   /* Task cards: ONE action row — Done (primary), Clock in, then "..."
      which reveals Edit / Skip subject / Skip on tap */
-  .task-row > .btn,.task-row > .chip{display:none}
+  .task-row-actions > .btn,.task-row > .chip{display:none}
   .task-row > .chip.chip-kind{display:inline-flex}
-  .task-row > .btn.task-primary,.task-row > .btn.task-clock,.task-row > .btn.task-more{display:inline-flex}
-  .task-row.expanded-actions > .btn{display:inline-flex}
+  .task-row-actions > .btn.task-primary,.task-row-actions > .btn.task-clock,.task-row-actions > .btn.task-more{display:inline-flex}
+  .task-row.expanded-actions .task-row-actions > .btn{display:inline-flex}
   .task-row.expanded-actions > .chip{display:inline-flex}
   /* PENDING chip hidden on phones — the card state already says it */
   .task-row > .chip.chip-pending{display:none !important}
@@ -1907,7 +1907,7 @@ body.mode-focused::before{animation:none;opacity:.4}
 /* The "..." more button: ONLY visible on mobile (<640px), hidden on desktop */
 .task-more{display:none !important;font-weight:800;letter-spacing:1px}
 @media(max-width:640px){
-  .task-row > .btn.task-more{display:inline-flex !important}
+  .task-row-actions > .btn.task-more{display:inline-flex !important}
 }
 
 /* Softer light canvas: barely-warm porcelain, calmer than pure grey */
@@ -1965,8 +1965,8 @@ body.mode-focused::before{animation:none;opacity:.4}
 }
 .modal-box .task-row{flex-wrap:wrap;row-gap:8px;overflow:hidden}
 .modal-box .task-main{flex:1 1 100%;min-width:0}
-.modal-box .task-row > .btn,.modal-box .task-row > .chip{flex:0 0 auto}
-.modal-box .task-row > .btn:last-of-type{margin-right:0}
+.modal-box .task-row-actions > .btn,.modal-box .task-row > .chip{flex:0 0 auto}
+.modal-box .task-row-actions > .btn:last-of-type{margin-right:0}
 
 /* Calendar grid: premium pass */
 .cal-cell{position:relative;transition:background .18s ease,border-color .18s ease,box-shadow .22s ease}
@@ -2061,7 +2061,7 @@ body.mode-focused::before{animation:none;opacity:.4}
   .task-row{padding:11px 12px;margin-bottom:5px}
   .task-row .task-title{font-size:.8rem;line-height:1.3}
   .task-row .task-sub{font-size:.64rem}
-  .task-row > .btn{padding:5px 10px;font-size:.66rem;min-height:28px}
+  .task-row-actions > .btn{padding:5px 10px;font-size:.66rem;min-height:28px}
   .tracker-bar{padding:10px 12px;margin-bottom:14px}
   .tracker-bar .mono{font-size:.95rem}
   .page-header{margin-bottom:12px}
@@ -2765,8 +2765,8 @@ button,a,.nav-item,.vtab,.cal-cell,.chip,.task-row,.rate-btn,input,select{touch-
 
 /* ── Comfortable task-row clock buttons on touch screens ── */
 @media(max-width:640px){
-  .task-row > .btn.task-clock{min-height:32px}
-  .task-row > .btn.task-clock.clock-live{font-weight:800}
+  .task-row-actions > .btn.task-clock{min-height:32px}
+  .task-row-actions > .btn.task-clock.clock-live{font-weight:800}
 }
 
 /* ════════════════════════════════════════════════════════════════
@@ -3552,10 +3552,10 @@ body.theme-dark .pulse-dot.live,body.theme-obsidian .pulse-dot.live,body.theme-n
 @media (hover:none) and (pointer:coarse){
   .btn,.btn-sm,.btn-xs,.ob-btn,.rate-btn,.vtab,.ai-quick button,
   .ob-range-chip,.cmdk-item,.ob-level-btn,.ob-choice-btn,
-  .task-row > .btn,.ob-course-item{min-height:var(--tap)}
+  .task-row-actions > .btn,.ob-course-item{min-height:var(--tap)}
   /* In desktop mode on touch phones/tablets (>640px), keep task row action buttons compact, centered and cleanly aligned */
   @media (min-width:641px){
-    .task-row > .btn{
+    .task-row-actions > .btn{
       min-height:32px !important;
       padding:5px 12px !important;
       font-size:.74rem !important;
@@ -4558,7 +4558,7 @@ body.theme-mint,body.theme-sunset,body.theme-silver-lavender,body.theme-default{
 /* Task rows: one gutter rhythm everywhere (only the modal used to get one),
    and the Done CTA always owns the right edge. */
 .task-row{row-gap:var(--sp-1)}
-.task-row > .task-primary{margin-inline-start:auto}
+.task-row-actions > .task-primary{margin-inline-start:auto}
 .modal-box .task-row{row-gap:8px}
 /* Segmented control + day heads: predictable, not hand-tuned. */
 @media(min-width:641px){.vtabs{width:fit-content;max-width:100%}}
@@ -5462,4 +5462,137 @@ body.mode-young .section-title::after{width:46px;height:3px;bottom:-8px}
   .focus-eyebrow-mark,.clock-state-chip--running .clock-state-dot{box-shadow:none}
   .sound-option{transition:none}
   .timer-ring-wrap{filter:none}
+}
+
+
+/* ════════════════════════════════════════════════════════════════
+   v15 — ALIGNMENT & LEGIBILITY + LIQUID-OS DEEPENING
+   Design document: docs/design/v15-ui-ux-alignment-and-legibility.md
+   Appended last, so it wins equal-specificity conflicts over every
+   layer above (v12/v13/v14 convention). Two jobs:
+     · Legibility — the tracker bar and task lists stop reading as
+       mashed-together fragments and read as normal sentences.
+     · Liquid OS — the tracker body becomes real translucent glass,
+       the live session earns a rotating rim-light, task rows get a
+       glass gloss, and the focus ring gains a slow conic halo.
+   No feature/data/copy changes. The only edits above this block are
+   the `.task-row > .btn` → `.task-row-actions > .btn` selector
+   migrations required by the new Planner row wrapper.
+════════════════════════════════════════════════════════════════ */
+
+/* ── Tracker bar · tier-2 glass body (same recipe as .toast) ────── */
+.tracker-bar{
+  background-color:transparent;
+  background-image:linear-gradient(172deg,
+    color-mix(in srgb,var(--surface-elevated) 93%,transparent) 0%,
+    color-mix(in srgb,var(--surface-elevated) 86%,transparent) 100%);
+  background-repeat:no-repeat;
+  -webkit-backdrop-filter:blur(22px) saturate(170%);
+  backdrop-filter:blur(22px) saturate(170%);
+}
+@media (hover:none) and (pointer:coarse), (max-width:820px){
+  .tracker-bar{-webkit-backdrop-filter:blur(14px) saturate(160%);backdrop-filter:blur(14px) saturate(160%)}
+}
+
+/* ── Tracker bar · identity + time cluster left, actions flush
+      right — no more space-between dead gutter ──────────────────── */
+@media(min-width:641px){
+  .tracker-bar{justify-content:flex-start;flex-wrap:nowrap;border-radius:var(--radius-xl)}
+  .tracker-labels{flex:0 1 auto;flex-direction:row;align-items:baseline;gap:7px}
+  .tracker-task::before{content:"· ";color:var(--text-dim)}
+  .tracker-actions{margin-left:auto}
+  /* One authoritative time: crisp tabular digits, softer glow */
+  .tracker-bar .tracker-time{
+    font-size:clamp(1.05rem,.9rem + .6vw,1.3rem);
+    font-variant-numeric:tabular-nums;
+    text-shadow:0 0 14px var(--accent-glow);
+  }
+}
+@media(max-width:640px){
+  .tracker-bar{border-radius:var(--radius-lg)}
+}
+
+/* ── Tracker bar · chips are captions now, not buttons ──────────── */
+.tracker-actions .chip{
+  text-transform:none;letter-spacing:.1px;
+  font-size:var(--fs-micro);font-weight:650;
+  background:color-mix(in srgb,var(--surface) 58%,transparent);
+  border-color:var(--glass-border);color:var(--text-muted);
+}
+.tracker-actions .chip.chip-kind{color:var(--accent)}
+
+/* ── Tracker bar · live rim-light while clocked in ──────────────── */
+@supports (mask-composite:exclude){
+  body.focus-live .tracker-bar::after{
+    inset:0;opacity:.85;padding:1.5px;
+    background:conic-gradient(from var(--lg-angle),
+      transparent 0deg,
+      color-mix(in srgb,var(--success-accent) 75%,transparent) 55deg,
+      color-mix(in srgb,var(--accent) 70%,transparent) 110deg,
+      transparent 190deg,transparent 360deg);
+    -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+    mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+    -webkit-mask-composite:xor;mask-composite:exclude;
+    animation:lgBeam 6s linear infinite;
+  }
+}
+
+/* ── Task rows · one actions gutter, right-aligned, wraps as a block ── */
+.task-row-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+@media(min-width:641px){
+  .task-row{flex-wrap:nowrap}
+  .task-row-actions{justify-content:flex-end;margin-inline-start:auto}
+}
+@media(max-width:640px){
+  .task-row-actions{order:2;flex:1 1 auto;justify-content:flex-end}
+}
+
+/* ── Task rows · quiet glass gloss + live rim ───────────────────── */
+.task-row{box-shadow:inset 0 1px 0 var(--lg-rim-faint)}
+.task-row.active-clock{
+  box-shadow:inset 0 1px 0 var(--lg-rim-faint),
+    inset 0 0 0 1px color-mix(in srgb,var(--success-accent) 26%,transparent);
+}
+@media(hover:hover) and (pointer:fine){
+  .task-row{transition:border-color .18s ease,box-shadow .18s ease,transform .18s var(--spring-soft),background .18s ease}
+  .task-row:hover{
+    border-color:color-mix(in srgb,var(--glass-border-hover) 88%,transparent);
+    box-shadow:inset 0 1px 0 var(--lg-rim),0 2px 8px color-mix(in srgb,var(--text-main) 8%,transparent);
+    transform:translateY(-1px);
+  }
+}
+
+/* ── Dashboard list · the absolute dot anchors to its own row ───── */
+.task-row.clean-list{
+  position:relative;
+  box-shadow:inset 0 1px 0 var(--lg-rim-faint),var(--shadow-sm);
+}
+
+/* ── Focus studio · normal-sentence label + liquid ring halo ────── */
+#t-label{text-transform:none;letter-spacing:.02em}
+.timer-stage{position:relative}
+.timer-stage::before{
+  content:"";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  width:min(64vw,300px);height:min(64vw,300px);border-radius:50%;
+  background:conic-gradient(from var(--lg-angle),transparent,
+    color-mix(in srgb,var(--accent) 50%,transparent) 90deg,transparent 210deg);
+  filter:blur(28px);opacity:.45;pointer-events:none;z-index:0;
+  animation:lgBeam 9s linear infinite;
+}
+
+/* ── Guards · mirror v14's reduced-motion / transparency / forced-colors ── */
+@media (prefers-reduced-motion: reduce){
+  body.focus-live .tracker-bar::after{animation:none}
+  .timer-stage::before{animation:none}
+}
+@media (prefers-reduced-transparency: reduce){
+  .tracker-bar{
+    background-color:var(--surface-elevated);background-image:none;
+    -webkit-backdrop-filter:none;backdrop-filter:none;
+  }
+  .timer-stage::before{display:none}
+}
+@media (forced-colors: active){
+  body.focus-live .tracker-bar::after{display:none}
+  .timer-stage::before{display:none}
 }

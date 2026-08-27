@@ -24,3 +24,6 @@ Thumbs.db
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# local UI preview scaffold (copied build css)
+preview/
