@@ -127,29 +127,31 @@ export default function PlannerView({
             </div>
           </div>
           <span className={`chip chip-${task.status}`}>{task.status}</span>
-          <button className="btn btn-xs btn-secondary" onClick={() => setEditingTaskId(task.id)}>Edit</button>
-          {subj && task.status !== "skipped" && (
-            <button className="btn btn-xs btn-secondary" title="Skip all tasks for this subject today"
-              onClick={() => onSkipSubject(subj.id, task.date)}>Skip subject</button>
-          )}
-          <TaskClockButton taskId={task.id} activeTaskId={activeTaskId} sessionActive={clockSessionActive}
-            onFocusTask={onFocusTask} onClockOut={onClockOut} />
-          <button className="btn btn-xs btn-secondary task-more" aria-label="More actions"
-            onClick={() => setMoreActionsId(moreActionsId === task.id ? null : task.id)}>⋯</button>
-          <button className={`btn btn-xs task-primary ${task.status === "done" ? "btn-secondary" : "btn-primary"}`}
-            onClick={() => {
-              if (task.status === "done") { onTaskStatus(task.id, "pending"); return; }
-              // Recall/revision tasks ask for a memory rating — that one tap
-              // trains the spaced-repetition model that schedules reviews.
-              if (task.kind === "revise" && task.topicId) { setRatingTaskId(ratingTaskId === task.id ? null : task.id); return; }
-              onTaskStatus(task.id, "done");
-            }}>
-            {task.status === "done" ? "Undo" : "Done"}
-          </button>
-          {task.status !== "skipped" && task.status !== "done" && (
-            <button className="btn btn-xs btn-secondary" title="Skip"
-              onClick={() => onTaskStatus(task.id, "skipped")}>Skip</button>
-          )}
+          <div className="task-row-actions">
+            <button className="btn btn-xs btn-secondary" onClick={() => setEditingTaskId(task.id)}>Edit</button>
+            {subj && task.status !== "skipped" && (
+              <button className="btn btn-xs btn-secondary" title="Skip all tasks for this subject today"
+                onClick={() => onSkipSubject(subj.id, task.date)}>Skip subject</button>
+            )}
+            <TaskClockButton taskId={task.id} activeTaskId={activeTaskId} sessionActive={clockSessionActive}
+              onFocusTask={onFocusTask} onClockOut={onClockOut} />
+            <button className="btn btn-xs btn-secondary task-more" aria-label="More actions"
+              onClick={() => setMoreActionsId(moreActionsId === task.id ? null : task.id)}>⋯</button>
+            <button className={`btn btn-xs task-primary ${task.status === "done" ? "btn-secondary" : "btn-primary"}`}
+              onClick={() => {
+                if (task.status === "done") { onTaskStatus(task.id, "pending"); return; }
+                // Recall/revision tasks ask for a memory rating — that one tap
+                // trains the spaced-repetition model that schedules reviews.
+                if (task.kind === "revise" && task.topicId) { setRatingTaskId(ratingTaskId === task.id ? null : task.id); return; }
+                onTaskStatus(task.id, "done");
+              }}>
+              {task.status === "done" ? "Undo" : "Done"}
+            </button>
+            {task.status !== "skipped" && task.status !== "done" && (
+              <button className="btn btn-xs btn-secondary" title="Skip"
+                onClick={() => onTaskStatus(task.id, "skipped")}>Skip</button>
+            )}
+          </div>
         </div>
         {ratingTaskId === task.id && task.status !== "done" && (
           <div className="rating-strip glass-panel slide-in">
