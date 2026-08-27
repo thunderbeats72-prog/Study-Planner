@@ -172,7 +172,7 @@ export default function Dashboard({
     <div className="fade-in">
       <div className="page-header">
         <div>
-          <h1 className="page-title">Hey {state.user.name}</h1>
+          <h1 className="page-title gradient-text">Hey {state.user.name}</h1>
           <p className="page-subtitle">
             {ctx.daysLeft} days to {prettyLong(state.settings.examDate)} · {state.user.courseName}
           </p>
@@ -458,7 +458,7 @@ export default function Dashboard({
           const meta = KIND_META[task.kind] || KIND_META.learn;
           const subj = state.subjects.find((s) => s.id === task.subjectId);
           return (
-            <div key={task.id} className={`task-row${task.status === "done" ? " done" : ""}${activeTaskId === task.id ? " active-clock" : ""}${moreActionsId === task.id ? " expanded-actions" : ""}`}>
+            <div key={task.id} className={`task-row clean-list${task.status === "done" ? " done" : ""}${activeTaskId === task.id ? " active-clock" : ""}${moreActionsId === task.id ? " expanded-actions" : ""}`}>
               <div className="task-dot" style={{ background: subj?.color || meta.color }} />
               <div className="task-main">
                 <div className="task-title">{task.title}</div>
@@ -467,6 +467,7 @@ export default function Dashboard({
                   {activeTaskId === task.id && activeClockSeconds ? ` · live +${Math.floor(activeClockSeconds / 60)}m ${activeClockSeconds % 60}s` : ""}
                 </div>
               </div>
+              <div className="task-row-actions">
               <button className="btn btn-xs btn-secondary" onClick={() => setEditingTaskId(task.id)}>Edit</button>
               {subj && task.status !== "skipped" && (
                 <button className="btn btn-xs btn-secondary" onClick={() => onSkipSubject(subj.id, task.date)}>Skip subject</button>
@@ -483,6 +484,7 @@ export default function Dashboard({
                 <button className="btn btn-xs btn-secondary" title="Skip"
                   onClick={() => onTaskStatus(task.id, "skipped")}>Skip</button>
               )}
+              </div>
             </div>
           );
         })}

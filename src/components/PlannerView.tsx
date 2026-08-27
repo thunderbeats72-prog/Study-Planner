@@ -95,7 +95,7 @@ export default function PlannerView({
     const open = canExpandLessonBrief && expanded === task.id;
     return (
       <div key={task.id}>
-        <div className={`task-row${task.status === "done" ? " done" : ""}${activeTaskId === task.id ? " active-clock" : ""}${moreActionsId === task.id ? " expanded-actions" : ""}`}>
+        <div className={`task-row clean-list${task.status === "done" ? " done" : ""}${activeTaskId === task.id ? " active-clock" : ""}${moreActionsId === task.id ? " expanded-actions" : ""}`}>
           <div className="task-dot" style={{ background: subj?.color || meta.color }} />
           <div className={`task-main${canExpandLessonBrief ? " is-expandable" : ""}`}
             role={canExpandLessonBrief ? "button" : undefined}
@@ -139,8 +139,6 @@ export default function PlannerView({
           <button className={`btn btn-xs task-primary ${task.status === "done" ? "btn-secondary" : "btn-primary"}`}
             onClick={() => {
               if (task.status === "done") { onTaskStatus(task.id, "pending"); return; }
-              // Recall/revision tasks ask for a memory rating — that one tap
-              // trains the spaced-repetition model that schedules reviews.
               if (task.kind === "revise" && task.topicId) { setRatingTaskId(ratingTaskId === task.id ? null : task.id); return; }
               onTaskStatus(task.id, "done");
             }}>
@@ -234,7 +232,7 @@ export default function PlannerView({
     <div className="fade-in">
       <div className="page-header">
         <div>
-          <h1 className="page-title">Study Planner</h1>
+          <h1 className="page-title gradient-text">Study Planner</h1>
           <p className="page-subtitle">
             Lesson-wise adaptive schedule · {state.tasks.length} tasks · {state.topics.length} lessons mapped
           </p>
