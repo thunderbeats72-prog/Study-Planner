@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { subjects, tasks, topics } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
-import { buildContext, dateFrom, fullState, getOrCreateUser, keyFrom } from "@/lib/state";
-import { fsrsInit, fsrsReview, masteryDelta, type ReviewRating } from "@/lib/ml";
+import { applyCompletionMastery, buildContext, dateFrom, fullState, getOrCreateUser, keyFrom } from "@/lib/state";
+import type { ReviewRating } from "@/lib/ml";
 import {
   enumValue, finiteNumber, isoDate, positiveId, readJsonObject,
   textValue, validationPayload,
@@ -133,40 +133,14 @@ async function patchTasks(req: Request) {
 
     const topicId = updated?.topicId;
     if (!topicId) return;
-    const topic = (await tx
-      .select()
-      .from(topics)
-      .where(and(eq(topics.id, topicId), eq(topics.userId, user.id)))
-      .limit(1))[0];
-    if (!topic) return;
 
     // Apply mastery once per pending/skipped -> done transition. Network
     // retries or repeated Done taps can no longer inflate mastery repeatedly.
+    // The same bookkeeping powers the study clock's time-based auto-complete
+    // (POST /api/sessions), so both paths share one implementation.
     const becameDone = nextStatus === "done" && previous.status !== "done";
     if (becameDone) {
-      const gain = updated.kind === "learn" ? 55 : 20;
-      const topicPatch: Record<string, unknown> = {
-        mastery: Math.min(100, topic.mastery + gain),
-        status: updated.kind === "learn" ? "done" : topic.status,
-      };
-      if (rating) {
-        const today = dateFrom(req);
-        const elapsed = topic.lastReview
-          ? Math.max(0, Math.round((Date.parse(today) - Date.parse(topic.lastReview)) / 86_400_000))
-          : 0;
-        const next = topic.stability > 0
-          ? fsrsReview(topic.stability, topic.difficulty, elapsed, rating)
-          : { stability: fsrsInit(rating, topic.difficulty), intervalDays: 0 };
-        topicPatch.stability = next.stability;
-        topicPatch.lastReview = today;
-        topicPatch.mastery = rating === 1
-          ? Math.max(0, topic.mastery + masteryDelta(rating))
-          : Math.min(100, topic.mastery + gain + masteryDelta(rating));
-      }
-      await tx
-        .update(topics)
-        .set(topicPatch)
-        .where(and(eq(topics.id, topicId), eq(topics.userId, user.id)));
+      await applyCompletionMastery(tx, updated, dateFrom(req), rating);
     } else if (nextStatus === "pending" && previous.status !== "pending" && updated.kind === "learn") {
       await tx
         .update(topics)

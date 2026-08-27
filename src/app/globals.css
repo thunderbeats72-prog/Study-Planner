@@ -5596,3 +5596,93 @@ body.mode-young .section-title::after{width:46px;height:3px;bottom:-8px}
   body.focus-live .tracker-bar::after{display:none}
   .timer-stage::before{display:none}
 }
+
+/* ════════════════════════════════════════════════════════════════
+   v16 — TRUE LIST VIEWS + POLISHED ROW CONTROLS + CALENDAR COLOR
+   (appended last so it wins the cascade over earlier sections)
+════════════════════════════════════════════════════════════════ */
+
+/* 1) Planner day blocks become proper lists: the glass panel keeps the
+      padding; the task rows inside are edge-to-edge rows separated by
+      hairlines instead of individual floating cards. */
+.planner-days .day-block{padding:0;overflow:hidden}
+.planner-days .day-block > .day-head{
+  padding:var(--sp-3) var(--sp-3) 12px;
+  margin-bottom:0;
+  border-bottom:1px solid var(--glass-border);
+}
+.planner-days .task-row{
+  padding:11px var(--sp-3);
+  margin:0;
+  border-radius:0;
+  background:transparent;
+  border:1px solid transparent;
+  border-bottom:1px solid var(--glass-border);
+  box-shadow:none;
+  gap:12px;
+}
+.planner-days .task-row.last-row{border-bottom:none}
+.planner-days .task-row:hover{background:var(--row-hover);border-color:transparent;transform:none;box-shadow:none}
+.planner-days .task-row.active-clock,.planner-days .task-row.active-clock:hover{border-color:var(--success-accent);border-bottom-color:var(--success-accent)}
+.planner-days .rating-strip,.planner-days .planner-lesson-brief{margin:8px var(--sp-3)}
+@media(min-width:641px){
+  .planner-days .task-row{flex-wrap:nowrap}
+}
+
+/* 2) Dashboard "Today's Study Load" — same list language (was a stack of
+      bordered cards with a dashed divider). */
+.task-row.clean-list{
+  flex-direction:row;align-items:center;gap:12px;
+  padding:12px var(--sp-4);
+  border-radius:0;
+  background:transparent;
+  border:1px solid transparent;
+  border-bottom:1px solid var(--glass-border);
+  box-shadow:none;
+  transition:background .15s ease;
+}
+.task-row.clean-list:hover{background:var(--row-hover);border-color:transparent;transform:none;box-shadow:none}
+.task-row.clean-list:last-child{border-bottom:none}
+.task-row.clean-list .task-main{flex:1 1 auto;width:auto;min-width:0;padding-left:0}
+.task-row.clean-list .task-dot{position:static;width:10px;height:10px;flex-shrink:0;align-self:center}
+.task-row.clean-list .task-row-actions{
+  display:flex;align-items:center;justify-content:flex-end;gap:6px;
+  padding-top:0;margin-top:0;border-top:none;flex-shrink:0;
+}
+.task-row.clean-list .task-row-actions > .task-primary{margin-inline-start:0}
+
+/* 3) One aligned, consistent row-control bar for every task row.
+      Buttons share a height, the clock button is a stable width so the
+      column of CTAs never jumps, and Done owns the right edge. */
+.task-row-actions{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.task-row-actions > .btn{min-height:30px;padding:4px 11px}
+.task-row-actions > .btn.task-clock{min-width:88px}
+.task-row-actions > .btn.task-primary{min-width:58px}
+.task-row-actions > .btn.task-more{width:32px;min-width:32px;padding:4px 0}
+
+/* 4) Mobile: one even, full-width action bar (Done · Clock · ⋯) with the
+      extras revealed by ⋯ wrapping into clean rows underneath. */
+@media(max-width:640px){
+  .task-row-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;width:100%;margin-left:0}
+  .task-row-actions > .btn{width:100%;min-width:0;padding:7px 6px}
+  .task-row-actions > .task-primary{order:-2}
+  .task-row-actions > .task-clock{order:-1}
+  .task-row-actions > .btn.task-more{width:100%;min-width:0}
+  .task-row.clean-list .task-row-actions{width:100%}
+}
+
+/* 5) Calendar: colour and topics at a glance — on phones the pills were
+      hidden entirely, leaving a plain number grid. Now every day with
+      tasks shows a soft tint of its first subject plus tiny coloured
+      topic pills, and the "+n more" hint stays readable. */
+.cal-cell.has-tasks{background:color-mix(in srgb,var(--cell-tint,var(--accent)) 9%,var(--row-bg))}
+.cal-cell.has-tasks:hover{background:color-mix(in srgb,var(--cell-tint,var(--accent)) 15%,var(--row-hover))}
+@media(max-width:640px){
+  .cal-cell{min-height:52px;padding:4px}
+  .cal-num{font-size:.66rem;margin-bottom:2px}
+  .cal-pill{display:block;font-size:.55rem;line-height:1.25;padding:1px 4px;margin-bottom:2px;border-radius:4px}
+  .cal-more{font-size:.55rem;margin-top:1px}
+}
+
+/* Zen linked-mode hint under the action buttons */
+.zen-hint{font-size:.8rem;color:rgba(255,255,255,.62);font-weight:550;max-width:46ch;text-align:center;margin-top:2px;line-height:1.5}

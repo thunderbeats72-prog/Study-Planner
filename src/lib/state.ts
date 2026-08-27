@@ -6,6 +6,10 @@ import { addDays, diffDays, todayStr } from "./planner";
 import type { TutorContext } from "./ai";
 import { advancedTopicMetadata } from "./curriculum";
 import { dateDistanceDays, isIsoDate } from "./validation";
+import { fsrsInit, fsrsReview, masteryDelta, type ReviewRating } from "./ml";
+
+/** Transaction handle type as produced by `db.transaction(cb)`. */
+export type DbTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 const USER_KEY_RE = /^u_[A-Za-z0-9_-]{12,120}$/;
 
@@ -257,6 +261,51 @@ export async function recomputeStreak(userId: number, asOf = todayStr()) {
   const lastStudyDate = [...days].sort().at(-1) || null;
   await db.update(users).set({ streak, lastStudyDate }).where(eq(users.id, userId));
   return streak;
+}
+
+/**
+ * Shared "task became done" bookkeeping: apply the mastery gain (and, when a
+ * memory rating is supplied, the FSRS-lite stability update) to the task's
+ * linked topic. Used both by the manual Done flow (PATCH /api/tasks) and by
+ * the study clock's time-based auto-completion (POST /api/sessions), so the
+ * two paths never drift apart.
+ */
+export async function applyCompletionMastery(
+  tx: DbTx,
+  updated: { id: number; userId: number; topicId: number | null; kind: string },
+  today: string,
+  rating: ReviewRating | 0 = 0
+): Promise<void> {
+  if (!updated.topicId) return;
+  const topic = (await tx
+    .select()
+    .from(topics)
+    .where(and(eq(topics.id, updated.topicId), eq(topics.userId, updated.userId)))
+    .limit(1))[0];
+  if (!topic) return;
+
+  const gain = updated.kind === "learn" ? 55 : 20;
+  const topicPatch: Record<string, unknown> = {
+    mastery: Math.min(100, topic.mastery + gain),
+    status: updated.kind === "learn" ? "done" : topic.status,
+  };
+  if (rating) {
+    const elapsed = topic.lastReview
+      ? Math.max(0, Math.round((Date.parse(today) - Date.parse(topic.lastReview)) / 86_400_000))
+      : 0;
+    const next = topic.stability > 0
+      ? fsrsReview(topic.stability, topic.difficulty, elapsed, rating)
+      : { stability: fsrsInit(rating, topic.difficulty), intervalDays: 0 };
+    topicPatch.stability = next.stability;
+    topicPatch.lastReview = today;
+    topicPatch.mastery = rating === 1
+      ? Math.max(0, topic.mastery + masteryDelta(rating))
+      : Math.min(100, topic.mastery + gain + masteryDelta(rating));
+  }
+  await tx
+    .update(topics)
+    .set(topicPatch)
+    .where(and(eq(topics.id, topic.id), eq(topics.userId, topic.userId)));
 }
 
 export async function clearPlan(userId: number) {

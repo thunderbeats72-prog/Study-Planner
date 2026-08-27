@@ -32,6 +32,81 @@ The following changes were made and merged. Do NOT redo them — just verify the
 
 ---
 
+## v16 — UI POLISH: TRUE LISTS, ALIGNED BUTTONS, CALENDAR COLOUR, FOCUS+CLOCK LINK (this session)
+
+Four UX gaps were fixed together:
+
+1. **List view is a list again** — `src/app/globals.css` (appended "v16" section):
+   - Planner day blocks: `.planner-days .day-block` padding moved to the day
+     head; `.planner-days .task-row` rows are edge-to-edge with hairline
+     separators (`last-row` class removes the final divider — set from
+     `PlannerView.tsx` via `renderTask(task, { lastRow })`).
+   - Dashboard "Today's Study Load": `.task-row.clean-list` is horizontal
+     again (was a stack of bordered cards with a dashed divider).
+2. **Aligned row controls** — `.task-row-actions` uniform 30px buttons, fixed
+   clock-button width (`min-width:88px`), Done pinned right; on ≤640px the
+   action bar is a 3-column grid (Done · Clock · ⋯) with `order:-2/-1` and
+   expanded actions wrapping below.
+3. **Calendar colour** — `PlannerView.tsx` sets `--cell-tint` per cell from
+   the first task's subject colour; CSS tints `.cal-cell.has-tasks`; the
+   ≤640px rule that hid `.cal-pill` is overridden so phones show coloured
+   topic pills too.
+4. **Focus ↔ clock link** — `FocusView.tsx` `toggleTimerLinked()`: starting a
+   focus block also starts the study clock (attaches the first pending task
+   of the day), breaks never touch the clock, new `onClockLink` prop surfaces
+   a toast. `page.tsx` Zen mode: primary button is now "Start Focus + Clock"
+   (`startFocusWithClock`), with the redundant standalone Clock In removed
+   and a `.zen-hint` explaining the combined action.
+5. **Branded favicon** — new `src/app/icon.svg` (gradient tile + layered
+   chevrons matching `IconLogo`); Next.js serves it as the tab icon.
+
+Files changed:
+```
+src/app/globals.css            ← appended v16 section (list rows, buttons, calendar, zen hint)
+src/components/PlannerView.tsx ← last-row flag + calendar --cell-tint
+src/components/Dashboard.tsx   ← (no change; .clean-list restyled via CSS)
+src/components/FocusView.tsx   ← toggleTimerLinked + onClockLink prop + copy
+src/app/page.tsx               ← startFocusWithClock, Zen restructure, onClockLink wiring
+src/app/icon.svg               ← NEW branded favicon
+README.txt                     ← v16 section
+```
+
+---
+
+## v15 — STUDY CLOCK AUTO-COMPLETE (merged in this session)
+
+Tasks are now marked **done automatically** the moment the minutes logged for
+them reach the planned time — no manual "Done" tap required (e.g. a 15-min
+recall studied for 28 min completes at the 15-min mark). This was the fix for:
+"the recall planned time was given 15min but I logged in for 28mins … if I have
+logged above 15 min it should be marked as complete and should notify me that
+this is done and after that it should come to next task."
+
+Where the logic lives:
+1. `src/lib/completion.ts` (NEW) — pure rule: `shouldAutoComplete(actual,
+   planned, status)` (pending + actual ≥ planned) and `nextPendingTask(tasks,
+   date, excludeId)` (the task the clock rolls into after a completion).
+2. `src/lib/state.ts` — `applyCompletionMastery(tx, updated, today, rating?)`
+   extracted from the tasks route (mastery gain + FSRS-lite update), now
+   shared by the manual Done flow and the auto-complete flow so they cannot
+   drift apart.
+3. `src/app/api/sessions/route.ts` — after summing session minutes and
+   updating `actualMinutes`, a pending task that has met its plan is flipped
+   to `done` via a conditional update (`where status = 'pending'`), so a
+   concurrent request can never double-apply mastery. The response includes
+   `completedTask: { id, title, plannedMinutes, actualMinutes } | null`.
+4. `src/app/page.tsx` — `drainSessionQueue` reads `completedTask`, shows a
+   success toast, and if the study clock is STILL running on that task calls
+   `clock.clockIn({ taskId: next.id })` to roll forward to the next pending
+   task so continued minutes are logged against the right lesson.
+
+Note for future sessions: auto-completion is generic (all task kinds, not just
+recalls), never re-marks done/skipped tasks, and works for queued offline
+session logs too. Tests live in `scripts/test-suite.ts` under
+"5b. Study-Clock Auto-Completion Rule".
+
+---
+
 ## IF SOMETHING NEEDS TO BE REDONE OR EXTENDED
 
 ### To add a new provider (e.g., Anthropic/Claude):
@@ -161,6 +236,7 @@ These run 100% on the server from your own logged data. Adding an AI key makes S
 
 ## FILES CHANGED IN THIS SESSION (for reference)
 
+Previous session:
 ```
 src/lib/ai.ts                    ← Main AI provider config + SHIGUN system prompt
 src/components/SettingsView.tsx  ← AI Connectivity section removed
@@ -168,4 +244,15 @@ src/components/ChatPanel.tsx     ← Cleaner SHIGUN interface
 src/components/icons.tsx         ← (unchanged)
 scripts/test-suite.ts            ← Test refs updated groq→cerebras
 .env.example                     ← Updated provider docs
+```
+
+v15 session (study-clock auto-complete):
+```
+src/lib/completion.ts            ← NEW: shouldAutoComplete + nextPendingTask rule
+src/lib/state.ts                 ← applyCompletionMastery shared helper
+src/app/api/sessions/route.ts    ← auto-complete on log + completedTask in response
+src/app/api/tasks/route.ts       ← reuses applyCompletionMastery (no behavior change)
+src/app/page.tsx                 ← toast + roll clock to next pending task
+scripts/test-suite.ts            ← "5b. Study-Clock Auto-Completion Rule" tests
+README.txt                       ← v15 section
 ```

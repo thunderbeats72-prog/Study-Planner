@@ -24,13 +24,15 @@ const MODES: { id: TimerMode; label: string }[] = [
 ];
 
 export default function FocusView({
-  state, timer, clock, onCompleteTask, onZen,
+  state, timer, clock, onCompleteTask, onZen, onClockLink,
 }: {
   state: AppState;
   timer: TimerApi;
   clock: ClockApi;
   onCompleteTask: (id: number) => void;
   onZen: () => void;
+  /** Called when the focus timer starts the study clock too (linked mode). */
+  onClockLink: (message: string) => void;
 }) {
   const [sound, setSound] = useState(() => currentSound());
   const [vol, setVol] = useState(0.3);
@@ -67,6 +69,32 @@ export default function FocusView({
     : timer.seconds < timer.total;
   const timerStateLabel = timer.running ? (timer.isBreak ? "BREAK" : "FOCUSED") : timerInProgress ? "PAUSED" : "READY";
   const selectedSoundLabel = SOUNDS.find((x) => x.id === sound)?.label || "Sound Off";
+
+  /**
+   * Linked start: one tap begins the focus block AND the study clock, so the
+   * learner never juggles two timers. Breaks are the exception — a short or
+   * long break is rest, so the clock keeps whatever state it was in.
+   */
+  const toggleTimerLinked = () => {
+    if (timer.running) { timer.pause(); return; }
+    if (timer.isBreak) { timer.start(); return; }
+    timer.start();
+    if (clock.onBreak) {
+      clock.endBreak();
+      onClockLink("Break ended — study clock resumed with your focus timer.");
+    } else if (!clock.sessionActive) {
+      const firstTask = state.tasks.find((x) => x.date === t && x.status === "pending")
+        || state.tasks.find((x) => x.date === t)
+        || null;
+      clock.clockIn({ taskId: firstTask?.id ?? null, subjectId: firstTask?.subjectId ?? null });
+      onClockLink(firstTask
+        ? `Study clock started on “${firstTask.title.slice(0, 40)}” — minutes are recorded.`
+        : "Study clock started — free session. Attach a task to track it.");
+    } else if (!clock.running) {
+      clock.resume();
+      onClockLink("Study clock resumed with your focus timer.");
+    }
+  };
 
   return (
     <div className="fade-in focus-view">
@@ -189,7 +217,7 @@ export default function FocusView({
 
           <div className="timer-mode-heading">
             <span>Choose a mode</span>
-            <span className="timer-mode-note">Clock runs independently</span>
+            <span className="timer-mode-note">Start Focus also starts the study clock · breaks don&apos;t</span>
           </div>
           <div className="mode-row" role="group" aria-label="Focus timer mode">
             {MODES.map((m) => (
@@ -231,13 +259,13 @@ export default function FocusView({
           </div>
 
           <div className="flex-row gap-md timer-controls">
-            <button className="btn btn-primary btn-lg" type="button" onClick={timer.toggle}>
+            <button className="btn btn-primary btn-lg" type="button" onClick={toggleTimerLinked}>
               {timer.running ? "Pause" : timer.isBreak ? "Start Break" : timerInProgress ? "Resume Focus" : "Start Focus"}
             </button>
             <button className="btn btn-secondary btn-lg" type="button" onClick={timer.reset}>Reset</button>
           </div>
           <p className="panel-lead timer-footnote">
-            This timer structures your session; it does <strong>not</strong> start or stop the study clock above.
+            Starting a focus block also starts the study clock, so your minutes are recorded. Breaks never touch the clock.
           </p>
         </section>
 

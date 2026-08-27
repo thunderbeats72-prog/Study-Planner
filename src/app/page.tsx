@@ -2,7 +2,8 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError, prettyLong, today, type AppState, type MessageRow } from "@/lib/client";
-import { mmss, useFocusTimer, useStudyClock, type TimerMode } from "@/lib/useTimer";
+import { mmss, useFocusTimer, useStudyClock, type ClockApi, type TimerMode } from "@/lib/useTimer";
+import { nextPendingTask, type CompletedTaskInfo } from "@/lib/completion";
 import Onboarding from "@/components/Onboarding";
 import Dashboard from "@/components/Dashboard";
 import PlannerView from "@/components/PlannerView";
@@ -45,6 +46,10 @@ type PendingSessionLog = {
   mode: string;
   date: string;
 };
+
+/** POST /api/sessions response — same full state, plus which task (if any)
+ *  the server auto-completed because its logged minutes met the plan. */
+type SessionLogResponse = AppState & { completedTask?: CompletedTaskInfo | null };
 
 const SIDEBAR_KEY = "spp-sidebar-collapsed";
 const SESSION_QUEUE_KEY = "spp-pending-session-logs";
@@ -93,6 +98,8 @@ export default function Home() {
   const sessionQueueRef = useRef<PendingSessionLog[] | null>(null);
   const sessionDrainRef = useRef(false);
   const lastSessionErrorRef = useRef(0);
+  const clockApiRef = useRef<ClockApi | null>(null);
+  const autoCompleteRef = useRef<(fresh: AppState, completed: CompletedTaskInfo, date: string) => void>(() => {});
   const [forceWizard, setForceWizard] = useState(false);
   const [confirmWipe, setConfirmWipe] = useState(false);
   useBackClose(confirmWipe, () => setConfirmWipe(false));
@@ -118,6 +125,36 @@ export default function Home() {
     toastTimer.current = setTimeout(() => setToast(null), 3400);
   }, []);
   useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current); }, []);
+
+  useEffect(() => {
+    // Auto-completion handler: the server just marked a task done because the
+    // logged minutes reached its planned time. Notify the learner, and if the
+    // study clock is STILL recording that task, roll it forward to the next
+    // pending task so the minutes they keep studying land on the right lesson.
+    autoCompleteRef.current = (fresh, completed, date) => {
+      const clockApi = clockApiRef.current;
+      const stillRecording = !!clockApi && clockApi.sessionActive && clockApi.running && clockApi.taskId === completed.id;
+      const next = nextPendingTask(fresh.tasks || [], date, completed.id);
+      haptic([10, 30, 18]);
+      if (stillRecording && next) {
+        clockApi.clockIn({ taskId: next.id, subjectId: next.subjectId ?? null });
+        notify(
+          `“${completed.title}” complete — ${completed.actualMinutes}m logged (≥ ${completed.plannedMinutes}m planned). Clocked into next: ${next.title.slice(0, 42)}`,
+          "success"
+        );
+      } else if (next) {
+        notify(
+          `“${completed.title}” complete — ${completed.actualMinutes}m logged (≥ ${completed.plannedMinutes}m planned). Next up: ${next.title.slice(0, 42)}`,
+          "success"
+        );
+      } else {
+        notify(
+          `“${completed.title}” complete — ${completed.actualMinutes}m logged (≥ ${completed.plannedMinutes}m planned). All of today's tasks done!`,
+          "success"
+        );
+      }
+    };
+  }, [notify]);
 
   const loadInitialState = useCallback(() => {
     setLoading(true);
@@ -432,7 +469,7 @@ export default function Home() {
       while (sessionQueueRef.current.length) {
         const entry = sessionQueueRef.current[0];
         try {
-          const fresh = await api<AppState>("/api/sessions", {
+          const fresh = await api<SessionLogResponse>("/api/sessions", {
             method: "POST",
             body: JSON.stringify(entry),
             timeoutMs: 25_000,
@@ -440,6 +477,9 @@ export default function Home() {
           sessionQueueRef.current.shift();
           persistSessionQueue();
           setState(fresh);
+          if (fresh.completedTask) {
+            autoCompleteRef.current(fresh, fresh.completedTask, entry.date);
+          }
         } catch {
           const now = Date.now();
           if (now - lastSessionErrorRef.current > 60_000) {
@@ -491,6 +531,9 @@ export default function Home() {
 
   // 1) The study clock — tracks actual studied time
   const clock = useStudyClock(logSession);
+  useEffect(() => {
+    clockApiRef.current = clock;
+  });
   useEffect(() => {
     document.body.classList.toggle("focus-live", clock.running);
   }, [clock.running]);
@@ -660,6 +703,24 @@ export default function Home() {
     else if (clock.onBreak || clock.elapsed > 0) { clock.resume(); notify("Resumed — back on the clock."); }
     else startSmartClock();
   };
+
+  // Linked focus start (used by Zen): one tap starts the focus timer AND the
+  // study clock, so entering Zen no longer means juggling two separate
+  // controls. Breaks keep the clock untouched (they are rest, not study).
+  const startFocusWithClock = useCallback(() => {
+    if (!timer.running) timer.start();
+    if (clock.onBreak) {
+      clock.endBreak();
+      notify("Break ended — study clock resumed with your focus timer.", "success");
+      return;
+    }
+    if (!clock.sessionActive) {
+      startSmartClock();
+    } else if (!clock.running) {
+      clock.resume();
+      notify("Study clock resumed with your focus timer.", "success");
+    }
+  }, [clock, notify, startSmartClock, timer]);
 
   const focusTask = (taskId: number) => {
     const task = state?.tasks.find((x) => x.id === taskId);
@@ -992,7 +1053,9 @@ export default function Home() {
               onAskTutor={askTutor} replanning={busy} onReplan={replan} />
           )}
           {page === "focus" && (
-            <FocusView state={state} timer={timer} clock={clock} onCompleteTask={(id) => setTaskStatus(id, "done")} onZen={() => setZen(true)} />
+            <FocusView state={state} timer={timer} clock={clock} onCompleteTask={(id) => setTaskStatus(id, "done")}
+              onZen={() => setZen(true)}
+              onClockLink={(msg) => notify(msg, "success")} />
           )}
           {page === "subjects" && (
             <SubjectsView state={state} onAdd={addSubject} onEdit={editSubject} onDelete={deleteSubject} busy={busy} onAskTutor={askTutor} />
@@ -1020,17 +1083,24 @@ export default function Home() {
             Study clock: {clock.running ? "recording" : clock.onBreak ? "on break" : clock.sessionActive ? "paused" : "not clocked in"} · {mmss(clock.elapsed)}
           </div>
           <div className="flex-row gap-md zen-actions">
-            <button className="btn btn-primary" onClick={timer.toggle}>{timer.running ? "Pause Focus" : "Start Focus"}</button>
-            {!clock.sessionActive
-              ? <button className="btn btn-secondary" onClick={startSmartClock}>Clock In</button>
-              : <>
-                  <button className="btn btn-secondary" onClick={pauseOrResume}>
-                    {clock.running ? "Pause Clock" : "Resume Clock"}
-                  </button>
-                  <button className="btn btn-danger" onClick={clockOutNow}>Clock Out</button>
-                </>}
+            <button className="btn btn-primary" onClick={() => (timer.running ? timer.pause() : startFocusWithClock())}>
+              {timer.running ? "Pause Focus" : "Start Focus + Clock"}
+            </button>
+            {clock.sessionActive && (
+              <>
+                <button className="btn btn-secondary" onClick={pauseOrResume}>
+                  {clock.running ? "Pause Clock" : "Resume Clock"}
+                </button>
+                <button className="btn btn-danger" onClick={clockOutNow}>Clock Out</button>
+              </>
+            )}
             <button className="btn btn-secondary" onClick={() => setZen(false)}>Exit Zen</button>
           </div>
+          {!timer.running && !clock.sessionActive && (
+            <p className="zen-hint">
+              “Start Focus + Clock” begins your focus timer and study clock together — one tap, no juggling.
+            </p>
+          )}
         </div>
       )}
 

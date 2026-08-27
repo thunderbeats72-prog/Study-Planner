@@ -10,7 +10,7 @@ import TaskClockButton from "./TaskClockButton";
 import { useBackClose } from "@/lib/useBackClose";
 
 type View = "list" | "calendar" | "kanban";
-type RenderTaskOptions = { showLessonBrief?: boolean };
+type RenderTaskOptions = { showLessonBrief?: boolean; lastRow?: boolean };
 
 export default function PlannerView({
   state, onTaskStatus, onTaskUpdate, onSkipSubject, onFocusTask, activeTaskId, activeClockSeconds,
@@ -95,7 +95,7 @@ export default function PlannerView({
     const open = canExpandLessonBrief && expanded === task.id;
     return (
       <div key={task.id}>
-        <div className={`task-row${task.status === "done" ? " done" : ""}${activeTaskId === task.id ? " active-clock" : ""}${moreActionsId === task.id ? " expanded-actions" : ""}`}>
+        <div className={`task-row${task.status === "done" ? " done" : ""}${activeTaskId === task.id ? " active-clock" : ""}${moreActionsId === task.id ? " expanded-actions" : ""}${options.lastRow ? " last-row" : ""}`}>
           <div className="task-dot" style={{ background: subj?.color || meta.color }} />
           <div className={`task-main${canExpandLessonBrief ? " is-expandable" : ""}`}
             role={canExpandLessonBrief ? "button" : undefined}
@@ -310,7 +310,7 @@ export default function PlannerView({
                     <div className="bar-fill" style={{ width: `${list.length ? (done / list.length) * 100 : 0}%` }} />
                   </div>
                 </div>
-                {list.map((task) => renderTask(task))}
+                {list.map((task, index) => renderTask(task, { lastRow: index === list.length - 1 }))}
               </div>
             );
           })}
@@ -334,8 +334,15 @@ export default function PlannerView({
             {cells.map((d, i) => {
               if (!d) return <div className="cal-cell empty" key={`e${i}`} />;
               const list = dayTasks(d);
+              // Soft per-day tint from the first task's subject colour, so a
+              // glance at the month shows where the load is — on phones too.
+              const tint = list.length
+                ? subjFor(list[0])?.color || (KIND_META[list[0].kind] || KIND_META.learn).color
+                : null;
               return (
-                <div key={d} className={`cal-cell${d === t ? " today" : ""}`} onClick={() => list.length && setOpenDay(d)}>
+                <div key={d} className={`cal-cell${d === t ? " today" : ""}${list.length ? " has-tasks" : ""}`}
+                  style={tint ? ({ "--cell-tint": tint } as React.CSSProperties) : undefined}
+                  onClick={() => list.length && setOpenDay(d)}>
                   <div className="cal-num">{parseDate(d).getDate()}</div>
                   {list.slice(0, 3).map((task) => {
                     const c = subjFor(task)?.color || (KIND_META[task.kind] || KIND_META.learn).color;

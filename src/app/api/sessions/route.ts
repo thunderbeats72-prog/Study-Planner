@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { sessions, subjects, tasks } from "@/db/schema";
 import { and, eq, sql } from "drizzle-orm";
-import { buildContext, dateFrom, fullState, getOrCreateUser, keyFrom, recomputeStreak } from "@/lib/state";
+import { applyCompletionMastery, buildContext, dateFrom, fullState, getOrCreateUser, keyFrom, recomputeStreak } from "@/lib/state";
 import { withDbGuard } from "@/lib/routeGuard";
+import { shouldAutoComplete, type CompletedTaskInfo } from "@/lib/completion";
 import {
   dateDistanceDays, enumValue, finiteNumber, isIsoDate, positiveId,
   readJsonObject, textValue, validationPayload,
@@ -74,6 +75,8 @@ async function postSessions(req: Request) {
     subjectId = subject.id;
   }
 
+  // Auto-completed by time: the task whose logged minutes met its plan.
+  let completedTask: CompletedTaskInfo | null = null;
   if (minutes > 0.01) {
     await db.transaction(async (tx) => {
       await tx
@@ -91,11 +94,39 @@ async function postSessions(req: Request) {
           .update(tasks)
           .set({ actualMinutes: Math.max(0, Math.round(total)) })
           .where(and(eq(tasks.id, taskId), eq(tasks.userId, user.id)));
+
+        // Auto-complete: once the logged minutes reach the planned time, the
+        // task is done — no manual "Done" tap needed (a 15-min recall studied
+        // for 28 min is complete at the 15-min mark). Only a pending task
+        // flips; done/skipped are never re-marked, and if a concurrent
+        // request completes it first, the conditional status update below
+        // matches zero rows and the mastery bookkeeping runs exactly once.
+        const fresh = (await tx
+          .select()
+          .from(tasks)
+          .where(and(eq(tasks.id, taskId), eq(tasks.userId, user.id)))
+          .limit(1))[0];
+        if (fresh && shouldAutoComplete(fresh.actualMinutes, fresh.plannedMinutes, fresh.status)) {
+          const done = (await tx
+            .update(tasks)
+            .set({ status: "done" })
+            .where(and(
+              eq(tasks.id, taskId), eq(tasks.userId, user.id), eq(tasks.status, "pending")
+            ))
+            .returning())[0];
+          if (done) {
+            await applyCompletionMastery(tx, done, date);
+            completedTask = {
+              id: done.id, title: done.title,
+              plannedMinutes: done.plannedMinutes, actualMinutes: done.actualMinutes,
+            };
+          }
+        }
       }
     });
     await recomputeStreak(user.id, date > serverToday ? date : serverToday);
   }
 
   const state = await fullState(key);
-  return NextResponse.json({ ...state, context: buildContext(state, dateFrom(req)) });
+  return NextResponse.json({ ...state, context: buildContext(state, dateFrom(req)), completedTask });
 }

@@ -16,6 +16,7 @@ import { mdToHtml } from "../src/lib/client";
 import { buildPlan, countStudyDays, projectCompletionDate } from "../src/lib/planner";
 import { cbseCatalogFor, nmimsSem1Subjects } from "../src/lib/curriculum";
 import { finiteNumber, isIsoDate } from "../src/lib/validation";
+import { shouldAutoComplete, nextPendingTask } from "../src/lib/completion";
 import React from "react";
 import TestRenderer, { act } from "react-test-renderer";
 import { useStudyClock, type ClockApi } from "../src/lib/useTimer";
@@ -398,6 +399,24 @@ async function runTests() {
   else (globalThis as { window?: unknown }).window = originalWindow;
   if (originalDocument === undefined) delete (globalThis as { document?: unknown }).document;
   else (globalThis as { document?: unknown }).document = originalDocument;
+
+  console.log("\n--- 5b. Study-Clock Auto-Completion Rule ---");
+  check(shouldAutoComplete(28, 15, "pending"), "28 logged minutes complete a 15-minute recall");
+  check(shouldAutoComplete(15, 15, "pending"), "Exactly the planned time completes");
+  check(!shouldAutoComplete(14, 15, "pending"), "Below planned time stays pending");
+  check(!shouldAutoComplete(30, 15, "done"), "Already-done task is never re-marked");
+  check(!shouldAutoComplete(30, 15, "skipped"), "Skipped task is never auto-completed");
+  const dayTasks = [
+    { id: 1, date: "2026-08-27", status: "done", position: 0 },
+    { id: 2, date: "2026-08-27", status: "pending", position: 1 },
+    { id: 3, date: "2026-08-27", status: "pending", position: 2 },
+    { id: 4, date: "2026-08-28", status: "pending", position: 0 },
+  ];
+  check(nextPendingTask(dayTasks, "2026-08-27", null)?.id === 2, "Next task is the first pending one of the day");
+  check(nextPendingTask(dayTasks, "2026-08-27", 1)?.id === 2, "Completed task is excluded from the queue");
+  check(nextPendingTask(dayTasks, "2026-08-27", 2)?.id === 3, "Next task follows schedule order after the exclusion");
+  check(nextPendingTask(dayTasks, "2026-08-28", null)?.id === 4, "Next-day tasks are found by their own date");
+  check(nextPendingTask(dayTasks, "2026-08-29", null) === null, "No pending task returns null");
 
   console.log("\n--- 6. Curriculum Ground Truth ---");
   check(nmimsSem1Subjects().length === 6, "NMIMS Semester 1 ground truth has 6 subjects");

@@ -101,6 +101,49 @@ instead of stopping on a “voice model unavailable” error; the chat shows a
 clear non-error notice. One failed long-answer part switches the remaining
 parts to that local voice, so every later part keeps flowing.
 
+v16 UI POLISH (this build)
+--------------------------
+ - TRUE LIST VIEWS: Planner day blocks and the Overview's "Today's Study
+   Load" are real lists again — rows span the panel edge to edge, divided
+   by clean hairlines instead of each row wearing its own card border,
+   shadow and rounded corners.
+ - ALIGNED ROW CONTROLS: every task row's buttons share one height, the
+   clock button keeps a stable width so the CTA column never jumps, and
+   Done owns the right edge. On phones the visible actions (Done · Clock
+   in/out · ⋯) form one even, full-width 3-column bar, with Edit / Skip
+   subject / Skip revealed by ⋯ wrapping into tidy rows underneath.
+ - CALENDAR COLOUR EVERYWHERE: each calendar day with tasks is softly
+   tinted with its first subject's colour, and on phones the coloured
+   topic pills are visible again (they used to be hidden entirely, which
+   left a plain number grid) — the month now reads at a glance on any
+   device, and tapping a day still opens the full task sheet.
+ - FOCUS + CLOCK IN ONE TAP: "Start Focus" now also starts the study
+   clock (attaching the first pending task of the day when possible), and
+   Zen mode's primary button is "Start Focus + Clock" — no more juggling
+   two timers. Breaks (short/long) never touch the clock; Pause and
+   Clock Out stay independent.
+ - BRANDED FAVICON: the browser tab now shows the Study Planner Pro
+   logo (the layered chevron mark on the gradient tile) instead of the
+   default globe — `src/app/icon.svg`, served automatically by Next.js.
+
+v15 STUDY CLOCK AUTO-COMPLETE (this build)
+------------------------------------------
+ - DONE WITHOUT THE DONE BUTTON: the study clock watches every task's
+   planned minutes. The moment your logged time reaches the plan — a
+   15-minute recall after 15+ minutes, a 45-minute lesson after 45+ — the
+   task is marked complete automatically. No more studying for 28 minutes
+   on a 15-minute recall and still seeing it "pending".
+ - NOTIFIED, THEN NEXT: completion fires a success toast ("…complete —
+   28m logged ≥ 15m planned") and, while the clock is still running on
+   that task, the clock rolls itself forward to the next pending task, so
+   every minute you keep studying lands on the right lesson. If the task
+   was the last of the day, it says so. Nothing is re-marked once a task
+   is done or skipped, and the mastery/memory-model bookkeeping is shared
+   with the manual Done flow, so both paths behave identically.
+ - WORKS OFFLINE TOO: the same logic lives in the server's session-log
+   route, so auto-completion applies to every minute that syncs from the
+   device queue, not just live ticks.
+
 v14 LIQUID GLASS DELUXE (this build)
 ------------------------------------
  - MATERIAL TIERS, NOT BLUR EVERYWHERE: cards (tier 1) paint their glass as
