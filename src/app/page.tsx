@@ -136,7 +136,15 @@ export default function Home() {
         : level === "pg" || level === "phd" || level === "professional"
           ? "mode-focused"
           : "";
-    document.body.className = [theme, mode].filter(Boolean).join(" ");
+    const next = [theme, mode].filter(Boolean).join(" ");
+    // v13: where the View Transitions API exists, the theme flip becomes a
+    // real cross-fade instead of an instant repaint.
+    const doc = document as Document & { startViewTransition?: (cb: () => void) => unknown };
+    if (doc.startViewTransition && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      doc.startViewTransition(() => { document.body.className = next; });
+    } else {
+      document.body.className = next;
+    }
   }, [state?.settings.theme, state?.user.level]);
 
   /* v12 — global click micro-interactions: every small click gets a soft
@@ -147,13 +155,43 @@ export default function Home() {
       "button, a, .vtab, .nav-item, .cal-cell, .cmdk-item, .task-row, .ob-range-chip, [role='button']";
     const RIPPLE_HOST = ".btn, .ob-btn-primary, .ai-fab";
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const coarse = window.matchMedia("(pointer: coarse)");
     const SPRING = "cubic-bezier(.22,1,.36,1)";
+    /* v13: a tiny confetti burst celebrates completions at the pointer */
+    const CONFETTI = ["--accent", "--success-accent", "--warning-accent", "--color-ai"];
+    const burst = (x: number, y: number) => {
+      const cs = getComputedStyle(document.body);
+      for (let i = 0; i < 12; i++) {
+        const p = document.createElement("span");
+        p.className = "confetti";
+        p.style.background = cs.getPropertyValue(CONFETTI[i % CONFETTI.length]);
+        p.style.left = `${x}px`;
+        p.style.top = `${y}px`;
+        document.body.appendChild(p);
+        const angle = ((Math.PI * 2) / 12) * i + Math.random() * 0.6;
+        const dist = 34 + Math.random() * 46;
+        const anim = p.animate(
+          [
+            { transform: "translate(-50%,-50%) rotate(0deg)", opacity: 1 },
+            {
+              transform: `translate(calc(-50% + ${(Math.cos(angle) * dist).toFixed(1)}px), calc(-50% + ${(Math.sin(angle) * dist - 14).toFixed(1)}px)) rotate(${(180 + Math.random() * 180).toFixed(0)}deg)`,
+              opacity: 0,
+            },
+          ],
+          { duration: 650 + Math.random() * 350, easing: "cubic-bezier(.16,1,.3,1)" },
+        );
+        anim.onfinish = () => p.remove();
+      }
+    };
     const onClick = (e: MouseEvent) => {
-      if (reduce.matches) return;
       const t = e.target;
       if (!(t instanceof Element)) return;
+      if (coarse.matches) haptic(6); // light tick on real taps
+      if (reduce.matches) return;
       const el = t.closest(PRESSABLE);
       if (!(el instanceof HTMLElement)) return;
+      const label = (el.textContent || "").trim();
+      if (label === "Done" || el.matches(".rate-btn")) burst(e.clientX, e.clientY);
       const soft = el.matches(".task-row, .kpi-card");
       el.animate(
         [
@@ -193,6 +231,36 @@ export default function Home() {
     };
     document.addEventListener("click", onClick);
     return () => document.removeEventListener("click", onClick);
+  }, []);
+
+  /* v13 — cursor spotlight: an accent pool tracks the mouse over cards.
+     Delegated + rAF-throttled; touch pointers never trigger it. */
+  useEffect(() => {
+    let spotEl: HTMLElement | null = null;
+    let raf = 0;
+    let x = 0;
+    let y = 0;
+    const paint = () => {
+      raf = 0;
+      if (!spotEl) return;
+      const r = spotEl.getBoundingClientRect();
+      spotEl.style.setProperty("--mx", `${(x - r.left).toFixed(1)}px`);
+      spotEl.style.setProperty("--my", `${(y - r.top).toFixed(1)}px`);
+    };
+    const onMove = (e: PointerEvent) => {
+      if (e.pointerType !== "mouse") return;
+      const t = e.target;
+      const el = t instanceof Element ? t.closest(".tilt-card") : null;
+      spotEl = el instanceof HTMLElement ? el : null;
+      x = e.clientX;
+      y = e.clientY;
+      if (spotEl && !raf) raf = requestAnimationFrame(paint);
+    };
+    document.addEventListener("pointermove", onMove, { passive: true });
+    return () => {
+      document.removeEventListener("pointermove", onMove);
+      if (raf) cancelAnimationFrame(raf);
+    };
   }, []);
 
   const persistSessionQueue = useCallback(() => {

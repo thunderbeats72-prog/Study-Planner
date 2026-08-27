@@ -3944,3 +3944,57 @@ body.theme-switching{animation:themeBlink .7s ease}
   body::after{animation:none}
   .fx-ripple{display:none}
 }
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   v13 — DELUXE POLISH
+     1 · Cursor spotlight on tilt-cards (::before; ::after keeps sheen)
+     2 · AI FAB breathing glow (drop-shadow survives overflow:hidden)
+     3 · Shimmer sweep on display headings
+     4 · Native view-transition cross-fade when the theme flips
+     5 · Confetti particles (styled here; page.tsx spawns them)
+═══════════════════════════════════════════════════════════════════ */
+
+/* 1 · Spotlight — a soft accent pool that follows the cursor */
+@media(hover:hover) and (pointer:fine){
+  .tilt-card::before{
+    content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:0;
+    opacity:0;transition:opacity .5s ease;
+    background:radial-gradient(460px circle at var(--mx,50%) var(--my,18%),
+      color-mix(in srgb,var(--accent) 9%,transparent),transparent 65%);
+  }
+  .tilt-card:hover::before{opacity:1}
+}
+
+/* 2 · FAB breathing glow */
+@media(hover:hover){
+  .ai-fab{animation:fabFloat 5s ease-in-out infinite,fabGlow 3.2s ease-in-out infinite}
+}
+@keyframes fabGlow{
+  0%,100%{filter:drop-shadow(0 6px 16px rgba(var(--ai-rgb),.32))}
+  50%{filter:drop-shadow(0 10px 30px rgba(var(--ai-rgb),.58))}
+}
+
+/* 3 · Heading shimmer — a slow light sweep across display type */
+.page-title,.ob-card h1,.loader-title{
+  background:linear-gradient(100deg,var(--text-main) 42%,
+    color-mix(in srgb,var(--accent) 65%,var(--text-main)) 50%,var(--text-main) 58%);
+  background-size:240% 100%;background-position:120% 0;
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  animation:textShine 7s ease-in-out 1.2s infinite;
+}
+@keyframes textShine{0%,55%,100%{background-position:120% 0}25%{background-position:-40% 0}}
+
+/* 4 · Theme flip becomes a real cross-fade where the browser supports it */
+::view-transition-old(root),::view-transition-new(root){
+  animation-duration:.55s;animation-timing-function:ease;
+}
+
+/* 5 · Confetti bits (position/colour/animation set inline by page.tsx) */
+.confetti{position:fixed;width:7px;height:7px;border-radius:2px;pointer-events:none;z-index:700}
+
+@media (prefers-reduced-motion: reduce){
+  .page-title,.ob-card h1,.loader-title,.ai-fab{animation:none !important}
+  .tilt-card::before{display:none}
+  .confetti{display:none}
+}
