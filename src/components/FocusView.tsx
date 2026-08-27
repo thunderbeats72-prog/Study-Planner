@@ -64,16 +64,16 @@ export default function FocusView({
       </div>
 
       {/* ---------------- STUDY CLOCK ---------------- */}
-      <div className="glass-panel tilt-card section-card accent-edge accent-edge--success">
+      <div className="glass-panel tilt-card liquid-card section-card accent-edge accent-edge--success">
         <div className="day-head">
           <div>
-            <h3 className="section-title">Study Clock — time tracking</h3>
+            <h3 className="section-title gradient-text">Study Clock — time tracking</h3>
             <div className="day-meta">
               {clock.running ? "Recording your study time" : clock.onBreak ? "On a break — clock paused" : clock.sessionActive ? "Paused — resume or clock out" : "Not clocked in"}
               {" · "}{loggedTodayLabel} min logged today
             </div>
           </div>
-          <div className="mono stat-big">{mmss(clock.elapsed)}</div>
+          <div className="mono stat-big gradient-text shimmer-text">{mmss(clock.elapsed)}</div>
         </div>
 
         <div className="grid-2 clock-pickers">
@@ -136,8 +136,8 @@ export default function FocusView({
 
       {/* ---------------- FOCUS TIMER ---------------- */}
       <div className="focus-grid-2">
-        <div className="glass-panel tilt-card flex-col section-card timer-panel">
-          <div className="timer-kicker">
+        <div className="glass-panel tilt-card liquid-card flex-col section-card timer-panel">
+          <div className="timer-kicker shimmer-text">
             Focus Timer · {timer.cycles} cycles done
           </div>
           <div className="flex-row gap-sm mb-md mode-row">
@@ -164,7 +164,7 @@ export default function FocusView({
                 style={{ transition: "stroke-dashoffset .4s linear" }} />
             </svg>
             <div className="timer-center">
-              <div id="t-digits" className="mono">{mmss(timer.seconds)}</div>
+              <div id="t-digits" className="mono shimmer-text">{mmss(timer.seconds)}</div>
               <div id="t-label">{timer.running ? (timer.isBreak ? "BREAK" : "FOCUSED") : "READY"}</div>
             </div>
           </div>

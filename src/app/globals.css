@@ -189,7 +189,7 @@ select.input-field{appearance:none;background-image:linear-gradient(45deg,transp
 
 /* ============ TIMER ============ */
 .focus-grid-2{display:grid;grid-template-columns:1.3fr 1fr;gap:16px}
-.timer-ring-wrap{position:relative;width:260px;height:260px;margin:18px 0}
+.timer-ring-wrap{position:relative;width:260px;height:260px;margin:18px 0;filter:drop-shadow(0 8px 28px var(--accent-glow));}
 .timer-ring-wrap svg{transform:rotate(-90deg);width:100%;height:100%}
 #t-digits{font-size:2.9rem;font-weight:800;letter-spacing:-2px;font-variant-numeric:tabular-nums}
 #t-label{font-size:.7rem;font-weight:800;text-transform:uppercase;letter-spacing:2px;color:var(--text-muted);margin-top:4px}
@@ -4496,7 +4496,7 @@ body.theme-mint,body.theme-sunset,body.theme-silver-lavender,body.theme-default{
 .mastery-row{margin-bottom:5px}
 .mastery-row-wrap{min-width:0}
 .panel-lead{font-size:var(--fs-xs);color:var(--text-dim);line-height:1.6;font-weight:600;max-width:66ch;text-wrap:pretty;margin:0}
-.stat-big{font-size:var(--fs-kpi);font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.03em;line-height:1;flex:0 0 auto}
+.stat-big{font-size:var(--fs-kpi);font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.03em;line-height:1;flex:0 0 auto;animation:valueIn .8s var(--spring-soft) backwards;text-shadow:0 0 24px var(--accent-glow)}
 /* Gradient accent edge, painted as a background layer: follows the radius,
    never fights an existing border, and replaces four different inline
    borderLeft recipes. */
@@ -4625,7 +4625,7 @@ body.theme-mint,body.theme-sunset,body.theme-silver-lavender,body.theme-default{
 .custom-min-row{align-items:center;justify-content:center}
 .custom-min-label{font-size:var(--fs-xs);font-weight:700;color:var(--text-muted)}
 .custom-min-input{width:min(90px,24vw);min-height:34px;padding:4px 10px;text-align:center}
-.timer-controls{justify-content:center;flex-wrap:wrap}
+.timer-controls,.clock-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:center;padding-top:8px;border-top:1px solid var(--glass-border);margin-top:8px}
 .timer-footnote{margin-top:var(--sp-3);text-align:center;max-width:34ch;margin-inline:auto}
 .vol-label{display:flex;justify-content:space-between;align-items:baseline;gap:10px;
   font-size:var(--fs-xs);font-weight:700;color:var(--text-muted);margin-bottom:6px}
