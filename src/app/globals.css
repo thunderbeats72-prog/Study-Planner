@@ -89,7 +89,7 @@ body{
 .nav-item:hover{background:var(--row-hover);color:var(--text-main)}
 .nav-item.active{background:var(--nav-active-bg);color:var(--nav-active-text);border-color:var(--nav-active-border);font-weight:650;box-shadow:inset 0 0 0 1px var(--nav-active-border)}
 .streak-badge{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:99px;background:var(--accent-glow);color:var(--accent);font-size:.72rem;font-weight:800}
-.page-header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:22px;flex-wrap:wrap}
+.page-header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:22px;flex-wrap:wrap}
 .page-title{
   font-family:var(--font-display);font-size:1.9rem;font-weight:750;letter-spacing:-.7px;margin:0;
   color:var(--text-main);
@@ -134,19 +134,20 @@ select.input-field{appearance:none;background-image:linear-gradient(45deg,transp
 
 /* ============ KPI / DASHBOARD ============ */
 .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:16px;margin-bottom:18px}
-.kpi-card{padding:20px}
+.kpi-card{padding:24px}
 .kpi-label{font-size:.7rem;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted)}
-.kpi-value{font-size:2rem;font-weight:800;letter-spacing:-1.2px;margin-top:6px;line-height:1}
-.kpi-sub{font-size:.76rem;color:var(--text-muted);font-weight:600;margin-top:5px}
+.kpi-value{font-size:2rem;font-weight:800;letter-spacing:-1.2px;margin-top:8px;line-height:1}
+.kpi-sub{font-size:.76rem;color:var(--text-muted);font-weight:600;margin-top:8px}
 
-.dash-grid-2{display:grid;grid-template-columns:1.4fr 1fr;gap:16px;margin-bottom:18px}
-.dash-card{padding:20px}
+.dash-grid-2{display:grid;grid-template-columns:1.4fr 1fr;gap:20px;margin-bottom:24px}
+.dash-card{padding:24px}
 .bar-track{height:8px;border-radius:99px;background:var(--row-bg);overflow:hidden}
 .bar-fill{height:100%;border-radius:99px;background:var(--accent-gradient);transition:width .6s cubic-bezier(.22,1,.36,1)}
 
 /* ============ TASK ROWS ============ */
-.day-block{margin-bottom:14px;padding:16px 18px}
-.day-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.day-block{margin-bottom:16px;padding:20px 24px}
+.day-head{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:16px}
+
 .day-date{font-size:.95rem;font-weight:800;letter-spacing:-.3px}
 .day-meta{font-size:.74rem;color:var(--text-muted);font-weight:650}
 
@@ -3280,13 +3281,13 @@ svg{flex-shrink:0;vertical-align:middle}
   --fs-kpi:clamp(1.5rem,1.25rem + 1.1vw,2.3rem);
   --fs-timer:clamp(2.1rem,1.55rem + 2.5vw,3.1rem);
 
-  --sp-1:clamp(4px,.35vw + 3px,7px);
-  --sp-2:clamp(8px,.7vw + 5px,13px);
-  --sp-3:clamp(12px,1vw + 7px,19px);
-  --sp-4:clamp(13px,1.3vw + 8px,26px);
-  --sp-5:clamp(18px,1.7vw + 10px,34px);
-  --pad-shell:clamp(12px,2.2vw,26px);
-  --gap-grid:clamp(10px,.9vw + 5px,18px);
+  --sp-1:clamp(6px,.4vw + 4px,10px);
+  --sp-2:clamp(12px,.8vw + 8px,18px);
+  --sp-3:clamp(16px,1.2vw + 10px,24px);
+  --sp-4:clamp(20px,1.6vw + 12px,32px);
+  --sp-5:clamp(26px,2vw + 14px,42px);
+  --pad-shell:clamp(16px,2.5vw,32px);
+  --gap-grid:clamp(16px,1.2vw + 10px,28px);
 }
 
 .page-title{font-size:var(--fs-h1);letter-spacing:-.032em}
@@ -3357,8 +3358,9 @@ svg{flex-shrink:0;vertical-align:middle}
                 0 30px 60px -30px rgba(16,16,26,.16);
 }
 body.theme-dark,body.theme-obsidian,body.theme-nebula{
-  --glass-tint-a:color-mix(in srgb,var(--surface) 84%,transparent);
-  --glass-tint-b:color-mix(in srgb,var(--surface) 66%,transparent);
+  --glass-blur:blur(20px) saturate(220%);
+  --glass-tint-a:color-mix(in srgb,var(--surface) 45%,transparent);
+  --glass-tint-b:color-mix(in srgb,var(--surface) 25%,transparent);
   --glass-depth:0 1px 2px rgba(0,0,0,.5),
                 0 10px 26px -12px rgba(0,0,0,.62),
                 0 34px 70px -34px rgba(0,0,0,.72);
@@ -4566,7 +4568,7 @@ body.theme-mint,body.theme-sunset,body.theme-silver-lavender,body.theme-default{
 /* Mobile density stays mobile density: the fluid scale must not inflate it. */
 @media(max-width:640px){
   .section-card{padding:13px 12px;margin-bottom:10px}
-  .section-head{margin-bottom:9px;align-items:flex-start}
+  .section-head{margin-bottom:9px;align-items:center}
   .section-title{font-size:.9rem}
   .section-meta{white-space:normal;text-align:left}
   .wk-chart{height:132px}
