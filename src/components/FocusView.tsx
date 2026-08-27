@@ -64,21 +64,19 @@ export default function FocusView({
       </div>
 
       {/* ---------------- STUDY CLOCK ---------------- */}
-      <div className="glass-panel tilt-card" style={{ padding: 22, marginBottom: 16, borderLeft: "4px solid var(--success-accent)" }}>
+      <div className="glass-panel tilt-card section-card accent-edge accent-edge--success">
         <div className="day-head">
           <div>
-            <h3 style={{ fontSize: ".95rem", fontWeight: 800, margin: 0 }}>Study Clock — time tracking</h3>
+            <h3 className="section-title">Study Clock — time tracking</h3>
             <div className="day-meta">
               {clock.running ? "Recording your study time" : clock.onBreak ? "On a break — clock paused" : clock.sessionActive ? "Paused — resume or clock out" : "Not clocked in"}
               {" · "}{loggedTodayLabel} min logged today
             </div>
           </div>
-          <div className="mono" style={{ fontSize: "1.9rem", fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>
-            {mmss(clock.elapsed)}
-          </div>
+          <div className="mono stat-big">{mmss(clock.elapsed)}</div>
         </div>
 
-        <div className="grid-2" style={{ marginBottom: 14 }}>
+        <div className="grid-2 clock-pickers">
           <div>
             <label className="lbl">Studying subject</label>
             <select className="input-field" value={clock.subjectId ?? ""}
@@ -101,7 +99,7 @@ export default function FocusView({
           </div>
         </div>
 
-        <div className="flex-row gap-sm" style={{ flexWrap: "wrap" }}>
+        <div className="flex-row gap-sm clock-actions">
           {!clock.sessionActive && (
             <button className="btn btn-primary" onClick={() => clock.clockIn()}>Clock In</button>
           )}
@@ -131,18 +129,18 @@ export default function FocusView({
             </>
           )}
         </div>
-        <div style={{ fontSize: ".74rem", color: "var(--text-dim)", fontWeight: 600, marginTop: 10 }}>
+        <div className="panel-lead">
           Minutes are written to the server every 60 seconds, so nothing is lost if you close the tab.
         </div>
       </div>
 
       {/* ---------------- FOCUS TIMER ---------------- */}
       <div className="focus-grid-2">
-        <div className="glass-panel tilt-card flex-col" style={{ padding: 28, alignItems: "center" }}>
-          <div style={{ fontSize: ".7rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: "var(--text-muted)", marginBottom: 12 }}>
+        <div className="glass-panel tilt-card flex-col section-card timer-panel">
+          <div className="timer-kicker">
             Focus Timer · {timer.cycles} cycles done
           </div>
-          <div className="flex-row gap-sm mb-md" style={{ flexWrap: "wrap", justifyContent: "center" }}>
+          <div className="flex-row gap-sm mb-md mode-row">
             {MODES.map((m) => (
               <button key={m.id}
                 className={`btn btn-sm ${timer.mode === m.id ? "btn-primary" : "btn-secondary"}`}
@@ -150,9 +148,9 @@ export default function FocusView({
             ))}
           </div>
           {timer.mode === "custom" && (
-            <div className="flex-row gap-sm mb-md">
-              <span style={{ fontSize: ".78rem", fontWeight: 700, color: "var(--text-muted)" }}>Minutes</span>
-              <input type="number" className="input-field" style={{ width: "min(90px, 24vw)", height: 34 }} min={1} max={180}
+            <div className="flex-row gap-sm mb-md custom-min-row">
+              <label className="custom-min-label" htmlFor="custom-min">Minutes</label>
+              <input id="custom-min" type="number" className="input-field custom-min-input" min={1} max={180}
                 value={timer.customMin} onChange={(e) => timer.setCustomMin(Number(e.target.value) || 1)} />
             </div>
           )}
@@ -165,44 +163,44 @@ export default function FocusView({
                 strokeDashoffset={circ * (1 - pct)} strokeLinecap="round"
                 style={{ transition: "stroke-dashoffset .4s linear" }} />
             </svg>
-            <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+            <div className="timer-center">
               <div id="t-digits" className="mono">{mmss(timer.seconds)}</div>
               <div id="t-label">{timer.running ? (timer.isBreak ? "BREAK" : "FOCUSED") : "READY"}</div>
             </div>
           </div>
 
-          <div className="flex-row gap-md">
-            <button className="btn btn-primary" style={{ padding: "13px 30px", fontSize: ".95rem" }} onClick={timer.toggle}>
+          <div className="flex-row gap-md timer-controls">
+            <button className="btn btn-primary btn-lg" onClick={timer.toggle}>
               {timer.running ? "Pause" : timer.isBreak ? "Start Break" : "Start Focus"}
             </button>
-            <button className="btn btn-secondary" style={{ padding: "13px 16px" }} onClick={timer.reset}>Reset</button>
+            <button className="btn btn-secondary btn-lg" onClick={timer.reset}>Reset</button>
           </div>
-          <div style={{ fontSize: ".74rem", color: "var(--text-dim)", fontWeight: 600, marginTop: 14, textAlign: "center", maxWidth: 320 }}>
+          <div className="panel-lead timer-footnote">
             This timer only structures your session. It does <strong>not</strong> start or stop the study clock above.
           </div>
         </div>
 
         <div className="flex-col gap-md">
-          <div className="glass-panel tilt-card" style={{ padding: 22 }}>
-            <h3 style={{ fontSize: ".92rem", fontWeight: 800, margin: "0 0 14px", display: "flex", alignItems: "center", gap: 8 }}>
+          <div className="glass-panel tilt-card section-card">
+            <h3 className="section-title section-title--row">
               <IconVolume /> Ambient Sounds
             </h3>
             <div className="flex-col gap-sm mb-md">
               {SOUNDS.map((x) => (
-                <button key={x.id} className={`btn ${sound === x.id ? "btn-primary" : "btn-secondary"}`}
-                  style={{ justifyContent: "flex-start" }} onClick={() => pick(x.id)}>{x.label}</button>
+                <button key={x.id} className={`btn btn-left ${sound === x.id ? "btn-primary" : "btn-secondary"}`}
+                  onClick={() => pick(x.id)}>{x.label}</button>
               ))}
             </div>
-            <label style={{ display: "flex", justifyContent: "space-between", fontSize: ".78rem", fontWeight: 700, color: "var(--text-muted)", marginBottom: 6 }}>
+            <label className="vol-label">
               <span>Volume</span><span>{Math.round(vol * 100)}%</span>
             </label>
-            <input type="range" min={0} max={1} step={0.05} value={vol} style={{ width: "100%", accentColor: "var(--accent)" }}
+            <input type="range" className="vol-range" min={0} max={1} step={0.05} value={vol}
               onChange={(e) => setVol(Number(e.target.value))} />
           </div>
 
-          <div className="glass-panel tilt-card" style={{ padding: 22 }}>
-            <h3 style={{ fontSize: ".92rem", fontWeight: 800, margin: "0 0 12px" }}>Session Rules</h3>
-            <ul style={{ margin: 0, paddingLeft: 18, fontSize: ".82rem", color: "var(--text-muted)", lineHeight: 1.8, fontWeight: 550 }}>
+          <div className="glass-panel tilt-card section-card">
+            <h3 className="section-title">Session Rules</h3>
+            <ul className="rules-list">
               <li>Phone in another room — not face down.</li>
               <li>One task per session. Write it down first.</li>
               <li>If you stall for 2 minutes, do the easiest sub-step.</li>

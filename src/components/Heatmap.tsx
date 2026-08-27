@@ -56,16 +56,16 @@ export default function Heatmap({ state }: { state: AppState }) {
   });
 
   return (
-    <div className="glass-panel tilt-card dash-card">
-      <div className="day-head" style={{ marginBottom: 10 }}>
-        <h3 style={{ fontSize: ".88rem", fontWeight: 800, margin: 0 }}>Study Consistency</h3>
+    <div className="glass-panel tilt-card dash-card section-card">
+      <div className="day-head">
+        <h3 className="section-title">Study Consistency</h3>
         <span className="day-meta">{activeDays} active days · {Math.round(totalMin / 60)}h in 12 weeks</span>
       </div>
       <div className="heatmap-scroll">
         <div className="heatmap">
           <div className="heatmap-months">
             {months.map((m, i) => (
-              <span key={i} style={{ width: `calc(${m.span} * (13px + 3px))` }}>{m.span > 1 ? m.label : ""}</span>
+              <span key={i} className="heat-month" style={{ "--span": m.span } as React.CSSProperties}>{m.span > 1 ? m.label : ""}</span>
             ))}
           </div>
           <div className="heatmap-grid">

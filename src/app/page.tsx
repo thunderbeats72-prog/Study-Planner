@@ -70,7 +70,13 @@ function savedSessionQueue(raw: string | null): PendingSessionLog[] {
 export default function Home() {
   const [state, setState] = useState<AppState | null>(null);
   const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState<Page>("dashboard");
+  /* v14 — the page and the direction it was entered from are one piece of
+     state, written together by the nav action. The first painted frame of a
+     new view therefore already knows which way to slide in, and the state
+     updater stays pure. */
+  const [nav, setNav] = useState<{ page: Page; dir: "fwd" | "back" }>({ page: "dashboard", dir: "fwd" });
+  const page = nav.page;
+  const navDir = nav.dir;
   const [busy, setBusy] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [thinking, setThinking] = useState(false);
@@ -309,34 +315,103 @@ export default function Home() {
     };
   }, []);
 
-  /* v13 — cursor spotlight: an accent pool tracks the mouse over cards.
-     Delegated + rAF-throttled; touch pointers never trigger it. */
+  /* v14 — pointer light. One delegated, rAF-throttled listener paints every
+     pointer-reactive effect in the app: the tilt origin (--mx/--my), the
+     liquid-glass specular pool (--spec-x/--spec-y, v14 CSS) and the CTA
+     gradient origin (--px/--py). Two elements maximum per frame, and mouse
+     pointers only — a finger never runs this. */
   useEffect(() => {
-    let spotEl: HTMLElement | null = null;
+    let card: HTMLElement | null = null;
+    let btn: HTMLElement | null = null;
     let raf = 0;
     let x = 0;
     let y = 0;
     const paint = () => {
       raf = 0;
-      if (!spotEl) return;
-      const r = spotEl.getBoundingClientRect();
-      spotEl.style.setProperty("--mx", `${(x - r.left).toFixed(1)}px`);
-      spotEl.style.setProperty("--my", `${(y - r.top).toFixed(1)}px`);
+      if (card) {
+        const r = card.getBoundingClientRect();
+        const cx = (x - r.left).toFixed(1);
+        const cy = (y - r.top).toFixed(1);
+        card.style.setProperty("--mx", `${cx}px`);
+        card.style.setProperty("--my", `${cy}px`);
+        card.style.setProperty("--spec-x", `${cx}px`);
+        card.style.setProperty("--spec-y", `${cy}px`);
+      }
+      if (btn) {
+        const r = btn.getBoundingClientRect();
+        btn.style.setProperty("--px", `${(x - r.left).toFixed(1)}px`);
+        btn.style.setProperty("--py", `${(y - r.top).toFixed(1)}px`);
+      }
     };
     const onMove = (e: PointerEvent) => {
       if (e.pointerType !== "mouse") return;
       const t = e.target;
-      const el = t instanceof Element ? t.closest(".tilt-card") : null;
-      spotEl = el instanceof HTMLElement ? el : null;
+      if (!(t instanceof Element)) return;
+      const c = t.closest(".tilt-card,.glass-panel,.ai-panel");
+      card = c instanceof HTMLElement ? c : null;
+      const b = t.closest(".btn");
+      btn = b instanceof HTMLElement ? b : null;
       x = e.clientX;
       y = e.clientY;
-      if (spotEl && !raf) raf = requestAnimationFrame(paint);
+      if ((card || btn) && !raf) raf = requestAnimationFrame(paint);
     };
     document.addEventListener("pointermove", onMove, { passive: true });
     return () => {
       document.removeEventListener("pointermove", onMove);
       if (raf) cancelAnimationFrame(raf);
     };
+  }, []);
+
+  /* v14 — liquid nav indicator. The active pill is measured, not guessed, so
+     it survives font scaling, the collapsed rail, the phone dock, landscape
+     rotation and label wrapping. `.lg-nav-ready` is only added once a real
+     box was measured: if this effect never runs, the CSS leaves v13 alone. */
+  const navRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    const list = navRef.current;
+    if (!list) return;
+    let raf = 0;
+    const measure = () => {
+      raf = 0;
+      const active = list.querySelector<HTMLElement>(".nav-item.active");
+      if (!active) { list.classList.remove("lg-nav-ready"); return; }
+      const lr = list.getBoundingClientRect();
+      const ar = active.getBoundingClientRect();
+      // Mid-collapse the rail can momentarily report a zero-width item;
+      // keeping the last good geometry beats jumping the pill to 0×0.
+      if (ar.width < 6 || ar.height < 6) return;
+      list.style.setProperty("--nav-x", `${(ar.left - lr.left).toFixed(1)}px`);
+      list.style.setProperty("--nav-y", `${(ar.top - lr.top).toFixed(1)}px`);
+      list.style.setProperty("--nav-w", `${ar.width.toFixed(1)}px`);
+      list.style.setProperty("--nav-h", `${ar.height.toFixed(1)}px`);
+      list.classList.add("lg-nav-ready");
+    };
+    const schedule = () => { if (!raf) raf = requestAnimationFrame(measure); };
+    schedule();
+    const settle = [80, 260, 520].map((ms) => window.setTimeout(schedule, ms));
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(schedule) : null;
+    ro?.observe(list);
+    window.addEventListener("resize", schedule);
+    window.addEventListener("orientationchange", schedule);
+    return () => {
+      if (raf) cancelAnimationFrame(raf);
+      settle.forEach((id) => window.clearTimeout(id));
+      ro?.disconnect();
+      window.removeEventListener("resize", schedule);
+      window.removeEventListener("orientationchange", schedule);
+    };
+  }, [page, sidebarCollapsed]);
+
+  /* v14 — advancing through the rail slides the new view in from the right,
+     stepping back from the left. Anything that is not a rail move (an AI
+     command, a re-plan landing on the Planner) travels forward. */
+  const goPage = useCallback((next: Page) => {
+    setNav((prev) => {
+      if (prev.page === next) return prev;
+      const from = NAV.findIndex((n) => n.id === prev.page);
+      const to = NAV.findIndex((n) => n.id === next);
+      return { page: next, dir: from < 0 || to >= from ? "fwd" : "back" };
+    });
   }, []);
 
   const persistSessionQueue = useCallback(() => {
@@ -667,7 +742,7 @@ export default function Home() {
         if (r.ai?.degraded && r.ai.message) notify(r.ai.message, "info");
         const a = r.action;
         if (a) {
-          if (a.type === "navigate") setPage(String(a.payload) as Page);
+          if (a.type === "navigate") goPage(String(a.payload) as Page);
           if (a.type === "startTimer") { if (!clock.running) { if (clock.sessionActive) clock.resume(); else startSmartClock(); } }
           if (a.type === "stopTimer") { if (clock.sessionActive) clockOutNow(); }
           if (a.type === "pause") { if (clock.running) clock.pause(); else notify("No session running to pause."); }
@@ -690,7 +765,7 @@ export default function Home() {
           fallbackText = langReply;
         } else if (action) {
           fallbackText = commandReply(action, message, currentCtx?.daysLeft ?? 90);
-          if (action.type === "navigate") setPage(String(action.payload) as Page);
+          if (action.type === "navigate") goPage(String(action.payload) as Page);
           if (action.type === "startTimer") { if (!clock.running) { if (clock.sessionActive) clock.resume(); else startSmartClock(); } }
           if (action.type === "stopTimer") { if (clock.sessionActive) clockOutNow(); }
           if (action.type === "pause") { if (clock.running) clock.pause(); else notify("No session running to pause."); }
@@ -727,7 +802,7 @@ export default function Home() {
         setThinking(false);
       }
     },
-    [clock, clockOutNow, notify, patchSettings, startSmartClock, state]
+    [clock, clockOutNow, goPage, notify, patchSettings, startSmartClock, state]
   );
 
   if (loading) {
@@ -738,10 +813,10 @@ export default function Home() {
           <div className="loader-title">Study Planner Pro</div>
           <div className="loader-sub">Loading your study plan…</div>
           <div className="loader-skeletons">
-            <div className="skeleton skeleton-strong" style={{ height: 52, borderRadius: 999 }} />
-            <div className="skeleton skeleton-strong" style={{ height: 84 }} />
-            <div className="skeleton skeleton-strong" style={{ height: 84, opacity: .72 }} />
-            <div className="skeleton skeleton-strong" style={{ height: 84, opacity: .45 }} />
+            <div className="skeleton skeleton-strong sk-pill" />
+            <div className="skeleton skeleton-strong sk-card" />
+            <div className="skeleton skeleton-strong sk-card sk-card-soft" />
+            <div className="skeleton skeleton-strong sk-card sk-card-faint" />
           </div>
         </div>
       </div>
@@ -753,14 +828,14 @@ export default function Home() {
       <div className="loader-screen">
         <div className="loader-title">Connection problem</div>
         <div className="loader-sub">Your data is still safe. Check the connection and try again.</div>
-        <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={loadInitialState}>Retry</button>
+        <button className="btn btn-primary retry-btn" onClick={loadInitialState}>Retry</button>
       </div>
     );
   }
 
   if (!state.user.onboarded || forceWizard) {
     return <Onboarding
-      onDone={(s) => { setState(s); setForceWizard(false); setPage("dashboard"); }}
+      onDone={(s) => { setState(s); setForceWizard(false); goPage("dashboard"); }}
       isRerun={state.user.onboarded}
       initialName={state.user.onboarded ? state.user.name : ""}
       onCancel={state.user.onboarded ? () => setForceWizard(false) : undefined}
@@ -781,11 +856,11 @@ export default function Home() {
     "Free session";
 
   const commands: Command[] = [
-    { id: "nav-dash", group: "Navigate", label: "Go to Overview", hint: "Dashboard", keywords: "home stats", run: () => setPage("dashboard") },
-    { id: "nav-plan", group: "Navigate", label: "Go to Planner", hint: "Schedule", keywords: "tasks lessons", run: () => setPage("planner") },
-    { id: "nav-focus", group: "Navigate", label: "Go to Focus", hint: "Pomodoro", keywords: "timer deep work", run: () => setPage("focus") },
-    { id: "nav-subj", group: "Navigate", label: "Go to Subjects", hint: "Syllabus", keywords: "units topics", run: () => setPage("subjects") },
-    { id: "nav-set", group: "Navigate", label: "Go to Settings", keywords: "theme preferences", run: () => setPage("settings") },
+    { id: "nav-dash", group: "Navigate", label: "Go to Overview", hint: "Dashboard", keywords: "home stats", run: () => goPage("dashboard") },
+    { id: "nav-plan", group: "Navigate", label: "Go to Planner", hint: "Schedule", keywords: "tasks lessons", run: () => goPage("planner") },
+    { id: "nav-focus", group: "Navigate", label: "Go to Focus", hint: "Pomodoro", keywords: "timer deep work", run: () => goPage("focus") },
+    { id: "nav-subj", group: "Navigate", label: "Go to Subjects", hint: "Syllabus", keywords: "units topics", run: () => goPage("subjects") },
+    { id: "nav-set", group: "Navigate", label: "Go to Settings", keywords: "theme preferences", run: () => goPage("settings") },
     { id: "clock-in", group: "Study Clock", label: clock.running ? "Pause Clock" : clock.sessionActive ? "Resume Clock" : "Clock In", hint: clock.running ? "Freeze, keep session" : "Start recording", keywords: "timer record attendance pause", run: () => (clock.running ? clock.pause() : clock.sessionActive ? clock.resume() : startSmartClock()) },
     { id: "clock-out", group: "Study Clock", label: "Clock Out", hint: clock.sessionActive ? "Stop & save minutes" : "no open session", keywords: "stop end finish timer", run: () => (clock.sessionActive ? clockOutNow() : notify("No open session to close.")) },
     { id: "clock-break", group: "Study Clock", label: clock.onBreak ? "Resume from break" : "Take a break", keywords: "pause rest", run: () => (clock.onBreak ? clock.endBreak() : clock.takeBreak()) },
@@ -793,7 +868,7 @@ export default function Home() {
     { id: "zen", group: "Focus", label: "Enter Zen mode", hint: "Distraction-free", keywords: "fullscreen minimal", run: () => setZen(true) },
     { id: "ai", group: "AI Tutor", label: "Ask AI Tutor", hint: "Open chat", keywords: "help question doubt", run: () => setChatOpen(true) },
     { id: "ai-today", group: "AI Tutor", label: "What should I study today?", keywords: "plan today", run: () => askTutor("What should I study today and in what order?") },
-    { id: "replan", group: "Plan", label: "Re-plan Mathematically", hint: "Rebalance", keywords: "regenerate schedule", run: () => { setPage("planner"); replan(); } },
+    { id: "replan", group: "Plan", label: "Re-plan Mathematically", hint: "Rebalance", keywords: "regenerate schedule", run: () => { goPage("planner"); replan(); } },
     { id: "setup", group: "Plan", label: "Re-run Setup Wizard", keywords: "onboarding restart course", run: () => requestWizardRestart() },
   ];
 
@@ -801,8 +876,8 @@ export default function Home() {
     <>
       <header className="mobile-header">
         <div className="flex-row gap-sm">
-          <div className="brand-logo-icon" style={{ width: 30, height: 30 }}><IconLogo size={16} /></div>
-          <span style={{ fontSize: ".92rem", fontWeight: 800 }}>Study Planner Pro</span>
+          <div className="brand-logo-icon brand-logo-sm"><IconLogo size={16} /></div>
+          <span className="brand-wordmark">Study Planner Pro</span>
         </div>
         <span className="streak-badge"><IconFlame /> {state.user.streak}d</span>
       </header>
@@ -824,39 +899,39 @@ export default function Home() {
               <div className="brand-course">{state.user.courseName}</div>
             </div>
           </div>
-          <nav className="nav-list">
+          <nav className="nav-list" ref={navRef}>
             {NAV.map((n) => (
               <div
                 key={n.id}
                 className={`nav-item${page === n.id ? " active" : ""}`}
-                onClick={() => setPage(n.id)}
+                onClick={() => goPage(n.id)}
                 title={sidebarCollapsed ? n.label : undefined}
                 aria-label={n.label}
                 role="button"
                 tabIndex={0}
-                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setPage(n.id); } }}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); goPage(n.id); } }}
               >
                 {n.icon}<span>{n.label}</span>
               </div>
             ))}
           </nav>
-          <div className="sidebar-foot" style={{ marginTop: "auto", paddingTop: 16 }}>
-            <div className="glass-panel tilt-card" style={{ padding: 18, textAlign: "center" }}>
-              <div className="streak-badge" style={{ marginBottom: 10 }}>
+          <div className="sidebar-foot">
+            <div className="glass-panel tilt-card accent-edge accent-edge--warning">
+              <div className="streak-badge foot-badge">
                 <IconFlame /> {state.user.streak} Day Streak
               </div>
-              <h4 style={{ fontSize: ".88rem", fontWeight: 800, margin: "0 0 4px" }}>Keep Moving</h4>
-              <p style={{ fontSize: ".76rem", color: "var(--text-muted)", lineHeight: 1.45, margin: "0 0 12px" }}>
+              <h4 className="foot-title">Keep Moving</h4>
+              <p className="foot-sub">
                 {ctx.daysLeft} days left · {ctx.progressPct}% syllabus completed.
               </p>
-              <button className="btn btn-secondary w-full" style={{ fontSize: ".78rem", padding: 8 }} onClick={requestWizardRestart}>
+              <button className="btn btn-secondary btn-sm w-full" onClick={requestWizardRestart}>
                 Re-run Setup
               </button>
             </div>
           </div>
         </aside>
 
-        <main className="main-workspace">
+        <main className="main-workspace" data-nav-dir={navDir}>
           <div className="tracker-bar" role="status" aria-live="off">
             <div className="flex-row gap-md tracker-status">
               <div className={`pulse-dot${clock.running ? " live" : ""}`} />
@@ -937,14 +1012,14 @@ export default function Home() {
 
       {zen && (
         <div className="zen">
-          <div style={{ fontSize: ".78rem", letterSpacing: 3, textTransform: "uppercase", opacity: 0.7 }}>
+          <div className="zen-kicker">
             {state.subjects.find((x) => x.id === clock.subjectId)?.name || "Deep Focus Session"}
           </div>
           <div className="zen-digits mono">{mmss(timer.seconds)}</div>
-          <div style={{ fontSize: ".84rem", opacity: 0.65, fontWeight: 700 }}>
+          <div className="zen-status">
             Study clock: {clock.running ? "recording" : clock.onBreak ? "on break" : clock.sessionActive ? "paused" : "not clocked in"} · {mmss(clock.elapsed)}
           </div>
-          <div className="flex-row gap-md" style={{ flexWrap: "wrap", justifyContent: "center" }}>
+          <div className="flex-row gap-md zen-actions">
             <button className="btn btn-primary" onClick={timer.toggle}>{timer.running ? "Pause Focus" : "Start Focus"}</button>
             {!clock.sessionActive
               ? <button className="btn btn-secondary" onClick={startSmartClock}>Clock In</button>
@@ -964,15 +1039,15 @@ export default function Home() {
         <div className="modal-overlay" onClick={() => setConfirmWipe(false)}>
           <div className="glass-panel modal-box confirm-box" onClick={(e) => e.stopPropagation()}>
             <div className="confirm-icon"><IconWarn size={22} /></div>
-            <h3 style={{ margin: "0 0 6px", fontSize: "1.05rem" }}>Start fresh with the Setup Wizard?</h3>
-            <p style={{ fontSize: ".86rem", color: "var(--text-muted)", lineHeight: 1.6, margin: "0 0 6px" }}>
+            <h3 className="modal-title">Start fresh with the Setup Wizard?</h3>
+            <p className="modal-lead">
               Re-running setup <strong>completely wipes</strong> your current course data — subjects, lessons,
               schedule, logged study minutes and AI chat history — and rebuilds everything from scratch.
             </p>
-            <p style={{ fontSize: ".78rem", color: "var(--text-dim)", margin: "0 0 18px" }}>
+            <p className="modal-note">
               Your name and app preferences (theme, timer lengths) are kept.
             </p>
-            <div className="flex-row gap-sm" style={{ flexWrap: "wrap" }}>
+            <div className="flex-row gap-sm modal-actions-wrap">
               <button className="btn btn-primary" onClick={startWizard}>Wipe &amp; restart</button>
               <button className="btn btn-secondary" onClick={() => setConfirmWipe(false)}>Keep my plan</button>
             </div>

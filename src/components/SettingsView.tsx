@@ -47,8 +47,8 @@ export default function SettingsView({
 
       <div className="grid-fit-300">
         {/* ── Left column: Schedule Engine ── */}
-        <div className="glass-panel tilt-card" style={{ padding: 22 }}>
-          <h3 style={{ fontSize: ".95rem", fontWeight: 800, margin: "0 0 16px" }}>Schedule Engine</h3>
+        <div className="glass-panel tilt-card section-card">
+          <h3 className="section-title">Schedule Engine</h3>
 
           <div className="mb-md"><label className="lbl">Your Name</label>
             <input className="input-field" value={local.name} onChange={(e) => set("name", e.target.value)} /></div>
@@ -116,9 +116,9 @@ export default function SettingsView({
         <div className="flex-col gap-md">
 
           {/* Appearance */}
-          <div className="glass-panel tilt-card" style={{ padding: 22 }}>
-            <h3 style={{ fontSize: ".95rem", fontWeight: 800, margin: "0 0 16px" }}>Appearance</h3>
-            <div className="grid-2" style={{ gap: 9 }}>
+          <div className="glass-panel tilt-card section-card">
+            <h3 className="section-title">Appearance</h3>
+            <div className="grid-2 theme-grid">
               {THEMES.map((th) => (
                 <button
                   key={th.id}
@@ -133,8 +133,8 @@ export default function SettingsView({
           </div>
 
           {/* Timer */}
-          <div className="glass-panel tilt-card" style={{ padding: 22 }}>
-            <h3 style={{ fontSize: ".95rem", fontWeight: 800, margin: "0 0 16px" }}>Timer</h3>
+          <div className="glass-panel tilt-card section-card">
+            <h3 className="section-title">Timer</h3>
             <div className="mb-md"><label className="lbl">Focus length (min)</label>
               <input type="number" min={5} max={120} className="input-field" defaultValue={s.pomodoro}
                 onBlur={(e) => onPatch({ pomodoro: Number(e.target.value) })} /></div>
@@ -147,10 +147,10 @@ export default function SettingsView({
           </div>
 
           {/* Engine Status — clean, no provider names */}
-          <div className="glass-panel tilt-card" style={{ padding: 22 }}>
-            <h3 style={{ fontSize: ".95rem", fontWeight: 800, margin: "0 0 12px" }}>Engine Status</h3>
-            <div style={{ fontSize: ".82rem", color: "var(--text-muted)", lineHeight: 1.8, fontWeight: 600 }}>
-              <div>Shigun AI: <strong style={{ color: state.aiProvider ? "var(--success-accent)" : "var(--text-main)" }}>{engineStatus}</strong></div>
+          <div className="glass-panel tilt-card section-card">
+            <h3 className="section-title">Engine Status</h3>
+            <div className="engine-status">
+              <div>Shigun AI: <strong className={state.aiProvider ? "is-live" : ""}>{engineStatus}</strong></div>
               <div>Lessons generated: <strong>{state.topics.length}</strong></div>
               <div>Scheduled tasks: <strong>{state.tasks.length}</strong></div>
               <div>Sessions logged: <strong>{state.sessions.length}</strong></div>

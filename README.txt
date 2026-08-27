@@ -101,6 +101,62 @@ instead of stopping on a “voice model unavailable” error; the chat shows a
 clear non-error notice. One failed long-answer part switches the remaining
 parts to that local voice, so every later part keeps flowing.
 
+v14 LIQUID GLASS DELUXE (this build)
+------------------------------------
+ - MATERIAL TIERS, NOT BLUR EVERYWHERE: cards (tier 1) paint their glass as
+   background LAYERS — pointer specular → gloss → gradient accent edge →
+   corner wash → tint body — at a 90%/84% tint floor (88%/80% on dark
+   themes) so text never loses contrast. Only genuinely floating layers
+   (tracker bar, command palette, toasts, chat sheet, sidebar dock) get the
+   refractive rim: a masked, blurred ring inside the edge that bends the
+   content sliding underneath it. Phones thin the rim to 7px and drop every
+   float to a single 14px blur budget; the docked desktop sidebar skips it.
+ - ONE POINTER LIGHT: a single delegated rAF listener feeds --spec-x/-y into
+   whatever panel the cursor is over (and --px/--py into a button), so the
+   specular pool and the press glow are one lighting system instead of five
+   hover gradients. Coarse pointers never pay for it.
+ - LIQUID NAV: the active-destination pill is measured in JS and travels and
+   resizes between items (spring on transform/width/height) instead of five
+   backgrounds blinking; it follows the collapsed rail, the phone dock,
+   rotation and font scaling. `.lg-nav-ready` is only set after a real box
+   was measured, so if the effect never runs the previous look is untouched.
+ - SCROLL-AWARE CHROME: the sticky bar is opaque at the top of the page and
+   frosts to ~86% tint + 20px blur over the first 76px of scroll
+   (animation-timeline: scroll — zero JS, zero scroll listeners); below-fold
+   panels reveal themselves on their own view timeline; the canvas mesh
+   parallaxes one cell behind the page.
+ - GRADIENT LANGUAGE: the accent edge is now one class
+   (`accent-edge` + `--edge`) replacing four different inline borderLeft
+   recipes; washes (`--wash-accent|ai|success`) replace flat tint fills;
+   gradient hairlines under section titles, day heads and the phone header
+   draw a real 1px contact instead of a solid rgba line.
+ - ALIGNMENT + PADDING: one card rhythm everywhere via `.section-card`,
+   `.section-head`, `.section-title`, `.panel-lead`, `.stat-big` and the
+   `--sp-1..5` scale; ~60 inline style declarations across the six views
+   became semantic classes (only genuinely data-driven values — a colour, a
+   bar width, a chevron angle — are still inline).
+ - RESPONSIVE FOR ALL DEVICES: KPI/subject/kanban grids are intrinsically
+   sized (`auto-fit` + `min(…, 100%)`), cards answer their OWN width through
+   `container: card / inline-size` (2-up KPI and a wider progress bar inside
+   a narrow sheet, 3-up on wide panels), the 861–1180px band restores the
+   two-column dash when the rail is collapsed, the Planner goes 2-up at
+   ≥1120px and 3-up at ≥1600px, heat cells and the day progress bar scale per
+   breakpoint, and touch gets `min-height:var(--tap)` controls with the press
+   glow, sheen, specular pool and hover lift switched off.
+ - RESPONSIVE FINISH: safe-area padding for notched phones in landscape,
+   `100dvh`, `overscroll-behavior` and `touch-action:manipulation`, an
+   `env()`-aware PWA dock height, hover-only affordances (chevrons, row
+   actions) permanently shown on touch, and a 2-up KPI row at ≤479px that
+   goes 1-up below 340px.
+ - GUARDED AS ALWAYS: every modern feature sits behind `@supports`
+   (mask-composite, animation-timeline, interpolate-size, backdrop-filter),
+   `@media (hover:hover)` or `@media (prefers-reduced-motion: no-preference)`;
+   `prefers-reduced-motion`, `prefers-reduced-transparency`,
+   `prefers-contrast`, `forced-colors` and print all get explicit exits.
+   All seven themes and both `mode-focused` / `mode-young` densities keep
+   working — the whole layer is appended CSS, no earlier rule was edited and
+   no data, scheduling or AI behaviour changed (101/101 logic tests pass).
+
 v10 FIXES (this build)
 ----------------------
  - FULL UI RESTYLE ("ditto" of the Task Manager Pro design language):
