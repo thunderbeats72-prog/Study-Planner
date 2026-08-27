@@ -1,12 +1,40 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { api, addDays, dayDiff, mdToHtml, prettyLong, today, KIND_META, type AppState } from "@/lib/client";
 import { mmss } from "@/lib/useTimer";
 import { IconSpark } from "./icons";
 import TaskEditor, { type TaskPatch } from "./TaskEditor";
 import TaskClockButton from "./TaskClockButton";
 import Heatmap from "./Heatmap";
+
+/** v13 — KPI digits count up to their new value instead of snapping.
+ *  Returns a formatted string (integers stay clean, tenths when needed). */
+function useCountUp(target: number): string {
+  const [display, setDisplay] = useState(target);
+  const prev = useRef(target);
+  useEffect(() => {
+    const from = prev.current;
+    prev.current = target;
+    if (from === target) return;
+    // Reduced motion collapses the duration to a single async frame so no
+    // setState ever runs synchronously inside the effect body.
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const t0 = performance.now();
+    const dur = reduce ? 0 : 900;
+    let raf = 0;
+    const step = (now: number) => {
+      const p = dur === 0 ? 1 : Math.min(1, (now - t0) / dur);
+      const eased = 1 - Math.pow(1 - p, 3);
+      setDisplay(from + (target - from) * eased);
+      if (p < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [target]);
+  const rounded = Math.round(display * 10) / 10;
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+}
 
 export default function Dashboard({
   state, onTaskStatus, onTaskUpdate, onSkipSubject, onFocusTask, activeTaskId, activeClockSeconds,
@@ -101,6 +129,12 @@ export default function Dashboard({
     for (let i = 0; i < span; i++) if (days.has(addDays(t, -i))) hit++;
     return Math.round((hit / span) * 100);
   })();
+  // v13 — animated KPI readouts
+  const daysLeftAnim = useCountUp(ctx.daysLeft);
+  const progressAnim = useCountUp(ctx.progressPct);
+  const hoursAnim = useCountUp(ctx.hoursThisWeek);
+  const consistencyAnim = useCountUp(consistency);
+
   const totalPlannedMin = todayTasks.reduce((a, x) => a + x.plannedMinutes, 0);
   const loggedTodayMin = state.sessions.filter((s) => s.date === t).reduce((a, s) => a + s.minutes, 0);
 
@@ -221,24 +255,24 @@ export default function Dashboard({
       <div className="kpi-grid">
         <div className="glass-panel tilt-card kpi-card">
           <div className="kpi-label">Days Remaining</div>
-          <div className="kpi-value">{ctx.daysLeft}</div>
+          <div className="kpi-value">{daysLeftAnim}</div>
           <div className="kpi-sub">Target: {prettyLong(state.settings.examDate)}</div>
         </div>
         <div className="glass-panel tilt-card kpi-card">
           <div className="kpi-label">Syllabus Progress</div>
-          <div className="kpi-value" style={{ color: "var(--accent)" }}>{ctx.progressPct}%</div>
+          <div className="kpi-value" style={{ color: "var(--accent)" }}>{progressAnim}%</div>
           <div className="bar-track" style={{ marginTop: 8 }}>
             <div className="bar-fill" style={{ width: `${ctx.progressPct}%` }} />
           </div>
         </div>
         <div className="glass-panel tilt-card kpi-card">
           <div className="kpi-label">Hours This Week</div>
-          <div className="kpi-value">{ctx.hoursThisWeek}</div>
+          <div className="kpi-value">{hoursAnim}</div>
           <div className="kpi-sub">Target {Math.round(state.settings.dailyHours * 7)}h · {fmtMin(loggedTodayMin)} today</div>
         </div>
         <div className="glass-panel tilt-card kpi-card">
           <div className="kpi-label">Consistency</div>
-          <div className="kpi-value" style={{ color: "var(--success-accent)" }}>{consistency}%</div>
+          <div className="kpi-value" style={{ color: "var(--success-accent)" }}>{consistencyAnim}%</div>
           <div className="kpi-sub">{state.user.streak} day streak · {ctx.overdue} overdue</div>
         </div>
       </div>
