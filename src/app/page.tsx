@@ -272,51 +272,34 @@ export default function Home() {
     }
   }, [themeSetting, themeLevel]);
 
-  /* v12 — global click micro-interactions: every small click gets a soft
-     spring pulse (its icon pops with it) and CTAs grow a ripple at the
-     pointer. Delegated once; WAAPI so it never fights the CSS animations. */
+  /* Calm interaction layer. The old per-click pulse, icon pop, pointer-light
+     listener and ripple were removed; hover/focus states now carry the
+     micro-feedback. We keep only real completion celebration + touch haptics. */
+  const navRef = useRef<HTMLElement | null>(null);
   useEffect(() => {
-    const PRESSABLE =
-      "button, a, .vtab, .nav-item, .cal-cell, .cmdk-item, .task-row, .ob-range-chip, [role='button']";
-    const RIPPLE_HOST = ".btn, .ob-btn-primary, .ai-fab";
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
     const coarse = window.matchMedia("(pointer: coarse)");
-    const SPRING = "cubic-bezier(.22,1,.36,1)";
-    /* WAAPI pulses must COMPOSE with the element's own CSS transforms
-       (hover lift on CTAs, :active press scale, rotated/spinning icons) —
-       replace-mode used to hijack the transform for the pulse's duration
-       and then snap back, which read as a glitch on every CTA click.
-       `composite:"add"` layers the pulse on top instead; browsers that
-       reject the option fall back to the old replace behaviour. */
-    const pulse = (target: Element, frames: Keyframe[], opts: KeyframeAnimationOptions) => {
-      try {
-        target.animate(frames, { ...opts, composite: "add" });
-      } catch {
-        try { target.animate(frames, opts); } catch { /* no-op */ }
-      }
-    };
-    /* v13: a tiny confetti burst celebrates completions at the pointer */
-    const CONFETTI = ["--accent", "--success-accent", "--warning-accent", "--color-ai"];
+    const CONFETTI = ["--accent", "--success-accent"];
     const burst = (x: number, y: number) => {
       const cs = getComputedStyle(document.body);
-      for (let i = 0; i < 12; i++) {
+      for (let i = 0; i < 8; i++) {
         const p = document.createElement("span");
         p.className = "confetti";
         p.style.background = cs.getPropertyValue(CONFETTI[i % CONFETTI.length]);
         p.style.left = `${x}px`;
         p.style.top = `${y}px`;
         document.body.appendChild(p);
-        const angle = ((Math.PI * 2) / 12) * i + Math.random() * 0.6;
-        const dist = 34 + Math.random() * 46;
+        const angle = ((Math.PI * 2) / 8) * i + Math.random() * 0.5;
+        const dist = 24 + Math.random() * 22;
         const anim = p.animate(
           [
-            { transform: "translate(-50%,-50%) rotate(0deg)", opacity: 1 },
+            { transform: "translate(-50%,-50%) rotate(0deg)", opacity: 0.85 },
             {
-              transform: `translate(calc(-50% + ${(Math.cos(angle) * dist).toFixed(1)}px), calc(-50% + ${(Math.sin(angle) * dist - 14).toFixed(1)}px)) rotate(${(180 + Math.random() * 180).toFixed(0)}deg)`,
+              transform: `translate(calc(-50% + ${(Math.cos(angle) * dist).toFixed(1)}px), calc(-50% + ${(Math.sin(angle) * dist - 10).toFixed(1)}px)) rotate(${(180 + Math.random() * 180).toFixed(0)}deg)`,
               opacity: 0,
             },
           ],
-          { duration: 650 + Math.random() * 350, easing: "cubic-bezier(.16,1,.3,1)" },
+          { duration: 520 + Math.random() * 180, easing: "cubic-bezier(.22,1,.36,1)" },
         );
         anim.onfinish = () => p.remove();
         anim.oncancel = () => p.remove();
@@ -325,168 +308,22 @@ export default function Home() {
     const onClick = (e: MouseEvent) => {
       const t = e.target;
       if (!(t instanceof Element)) return;
-      if (coarse.matches) haptic(6); // light tick on real taps
-      if (reduce.matches) return;
-      const el = t.closest(PRESSABLE);
+      if (coarse.matches) haptic(6);
+      const el = t.closest("button, a, .rate-btn, [role='button']");
       if (!(el instanceof HTMLElement)) return;
-      const rect = el.getBoundingClientRect();
-      // Keyboard "clicks" report (0,0) — anchor effects to the element then.
-      const fromKeyboard = e.detail === 0 || (e.clientX === 0 && e.clientY === 0);
-      const px = fromKeyboard ? rect.left + rect.width / 2 : e.clientX;
-      const py = fromKeyboard ? rect.top + rect.height / 2 : e.clientY;
+      if (reduce.matches) return;
       const label = (el.textContent || "").trim();
-      if (label === "Done" || el.matches(".rate-btn")) burst(px, py);
-      const soft = el.matches(".task-row, .kpi-card");
-      pulse(
-        el,
-        [
-          { transform: "scale(1)" },
-          { transform: soft ? "scale(1.012)" : "scale(1.045)", offset: 0.35 },
-          { transform: "scale(1)" },
-        ],
-        { duration: soft ? 500 : 620, easing: SPRING },
-      );
-      const icon = el.querySelector("svg");
-      if (icon) {
-        pulse(
-          icon,
-          [
-            { transform: "scale(.82)" },
-            { transform: "scale(1.14)", offset: 0.55 },
-            { transform: "scale(1)" },
-          ],
-          { duration: 520, easing: SPRING },
-        );
-      }
-      const host = el.matches(RIPPLE_HOST) ? el : el.closest(RIPPLE_HOST);
-      if (host instanceof HTMLElement) {
-        const r = host.getBoundingClientRect();
-        const size = Math.max(r.width, r.height) * 2.2;
-        const span = document.createElement("span");
-        span.className = "fx-ripple";
-        span.style.width = span.style.height = `${size}px`;
-        span.style.left = `${px - r.left}px`;
-        span.style.top = `${py - r.top}px`;
-        host.appendChild(span);
-        const anim = span.animate(
-          [
-            { transform: "translate(-50%,-50%) scale(0)", opacity: 0.55 },
-            { transform: "translate(-50%,-50%) scale(1)", opacity: 0 },
-          ],
-          { duration: 750, easing: "cubic-bezier(.16,1,.3,1)" },
-        );
-        anim.onfinish = () => span.remove();
-        anim.oncancel = () => span.remove();
-      }
-    };
-    /* The CSS press-glow (.btn:active::after) blooms at var(--px)/var(--py);
-       nothing ever set those vars, so it always flashed at the CENTER while
-       the JS ripple bloomed at the pointer — two misaligned flashes on one
-       press. Wire the vars up on pointerdown so both effects share origin. */
-    const onDown = (e: PointerEvent) => {
-      const t = e.target;
-      if (!(t instanceof Element)) return;
-      const host = t.closest(".btn");
-      if (host instanceof HTMLElement) {
-        const r = host.getBoundingClientRect();
-        host.style.setProperty("--px", `${(e.clientX - r.left).toFixed(1)}px`);
-        host.style.setProperty("--py", `${(e.clientY - r.top).toFixed(1)}px`);
+      if (label === "Done" || el.matches(".rate-btn")) {
+        const rect = el.getBoundingClientRect();
+        const fromKeyboard = e.detail === 0 || (e.clientX === 0 && e.clientY === 0);
+        const px = fromKeyboard ? rect.left + rect.width / 2 : e.clientX;
+        const py = fromKeyboard ? rect.top + rect.height / 2 : e.clientY;
+        burst(px, py);
       }
     };
     document.addEventListener("click", onClick);
-    document.addEventListener("pointerdown", onDown, { passive: true });
-    return () => {
-      document.removeEventListener("click", onClick);
-      document.removeEventListener("pointerdown", onDown);
-    };
+    return () => document.removeEventListener("click", onClick);
   }, []);
-
-  /* v14 — pointer light. One delegated, rAF-throttled listener paints every
-     pointer-reactive effect in the app: the tilt origin (--mx/--my), the
-     liquid-glass specular pool (--spec-x/--spec-y, v14 CSS) and the CTA
-     gradient origin (--px/--py). Two elements maximum per frame, and mouse
-     pointers only — a finger never runs this. */
-  useEffect(() => {
-    let card: HTMLElement | null = null;
-    let btn: HTMLElement | null = null;
-    let raf = 0;
-    let x = 0;
-    let y = 0;
-    const paint = () => {
-      raf = 0;
-      if (card) {
-        const r = card.getBoundingClientRect();
-        const cx = (x - r.left).toFixed(1);
-        const cy = (y - r.top).toFixed(1);
-        card.style.setProperty("--mx", `${cx}px`);
-        card.style.setProperty("--my", `${cy}px`);
-        card.style.setProperty("--spec-x", `${cx}px`);
-        card.style.setProperty("--spec-y", `${cy}px`);
-      }
-      if (btn) {
-        const r = btn.getBoundingClientRect();
-        btn.style.setProperty("--px", `${(x - r.left).toFixed(1)}px`);
-        btn.style.setProperty("--py", `${(y - r.top).toFixed(1)}px`);
-      }
-    };
-    const onMove = (e: PointerEvent) => {
-      if (e.pointerType !== "mouse") return;
-      const t = e.target;
-      if (!(t instanceof Element)) return;
-      const c = t.closest(".tilt-card,.glass-panel,.ai-panel");
-      card = c instanceof HTMLElement ? c : null;
-      const b = t.closest(".btn");
-      btn = b instanceof HTMLElement ? b : null;
-      x = e.clientX;
-      y = e.clientY;
-      if ((card || btn) && !raf) raf = requestAnimationFrame(paint);
-    };
-    document.addEventListener("pointermove", onMove, { passive: true });
-    return () => {
-      document.removeEventListener("pointermove", onMove);
-      if (raf) cancelAnimationFrame(raf);
-    };
-  }, []);
-
-  /* v14 — liquid nav indicator. The active pill is measured, not guessed, so
-     it survives font scaling, the collapsed rail, the phone dock, landscape
-     rotation and label wrapping. `.lg-nav-ready` is only added once a real
-     box was measured: if this effect never runs, the CSS leaves v13 alone. */
-  const navRef = useRef<HTMLElement | null>(null);
-  useEffect(() => {
-    const list = navRef.current;
-    if (!list) return;
-    let raf = 0;
-    const measure = () => {
-      raf = 0;
-      const active = list.querySelector<HTMLElement>(".nav-item.active");
-      if (!active) { list.classList.remove("lg-nav-ready"); return; }
-      const lr = list.getBoundingClientRect();
-      const ar = active.getBoundingClientRect();
-      // Mid-collapse the rail can momentarily report a zero-width item;
-      // keeping the last good geometry beats jumping the pill to 0×0.
-      if (ar.width < 6 || ar.height < 6) return;
-      list.style.setProperty("--nav-x", `${(ar.left - lr.left).toFixed(1)}px`);
-      list.style.setProperty("--nav-y", `${(ar.top - lr.top).toFixed(1)}px`);
-      list.style.setProperty("--nav-w", `${ar.width.toFixed(1)}px`);
-      list.style.setProperty("--nav-h", `${ar.height.toFixed(1)}px`);
-      list.classList.add("lg-nav-ready");
-    };
-    const schedule = () => { if (!raf) raf = requestAnimationFrame(measure); };
-    schedule();
-    const settle = [80, 260, 520].map((ms) => window.setTimeout(schedule, ms));
-    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(schedule) : null;
-    ro?.observe(list);
-    window.addEventListener("resize", schedule);
-    window.addEventListener("orientationchange", schedule);
-    return () => {
-      if (raf) cancelAnimationFrame(raf);
-      settle.forEach((id) => window.clearTimeout(id));
-      ro?.disconnect();
-      window.removeEventListener("resize", schedule);
-      window.removeEventListener("orientationchange", schedule);
-    };
-  }, [page, sidebarCollapsed]);
 
   /* v14 — advancing through the rail slides the new view in from the right,
      stepping back from the left. Anything that is not a rail move (an AI

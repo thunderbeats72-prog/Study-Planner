@@ -2,7 +2,6 @@ import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 import "./study-planner-refresh.css";
-import "./study-planner-scene.css";
 import "./pastel-ui-system.css";
 import "./study-planner-redesign.css";
 
