@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import StudyScene from "./StudyScene";
 import { api, addDays, dayDiff, mdToHtml, prettyLong, today, KIND_META, normalizeCheckpointTitle, type AppState } from "@/lib/client";
 import { mmss } from "@/lib/useTimer";
 import { IconSpark } from "./icons";
@@ -171,6 +172,7 @@ export default function Dashboard({
   return (
     <div className="fade-in">
       <div className="page-header">
+        <StudyScene className="page-header-scene" />
         <div>
           <h1 className="page-title gradient-text">Hey {state.user.name}</h1>
           <p className="page-subtitle">
