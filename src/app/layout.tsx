@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
+import "./study-planner-refresh.css";
+import "./study-planner-scene.css";
 
 const inter = localFont({
   src: "./fonts/inter-latin-variable.woff2",
