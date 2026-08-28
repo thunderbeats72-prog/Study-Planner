@@ -643,12 +643,9 @@ body {
 }
 .mobile-drawer { display: none; }
 .mobile-bottom-nav { display: none; }
-.mh-menu {
-  display: none;
-}
 @media (max-width: 860px) {
-  /* The legacy desktop sidebar is replaced by the compact app bar, the
-     drawer for secondary controls, and the fixed bottom navigation. */
+  /* The legacy desktop sidebar is replaced by the compact app bar and the
+     fixed bottom navigation, which is the primary mobile navigation. */
   .sidebar { display: none !important; }
 
   /* Clearance for the fixed mobile bottom navigation: content must never
@@ -660,18 +657,6 @@ body {
   .main-workspace {
     padding-bottom: calc(84px + env(safe-area-inset-bottom)) !important;
   }
-
-  .mh-menu {
-    display: inline-flex; align-items: center; justify-content: center;
-    width: 38px; height: 38px; flex: 0 0 auto;
-    border: 1px solid var(--glass-border);
-    background: var(--surface);
-    color: var(--text-main);
-    border-radius: 11px;
-    cursor: pointer;
-    transition: background .15s ease, color .15s ease;
-  }
-  .mh-menu:hover { background: var(--rd-lavender-soft); color: var(--accent); }
 
   .drawer-scrim {
     display: block;
