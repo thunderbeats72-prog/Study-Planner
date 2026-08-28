@@ -304,3 +304,38 @@ body { background-attachment:fixed; color:var(--text-main); }
     color:var(--text-muted) !important;
   }
 }
+
+/* Collapsed desktop rail alignment — an intentional icon stack, not a shrunken sidebar. */
+@media (min-width:861px) {
+  .app-wrapper.sb-collapsed { --sidebar-w:78px !important; gap:18px !important; }
+  .app-wrapper.sb-collapsed .sidebar {
+    width:78px !important; min-width:78px !important; padding:12px 10px !important;
+    display:flex !important; flex-direction:column !important; align-items:center !important;
+  }
+  .app-wrapper.sb-collapsed .sb-toggle {
+    position:static !important; inset:auto !important; flex:0 0 40px !important;
+    width:40px !important; height:40px !important; margin:0 0 10px !important;
+  }
+  .app-wrapper.sb-collapsed .brand-header {
+    display:flex !important; flex:0 0 42px !important; width:42px !important; height:42px !important;
+    min-height:42px !important; margin:0 0 12px !important; padding:0 !important;
+    border:0 !important; justify-content:center !important; overflow:visible !important;
+  }
+  .app-wrapper.sb-collapsed .brand-text { display:none !important; }
+  .app-wrapper.sb-collapsed .brand-logo-icon { width:40px !important; height:40px !important; margin:0 !important; }
+  .app-wrapper.sb-collapsed .nav-list {
+    display:flex !important; flex:0 0 auto !important; width:100% !important;
+    margin:0 !important; padding:0 !important; gap:8px !important;
+  }
+  .app-wrapper.sb-collapsed .sidebar .nav-item {
+    width:44px !important; height:44px !important; min-height:44px !important;
+    margin:0 auto !important; padding:0 !important; gap:0 !important; justify-content:center !important;
+  }
+  .app-wrapper.sb-collapsed .sidebar .nav-item span { display:none !important; }
+  .app-wrapper.sb-collapsed .sidebar-foot {
+    display:flex !important; flex-direction:column !important; align-items:center !important;
+    width:100% !important; margin-top:auto !important; padding:0 !important;
+  }
+  .app-wrapper.sb-collapsed .sidebar-foot > .glass-panel { display:none !important; }
+  .app-wrapper.sb-collapsed .cmdk-tip { margin:0 !important; }
+}
