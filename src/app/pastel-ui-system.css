@@ -145,3 +145,124 @@ body { background-attachment:fixed; color:var(--text-main); }
   .study-scene__lamp,.study-scene__plant { animation:none; }
   .tilt-card:hover { transform:none; }
 }
+
+/* -------------------------------------------------------------------------
+   v2 layout contract
+   This intentionally sits after the legacy layers.  The application used to
+   have several generations of mobile rules fighting each other; these are the
+   single source of truth for spacing, alignment, and small-screen hierarchy.
+   ------------------------------------------------------------------------- */
+.app-wrapper { align-items:flex-start; }
+.main-workspace { width:min(100%, 1420px); margin-inline:auto; }
+.page-header { display:flex; justify-content:flex-start; }
+.tracker-bar { position:sticky; z-index:40; }
+
+@media (min-width:861px) {
+  .main-workspace { padding:2px 0 64px !important; }
+  .sidebar { top:16px; height:calc(100vh - 32px); overflow:hidden; }
+  .sidebar-foot { margin-top:auto; }
+  .page-header { min-height:124px; padding:20px 315px 18px 4px; margin:0 0 12px; }
+  .page-header-scene { right:12px; bottom:0; }
+  .page-title { line-height:1.06; }
+  .tracker-bar { top:16px; }
+}
+
+@media (max-width:860px) {
+  :root { --dock-h:72px; --header-h:58px; }
+  html,body { min-width:0; overflow-x:clip; }
+  .app-wrapper {
+    display:block !important;
+    padding:0 12px calc(84px + env(safe-area-inset-bottom)) !important;
+    min-height:100dvh;
+  }
+  .main-workspace {
+    width:100%; min-width:0; padding:calc(58px + env(safe-area-inset-top)) 0 20px !important;
+  }
+
+  /* A compact, readable mobile masthead — it never competes with the timer. */
+  .mobile-header {
+    display:flex !important; position:fixed !important; inset:0 0 auto !important;
+    height:58px !important; min-height:58px; padding:0 14px !important;
+    background:rgba(255,254,250,.96) !important; border-bottom:1px solid var(--glass-border) !important;
+    box-shadow:0 2px 14px rgba(32,34,61,.06) !important; z-index:120 !important;
+  }
+  .mobile-header .brand-logo-icon { width:30px !important; height:30px !important; border-radius:10px !important; }
+  .mobile-header .brand-title { max-width:180px; font-size:.78rem !important; line-height:1.1 !important; }
+  .mobile-header .brand-course { display:none !important; }
+  .mobile-header .mh-streak { font-size:.67rem !important; padding:6px 9px !important; }
+
+  /* The study session is a deliberate two-row card, never a wrapping accident. */
+  .tracker-bar {
+    position:relative !important; top:auto !important; display:grid !important;
+    grid-template-columns:minmax(0,1fr) auto !important; grid-template-areas:"status time" "actions actions" !important;
+    gap:10px !important; min-height:0 !important; margin:0 0 18px !important; padding:13px 14px !important;
+    border-radius:18px !important; background:var(--surface-elevated) !important;
+  }
+  .tracker-bar .tracker-status { grid-area:status !important; display:flex !important; width:auto !important; min-width:0 !important; gap:8px !important; }
+  .tracker-bar .tracker-labels { display:flex !important; flex-direction:column !important; align-items:flex-start !important; gap:2px !important; min-width:0 !important; overflow:hidden !important; }
+  .tracker-bar .tracker-state { font-size:.73rem !important; line-height:1.2 !important; white-space:nowrap !important; }
+  .tracker-bar .tracker-task { display:block !important; max-width:100% !important; overflow:hidden !important; text-overflow:ellipsis !important; white-space:nowrap !important; font-size:.66rem !important; }
+  .tracker-bar .tracker-time { grid-area:time !important; margin:0 !important; align-self:start !important; font-size:1.1rem !important; line-height:1.25 !important; }
+  .tracker-bar .tracker-actions { grid-area:actions !important; display:flex !important; width:100% !important; gap:8px !important; padding:0 !important; flex-wrap:nowrap !important; }
+  .tracker-bar .tracker-actions .chip, .tracker-bar .tracker-actions .ambient-pill { display:none !important; }
+  .tracker-bar .tracker-actions .btn, .tracker-bar .tracker-actions .tracker-zen {
+    flex:1 1 0 !important; width:auto !important; min-width:0 !important; height:40px !important; min-height:40px !important;
+    padding:0 12px !important; border-radius:11px !important; font-size:.74rem !important; white-space:nowrap !important;
+  }
+
+  .page-header { display:block !important; min-height:0 !important; margin:0 2px 17px !important; padding:0 !important; }
+  .page-header-scene { display:none !important; }
+  .page-title { font-size:clamp(1.48rem,7vw,1.8rem) !important; line-height:1.08 !important; }
+  .page-subtitle { margin-top:7px !important; font-size:.79rem !important; line-height:1.55 !important; }
+  .page-header > .flex-row, .planner-tools { margin-top:14px; }
+
+  .kpi-grid { grid-template-columns:repeat(2,minmax(0,1fr)) !important; gap:10px !important; margin-bottom:14px !important; }
+  .kpi-card { min-width:0 !important; min-height:112px !important; padding:15px !important; border-radius:18px !important; }
+  .kpi-card::after { width:64px; height:64px; }
+  .kpi-label { font-size:.58rem !important; letter-spacing:.075em !important; }
+  .kpi-value { font-size:1.55rem !important; }
+  .kpi-sub { font-size:.64rem !important; overflow-wrap:anywhere; }
+  .dash-grid-2,.focus-grid-2,.subs-wrap { display:grid !important; grid-template-columns:minmax(0,1fr) !important; gap:12px !important; }
+  .dash-card,.day-block,.section-card,.study-clock-panel,.timer-panel { min-width:0 !important; border-radius:20px !important; }
+  .dash-card { padding:16px !important; }
+  .wk-chart { min-width:0 !important; overflow:hidden; }
+
+  /* Planner rows become genuine cards: information first, controls second. */
+  .planner-days { gap:12px !important; }
+  .planner-days .day-block { overflow:hidden; }
+  .planner-days .day-head { padding:15px !important; }
+  .planner-days .task-row { display:flex !important; align-items:flex-start !important; flex-wrap:wrap !important; gap:9px !important; margin:8px !important; padding:13px !important; }
+  .planner-days .task-row .task-main { flex:1 1 calc(100% - 18px) !important; width:calc(100% - 18px) !important; min-width:0 !important; }
+  .planner-days .task-row > .chip { order:2; margin:0 !important; min-width:0 !important; }
+  .planner-days .task-row .task-row-actions { order:3; display:grid !important; grid-template-columns:repeat(2,minmax(0,1fr)) !important; width:100% !important; min-width:0 !important; gap:7px !important; }
+  .planner-days .task-row .task-row-actions .btn { width:100% !important; min-width:0 !important; padding-inline:8px !important; }
+
+  /* A bottom dock that keeps all five destinations touch-sized and legible. */
+  .sidebar {
+    position:fixed !important; inset:auto 10px max(10px,env(safe-area-inset-bottom)) !important;
+    width:auto !important; height:64px !important; min-height:64px !important; padding:5px !important;
+    display:block !important; overflow:visible !important; border-radius:20px !important;
+    background:rgba(255,254,250,.98) !important; box-shadow:0 12px 34px rgba(32,34,61,.16) !important; z-index:130 !important;
+  }
+  .sidebar .brand-header,.sidebar .sidebar-foot,.sidebar .sb-toggle { display:none !important; }
+  .sidebar .nav-list { display:grid !important; grid-template-columns:repeat(5,minmax(0,1fr)) !important; width:100% !important; height:100% !important; margin:0 !important; gap:2px !important; }
+  .sidebar .nav-item { display:flex !important; min-width:0 !important; min-height:54px !important; padding:5px 2px !important; gap:3px !important; border-radius:14px !important; flex-direction:column !important; justify-content:center !important; align-items:center !important; color:var(--text-muted) !important; }
+  .sidebar .nav-item svg { width:19px !important; height:19px !important; flex:none !important; }
+  .sidebar .nav-item span { display:block !important; width:100% !important; overflow:hidden !important; text-overflow:ellipsis !important; white-space:nowrap !important; text-align:center !important; font-size:9px !important; line-height:1.1 !important; }
+  .sidebar .nav-item.active { background:var(--accent-gradient) !important; color:#fff !important; box-shadow:0 5px 12px var(--accent-glow) !important; }
+  .sidebar .nav-item.active::before { display:none !important; }
+
+  .ai-fab { right:18px !important; bottom:86px !important; width:52px !important; height:52px !important; }
+}
+
+@media (max-width:375px) {
+  .app-wrapper { padding-inline:9px !important; }
+  .mobile-header { padding-inline:10px !important; }
+  .mobile-header .brand-title { max-width:145px; }
+  .tracker-bar { padding:12px !important; }
+  .tracker-bar .tracker-actions .btn,.tracker-bar .tracker-actions .tracker-zen { padding-inline:8px !important; font-size:.7rem !important; }
+  .kpi-card { padding:12px !important; }
+  .kpi-value { font-size:1.4rem !important; }
+  .sidebar { inset-inline:7px !important; }
+}
+
