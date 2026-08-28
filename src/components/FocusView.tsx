@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import StudyScene from "./StudyScene";
 import { today, type AppState } from "@/lib/client";
 import { mmss, type ClockApi, type TimerApi, type TimerMode } from "@/lib/useTimer";
 import { playSound, setVolume, stopSound, currentSound } from "@/lib/sound";
@@ -99,6 +100,7 @@ export default function FocusView({
   return (
     <div className="fade-in focus-view">
       <div className="page-header focus-page-header">
+        <StudyScene className="page-header-scene" />
         <div className="focus-header-copy">
           <div className="focus-eyebrow"><span className="focus-eyebrow-mark" /> Focus Studio</div>
           <h1 className="page-title">A calmer way to study</h1>
