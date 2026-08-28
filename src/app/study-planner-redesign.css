@@ -297,7 +297,12 @@ body {
    DASHBOARD
 ══════════════════════════════════════════════════════════════════════ */
 
-/* Anchor the decorative header scene on Planner/Focus/Settings views. */
+/* ── Page illustrations ─────────────────────────────────────────────────
+   Every view header carries its own scene (planner → calendar+books+plant,
+   focus → clock+plant+desk, subjects → notebook, settings → stationery,
+   dashboard → lamp+books+plant). They share one 360×200 canvas and the
+   `--scene-*` tokens, so a single sizing rule fits all of them and every
+   theme re-colours them for free. */
 .page-header { position: relative; }
 .page-header-scene {
   z-index: 0;
@@ -305,9 +310,39 @@ body {
   display: block !important;
   width: clamp(190px, 21vw, 280px);
 }
+.study-scene svg { display: block; width: 100%; height: auto; }
+@media (prefers-reduced-motion: no-preference) {
+  .study-scene { animation: sceneIn .5s cubic-bezier(.22, 1, .36, 1) both; }
+}
+@keyframes sceneIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
 @media (max-width: 1100px) { .page-header-scene { width: 200px; opacity: .8; } }
-@media (max-width: 700px) { .page-header-scene { display: none !important; } }
 .page-header > :not(.page-header-scene) { position: relative; z-index: 1; }
+
+/* Below the desktop breakpoint the header stacks, so the scene stops
+   floating over the title: it becomes a centred, non-overlapping block
+   that rides underneath the copy instead of behind it. */
+@media (max-width: 860px) {
+  .page-header {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 12px !important;
+  }
+  .page-header-scene {
+    position: static !important;
+    order: 3;
+    display: block !important;
+    width: min(230px, 62%) !important;
+    max-width: 100%;
+    margin: 2px auto 0 !important;
+    opacity: .8;
+  }
+  .page-header > :not(.page-header-scene) { position: static; }
+  .focus-zen-button { order: 2; }
+}
 
 /* The old pastel system drew a decorative corner blob on KPI cards;
    the icon chips now carry that visual job. (Only ::after is the blob;
@@ -690,17 +725,11 @@ body {
   }
   .drawer-tool:hover { color: var(--accent); border-color: var(--nav-active-border); background: var(--rd-lavender-soft); }
   .drawer-tool:disabled { opacity: .55; cursor: wait; }
-  .drawer-theme-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
-  .drawer-theme-dot {
-    width: 26px; height: 26px; border-radius: 50%;
-    border: 2px solid transparent;
-    cursor: pointer;
-    box-shadow: inset 0 1px 0 rgba(255,255,255,.35), 0 1px 3px rgba(16,14,34,.18);
-    transition: transform .15s cubic-bezier(.22,1,.36,1);
-  }
-  .drawer-theme-dot:hover { transform: scale(1.12); }
-  .drawer-theme-dot.active { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+  /* The mobile drawer carries navigation only — no theme swatches and no
+     ⌘K hint (both are desktop chrome; themes live in Settings). */
   .drawer-nav { display: flex; flex-direction: column; gap: 4px; }
+  .mobile-drawer .cmdk-tip,
+  .mobile-drawer .sb-toggle { display: none !important; }
   .drawer-item {
     display: flex; align-items: center; gap: 13px;
     width: 100%;
@@ -731,50 +760,86 @@ body {
 
 /* ══════════════════════════════════════════════════════════════════════
    ZEN FOCUS MODE
+   A full-screen, immersive dark room: atmospheric desk · lamp · books ·
+   plant at the bottom, one large centred timer with an elegant progress
+   ring, and a quiet guidance panel underneath. Calm and premium — the
+   only colour in the room is the ring and the lamp.
 ══════════════════════════════════════════════════════════════════════ */
 .zen {
   position: fixed; inset: 0; z-index: 999999;
   background:
-    radial-gradient(900px 480px at 50% -10%, rgba(124, 99, 246, .22), transparent 65%),
-    radial-gradient(600px 420px at 12% 108%, rgba(124, 99, 246, .12), transparent 60%),
-    radial-gradient(600px 420px at 88% 108%, rgba(80, 200, 180, .08), transparent 60%),
-    linear-gradient(180deg, #0b0a1c 0%, #080714 55%, #0a091d 100%) !important;
+    radial-gradient(900px 460px at 50% -12%, rgba(124, 99, 246, .16), transparent 62%),
+    radial-gradient(620px 420px at 10% 106%, rgba(124, 99, 246, .08), transparent 60%),
+    radial-gradient(620px 420px at 92% 108%, rgba(90, 190, 170, .05), transparent 60%),
+    linear-gradient(180deg, #0b0a1c 0%, #080714 58%, #0a091d 100%) !important;
   color: #f4f3ff;
   display: flex; flex-direction: column;
-  align-items: center; justify-content: center;
-  gap: 20px;
-  padding: 28px 20px;
+  align-items: center;
+  gap: 0;
+  padding: 0;
   overflow: hidden;
 }
 /* The legacy dark vignette is replaced by the atmospheric glow. */
 .zen::after { display: none !important; }
+
 .zen-glow {
-  position: absolute; left: 50%; top: 42%;
-  width: min(720px, 90vw); height: min(720px, 90vw);
+  position: absolute; left: 50%; top: 40%;
+  width: min(760px, 92vmin); height: min(760px, 92vmin);
   transform: translate(-50%, -50%);
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(139, 124, 246, .16), transparent 62%);
+  background: radial-gradient(circle, rgba(139, 124, 246, .13), transparent 62%);
   pointer-events: none;
-  animation: zenBreathe 7s ease-in-out infinite;
+  opacity: .55;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .zen-glow { animation: zenBreathe 11s ease-in-out infinite; }
 }
 @keyframes zenBreathe {
-  0%, 100% { opacity: .7; transform: translate(-50%, -50%) scale(1); }
-  50% { opacity: 1; transform: translate(-50%, -50%) scale(1.08); }
+  0%, 100% { opacity: .45; transform: translate(-50%, -50%) scale(1); }
+  50% { opacity: .72; transform: translate(-50%, -50%) scale(1.06); }
 }
+
 .zen-environment {
   position: absolute; left: 0; right: 0; bottom: 0;
-  width: 100%; pointer-events: none; opacity: .8;
+  width: 100%; pointer-events: none; opacity: .78;
 }
 .zen-environment svg { display: block; width: 100%; height: auto; max-height: 34vh; }
 
+/* ── Ambient movement inside the scene: barely there, never distracting ── */
+@media (prefers-reduced-motion: no-preference) {
+  .zen-scene__glow {
+    transform-box: view-box; transform-origin: 274px 134px;
+    animation: zenLampBreathe 10s ease-in-out infinite;
+  }
+  .zen-scene__plant {
+    transform-box: view-box; transform-origin: 858px 300px;
+    animation: zenSway 13s ease-in-out infinite;
+  }
+  .zen-scene__motes { animation: zenDrift 16s ease-in-out infinite; }
+}
+@keyframes zenLampBreathe {
+  0%, 100% { opacity: .34; }
+  50% { opacity: .5; }
+}
+@keyframes zenSway {
+  0%, 100% { transform: rotate(-.6deg); }
+  50% { transform: rotate(.6deg); }
+}
+@keyframes zenDrift {
+  0%, 100% { opacity: .35; transform: translateY(0); }
+  50% { opacity: .6; transform: translateY(-7px); }
+}
+
+/* ── Top bar: Focus Mode · DEEP FOCUS SESSION · Full Screen / Exit ────── */
 .zen-topbar {
   position: absolute; top: 0; left: 0; right: 0;
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 12px;
+  display: grid; grid-template-columns: 1fr auto 1fr;
+  align-items: center; gap: 12px;
   padding: calc(14px + env(safe-area-inset-top)) 18px 0;
   z-index: 3;
 }
-.zen-topbar-right { display: flex; gap: 8px; }
+.zen-topbar > .zen-ghost { justify-self: start; }
+.zen-topbar-right { display: flex; gap: 8px; justify-self: end; }
 .zen-ghost {
   display: inline-flex; align-items: center; gap: 7px;
   padding: 9px 15px;
@@ -785,74 +850,116 @@ body {
   font-family: inherit; font-size: .78rem; font-weight: 650;
   cursor: pointer;
   backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-  transition: background .18s ease, color .18s ease, border-color .18s ease;
+  transition: background .2s ease, color .2s ease, border-color .2s ease,
+              transform .18s cubic-bezier(.25, 1, .4, 1);
 }
-.zen-ghost:hover { background: rgba(255, 255, 255, .12); color: #fff; border-color: rgba(255, 255, 255, .28); }
-.zen-exit { color: rgba(255, 255, 255, .7); }
+.zen-ghost:hover {
+  background: rgba(255, 255, 255, .12); color: #fff;
+  border-color: rgba(255, 255, 255, .28);
+}
+.zen-ghost:active { transform: scale(.97); }
+/* The legacy "kiosk lock" rule pinned `.zen-exit` to the viewport corner.
+   It now lives inside the top-bar grid, so it has to stay in flow. */
+.zen-exit {
+  position: static; top: auto; right: auto;
+  color: rgba(255, 255, 255, .72);
+}
 .zen-eyebrow {
-  font-size: .72rem; font-weight: 800; letter-spacing: .28em;
+  justify-self: center;
+  font-size: .7rem; font-weight: 800; letter-spacing: .3em;
   text-transform: uppercase;
-  color: rgba(196, 188, 255, .85);
-  text-align: center;
+  color: rgba(196, 188, 255, .8);
+  text-align: center; white-space: nowrap;
+}
+
+/* ── Centre stage: kicker · ring · actions · hint ─────────────────────── */
+.zen-stage {
+  position: relative; z-index: 2;
+  flex: 1 1 auto; width: 100%; max-width: 940px;
+  min-height: 0;              /* lets the stage scroll instead of overflowing */
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: clamp(10px, 2.2vh, 22px);
+  padding: calc(74px + env(safe-area-inset-top)) 20px calc(84px + env(safe-area-inset-bottom));
+  overflow-y: auto;
 }
 .zen-kicker {
-  font-size: .92rem; font-weight: 600; color: rgba(255, 255, 255, .62);
-  text-align: center; max-width: 60ch; z-index: 2;
+  font-size: .9rem; font-weight: 600; color: rgba(255, 255, 255, .62);
+  text-align: center; max-width: 60ch;
+  text-transform: none; letter-spacing: 0; opacity: 1;
 }
 
 .zen-ring-wrap {
-  position: relative; z-index: 2;
-  width: min(380px, 64vw);
+  position: relative;
+  width: min(380px, 62vmin);
   aspect-ratio: 1;
   display: grid; place-items: center;
+  flex: 0 0 auto;
 }
 .zen-ring { width: 100%; height: 100%; transform: rotate(-90deg); }
 .zen-ring-track {
   fill: none;
-  stroke: rgba(255, 255, 255, .08);
-  stroke-width: 5;
+  stroke: rgba(255, 255, 255, .07);
+  stroke-width: 6;
 }
 .zen-ring-progress {
   fill: none;
   stroke: url(#zenRingGradient);
-  stroke: #9d8df6;
-  stroke-width: 5;
+  stroke-width: 6;
   stroke-linecap: round;
   stroke-dasharray: 879.65;
-  transition: stroke-dashoffset .6s linear;
-  filter: drop-shadow(0 0 10px rgba(140, 122, 246, .55));
+  transition: stroke-dashoffset .7s cubic-bezier(.33, 1, .68, 1);
 }
 .zen-center {
   position: absolute; inset: 0;
   display: flex; flex-direction: column;
-  align-items: center; justify-content: center; gap: 8px;
+  align-items: center; justify-content: center; gap: 9px;
+  text-align: center; padding: 0 12%;
+}
+/* A soft disc behind the digits gives the ring centre depth. */
+.zen-center::before {
+  content: ""; position: absolute; inset: 14%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(139, 124, 246, .12), transparent 70%);
+  pointer-events: none;
+}
+.zen-mode {
+  position: relative;
+  font-size: .66rem; font-weight: 750; letter-spacing: .22em;
+  text-transform: uppercase;
+  color: rgba(196, 188, 255, .72);
 }
 .zen .zen-digits {
+  position: relative;
   font-family: var(--font-display, inherit);
-  font-size: clamp(3rem, 11vw, 5.6rem) !important;
-  font-weight: 750;
-  letter-spacing: -.04em !important;
+  font-size: clamp(3rem, 10.5vw, 5.4rem) !important;
+  font-weight: 700;
+  letter-spacing: -.03em !important;
   font-variant-numeric: tabular-nums;
   line-height: 1;
-  text-shadow: 0 0 46px rgba(150, 132, 246, .4);
+  text-shadow: 0 0 34px rgba(150, 132, 246, .22);
   animation: none !important;
 }
 .zen-status {
+  position: relative;
   font-size: .74rem; font-weight: 600;
-  color: rgba(255, 255, 255, .55);
-  letter-spacing: .03em;
+  color: rgba(255, 255, 255, .56);
+  letter-spacing: .02em;
   text-transform: none;
+  opacity: 1;
 }
 
-.zen-actions { z-index: 2; flex-wrap: wrap; justify-content: center; gap: 10px !important; }
+.zen-actions { flex-wrap: wrap; justify-content: center; gap: 10px !important; }
 .zen-primary {
   min-height: 48px; padding: 12px 28px;
   font-size: .92rem; font-weight: 750;
   border-radius: 999px;
-  background: linear-gradient(150deg, #9688f6, #6e5de8);
-  box-shadow: 0 10px 30px -8px rgba(124, 110, 240, .65), inset 0 1px 0 rgba(255,255,255,.3);
+  background: linear-gradient(150deg, #8f81f2, #6a5ae4);
+  border: 1px solid rgba(255, 255, 255, .16);
+  box-shadow: 0 10px 30px -14px rgba(124, 110, 240, .7), inset 0 1px 0 rgba(255, 255, 255, .22);
 }
-.zen-primary:hover { filter: brightness(1.08); transform: translateY(-1px); }
+.zen-primary:hover { filter: brightness(1.07); transform: translateY(-1px); }
+.zen-primary:active { transform: translateY(0) scale(.985); }
 .zen-secondary {
   min-height: 44px; padding: 10px 22px;
   border-radius: 999px;
@@ -869,50 +976,63 @@ body {
   color: #f3a4a4;
 }
 .zen-hint {
-  z-index: 2; font-size: .8rem; color: rgba(255, 255, 255, .55);
+  font-size: .8rem; color: rgba(255, 255, 255, .5);
   max-width: 46ch; text-align: center; margin: 0; line-height: 1.55;
 }
 
+/* ── Bottom focus-guidance panel ──────────────────────────────────────── */
 .zen-guidance {
-  position: absolute;
-  left: 50%; bottom: calc(20px + env(safe-area-inset-bottom));
-  transform: translateX(-50%);
-  z-index: 3;
-  display: flex; align-items: center; gap: 14px;
+  position: relative; z-index: 3;
+  flex: 0 0 auto;
+  display: flex; align-items: center; justify-content: center; gap: 14px;
+  max-width: calc(100% - 24px);
+  margin: 0 auto calc(20px + env(safe-area-inset-bottom));
   padding: 11px 22px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, .05);
-  border: 1px solid rgba(255, 255, 255, .1);
+  background: rgba(255, 255, 255, .045);
+  border: 1px solid rgba(255, 255, 255, .09);
   backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-  color: rgba(255, 255, 255, .72);
+  color: rgba(255, 255, 255, .7);
   font-size: .78rem; font-weight: 650;
-  white-space: nowrap;
+  flex-wrap: wrap;
 }
 .zen-guidance-item { display: inline-flex; align-items: center; gap: 8px; }
-.zen-guidance-item svg { color: rgba(196, 188, 255, .9); }
-.zen-guidance-sep { width: 4px; height: 4px; border-radius: 50%; background: rgba(255, 255, 255, .3); }
+.zen-guidance-item svg { color: rgba(196, 188, 255, .85); flex: 0 0 auto; }
+.zen-guidance-sep { width: 4px; height: 4px; border-radius: 50%; background: rgba(255, 255, 255, .28); }
 
+/* Minimal mode keeps the room, drops the furniture. */
 .zen-minimal .zen-environment,
 .zen-minimal .zen-guidance,
 .zen-minimal .zen-kicker { opacity: 0; pointer-events: none; transition: opacity .3s ease; }
+.zen-minimal .zen-guidance,
+.zen-minimal .zen-kicker { display: none; }
 
 @media (max-width: 640px) {
-  .zen { gap: 14px; padding: 20px 14px; }
-  .zen-ring-wrap { width: min(300px, 72vw); }
-  .zen-eyebrow { font-size: .62rem; letter-spacing: .2em; }
-  .zen-topbar { padding: calc(10px + env(safe-area-inset-top)) 12px 0; }
+  .zen-stage { padding: calc(66px + env(safe-area-inset-top)) 16px calc(76px + env(safe-area-inset-bottom)); }
+  .zen-ring-wrap { width: min(300px, 66vmin); }
+  .zen-eyebrow { font-size: .58rem; letter-spacing: .18em; }
+  .zen-topbar { padding: calc(10px + env(safe-area-inset-top)) 12px 0; gap: 8px; }
   .zen-ghost { padding: 8px 12px; font-size: .7rem; }
-  .zen-guidance {
-    gap: 10px; padding: 9px 14px; font-size: .68rem;
-    max-width: calc(100vw - 24px);
-  }
+  .zen-guidance { gap: 10px; padding: 9px 14px; font-size: .68rem; }
   .zen-exit-btn { display: none; }
+  .zen-kicker { font-size: .82rem; }
 }
-@media (max-width: 380px) {
+@media (max-width: 420px) {
+  .zen-eyebrow { font-size: .52rem; letter-spacing: .12em; }
   .zen-ghost span { display: none; }
   .zen-ghost { padding: 9px; }
   .zen-guidance { gap: 8px; }
   .zen-guidance-item span { font-size: .64rem; }
+  .zen-guidance-sep { display: none; }
+}
+/* Short landscape phones: the scene and guidance step aside for the ring. */
+@media (max-height: 560px) and (orientation: landscape) {
+  .zen-environment { display: none; }
+  .zen-guidance { display: none; }
+  .zen-ring-wrap { width: min(240px, 38vh); }
+  .zen-stage { gap: 8px; padding: calc(58px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom)); }
+  .zen-kicker { display: none; }
+  .zen-hint { display: none; }
 }
 
 /* ── Responsive polish ──────────────────────────────────────────────────── */
@@ -934,19 +1054,36 @@ body {
   .mini-cal-grid { gap: 2px; }
   .mini-cal-cell { font-size: .68rem; }
 }
-/* Short landscape phones: Zen scene shrinks so the ring stays centred. */
-@media (max-height: 560px) and (orientation: landscape) {
-  .zen-environment { display: none; }
-  .zen-guidance { display: none; }
-  .zen-ring-wrap { width: min(240px, 38vh); }
-  .zen { gap: 10px; }
+/* ── Mobile / touch chrome ───────────────────────────────────────────────
+   Below 860px the sidebar IS the bottom dock. It keeps navigation and
+   nothing else: no theme swatches, no ⌘K hint (there is no keyboard),
+   no collapse arrow. Theme switching stays in Settings, where it belongs,
+   and the compact app bar keeps its menu button for the full drawer. */
+@media (max-width: 860px) {
+  .sidebar {
+    background: var(--surface-elevated) !important;
+    border: 1px solid var(--glass-border) !important;
+    box-shadow: 0 12px 30px rgba(32, 34, 61, .12) !important;
+  }
+  .sidebar .nav-item {
+    transition: background .18s ease, color .18s ease, transform .16s cubic-bezier(.25, 1, .4, 1);
+  }
+  .sidebar .nav-item:active { transform: scale(.94); }
+  .sidebar .nav-item.active {
+    background: var(--nav-active-bg) !important;
+    color: var(--nav-active-text) !important;
+    box-shadow: none !important;
+  }
+  .sidebar .nav-item.active svg { color: var(--accent); }
+  .sidebar .nav-item.active span { font-weight: 700; }
+  /* Keyboard hints and rail controls belong to the pointer-driven layout. */
+  .cmdk-tip, .sidebar .sb-toggle { display: none !important; }
 }
 
-/* ── Reduced motion ─────────────────────────────────────────────────────── */
-@media (prefers-reduced-motion: reduce) {
-  .wave-emoji, .zen-glow, .drawer-scrim, .mobile-drawer { animation: none !important; }
-  .zen-environment { opacity: .7; }
-  .mobile-drawer { transition: none; }
+/* Touch devices (phones and tablets at any width) never show the ⌘K hint
+   or the rail collapse arrow — there is no hardware keyboard to hint at. */
+@media (pointer: coarse) {
+  .cmdk-tip, .sb-toggle { display: none !important; }
 }
 
 /* ══════════════════════════════════════════════════════════════════════
@@ -1110,7 +1247,6 @@ body::after { content: none !important; display: none !important; }
 .study-scene__lamp,
 .study-scene__plant { animation: none !important; }
 .dash-hero-scene { opacity: .9; }
-.zen-environment { opacity: .72 !important; }
 
 /* ── Quiet cards: neutral surface + hairline + soft elevation ────────── */
 .glass-panel:not(.dash-hero):not(.dash-quote-card) {
@@ -1462,72 +1598,143 @@ body::after { content: none !important; display: none !important; }
 .ai-fab:hover svg { transform: none !important; }
 .ai-fab:hover { box-shadow: 0 10px 28px -10px var(--accent-glow) !important; }
 
-/* ── Motion: only useful state changes stay animated ──────────────────── */
-.glass-panel, .kpi-value, .heat-cell, .cal-grid .cal-cell, .wk-bar,
+/* ══════════════════════════════════════════════════════════════════════
+   MOTION — refined, purposeful, quiet
+   This layer has the final word on animation. Decorative loops stay off;
+   what survives is feedback that means something: a view arriving, a
+   press landing, a lesson completed, a value growing, a panel opening.
+   Every rule is either inside `prefers-reduced-motion: no-preference` or
+   explicitly neutralised under `reduce`.
+══════════════════════════════════════════════════════════════════════ */
+
+/* Loops and decorative entrances that carry no information: off. */
+.glass-panel, .kpi-value, .heat-cell, .cal-grid .cal-cell,
 .bar-chart > div, .kanban > *, .grid-fit-300 > *, .ai-quick button,
 .modal-box > *, .day-block, .day-block .task-row, .modal-box .task-row,
-.vtab.active::after, .prog-fill, .bar-fill::after, .prog-fill::after,
-.kpi-card .bar-track .bar-fill, .ob-card, .ob-level-grid > *,
+.vtab.active::after, .bar-fill::after, .prog-fill::after,
+.ob-card, .ob-level-grid > *,
 .loader-ring, .loader-ring::after, .loader-screen .skeleton {
   animation: none !important;
 }
-.bar-fill, .prog-fill {
-  transition: width .32s cubic-bezier(.22, 1, .36, 1);
-}
-.bar-fill::after, .prog-fill::after { content: none !important; display: none !important; }
-.confetti { width: 6px; height: 6px; opacity: .8; }
-@media (prefers-reduced-motion: reduce) {
-  .confetti { display: none !important; }
-}
 
-/* Page transitions: quick, subtle. */
-@keyframes calmPageIn {
-  from { opacity: 0; transform: translateY(4px); }
+/* ── Page transitions: the new view slides in from the side it came from ── */
+@keyframes pageInFwd {
+  from { opacity: 0; transform: translate3d(10px, 2px, 0); }
   to { opacity: 1; transform: none; }
 }
-.main-workspace > :not(.tracker-bar),
-.main-workspace[data-nav-dir] > :not(.tracker-bar) {
-  animation: calmPageIn .28s cubic-bezier(.22, 1, .36, 1) both !important;
+@keyframes pageInBack {
+  from { opacity: 0; transform: translate3d(-10px, 2px, 0); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes pageInSettle {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: none; }
+}
+.main-workspace > :not(.tracker-bar) {
+  animation: pageInSettle .3s cubic-bezier(.22, 1, .36, 1) both !important;
+}
+.main-workspace[data-nav-dir="fwd"] > :not(.tracker-bar) {
+  animation: pageInFwd .34s cubic-bezier(.22, 1, .36, 1) both !important;
+}
+.main-workspace[data-nav-dir="back"] > :not(.tracker-bar) {
+  animation: pageInBack .34s cubic-bezier(.22, 1, .36, 1) both !important;
+}
+/* The dense "focused" presentation mode stays completely still. */
+body.mode-focused .main-workspace > :not(.tracker-bar) { animation: none !important; }
+
+/* ── Buttons: lift on hover, settle on press ──────────────────────────── */
+.btn {
+  transition: transform .16s cubic-bezier(.25, 1, .4, 1),
+              box-shadow .2s ease, background .16s ease,
+              border-color .16s ease, color .16s ease;
+}
+.btn-primary, .btn-secondary, .btn-danger { transition-property: transform, box-shadow, background, border-color, color, filter; }
+@media (hover: hover) {
+  .btn:hover { transform: translateY(-1px); }
+  .btn-xs:hover, .btn-sm:hover { transform: translateY(-1px); }
+}
+.btn:active { transform: translateY(0) scale(.975) !important; transition-duration: .06s; }
+.btn:disabled:hover, .btn[disabled]:hover { transform: none !important; }
+.btn:disabled:active, .btn[disabled]:active { transform: none !important; }
+/* Icon-only and chip-style controls get the same press feedback. */
+.icon-quick-btn, .vtab, .drawer-item, .nav-item, .theme-card, .sound-option,
+.task-more, .toast-close, .ai-close, .more-options-toggle {
+  transition: background .18s ease, color .18s ease, border-color .18s ease,
+              box-shadow .18s ease, transform .16s cubic-bezier(.25, 1, .4, 1);
+}
+.icon-quick-btn:active, .vtab:active, .drawer-item:active, .nav-item:active,
+.task-more:active, .toast-close:active, .ai-close:active { transform: scale(.96); }
+
+/* ── Active navigation: the pip grows in, the row eases into place ────── */
+.nav-item.active::before { animation: navPip .3s cubic-bezier(.22, 1, .36, 1) both; }
+.mobile-drawer .drawer-item.active { border-left-width: 3px; }
+
+/* ── Task completion: one quiet pulse, then it settles ────────────────── */
+@keyframes taskDone {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--success-accent) 30%, transparent); }
+  45% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--success-accent) 12%, transparent); }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .task-row.done { animation: taskDone .6s cubic-bezier(.22, 1, .36, 1); }
+  .task-row.done .task-dot { animation: donePop .42s cubic-bezier(.25, 1, .4, 1); }
 }
 
-/* ── Zen: calm immersion, not neon gaming ─────────────────────────────── */
-.zen {
-  background:
-    radial-gradient(700px 380px at 50% -10%, rgba(124, 99, 246, .12), transparent 62%),
-    linear-gradient(180deg, #0b0a1c 0%, #080714 60%, #0a091d 100%) !important;
+/* ── Progress: eased value changes, never a snap ──────────────────────── */
+.bar-fill, .prog-fill {
+  transition: width .5s cubic-bezier(.22, 1, .36, 1), background .25s ease;
 }
-.zen-glow {
-  opacity: .4 !important;
-  background: radial-gradient(circle, rgba(139, 124, 246, .10), transparent 62%) !important;
-  animation: zenBreathe 9s ease-in-out infinite;
+.wk-bar {
+  transition: height .55s cubic-bezier(.22, 1, .36, 1), filter .2s ease;
 }
+.timer-ring-wrap svg circle:last-child,
 .zen-ring-progress {
-  filter: none !important;
-  stroke: #9d8df6;
-  stroke-width: 5;
-}
-.zen .zen-digits {
-  text-shadow: 0 0 24px rgba(150, 132, 246, .18) !important;
-}
-.zen-environment { opacity: .72; }
-.zen-primary {
-  background: var(--accent) !important;
-  box-shadow: 0 4px 18px -10px rgba(0, 0, 0, .5) !important;
-}
-.zen-guidance {
-  background: rgba(255, 255, 255, .04);
-  box-shadow: none;
+  transition: stroke-dashoffset .7s cubic-bezier(.33, 1, .68, 1);
 }
 
-/* ── Focused & reduced-motion cleanup ─────────────────────────────────── */
+/* ── Modals and toasts: soft arrival, no bounce ───────────────────────── */
+@keyframes modalIn {
+  from { opacity: 0; transform: translateY(10px) scale(.985); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes modalSheetIn {
+  from { opacity: .4; transform: translateY(14%); }
+  to { opacity: 1; transform: none; }
+}
+.modal-overlay { animation: overlayIn .22s ease both; }
+.modal-box { animation: modalIn .34s cubic-bezier(.22, 1, .36, 1) both; }
+@media (max-width: 640px) {
+  .modal-box { animation: modalSheetIn .4s cubic-bezier(.22, 1, .36, 1) both; }
+}
+.toast { animation: toastIn .42s cubic-bezier(.22, 1, .36, 1) backwards; }
+@media (max-width: 640px) {
+  .toast { animation: toastUpMobile .42s cubic-bezier(.22, 1, .36, 1) backwards; }
+}
+.quick-popover { animation: modalIn .2s cubic-bezier(.22, 1, .36, 1) both; }
+
+.confetti { width: 6px; height: 6px; opacity: .8; }
+
+/* ── Reduced motion: every loop and every slide collapses ─────────────── */
 @media (prefers-reduced-motion: reduce) {
-  .tilt-card:hover, .kpi-card:hover, .btn-primary:hover, .btn-secondary:hover,
-  .btn-danger:hover, .theme-card:hover, .sound-option:hover {
+  .confetti { display: none !important; }
+  .study-scene, .task-row.done, .task-row.done .task-dot, .nav-item.active::before,
+  .zen-scene__glow, .zen-scene__plant, .zen-scene__motes {
+    animation: none !important;
+  }
+  .main-workspace > :not(.tracker-bar),
+  .main-workspace[data-nav-dir] > :not(.tracker-bar) { animation: none !important; }
+  .modal-box, .modal-overlay, .toast { animation: none !important; }
+  .tilt-card:hover, .kpi-card:hover, .btn:hover, .btn-primary:hover,
+  .btn-secondary:hover, .btn-danger:hover, .theme-card:hover, .sound-option:hover,
+  .icon-quick-btn:hover, .vtab:hover, .drawer-item:hover, .nav-item:hover {
     transform: none !important;
   }
-  .zen-glow, .zen .zen-digits, .mobile-drawer, .drawer-scrim, .quick-popover {
+  .quick-popover, .zen-glow, .zen .zen-digits, .mobile-drawer, .drawer-scrim,
+  .zen-scene__glow, .zen-scene__plant, .zen-scene__motes {
     animation: none !important;
     transition: none !important;
   }
-  .tracker-bar { transition: none; }
+  .zen-scene__glow { opacity: .42; }
+  .bar-fill, .prog-fill, .wk-bar, .timer-ring-wrap svg circle:last-child,
+  .zen-ring-progress, .tracker-bar { transition: none !important; }
 }

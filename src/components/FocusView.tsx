@@ -130,7 +130,7 @@ export default function FocusView({
   return (
     <div className="fade-in focus-view">
       <div className="page-header focus-page-header">
-        <StudyScene className="page-header-scene" />
+        <StudyScene variant="focus" className="page-header-scene" />
         <div className="focus-header-copy">
           <div className="focus-eyebrow"><span className="focus-eyebrow-mark" /> Focus Studio</div>
           <h1 className="page-title">Focus Studio</h1>

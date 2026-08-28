@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { api, ApiError, prettyLong, today, type AppState, type MessageRow } from "@/lib/client";
-import { mmss, useFocusTimer, useStudyClock, type ClockApi, type TimerMode } from "@/lib/useTimer";
+import { mmss, useFocusTimer, useStudyClock, type ClockApi, type TimerApi, type TimerMode } from "@/lib/useTimer";
 import { nextPendingTask, type CompletedTaskInfo } from "@/lib/completion";
 import Onboarding from "@/components/Onboarding";
 import Dashboard from "@/components/Dashboard";
@@ -30,6 +30,21 @@ import {
 import { appendChatTurn, isFallbackUser } from "@/lib/chatTurn";
 
 type Page = "dashboard" | "planner" | "focus" | "subjects" | "settings";
+
+/** Zen header label for the current focus-timer mode. Display only. */
+const ZEN_MODE_LABEL: Record<TimerMode, string> = {
+  pomodoro: "Focus block",
+  short: "Short break",
+  long: "Long break",
+  stopwatch: "Open session",
+  custom: "Custom block",
+};
+
+/** One calm line for the bottom guidance panel, matched to the timer state. */
+function zenGuidance(timer: TimerApi): string {
+  if (timer.mode === "short" || timer.mode === "long") return "Rest your eyes — the break is part of the work";
+  return timer.running ? "Stay with this block — one lesson at a time" : "Begin when you are ready";
+}
 
 const NAV: { id: Page; label: string; icon: React.ReactNode }[] = [
   { id: "dashboard", label: "Overview", icon: <IconHome /> },
@@ -899,20 +914,11 @@ export default function Home() {
             </button>
           ))}
         </nav>
+        {/* Mobile drawer footer deliberately stays plain: navigation, streak
+            and setup only. Theme switching lives in Settings (and the
+            desktop tracker-bar palette), and the ⌘K hint is desktop chrome,
+            so neither is repeated here. */}
         <div className="drawer-foot">
-          <div className="drawer-theme-row" role="group" aria-label="Theme">
-            {THEMES.map((th) => (
-              <button
-                key={th.id}
-                type="button"
-                className={`drawer-theme-dot theme-swatch--${th.id}${state.settings.theme === th.id ? " active" : ""}`}
-                title={th.label}
-                aria-label={`Theme: ${th.label}`}
-                aria-pressed={state.settings.theme === th.id}
-                onClick={() => void patchSettings({ theme: th.id })}
-              />
-            ))}
-          </div>
           <div className="streak-badge foot-badge">
             <IconFlame /> {state.user.streak} Day Streak
           </div>
@@ -1158,64 +1164,76 @@ export default function Home() {
 
           <div className="zen-topbar">
             <button className="zen-ghost" onClick={() => setZenMinimal((v) => !v)} aria-pressed={zenMinimal}>
-              <IconFocus2 size={14} /> Focus Mode
+              <IconFocus2 size={14} /> <span>Focus Mode</span>
             </button>
             <div className="zen-eyebrow">Deep Focus Session</div>
             <div className="zen-topbar-right">
               <button className="zen-ghost" onClick={toggleZenFullscreen}>
-                <IconExpand2 size={14} /> Full Screen
+                <IconExpand2 size={14} /> <span>Full Screen</span>
               </button>
               <button className="zen-ghost zen-exit" onClick={() => setZen(false)}>Exit Zen</button>
             </div>
           </div>
 
-          {!zenMinimal && (
-            <div className="zen-kicker">
-              {state.subjects.find((x) => x.id === clock.subjectId)?.name || "Protect this time for what matters"}
-            </div>
-          )}
+          <div className="zen-stage">
+            {!zenMinimal && (
+              <div className="zen-kicker">
+                {state.subjects.find((x) => x.id === clock.subjectId)?.name || "Protect this time for what matters"}
+              </div>
+            )}
 
-          <div className="zen-ring-wrap">
-            <svg className="zen-ring" viewBox="0 0 320 320" aria-hidden="true">
-              <circle cx="160" cy="160" r="140" className="zen-ring-track" />
-              <circle
-                cx="160" cy="160" r="140" className="zen-ring-progress"
-                style={{
-                  strokeDashoffset: 2 * Math.PI * 140 * (1 - zenRingPct),
-                }}
-              />
-            </svg>
-            <div className="zen-center">
-              <div className="zen-digits mono">{mmss(timer.seconds)}</div>
-              <div className="zen-status">
-                Study clock: {clock.running ? "recording" : clock.onBreak ? "on break" : clock.sessionActive ? "paused" : "not clocked in"} · {mmss(clock.elapsed)}
+            <div className="zen-ring-wrap">
+              <svg className="zen-ring" viewBox="0 0 320 320" aria-hidden="true">
+                <defs>
+                  {/* The component owns its gradient: the ring is the one
+                      element in Zen allowed a little colour. */}
+                  <linearGradient id="zenRingGradient" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0" stopColor="#b6aaff" />
+                    <stop offset="0.55" stopColor="#9b8bf7" />
+                    <stop offset="1" stopColor="#7d6cf0" />
+                  </linearGradient>
+                </defs>
+                <circle cx="160" cy="160" r="140" className="zen-ring-track" />
+                <circle
+                  cx="160" cy="160" r="140" className="zen-ring-progress"
+                  style={{
+                    strokeDashoffset: 2 * Math.PI * 140 * (1 - zenRingPct),
+                  }}
+                />
+              </svg>
+              <div className="zen-center">
+                <div className="zen-mode">{ZEN_MODE_LABEL[timer.mode]}</div>
+                <div className="zen-digits mono">{mmss(timer.seconds)}</div>
+                <div className="zen-status">
+                  Study clock: {clock.running ? "recording" : clock.onBreak ? "on break" : clock.sessionActive ? "paused" : "not clocked in"} · {mmss(clock.elapsed)}
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="flex-row gap-md zen-actions">
-            <button className="btn btn-primary zen-primary" onClick={() => (timer.running ? timer.pause() : startFocusWithClock())}>
-              {timer.running ? "Pause Focus" : "Start Focus + Clock"}
-            </button>
-            {clock.sessionActive && (
-              <>
-                <button className="btn btn-secondary zen-secondary" onClick={pauseOrResume}>
-                  {clock.running ? "Pause Clock" : "Resume Clock"}
-                </button>
-                <button className="btn btn-danger" onClick={clockOutNow}>Clock Out</button>
-              </>
+            <div className="flex-row gap-md zen-actions">
+              <button className="btn btn-primary zen-primary" onClick={() => (timer.running ? timer.pause() : startFocusWithClock())}>
+                {timer.running ? "Pause Focus" : "Start Focus + Clock"}
+              </button>
+              {clock.sessionActive && (
+                <>
+                  <button className="btn btn-secondary zen-secondary" onClick={pauseOrResume}>
+                    {clock.running ? "Pause Clock" : "Resume Clock"}
+                  </button>
+                  <button className="btn btn-danger" onClick={clockOutNow}>Clock Out</button>
+                </>
+              )}
+              <button className="btn btn-secondary zen-secondary zen-exit-btn" onClick={() => setZen(false)}>Exit Zen</button>
+            </div>
+            {!timer.running && !clock.sessionActive && (
+              <p className="zen-hint">
+                “Start Focus + Clock” begins your focus timer and study clock together — one tap, no juggling.
+              </p>
             )}
-            <button className="btn btn-secondary zen-secondary zen-exit-btn" onClick={() => setZen(false)}>Exit Zen</button>
           </div>
-          {!timer.running && !clock.sessionActive && (
-            <p className="zen-hint">
-              “Start Focus + Clock” begins your focus timer and study clock together — one tap, no juggling.
-            </p>
-          )}
 
           {!zenMinimal && (
             <div className="zen-guidance">
-              <div className="zen-guidance-item"><IconLeaf size={15} /><span>Stay present</span></div>
+              <div className="zen-guidance-item"><IconLeaf size={15} /><span>{zenGuidance(timer)}</span></div>
               <div className="zen-guidance-sep" aria-hidden="true" />
               <div className="zen-guidance-item"><IconFocus2 size={15} /><span>Protect your focus</span></div>
               <div className="zen-guidance-sep" aria-hidden="true" />

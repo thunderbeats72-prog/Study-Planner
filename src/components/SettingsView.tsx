@@ -55,7 +55,7 @@ export default function SettingsView({
   return (
     <div className="fade-in settings-view">
       <div className="page-header">
-        <StudyScene className="page-header-scene" />
+        <StudyScene variant="settings" className="page-header-scene" />
         <div>
           <h1 className="page-title">Settings</h1>
           <p className="page-subtitle">Tune your schedule, timer, and appearance.</p>

@@ -219,7 +219,7 @@ export default function Dashboard({
             </button>
           </div>
         </div>
-        <StudyScene className="dash-hero-scene" />
+        <StudyScene variant="dashboard" className="dash-hero-scene" />
       </section>
 
       {intel?.upNext && (() => {
