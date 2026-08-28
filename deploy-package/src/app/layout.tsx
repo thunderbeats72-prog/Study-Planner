@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
+import "./pastel-reference.css";
 
 const inter = localFont({
   src: "./fonts/inter-latin-variable.woff2",
@@ -26,10 +27,8 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  // Android soft keyboard resizes the layout instead of covering the chat
-  // input; iOS sheets keep their safe-area padding.
   interactiveWidget: "resizes-content",
-  themeColor: "#5B5CE2",
+  themeColor: "#7363EE",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
