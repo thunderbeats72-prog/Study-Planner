@@ -266,3 +266,41 @@ body { background-attachment:fixed; color:var(--text-main); }
   .sidebar { inset-inline:7px !important; }
 }
 
+/* Narrow phone cleanup — content remains readable before decoration. */
+@media (max-width:480px) {
+  .page-header { margin-bottom:14px !important; }
+  .page-header .btn { width:100% !important; min-height:46px !important; margin-top:12px !important; }
+  .up-next {
+    display:grid !important; grid-template-columns:minmax(0,1fr) auto !important; align-items:center !important;
+    gap:12px !important; min-height:112px !important; padding:15px !important; border-radius:18px !important;
+  }
+  .up-next-main { min-width:0 !important; }
+  .up-next-title {
+    display:-webkit-box !important; -webkit-box-orient:vertical !important; -webkit-line-clamp:2 !important;
+    overflow:hidden !important; white-space:normal !important; font-size:.93rem !important; line-height:1.32 !important;
+  }
+  .up-next-sub { overflow:hidden !important; text-overflow:ellipsis !important; white-space:nowrap !important; font-size:.67rem !important; }
+  .up-next > .btn { min-width:72px !important; min-height:46px !important; padding:0 10px !important; margin:0 !important; }
+  .momentum-strip {
+    display:flex !important; gap:7px !important; overflow-x:auto !important; overscroll-behavior-x:contain !important;
+    scrollbar-width:none !important; padding:1px 2px 8px !important; margin:0 0 9px !important;
+  }
+  .momentum-strip::-webkit-scrollbar { display:none; }
+  .momentum-pill { flex:0 0 auto !important; min-width:max-content !important; }
+  .ai-fab { width:46px !important; height:46px !important; right:14px !important; bottom:82px !important; }
+  /* Keep a clear interaction lane underneath the floating assistant. */
+  .dash-grid-2 > :last-child, .dashboard-tasks { scroll-margin-bottom:78px; }
+}
+
+/* Themes must stay internally consistent on phones. */
+@media (max-width:860px) {
+  body.theme-dark .mobile-header,body.theme-obsidian .mobile-header,body.theme-nebula .mobile-header,
+  body.theme-dark .sidebar,body.theme-obsidian .sidebar,body.theme-nebula .sidebar {
+    background:var(--surface-elevated) !important;
+    border-color:var(--glass-border) !important;
+    box-shadow:0 8px 24px rgba(0,0,0,.34) !important;
+  }
+  body.theme-dark .sidebar .nav-item,body.theme-obsidian .sidebar .nav-item,body.theme-nebula .sidebar .nav-item {
+    color:var(--text-muted) !important;
+  }
+}
