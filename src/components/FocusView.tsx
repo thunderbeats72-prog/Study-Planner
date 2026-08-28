@@ -37,10 +37,40 @@ export default function FocusView({
 }) {
   const [sound, setSound] = useState(() => currentSound());
   const [vol, setVol] = useState(0.3);
+  const [longBreakAfter, setLongBreakAfter] = useState(4);
   const t = today();
   const todayTasks = state.tasks.filter((x) => x.date === t);
 
   useEffect(() => { setVolume(vol); }, [vol]);
+
+  // "Long break after N focus blocks" — a local preference (the server
+  // settings table doesn't store it), defaulting to the classic 4. Read
+  // async after mount so no setState runs synchronously in the effect.
+  useEffect(() => {
+    const id = window.setTimeout(() => {
+      try {
+        const raw = localStorage.getItem("spp-long-break-after");
+        if (raw) setLongBreakAfter(Math.min(8, Math.max(2, Number(raw) || 4)));
+      } catch { /* private mode */ }
+    }, 0);
+    return () => window.clearTimeout(id);
+  }, []);
+
+  // Auto-flow: when a focus block ends, roll into a short break; a long
+  // break arrives every Nth block. When a break ends, return to focus.
+  useEffect(() => {
+    if (timer.running || timer.mode === "stopwatch" || timer.mode === "custom") return;
+    if (timer.seconds !== 0) return;
+    const id = window.setTimeout(() => {
+      if (timer.mode === "pomodoro") {
+        const n = Math.max(2, longBreakAfter);
+        timer.setMode(timer.cycles > 0 && timer.cycles % n === 0 ? "long" : "short");
+      } else {
+        timer.setMode("pomodoro");
+      }
+    }, 900);
+    return () => window.clearTimeout(id);
+  }, [timer, longBreakAfter]);
 
   const pick = (id: string) => {
     setSound(id);
@@ -103,9 +133,9 @@ export default function FocusView({
         <StudyScene className="page-header-scene" />
         <div className="focus-header-copy">
           <div className="focus-eyebrow"><span className="focus-eyebrow-mark" /> Focus Studio</div>
-          <h1 className="page-title">A calmer way to study</h1>
+          <h1 className="page-title">Focus Studio</h1>
           <p className="page-subtitle">
-            Record real study time with the clock, then use a separate focus timer to protect your attention.
+            A calm, distraction-free space — record real study time with the clock, then protect your attention with the focus timer.
           </p>
         </div>
         <button className="btn btn-secondary focus-zen-button" type="button" onClick={onZen}>

@@ -2,9 +2,12 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import StudyScene from "./StudyScene";
+import MiniCalendar from "./MiniCalendar";
 import { api, addDays, dayDiff, mdToHtml, prettyLong, today, KIND_META, normalizeCheckpointTitle, type AppState } from "@/lib/client";
 import { mmss } from "@/lib/useTimer";
-import { IconSpark } from "./icons";
+import {
+  IconSpark, IconCalendar, IconTarget, IconClock, IconFlame, IconPlay, IconLeaf, IconRocket,
+} from "./icons";
 import TaskEditor, { type TaskPatch } from "./TaskEditor";
 import TaskClockButton from "./TaskClockButton";
 import Heatmap from "./Heatmap";
@@ -37,9 +40,26 @@ function useCountUp(target: number): string {
   return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
 }
 
+const QUOTES = [
+  { text: "Small steps every day add up to big results.", tag: "Stay present" },
+  { text: "Focus is saying no to a hundred good ideas.", tag: "Protect your focus" },
+  { text: "You don't have to be great to start, but you have to start to be great.", tag: "You've got this" },
+  { text: "The expert in anything was once a beginner.", tag: "Keep going" },
+  { text: "Discipline is choosing between what you want now and what you want most.", tag: "Stay present" },
+  { text: "One focused hour beats a distracted day.", tag: "Protect your focus" },
+  { text: "Progress, not perfection.", tag: "You've got this" },
+];
+
+function dailyQuote(dateKey: string) {
+  let hash = 0;
+  for (let i = 0; i < dateKey.length; i++) hash = (hash * 31 + dateKey.charCodeAt(i)) >>> 0;
+  return QUOTES[hash % QUOTES.length];
+}
+
 export default function Dashboard({
   state, onTaskStatus, onTaskUpdate, onSkipSubject, onFocusTask, activeTaskId, activeClockSeconds,
   clockRunning, clockSessionActive, clockOnBreak, onClockOut, onPauseOrResume, replanning, onReplan,
+  onStartFocus,
 }: {
   state: AppState;
   onTaskStatus: (id: number, status: string, rating?: number) => void;
@@ -55,6 +75,7 @@ export default function Dashboard({
   onPauseOrResume: () => void;
   replanning: boolean;
   onReplan: () => void;
+  onStartFocus: () => void;
 }) {
   const [insights, setInsights] = useState<string>("");
   const [intel, setIntel] = useState<{
@@ -74,6 +95,7 @@ export default function Dashboard({
   const [moreActionsId, setMoreActionsId] = useState<number | null>(null);
   const t = today();
   const ctx = state.context;
+  const quote = dailyQuote(t);
 
   const taskProgressVersion = `${state.tasks.length}:${state.tasks.filter((task) => task.status === "done").length}:${state.tasks.filter((task) => task.status === "skipped").length}`;
   const loggedQuarterHour = Math.floor(
@@ -169,20 +191,36 @@ export default function Dashboard({
     return `${Number.isInteger(r) ? r : r.toFixed(1)}m`;
   };
 
+  const hourLabel = new Date().getHours();
+  const greeting = hourLabel < 12 ? "Good morning" : hourLabel < 17 ? "Good afternoon" : "Good evening";
+
   return (
     <div className="fade-in">
-      <div className="page-header">
-        <StudyScene className="page-header-scene" />
-        <div>
-          <h1 className="page-title gradient-text">Hey {state.user.name}</h1>
-          <p className="page-subtitle">
-            {ctx.daysLeft} days to {prettyLong(state.settings.examDate)} · {state.user.courseName}
+      {/* ── Hero greeting — course info, study scene, Start Focus ── */}
+      <section className="dash-hero glass-panel">
+        <div className="dash-hero-bg" aria-hidden="true" />
+        <div className="dash-hero-copy">
+          <div className="dash-hero-eyebrow">
+            <span className="streak-badge dash-hero-streak"><IconFlame /> {state.user.streak} day streak</span>
+          </div>
+          <h1 className="dash-hero-title">
+            Hey {state.user.name}! <span className="wave-emoji" aria-hidden="true">👋</span>
+          </h1>
+          <span className="sr-only">{greeting}</span>
+          <p className="dash-hero-sub">
+            {state.user.courseName} · {ctx.daysLeft} days to {prettyLong(state.settings.examDate)} · {ctx.progressPct}% syllabus done
           </p>
+          <div className="dash-hero-actions">
+            <button className="btn btn-primary btn-lg" onClick={onStartFocus}>
+              <IconPlay size={15} /> Start Focus
+            </button>
+            <button className="btn btn-secondary btn-lg" onClick={onReplan} disabled={replanning}>
+              <IconSpark size={15} />{replanning ? "Re-planning…" : "Re-plan with AI"}
+            </button>
+          </div>
         </div>
-        <button className="btn btn-primary" onClick={onReplan} disabled={replanning}>
-          <IconSpark size={15} />{replanning ? "Re-planning…" : "Re-plan with AI"}
-        </button>
-      </div>
+        <StudyScene className="dash-hero-scene" />
+      </section>
 
       {intel?.upNext && (() => {
         const next = intel.upNext!;
@@ -256,11 +294,13 @@ export default function Dashboard({
 
       <div className="kpi-grid">
         <div className="glass-panel tilt-card kpi-card">
+          <div className="kpi-icon kpi-icon--violet"><IconCalendar size={17} /></div>
           <div className="kpi-label">Days Remaining</div>
           <div className="kpi-value">{daysLeftAnim}</div>
           <div className="kpi-sub">Target: {prettyLong(state.settings.examDate)}</div>
         </div>
         <div className="glass-panel tilt-card kpi-card">
+          <div className="kpi-icon kpi-icon--indigo"><IconTarget size={17} /></div>
           <div className="kpi-label">Syllabus Progress</div>
           <div className="kpi-value tone-accent">{progressAnim}%</div>
           <div className="bar-track">
@@ -268,11 +308,13 @@ export default function Dashboard({
           </div>
         </div>
         <div className="glass-panel tilt-card kpi-card">
+          <div className="kpi-icon kpi-icon--mint"><IconClock size={17} /></div>
           <div className="kpi-label">Hours This Week</div>
           <div className="kpi-value">{hoursAnim}</div>
           <div className="kpi-sub">Target {Math.round(state.settings.dailyHours * 7)}h · {fmtMin(loggedTodayMin)} today</div>
         </div>
         <div className="glass-panel tilt-card kpi-card">
+          <div className="kpi-icon kpi-icon--orange"><IconFlame size={17} /></div>
           <div className="kpi-label">Consistency</div>
           <div className="kpi-value tone-success">{consistencyAnim}%</div>
           <div className="kpi-sub">{state.user.streak} day streak · {ctx.overdue} overdue</div>
@@ -429,74 +471,92 @@ export default function Dashboard({
         </div>
       )}
 
-      <div className="glass-panel tilt-card section-card">
-        <div className="day-head">
-          <h3 className="section-title">Today&apos;s Study Load</h3>
-          <span className="day-meta">{doneToday}/{todayTasks.length} done · {totalPlannedMin} min planned</span>
-        </div>
-        {!todayTasks.length && (
-          <div className="empty-state">
-            <div className="empty-state-icon">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="4" width="18" height="18" rx="3" /><path d="M16 2v4M8 2v4M3 10h18" />
-              </svg>
+      {/* ── Today's Plan + calendar/quote rail ── */}
+      <div className="dash-today-grid">
+        <div className="glass-panel tilt-card section-card dash-today-card">
+          <div className="day-head">
+            <h3 className="section-title">Today&apos;s Plan</h3>
+            <span className="day-meta">{doneToday}/{todayTasks.length} done · {totalPlannedMin} min planned</span>
+          </div>
+          {!todayTasks.length && (
+            <div className="empty-state">
+              <div className="empty-state-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="4" width="18" height="18" rx="3" /><path d="M16 2v4M8 2v4M3 10h18" />
+                </svg>
+              </div>
+              <h4 className="empty-state-title">No sessions scheduled today</h4>
+              <p className="empty-state-sub">This may be a rest day, or your plan hasn&apos;t been generated yet. Re-plan to fill your schedule.</p>
+              <button className="btn btn-secondary btn-sm" onClick={onReplan} disabled={replanning}>
+                {replanning ? "Re-planning…" : "Generate Plan"}
+              </button>
             </div>
-            <h4 className="empty-state-title">No sessions scheduled today</h4>
-            <p className="empty-state-sub">This may be a rest day, or your plan hasn&apos;t been generated yet. Re-plan to fill your schedule.</p>
-            <button className="btn btn-secondary btn-sm" onClick={onReplan} disabled={replanning}>
-              {replanning ? "Re-planning…" : "Generate Plan"}
-            </button>
-          </div>
-        )}
-        {todayTasks.length > 0 && doneToday === todayTasks.length && (
-          <div className="day-complete">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M20 6 9 17l-5-5" />
-            </svg>
-            All done for today. Well earned — see you tomorrow.
-          </div>
-        )}
-        {todayTasks.map((task) => {
-          const meta = KIND_META[task.kind] || KIND_META.learn;
-          const subj = state.subjects.find((s) => s.id === task.subjectId);
-          const isCheckpoint = task.title.toLowerCase().includes("checkpoint") || (task.kind === "mock" && !task.subjectId);
-          const kindLabel = isCheckpoint ? "Checkpoint" : meta.label;
-          const dotColor = subj?.color || (isCheckpoint ? "var(--color-primary)" : meta.color);
-          const formattedTitle = isCheckpoint ? normalizeCheckpointTitle(task.title) : task.title;
-          return (
-            <div key={task.id} className={`task-row clean-list${task.status === "done" ? " done" : ""}${activeTaskId === task.id ? " active-clock" : ""}${moreActionsId === task.id ? " expanded-actions" : ""}`}>
-              <div className="task-dot" style={{ background: dotColor }} />
-              <div className="task-main">
-                <div className="task-title">{formattedTitle}</div>
-                <div className="task-sub">
-                  <span className="chip chip-kind chip-tight">{kindLabel}</span> · {task.plannedMinutes} min
-                  {isCheckpoint ? " · All Subjects · Comprehensive Review" : ""}
-                  {taskLogged(task.id) ? ` · ${fmtMin(taskLogged(task.id))} logged` : task.actualMinutes ? ` · ${task.actualMinutes}m logged` : ""}
-                  {activeTaskId === task.id && activeClockSeconds ? ` · live +${Math.floor(activeClockSeconds / 60)}m ${activeClockSeconds % 60}s` : ""}
+          )}
+          {todayTasks.length > 0 && doneToday === todayTasks.length && (
+            <div className="day-complete">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 6 9 17l-5-5" />
+              </svg>
+              All done for today. Well earned — see you tomorrow.
+            </div>
+          )}
+          {todayTasks.map((task) => {
+            const meta = KIND_META[task.kind] || KIND_META.learn;
+            const subj = state.subjects.find((s) => s.id === task.subjectId);
+            const isCheckpoint = task.title.toLowerCase().includes("checkpoint") || (task.kind === "mock" && !task.subjectId);
+            const kindLabel = isCheckpoint ? "Checkpoint" : meta.label;
+            const dotColor = subj?.color || (isCheckpoint ? "var(--color-primary)" : meta.color);
+            const formattedTitle = isCheckpoint ? normalizeCheckpointTitle(task.title) : task.title;
+            return (
+              <div key={task.id} className={`task-row clean-list${task.status === "done" ? " done" : ""}${activeTaskId === task.id ? " active-clock" : ""}${moreActionsId === task.id ? " expanded-actions" : ""}`}>
+                <div className="task-dot" style={{ background: dotColor }} />
+                <div className="task-main">
+                  <div className="task-title">{formattedTitle}</div>
+                  <div className="task-sub">
+                    <span className="chip chip-kind chip-tight">{kindLabel}</span> · {task.plannedMinutes} min
+                    {isCheckpoint ? " · All Subjects · Comprehensive Review" : ""}
+                    {taskLogged(task.id) ? ` · ${fmtMin(taskLogged(task.id))} logged` : task.actualMinutes ? ` · ${task.actualMinutes}m logged` : ""}
+                    {activeTaskId === task.id && activeClockSeconds ? ` · live +${Math.floor(activeClockSeconds / 60)}m ${activeClockSeconds % 60}s` : ""}
+                  </div>
+                </div>
+                <div className="task-row-actions">
+                {subj && task.status !== "skipped" && (
+                  <button className="btn btn-xs btn-secondary task-skip-subj" title="Skip all tasks for this subject today"
+                    onClick={() => onSkipSubject(subj.id, task.date)}>Skip subject</button>
+                )}
+                <button className="btn btn-xs btn-secondary" onClick={() => setEditingTaskId(task.id)}>Edit</button>
+                {task.status !== "skipped" && task.status !== "done" && (
+                  <button className="btn btn-xs btn-secondary" title="Skip"
+                    onClick={() => onTaskStatus(task.id, "skipped")}>Skip</button>
+                )}
+                <TaskClockButton taskId={task.id} activeTaskId={activeTaskId} sessionActive={clockSessionActive}
+                  onFocusTask={onFocusTask} onClockOut={onClockOut} />
+                <button className="btn btn-xs btn-secondary task-more" aria-label="More actions"
+                  onClick={() => setMoreActionsId(moreActionsId === task.id ? null : task.id)}>⋯</button>
+                <button className={`btn btn-xs task-primary ${task.status === "done" ? "btn-secondary" : "btn-primary"}`}
+                  onClick={() => onTaskStatus(task.id, task.status === "done" ? "pending" : "done")}>
+                  {task.status === "done" ? "Undo" : "Done"}
+                </button>
                 </div>
               </div>
-              <div className="task-row-actions">
-              {subj && task.status !== "skipped" && (
-                <button className="btn btn-xs btn-secondary task-skip-subj" title="Skip all tasks for this subject today"
-                  onClick={() => onSkipSubject(subj.id, task.date)}>Skip subject</button>
-              )}
-              <button className="btn btn-xs btn-secondary" onClick={() => setEditingTaskId(task.id)}>Edit</button>
-              {task.status !== "skipped" && task.status !== "done" && (
-                <button className="btn btn-xs btn-secondary" title="Skip"
-                  onClick={() => onTaskStatus(task.id, "skipped")}>Skip</button>
-              )}
-              <TaskClockButton taskId={task.id} activeTaskId={activeTaskId} sessionActive={clockSessionActive}
-                onFocusTask={onFocusTask} onClockOut={onClockOut} />
-              <button className="btn btn-xs btn-secondary task-more" aria-label="More actions"
-                onClick={() => setMoreActionsId(moreActionsId === task.id ? null : task.id)}>⋯</button>
-              <button className={`btn btn-xs task-primary ${task.status === "done" ? "btn-secondary" : "btn-primary"}`}
-                onClick={() => onTaskStatus(task.id, task.status === "done" ? "pending" : "done")}>
-                {task.status === "done" ? "Undo" : "Done"}
-              </button>
-              </div>
+            );
+          })}
+        </div>
+
+        <div className="dash-side-rail">
+          <div className="glass-panel tilt-card section-card dash-cal-card">
+            <h3 className="section-title">Calendar</h3>
+            <MiniCalendar state={state} />
+          </div>
+          <div className="glass-panel tilt-card section-card dash-quote-card">
+            <div className="quote-mark" aria-hidden="true">“</div>
+            <p className="quote-text">{quote.text}</p>
+            <div className="quote-tag">
+              <span className="quote-tag-icon">{quote.tag === "Stay present" ? <IconLeaf size={12} /> : <IconRocket size={12} />}</span>
+              {quote.tag}
             </div>
-          );
-        })}
+          </div>
+        </div>
       </div>
       <TaskEditor
         key={editingTaskId ?? "closed"}

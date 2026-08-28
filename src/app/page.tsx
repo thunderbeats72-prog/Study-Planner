@@ -17,9 +17,12 @@ import { haptic } from "@/lib/haptics";
 import { useBackClose } from "@/lib/useBackClose";
 import type { TaskPatch } from "@/components/TaskEditor";
 import {
-  IconBolt, IconBook, IconCalendar, IconCheck, IconClock, IconFlame, IconGear, IconHome,
-  IconLogo, IconPanelLeft, IconSpark, IconWarn,
+  IconBolt, IconBell, IconBook, IconCalendar, IconCheck, IconClock, IconExpand2, IconFlame,
+  IconFocus2, IconGear, IconHome, IconLeaf, IconLogo, IconMenu, IconPalette, IconPanelLeft,
+  IconSpark, IconWarn,
 } from "@/components/icons";
+import ZenScene from "@/components/ZenScene";
+import { THEMES } from "@/lib/client";
 
 import {
   parseCommand, languageCapabilityReply, instantTutorReply, commandReply,
@@ -118,6 +121,23 @@ export default function Home() {
   const [forceWizard, setForceWizard] = useState(false);
   const [confirmWipe, setConfirmWipe] = useState(false);
   useBackClose(confirmWipe, () => setConfirmWipe(false));
+  /* Mobile navigation drawer (phones/tablets): the sidebar slides in
+     over a scrim instead of living in the bottom dock. */
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  useBackClose(drawerOpen, () => setDrawerOpen(false));
+  /* Quick controls: notifications + theme popovers in the tracker bar. */
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [themeOpen, setThemeOpen] = useState(false);
+  const [zenMinimal, setZenMinimal] = useState(false);
+  const zenRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!notifOpen && !themeOpen) return;
+    const close = () => { setNotifOpen(false); setThemeOpen(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") close(); };
+    window.addEventListener("click", close);
+    window.addEventListener("keydown", onKey);
+    return () => { window.removeEventListener("click", close); window.removeEventListener("keydown", onKey); };
+  }, [notifOpen, themeOpen]);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     // restore the user's sidebar preference (desktop only; harmless on mobile)
     try {
@@ -478,6 +498,16 @@ export default function Home() {
       const to = NAV.findIndex((n) => n.id === next);
       return { page: next, dir: from < 0 || to >= from ? "fwd" : "back" };
     });
+    setDrawerOpen(false);
+  }, []);
+
+  const toggleZenFullscreen = useCallback(() => {
+    const el = zenRef.current;
+    if (!el) return;
+    try {
+      if (document.fullscreenElement) void document.exitFullscreen();
+      else void el.requestFullscreen?.();
+    } catch { /* fullscreen may be blocked — Zen still works */ }
   }, []);
 
   const persistSessionQueue = useCallback(() => {
@@ -711,6 +741,14 @@ export default function Home() {
     }
   }, [clock, notify, state]);
 
+  /** Dashboard hero: one tap starts a smart clock session AND jumps to
+   *  the Focus Studio, so "Start Focus" always does both. */
+  const startFocusSession = useCallback(() => {
+    if (!clock.sessionActive) startSmartClock();
+    else if (!clock.running && !clock.onBreak) clock.resume();
+    goPage("focus");
+  }, [clock, goPage, startSmartClock]);
+
   // Clock out from ANYWHERE — one handler for the tracker bar, the up-next
   // card, task rows and Zen mode. Confirms the saved minutes by name.
   const clockOutNow = useCallback(() => {
@@ -938,6 +976,12 @@ export default function Home() {
   const todayTotal = state.tasks.filter((x) => x.date === t).length;
   const allMsgs = [...state.messages, ...pendingMsgs];
 
+  // Zen ring progress: countdown modes deplete over the block (start full,
+  // drain to zero); stopwatch eases a full sweep once an hour. 0..1, NaN-safe.
+  const zenRingPct = timer.mode === "stopwatch"
+    ? (timer.seconds % 3600) / 3600
+    : timer.total ? Math.min(1, Math.max(0, timer.seconds / timer.total)) : 0;
+
   // The full task title, untruncated — CSS wraps it cleanly instead of
   // slicing it in JS (fixes "Principles of Marketing: Introduction…").
   const clockTaskTitle =
@@ -967,6 +1011,14 @@ export default function Home() {
       {/* One flex row: [ mark + titles ]  ←→  [ status chip ]. The group keeps
           its own gap, and both ends are bounded so neither stretches. */}
       <header className="mobile-header">
+        <button
+          className="mh-menu"
+          aria-label="Open navigation menu"
+          aria-expanded={drawerOpen}
+          onClick={() => setDrawerOpen(true)}
+        >
+          <IconMenu size={20} />
+        </button>
         <div className="mh-brand">
           <div className="brand-logo-icon brand-logo-sm" aria-hidden="true"><IconLogo size={14} /></div>
           <div className="mh-titles">
@@ -976,6 +1028,65 @@ export default function Home() {
         </div>
         <span className="streak-badge mh-streak"><IconFlame /> {state.user.streak}d</span>
       </header>
+
+      {/* Mobile/tablet navigation drawer + scrim */}
+      {drawerOpen && <div className="drawer-scrim" onClick={() => setDrawerOpen(false)} aria-hidden="true" />}
+      <aside className={`mobile-drawer${drawerOpen ? " open" : ""}`} aria-hidden={!drawerOpen}>
+        <div className="drawer-head">
+          <div className="brand-header">
+            <div className="brand-logo-icon" aria-hidden="true"><IconLogo /></div>
+            <div className="brand-text">
+              <div className="brand-title">Study Planner Pro</div>
+              <div className="brand-course">{state.user.courseName}</div>
+            </div>
+          </div>
+          <button className="drawer-close" aria-label="Close navigation menu" onClick={() => setDrawerOpen(false)}>×</button>
+        </div>
+        <div className="drawer-tools">
+          <button className="drawer-tool" type="button"
+            onClick={() => { setDrawerOpen(false); void replan(); }}
+            disabled={busy} title="Re-plan schedule with AI">
+            <span className={busy ? "replanning-spark" : ""}><IconSpark size={15} /></span>
+            <span>Re-plan{busy ? "ning…" : ""}</span>
+          </button>
+        </div>
+        <nav className="drawer-nav">
+          {NAV.map((n) => (
+            <button
+              key={n.id}
+              type="button"
+              className={`drawer-item${page === n.id ? " active" : ""}`}
+              onClick={() => goPage(n.id)}
+            >
+              {n.icon}<span>{n.label}</span>
+            </button>
+          ))}
+        </nav>
+        <div className="drawer-foot">
+          <div className="drawer-theme-row" role="group" aria-label="Theme">
+            {THEMES.map((th) => (
+              <button
+                key={th.id}
+                type="button"
+                className={`drawer-theme-dot theme-swatch--${th.id}${state.settings.theme === th.id ? " active" : ""}`}
+                title={th.label}
+                aria-label={`Theme: ${th.label}`}
+                aria-pressed={state.settings.theme === th.id}
+                onClick={() => void patchSettings({ theme: th.id })}
+              />
+            ))}
+          </div>
+          <div className="streak-badge foot-badge">
+            <IconFlame /> {state.user.streak} Day Streak
+          </div>
+          <p className="foot-sub">
+            {ctx.daysLeft} days left · {ctx.progressPct}% syllabus completed.
+          </p>
+          <button className="btn btn-secondary btn-sm w-full" onClick={() => { setDrawerOpen(false); requestWizardRestart(); }}>
+            Re-run Setup
+          </button>
+        </div>
+      </aside>
 
       <div className={`app-wrapper${sidebarCollapsed ? " sb-collapsed" : ""}${railAnimating ? " sb-anim" : ""}`}>
         <aside className="sidebar">
@@ -1082,6 +1193,88 @@ export default function Home() {
                 </button>
               )}
               <button className="btn btn-xs btn-secondary tracker-zen" aria-label="Enter Zen focus mode" onClick={() => setZen(true)}><IconBolt size={12} /> Zen</button>
+              <span className="tracker-quick-controls">
+                <button
+                  className="icon-quick-btn"
+                  aria-label={`Re-plan schedule${busy ? " (in progress)" : ""}`}
+                  title="AI re-plan"
+                  disabled={busy}
+                  onClick={(e) => { e.stopPropagation(); void replan(); }}
+                >
+                  <span className={busy ? "replanning-spark" : ""}><IconSpark size={15} /></span>
+                </button>
+                <div className="quick-popover-wrap" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    className="icon-quick-btn"
+                    aria-label="Notifications"
+                    aria-expanded={notifOpen}
+                    onClick={(e) => { e.stopPropagation(); setThemeOpen(false); setNotifOpen((v) => !v); }}
+                  >
+                    <IconBell size={15} />
+                    <span className="icon-quick-dot" aria-hidden="true" />
+                  </button>
+                  {notifOpen && (
+                    <div className="quick-popover notif-popover" role="menu">
+                      <div className="quick-popover-title">Notifications</div>
+                      <div className="notif-row">
+                        <span className="notif-dot notif-dot--orange" />
+                        <div>
+                          <strong>{ctx.overdue > 0 ? `${ctx.overdue} overdue task${ctx.overdue > 1 ? "s" : ""}` : "No overdue tasks"}</strong>
+                          <span>{ctx.overdue > 0 ? "Re-plan to redistribute them." : "You're up to date."}</span>
+                        </div>
+                      </div>
+                      <div className="notif-row">
+                        <span className="notif-dot notif-dot--green" />
+                        <div>
+                          <strong>{todayDone}/{todayTotal} lessons done today</strong>
+                          <span>{todayTotal ? `${Math.round((todayDone / Math.max(1, todayTotal)) * 100)}% of today's plan` : "Rest day or no plan yet"}</span>
+                        </div>
+                      </div>
+                      <div className="notif-row">
+                        <span className="notif-dot notif-dot--violet" />
+                        <div>
+                          <strong>{state.user.streak} day streak</strong>
+                          <span>Study today to keep it alive.</span>
+                        </div>
+                      </div>
+                      <div className="notif-row">
+                        <span className="notif-dot notif-dot--blue" />
+                        <div>
+                          <strong>{ctx.daysLeft} days to {prettyLong(state.settings.examDate)}</strong>
+                          <span>{ctx.progressPct}% of the syllabus complete.</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div className="quick-popover-wrap" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    className="icon-quick-btn"
+                    aria-label="Change theme"
+                    aria-expanded={themeOpen}
+                    onClick={(e) => { e.stopPropagation(); setNotifOpen(false); setThemeOpen((v) => !v); }}
+                  >
+                    <IconPalette size={15} />
+                  </button>
+                  {themeOpen && (
+                    <div className="quick-popover theme-popover" role="menu">
+                      <div className="quick-popover-title">Theme</div>
+                      {THEMES.map((th) => (
+                        <button
+                          key={th.id}
+                          type="button"
+                          className={`theme-pop-item${state.settings.theme === th.id ? " active" : ""}`}
+                          onClick={(e) => { e.stopPropagation(); void patchSettings({ theme: th.id }); setThemeOpen(false); }}
+                        >
+                          <span className={`theme-pop-swatch theme-swatch--${th.id}`} aria-hidden="true" />
+                          <span>{th.label}</span>
+                          {state.settings.theme === th.id && <IconCheck size={13} />}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </span>
             </div>
           </div>
 
@@ -1091,7 +1284,7 @@ export default function Home() {
               activeTaskId={clock.taskId} activeClockSeconds={clock.elapsed}
               clockRunning={clock.running} clockSessionActive={clock.sessionActive} clockOnBreak={clock.onBreak}
               onClockOut={clockOutNow} onPauseOrResume={pauseOrResume}
-              replanning={busy} onReplan={replan} />
+              replanning={busy} onReplan={replan} onStartFocus={startFocusSession} />
           )}
           {page === "planner" && (
             <PlannerView state={state} onTaskStatus={setTaskStatus} onTaskUpdate={updateTask}
@@ -1122,32 +1315,75 @@ export default function Home() {
       <CommandPalette commands={commands} />
 
       {zen && (
-        <div className="zen">
-          <div className="zen-kicker">
-            {state.subjects.find((x) => x.id === clock.subjectId)?.name || "Deep Focus Session"}
+        <div className={`zen${zenMinimal ? " zen-minimal" : ""}`} ref={zenRef}>
+          <ZenScene className="zen-environment" />
+          <div className="zen-glow" aria-hidden="true" />
+
+          <div className="zen-topbar">
+            <button className="zen-ghost" onClick={() => setZenMinimal((v) => !v)} aria-pressed={zenMinimal}>
+              <IconFocus2 size={14} /> Focus Mode
+            </button>
+            <div className="zen-eyebrow">Deep Focus Session</div>
+            <div className="zen-topbar-right">
+              <button className="zen-ghost" onClick={toggleZenFullscreen}>
+                <IconExpand2 size={14} /> Full Screen
+              </button>
+              <button className="zen-ghost zen-exit" onClick={() => setZen(false)}>Exit Zen</button>
+            </div>
           </div>
-          <div className="zen-digits mono">{mmss(timer.seconds)}</div>
-          <div className="zen-status">
-            Study clock: {clock.running ? "recording" : clock.onBreak ? "on break" : clock.sessionActive ? "paused" : "not clocked in"} · {mmss(clock.elapsed)}
+
+          {!zenMinimal && (
+            <div className="zen-kicker">
+              {state.subjects.find((x) => x.id === clock.subjectId)?.name || "Protect this time for what matters"}
+            </div>
+          )}
+
+          <div className="zen-ring-wrap">
+            <svg className="zen-ring" viewBox="0 0 320 320" aria-hidden="true">
+              <circle cx="160" cy="160" r="140" className="zen-ring-track" />
+              <circle
+                cx="160" cy="160" r="140" className="zen-ring-progress"
+                style={{
+                  strokeDashoffset: 2 * Math.PI * 140 * (1 - zenRingPct),
+                }}
+              />
+            </svg>
+            <div className="zen-center">
+              <div className="zen-digits mono">{mmss(timer.seconds)}</div>
+              <div className="zen-status">
+                Study clock: {clock.running ? "recording" : clock.onBreak ? "on break" : clock.sessionActive ? "paused" : "not clocked in"} · {mmss(clock.elapsed)}
+              </div>
+            </div>
           </div>
+
           <div className="flex-row gap-md zen-actions">
-            <button className="btn btn-primary" onClick={() => (timer.running ? timer.pause() : startFocusWithClock())}>
+            <button className="btn btn-primary zen-primary" onClick={() => (timer.running ? timer.pause() : startFocusWithClock())}>
               {timer.running ? "Pause Focus" : "Start Focus + Clock"}
             </button>
             {clock.sessionActive && (
               <>
-                <button className="btn btn-secondary" onClick={pauseOrResume}>
+                <button className="btn btn-secondary zen-secondary" onClick={pauseOrResume}>
                   {clock.running ? "Pause Clock" : "Resume Clock"}
                 </button>
                 <button className="btn btn-danger" onClick={clockOutNow}>Clock Out</button>
               </>
             )}
-            <button className="btn btn-secondary" onClick={() => setZen(false)}>Exit Zen</button>
+            <button className="btn btn-secondary zen-secondary zen-exit-btn" onClick={() => setZen(false)}>Exit Zen</button>
           </div>
           {!timer.running && !clock.sessionActive && (
             <p className="zen-hint">
               “Start Focus + Clock” begins your focus timer and study clock together — one tap, no juggling.
             </p>
+          )}
+
+          {!zenMinimal && (
+            <div className="zen-guidance">
+              <div className="zen-guidance-item"><IconLeaf size={15} /><span>Stay present</span></div>
+              <div className="zen-guidance-sep" aria-hidden="true" />
+              <div className="zen-guidance-item"><IconFocus2 size={15} /><span>Protect your focus</span></div>
+              <div className="zen-guidance-sep" aria-hidden="true" />
+              <div className="zen-guidance-item"><IconSpark size={15} /><span>You&apos;ve got this</span></div>
+            </div>
           )}
         </div>
       )}

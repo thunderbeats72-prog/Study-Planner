@@ -272,7 +272,7 @@ export default function PlannerView({
         <div>
           <h1 className="page-title">Study Planner</h1>
           <p className="page-subtitle">
-            Lesson-wise adaptive schedule · {state.tasks.length} tasks · {state.topics.length} lessons mapped
+            {state.tasks.length} tasks · {state.topics.length} lessons mapped · your plan rebalances automatically
           </p>
         </div>
         <div className="flex-row gap-md planner-tools">

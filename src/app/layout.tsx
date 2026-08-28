@@ -4,6 +4,7 @@ import "./globals.css";
 import "./study-planner-refresh.css";
 import "./study-planner-scene.css";
 import "./pastel-ui-system.css";
+import "./study-planner-redesign.css";
 
 const inter = localFont({
   src: "./fonts/inter-latin-variable.woff2",
