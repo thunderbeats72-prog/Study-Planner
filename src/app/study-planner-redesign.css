@@ -642,21 +642,23 @@ body {
   display: none;
 }
 .mobile-drawer { display: none; }
+.mobile-bottom-nav { display: none; }
 .mh-menu {
   display: none;
 }
 @media (max-width: 860px) {
-  /* The old bottom dock is replaced by the compact app bar + drawer. */
+  /* The legacy desktop sidebar is replaced by the compact app bar, the
+     drawer for secondary controls, and the fixed bottom navigation. */
   .sidebar { display: none !important; }
-  .cmdk-tip { display: none !important; }
 
-  /* The compact app bar + drawer replace the old bottom dock, so the
-     oversized dock clearance is no longer needed. */
+  /* Clearance for the fixed mobile bottom navigation: content must never
+     be hidden behind the bar (bar ≈ 64px + safe area). The workspace owns
+     the clearance; the wrapper stays flat so the two never double up. */
   .app-wrapper {
-    padding-bottom: calc(36px + env(safe-area-inset-bottom)) !important;
+    padding-bottom: 0 !important;
   }
   .main-workspace {
-    padding-bottom: calc(32px + env(safe-area-inset-bottom)) !important;
+    padding-bottom: calc(84px + env(safe-area-inset-bottom)) !important;
   }
 
   .mh-menu {
@@ -725,10 +727,9 @@ body {
   }
   .drawer-tool:hover { color: var(--accent); border-color: var(--nav-active-border); background: var(--rd-lavender-soft); }
   .drawer-tool:disabled { opacity: .55; cursor: wait; }
-  /* The mobile drawer carries navigation only — no theme swatches and no
-     ⌘K hint (both are desktop chrome; themes live in Settings). */
+  /* The mobile drawer carries navigation only — no theme swatches
+     (themes live in Settings). */
   .drawer-nav { display: flex; flex-direction: column; gap: 4px; }
-  .mobile-drawer .cmdk-tip,
   .mobile-drawer .sb-toggle { display: none !important; }
   .drawer-item {
     display: flex; align-items: center; gap: 13px;
@@ -756,6 +757,54 @@ body {
   .drawer-foot .streak-badge { align-self: flex-start; }
   .drawer-foot .foot-sub { margin: 0; font-size: .76rem; }
   .drawer-foot .btn { margin-top: 4px; }
+
+  /* ── Fixed mobile bottom navigation ─────────────────────────────────
+     The primary page switcher on phones/tablets: five equal targets,
+     safe-area aware, active page highlighted with the same pill language
+     the drawer uses. Sits below the drawer/scrim/toasts so overlays
+     always win. */
+  .mobile-bottom-nav {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 2px;
+    /* z stays under the chat sheet (201), modals (300), drawer (350) and
+       toasts (400) so every overlay can cover the bar when it needs to. */
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 150;
+    padding:
+      6px
+      max(8px, env(safe-area-inset-right))
+      calc(7px + env(safe-area-inset-bottom))
+      max(8px, env(safe-area-inset-left));
+    background: color-mix(in srgb, var(--surface-elevated) 92%, transparent);
+    backdrop-filter: blur(16px) saturate(1.4);
+    -webkit-backdrop-filter: blur(16px) saturate(1.4);
+    border-top: 1px solid var(--glass-border);
+    box-shadow: 0 -10px 34px rgba(16, 14, 34, .14);
+  }
+  .mbn-item {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 3px;
+    min-height: 50px; min-width: 0;
+    border: none; border-radius: 13px; background: transparent;
+    color: var(--text-dim);
+    font-family: inherit; font-size: .62rem; font-weight: 700; letter-spacing: .01em;
+    cursor: pointer; user-select: none; -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    transition: background .22s ease, color .22s ease, transform .12s ease;
+  }
+  .mbn-icon { display: grid; place-items: center; }
+  .mbn-item svg { width: 21px; height: 21px; transition: color .22s ease; }
+  .mbn-label {
+    max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .mbn-item:hover { color: var(--text-main); }
+  .mbn-item:active { transform: scale(.93); }
+  .mbn-item.active {
+    color: var(--nav-active-text);
+    background: var(--nav-active-bg);
+  }
+  .mbn-item.active svg { color: var(--accent); }
+  .mbn-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 }
 
 /* ══════════════════════════════════════════════════════════════════════
@@ -764,9 +813,22 @@ body {
    plant at the bottom, one large centred timer with an elegant progress
    ring, and a quiet guidance panel underneath. Calm and premium — the
    only colour in the room is the ring and the lamp.
+
+   Layout contract — ONE flex column in normal flow, nothing overlaps:
+     1. top bar  — Focus Mode ←→ Full Screen / Exit Zen
+     2. stage    — focus emblem · DEEP FOCUS SESSION · timer ring ·
+                   actions · hint, vertically centred as a group
+     3. guidance — 3-part focus bar, the last row of the flow
+   The room sizes off 100dvh (with a 100vh fallback), so phones with
+   dynamic toolbars keep the composition in one viewport. Nothing uses
+   fixed heights: if a very small screen genuinely cannot fit the
+   composition, the room itself scrolls — content is never clipped, and
+   the page behind it never grows a scrollbar.
 ══════════════════════════════════════════════════════════════════════ */
 .zen {
   position: fixed; inset: 0; z-index: 999999;
+  min-height: 100vh;
+  min-height: 100dvh;   /* dynamic viewport: wins where supported */
   background:
     radial-gradient(900px 460px at 50% -12%, rgba(124, 99, 246, .16), transparent 62%),
     radial-gradient(620px 420px at 10% 106%, rgba(124, 99, 246, .08), transparent 60%),
@@ -774,13 +836,25 @@ body {
     linear-gradient(180deg, #0b0a1c 0%, #080714 58%, #0a091d 100%) !important;
   color: #f4f3ff;
   display: flex; flex-direction: column;
-  align-items: center;
+  align-items: stretch; justify-content: flex-start;
   gap: 0;
   padding: 0;
-  overflow: hidden;
+  overflow-x: hidden; overflow-y: auto;
+  overscroll-behavior: contain;
 }
 /* The legacy dark vignette is replaced by the atmospheric glow. */
 .zen::after { display: none !important; }
+
+/* Calm entrance: the room fades in, the stage settles a beat later. */
+@media (prefers-reduced-motion: no-preference) {
+  .zen { animation: zenRoomIn .32s ease both; }
+  .zen-stage { animation: zenStageIn .44s cubic-bezier(.22, 1, .36, 1) .06s backwards; }
+}
+@keyframes zenRoomIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes zenStageIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
 
 .zen-glow {
   position: absolute; left: 50%; top: 40%;
@@ -800,10 +874,12 @@ body {
 }
 
 .zen-environment {
-  position: absolute; left: 0; right: 0; bottom: 0;
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 1;
   width: 100%; pointer-events: none; opacity: .78;
 }
-.zen-environment svg { display: block; width: 100%; height: auto; max-height: 34vh; }
+/* Kept deliberately lower than the old 34vh: the desk scene is atmosphere,
+   not content — it must stay clear of the action buttons and guidance bar. */
+.zen-environment svg { display: block; width: 100%; height: auto; max-height: min(240px, 26vh); }
 
 /* ── Ambient movement inside the scene: barely there, never distracting ── */
 @media (prefers-reduced-motion: no-preference) {
@@ -830,16 +906,16 @@ body {
   50% { opacity: .6; transform: translateY(-7px); }
 }
 
-/* ── Top bar: Focus Mode · DEEP FOCUS SESSION · Full Screen / Exit ────── */
+/* ── Top bar: Focus Mode ←→ Full Screen / Exit Zen — one quiet row ────── */
 .zen-topbar {
-  position: absolute; top: 0; left: 0; right: 0;
-  display: grid; grid-template-columns: 1fr auto 1fr;
-  align-items: center; gap: 12px;
+  position: relative; z-index: 4;
+  flex: 0 0 auto;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px;
+  width: 100%;
   padding: calc(14px + env(safe-area-inset-top)) 18px 0;
-  z-index: 3;
 }
-.zen-topbar > .zen-ghost { justify-self: start; }
-.zen-topbar-right { display: flex; gap: 8px; justify-self: end; }
+.zen-topbar-right { display: flex; gap: 8px; }
 .zen-ghost {
   display: inline-flex; align-items: center; gap: 7px;
   padding: 9px 15px;
@@ -864,34 +940,47 @@ body {
   position: static; top: auto; right: auto;
   color: rgba(255, 255, 255, .72);
 }
-.zen-eyebrow {
-  justify-self: center;
-  font-size: .7rem; font-weight: 800; letter-spacing: .3em;
-  text-transform: uppercase;
-  color: rgba(196, 188, 255, .8);
-  text-align: center; white-space: nowrap;
-}
-
-/* ── Centre stage: kicker · ring · actions · hint ─────────────────────── */
+/* ── Centre stage: headline · ring · actions · hint, one centred column ── */
 .zen-stage {
   position: relative; z-index: 2;
-  flex: 1 1 auto; width: 100%; max-width: 940px;
-  min-height: 0;              /* lets the stage scroll instead of overflowing */
+  flex: 1 0 auto;
+  width: 100%; max-width: 940px;
+  margin: 0 auto;
   display: flex; flex-direction: column;
   align-items: center; justify-content: center;
-  gap: clamp(10px, 2.2vh, 22px);
-  padding: calc(74px + env(safe-area-inset-top)) 20px calc(84px + env(safe-area-inset-bottom));
-  overflow-y: auto;
+  gap: clamp(12px, 2.4vh, 24px);
+  padding: clamp(14px, 3vh, 30px) 20px;
+}
+
+/* Headline stack: small focus emblem → DEEP FOCUS SESSION → soft kicker.
+   Each line owns its own row, so nothing in the top area can collide. */
+.zen-headline {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 9px; text-align: center; min-width: 0;
+}
+.zen-emblem {
+  display: grid; place-items: center;
+  width: 34px; height: 34px; border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, .14);
+  background: rgba(255, 255, 255, .05);
+  color: rgba(196, 188, 255, .9);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+}
+.zen-eyebrow {
+  font-size: .72rem; font-weight: 800; letter-spacing: .3em; text-indent: .3em;
+  text-transform: uppercase;
+  color: rgba(196, 188, 255, .8);
+  text-align: center;
 }
 .zen-kicker {
-  font-size: .9rem; font-weight: 600; color: rgba(255, 255, 255, .62);
-  text-align: center; max-width: 60ch;
+  font-size: .88rem; font-weight: 600; color: rgba(255, 255, 255, .58);
+  text-align: center; max-width: 52ch; min-width: 0; overflow-wrap: anywhere;
   text-transform: none; letter-spacing: 0; opacity: 1;
 }
 
 .zen-ring-wrap {
   position: relative;
-  width: min(380px, 62vmin);
+  width: min(300px, 52vmin);
   aspect-ratio: 1;
   display: grid; place-items: center;
   flex: 0 0 auto;
@@ -932,7 +1021,7 @@ body {
 .zen .zen-digits {
   position: relative;
   font-family: var(--font-display, inherit);
-  font-size: clamp(3rem, 10.5vw, 5.4rem) !important;
+  font-size: clamp(2.9rem, 9.5vw, 4.9rem) !important;
   font-weight: 700;
   letter-spacing: -.03em !important;
   font-variant-numeric: tabular-nums;
@@ -980,13 +1069,15 @@ body {
   max-width: 46ch; text-align: center; margin: 0; line-height: 1.55;
 }
 
-/* ── Bottom focus-guidance panel ──────────────────────────────────────── */
+/* ── Bottom focus-guidance panel: the last row of the flow, always clear
+      of the stage above it and of the viewport's bottom edge ──────────── */
 .zen-guidance {
   position: relative; z-index: 3;
   flex: 0 0 auto;
+  width: fit-content;
   display: flex; align-items: center; justify-content: center; gap: 14px;
   max-width: calc(100% - 24px);
-  margin: 0 auto calc(20px + env(safe-area-inset-bottom));
+  margin: 6px auto calc(18px + env(safe-area-inset-bottom));
   padding: 11px 22px;
   border-radius: 999px;
   background: rgba(255, 255, 255, .045);
@@ -1007,30 +1098,75 @@ body {
 .zen-minimal .zen-guidance,
 .zen-minimal .zen-kicker { display: none; }
 
+/* ── Zen responsive behaviour ───────────────────────────────────────────
+   Phones & tablets: the timer stays the visual priority — everything
+   else shrinks first. Buttons stack, the scene gets quieter, and the
+   guidance bar keeps its place below the controls. */
 @media (max-width: 640px) {
-  .zen-stage { padding: calc(66px + env(safe-area-inset-top)) 16px calc(76px + env(safe-area-inset-bottom)); }
-  .zen-ring-wrap { width: min(300px, 66vmin); }
-  .zen-eyebrow { font-size: .58rem; letter-spacing: .18em; }
   .zen-topbar { padding: calc(10px + env(safe-area-inset-top)) 12px 0; gap: 8px; }
   .zen-ghost { padding: 8px 12px; font-size: .7rem; }
+  .zen-stage { gap: clamp(10px, 2vh, 18px); padding: 12px 16px; }
+  .zen-ring-wrap { width: min(280px, 62vmin); }
+  .zen-eyebrow { font-size: .6rem; letter-spacing: .22em; text-indent: .22em; }
+  .zen-kicker { font-size: .8rem; }
   .zen-guidance { gap: 10px; padding: 9px 14px; font-size: .68rem; }
-  .zen-exit-btn { display: none; }
-  .zen-kicker { font-size: .82rem; }
+  .zen-environment { opacity: .6; }
+  .zen-environment svg { max-height: 20vh; }
 }
-@media (max-width: 420px) {
-  .zen-eyebrow { font-size: .52rem; letter-spacing: .12em; }
+/* Narrow phones: the action buttons become one stacked, full-width column
+   so they can never collide with each other or with the scene. */
+@media (max-width: 460px) {
+  .zen-actions {
+    flex-direction: column; align-items: stretch;
+    width: 100%; max-width: 340px; gap: 8px !important;
+  }
+  .zen-actions .btn { width: 100%; }
+}
+@media (max-width: 400px) {
+  .zen-topbar { padding: calc(8px + env(safe-area-inset-top)) 10px 0; }
   .zen-ghost span { display: none; }
   .zen-ghost { padding: 9px; }
+  .zen-stage { gap: clamp(8px, 1.8vh, 14px); padding: 10px 14px; }
+  .zen-headline { gap: 6px; }
+  .zen-emblem { width: 30px; height: 30px; }
+  .zen-eyebrow { font-size: .54rem; letter-spacing: .14em; text-indent: .14em; }
+  .zen-kicker { font-size: .74rem; }
+  .zen-ring-wrap { width: min(220px, 54vmin); }
+  .zen .zen-digits { font-size: clamp(2.35rem, 12vw, 3.6rem) !important; }
+  .zen-mode { font-size: .58rem; letter-spacing: .16em; }
+  .zen-status { font-size: .66rem; }
+  .zen-hint { font-size: .74rem; }
   .zen-guidance { gap: 8px; }
   .zen-guidance-item span { font-size: .64rem; }
   .zen-guidance-sep { display: none; }
+  .zen-environment { opacity: .5; }
+  .zen-environment svg { max-height: 15vh; }
+}
+/* Short desktop/laptop viewports (small laptops, split view): the ring and
+   gaps step down so the whole composition still fits without scrolling. */
+@media (min-width: 641px) and (max-height: 700px) {
+  .zen-ring-wrap { width: min(280px, 52vmin, 44vh); }
+  .zen-stage { gap: clamp(8px, 1.6vh, 16px); padding: clamp(10px, 2vh, 18px) 20px; }
+  .zen-headline { gap: 7px; }
+  .zen-emblem { width: 30px; height: 30px; }
+  .zen-guidance { margin-top: 4px; }
+  .zen-environment svg { max-height: 20vh; }
+}
+/* Very small phones (320×568 class): decorative layers step out entirely so
+   the timer + controls fit in one viewport. */
+@media (max-width: 400px) and (max-height: 620px) {
+  .zen-kicker { display: none; }
+  .zen-hint { display: none; }
+  .zen-environment { display: none; }
 }
 /* Short landscape phones: the scene and guidance step aside for the ring. */
 @media (max-height: 560px) and (orientation: landscape) {
   .zen-environment { display: none; }
   .zen-guidance { display: none; }
-  .zen-ring-wrap { width: min(240px, 38vh); }
-  .zen-stage { gap: 8px; padding: calc(58px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom)); }
+  .zen-ring-wrap { width: min(240px, 42vh); }
+  .zen-stage { gap: 8px; padding: 8px 16px; }
+  .zen-headline { gap: 5px; }
+  .zen-emblem { display: none; }
   .zen-kicker { display: none; }
   .zen-hint { display: none; }
 }
@@ -1055,10 +1191,9 @@ body {
   .mini-cal-cell { font-size: .68rem; }
 }
 /* ── Mobile / touch chrome ───────────────────────────────────────────────
-   Below 860px the sidebar IS the bottom dock. It keeps navigation and
-   nothing else: no theme swatches, no ⌘K hint (there is no keyboard),
-   no collapse arrow. Theme switching stays in Settings, where it belongs,
-   and the compact app bar keeps its menu button for the full drawer. */
+   Below 860px primary navigation moves to the fixed bottom bar; the
+   drawer keeps secondary controls. No theme swatches anywhere here —
+   theme switching stays in Settings, where it belongs. */
 @media (max-width: 860px) {
   .sidebar {
     background: var(--surface-elevated) !important;
@@ -1076,14 +1211,14 @@ body {
   }
   .sidebar .nav-item.active svg { color: var(--accent); }
   .sidebar .nav-item.active span { font-weight: 700; }
-  /* Keyboard hints and rail controls belong to the pointer-driven layout. */
-  .cmdk-tip, .sidebar .sb-toggle { display: none !important; }
+  /* Rail controls belong to the pointer-driven layout. */
+  .sidebar .sb-toggle { display: none !important; }
 }
 
-/* Touch devices (phones and tablets at any width) never show the ⌘K hint
-   or the rail collapse arrow — there is no hardware keyboard to hint at. */
+/* Touch devices (phones and tablets at any width) never show the rail
+   collapse arrow — the desktop rail is not in use there. */
 @media (pointer: coarse) {
-  .cmdk-tip, .sb-toggle { display: none !important; }
+  .sb-toggle { display: none !important; }
 }
 
 /* ══════════════════════════════════════════════════════════════════════
@@ -1730,6 +1865,7 @@ body.mode-focused .main-workspace > :not(.tracker-bar) { animation: none !import
     transform: none !important;
   }
   .quick-popover, .zen-glow, .zen .zen-digits, .mobile-drawer, .drawer-scrim,
+  .zen, .zen-stage, .mobile-bottom-nav, .mbn-item, .mbn-item svg,
   .zen-scene__glow, .zen-scene__plant, .zen-scene__motes {
     animation: none !important;
     transition: none !important;

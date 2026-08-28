@@ -337,5 +337,4 @@ body { background-attachment:fixed; color:var(--text-main); }
     width:100% !important; margin-top:auto !important; padding:0 !important;
   }
   .app-wrapper.sb-collapsed .sidebar-foot > .glass-panel { display:none !important; }
-  .app-wrapper.sb-collapsed .cmdk-tip { margin:0 !important; }
 }
