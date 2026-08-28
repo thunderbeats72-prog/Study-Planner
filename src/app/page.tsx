@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError, prettyLong, today, type AppState, type MessageRow } from "@/lib/client";
 import { mmss, useFocusTimer, useStudyClock, type ClockApi, type TimerApi, type TimerMode } from "@/lib/useTimer";
 import { nextPendingTask, type CompletedTaskInfo } from "@/lib/completion";
@@ -90,21 +90,6 @@ function savedSessionQueue(raw: string | null): PendingSessionLog[] {
   } catch { return []; }
 }
 
-/** The ⌘K hint's compact rail form has to name the modifier the learner
- *  actually presses: ⌘ on Apple keyboards, ⌃ (Ctrl) on everything else.
- *  `useSyncExternalStore` is React's own platform-detection pattern — the
- *  server snapshot and the first hydration paint both answer "Apple", the
- *  client corrects immediately afterwards, and no effect or state is
- *  involved, so the markup can never desynchronise from the DOM. */
-const noStoreSubscription = () => () => {};
-function isApplePlatform(): boolean {
-  if (typeof navigator === "undefined") return true;
-  return /Mac|iPhone|iPad|iPod/i.test(`${navigator.userAgent || ""} ${navigator.platform || ""}`);
-}
-function useAppleKeyboard(): boolean {
-  return useSyncExternalStore(noStoreSubscription, isApplePlatform, () => true);
-}
-
 export default function Home() {
   const [state, setState] = useState<AppState | null>(null);
   const [loading, setLoading] = useState(true);
@@ -122,6 +107,14 @@ export default function Home() {
   const [ambient, setAmbient] = useState("none");
   useEffect(() => onSoundChange(setAmbient), []);
   useBackClose(zen, () => setZen(false));
+  /* Zen is a full-screen room: lock the page scroll behind it so the browser
+     never paints a second scrollbar next to the composition. Restored on exit. */
+  useEffect(() => {
+    if (!zen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, [zen]);
   useBackClose(chatOpen, () => setChatOpen(false));
   const [toast, setToast] = useState<Toast | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -167,10 +160,6 @@ export default function Home() {
   const [railAnimating, setRailAnimating] = useState(false);
   const railTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => { if (railTimer.current) clearTimeout(railTimer.current); }, []);
-  /* The collapsed rail has no room for a sentence, so the ⌘K hint shows a key
-     glyph there — and it has to be the glyph this learner actually presses:
-     ⌘ on Apple keyboards, ⌃ (Ctrl) on everything else. */
-  const cmdGlyph = useAppleKeyboard() ? "⌘" : "⌃";
   const toggleSidebar = () => {
     setRailAnimating(true);
     if (railTimer.current) clearTimeout(railTimer.current);
@@ -916,8 +905,7 @@ export default function Home() {
         </nav>
         {/* Mobile drawer footer deliberately stays plain: navigation, streak
             and setup only. Theme switching lives in Settings (and the
-            desktop tracker-bar palette), and the ⌘K hint is desktop chrome,
-            so neither is repeated here. */}
+            desktop tracker-bar palette), so it is not repeated here. */}
         <div className="drawer-foot">
           <div className="streak-badge foot-badge">
             <IconFlame /> {state.user.streak} Day Streak
@@ -979,16 +967,6 @@ export default function Home() {
                 Re-run Setup
               </button>
             </div>
-          </div>
-          {/* ⌘K hint. It lives *inside* the sidebar rather than pinned to the
-              viewport corner, so the rail's own width is the hint's width: it
-              shrinks, re-centres and stays clipped by the sidebar instead of
-              hanging out of it with a word cut in half. The sentence keeps its
-              place in the DOM (screen readers still get it) while the rail
-              swaps it for the compact key chip. */}
-          <div className="cmdk-tip">
-            <kbd className="cmdk-tip-key" aria-hidden="true">{cmdGlyph}K</kbd>
-            <span className="cmdk-tip-text">Press ⌘K / Ctrl-K for commands</span>
           </div>
         </aside>
 
@@ -1151,6 +1129,24 @@ export default function Home() {
         </main>
       </div>
 
+      {/* Mobile bottom navigation — the primary page switcher on phones and
+          tablets. Fixed, safe-area aware, shown only ≤ 860px via CSS; the
+          hamburger drawer keeps the secondary controls. */}
+      <nav className="mobile-bottom-nav" aria-label="Primary">
+        {NAV.map((n) => (
+          <button
+            key={n.id}
+            type="button"
+            className={`mbn-item${page === n.id ? " active" : ""}`}
+            aria-current={page === n.id ? "page" : undefined}
+            onClick={() => goPage(n.id)}
+          >
+            <span className="mbn-icon" aria-hidden="true">{n.icon}</span>
+            <span className="mbn-label">{n.label}</span>
+          </button>
+        ))}
+      </nav>
+
       <ChatPanel open={chatOpen} setOpen={setChatOpen} messages={allMsgs} onSend={askTutor}
         thinking={thinking} provider={state.aiProvider}
         learner={{ name: state.user.name, daysLeft: ctx.daysLeft, progressPct: ctx.progressPct, streak: state.user.streak, todayDone, todayTotal }} />
@@ -1162,11 +1158,11 @@ export default function Home() {
           <ZenScene className="zen-environment" />
           <div className="zen-glow" aria-hidden="true" />
 
+          {/* TOP — one quiet control row, in normal flow (nothing to collide with). */}
           <div className="zen-topbar">
             <button className="zen-ghost" onClick={() => setZenMinimal((v) => !v)} aria-pressed={zenMinimal}>
               <IconFocus2 size={14} /> <span>Focus Mode</span>
             </button>
-            <div className="zen-eyebrow">Deep Focus Session</div>
             <div className="zen-topbar-right">
               <button className="zen-ghost" onClick={toggleZenFullscreen}>
                 <IconExpand2 size={14} /> <span>Full Screen</span>
@@ -1175,12 +1171,18 @@ export default function Home() {
             </div>
           </div>
 
+          {/* CENTER — emblem · title · timer ring · actions · hint, one column
+              with generous gaps; the timer is always the visual priority. */}
           <div className="zen-stage">
-            {!zenMinimal && (
-              <div className="zen-kicker">
-                {state.subjects.find((x) => x.id === clock.subjectId)?.name || "Protect this time for what matters"}
-              </div>
-            )}
+            <div className="zen-headline">
+              <span className="zen-emblem" aria-hidden="true"><IconFocus2 size={15} /></span>
+              <div className="zen-eyebrow">Deep Focus Session</div>
+              {!zenMinimal && (
+                <div className="zen-kicker">
+                  {state.subjects.find((x) => x.id === clock.subjectId)?.name || "Protect this time for what matters"}
+                </div>
+              )}
+            </div>
 
             <div className="zen-ring-wrap">
               <svg className="zen-ring" viewBox="0 0 320 320" aria-hidden="true">
@@ -1231,6 +1233,7 @@ export default function Home() {
             )}
           </div>
 
+          {/* BOTTOM — the 3-part focus guidance bar, the last flow row. */}
           {!zenMinimal && (
             <div className="zen-guidance">
               <div className="zen-guidance-item"><IconLeaf size={15} /><span>{zenGuidance(timer)}</span></div>
