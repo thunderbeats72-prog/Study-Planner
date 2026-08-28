@@ -6434,3 +6434,104 @@ svg{max-width:none}
   .app-wrapper.sb-collapsed .sidebar .nav-item svg{width:18px;height:18px}
 }
 .timer-ring-wrap svg{width:100%;height:100%;max-width:none}
+
+/* ════════════════════════════════════════════════════════════════════
+   v23 — SHIGUN IS A CONVERSATION, NOT A CARD
+   The panel looked boxy because every surface was a rectangle with a
+   hairline: 22px shell, bordered bot bubbles with a left spine, a
+   square send tile, a square avatar, and (on phones) a 0-radius wall.
+   Chat products round the shell, drop inner boxes, and use capsules.
+════════════════════════════════════════════════════════════════════ */
+.ai-panel{
+  border-radius:28px !important;
+  border:0 !important;
+  overflow:hidden;
+  box-shadow:0 18px 50px -18px rgba(18,16,38,.28),0 4px 16px rgba(18,16,38,.08) !important;
+  background-color:var(--surface-elevated) !important;
+  background-image:none !important;
+}
+.ai-head{
+  border-bottom:0 !important;
+  padding:14px 16px 8px !important;
+  background:transparent !important;
+}
+.ai-head::after,.ai-head::before{content:none !important;display:none !important}
+.shigun-avatar{
+  width:36px;height:36px;border-radius:50% !important;
+  background:radial-gradient(circle at 32% 28%,var(--color-ai-bright),var(--color-ai));
+  color:#fff;
+}
+.ai-close{border-radius:50% !important;border:0 !important;background:transparent !important}
+
+.ai-msgs{padding:8px 14px 10px !important;gap:10px !important;background:transparent}
+.ai-message-row .ai-msg,
+.ai-msg{
+  border:0 !important;
+  box-shadow:none !important;
+  border-left:0 !important;
+}
+.ai-message-row.bot .ai-msg,
+.ai-msg.bot{
+  background:var(--row-bg) !important;
+  border-radius:20px 20px 20px 8px !important;
+  padding:11px 15px !important;
+}
+.ai-message-row.user .ai-msg,
+.ai-msg.user{
+  border-radius:20px 20px 8px 20px !important;
+  padding:11px 15px !important;
+}
+
+.ai-quick{
+  background:transparent !important;
+  border:0 !important;
+  padding:4px 14px 8px !important;
+}
+.ai-quick button{
+  border:0 !important;
+  background:var(--row-bg) !important;
+  border-radius:999px !important;
+  padding:8px 14px !important;
+}
+
+.ai-input-row,.ai-composer{
+  background:transparent !important;
+  border:0 !important;
+  padding:8px 12px 14px !important;
+  gap:8px !important;
+  align-items:center !important;
+}
+.ai-chat-input{
+  border-radius:999px !important;
+  border:0 !important;
+  background:var(--row-bg) !important;
+  min-height:44px !important;
+  padding:11px 16px !important;
+  box-shadow:none !important;
+}
+.ai-chat-input:focus{transform:none !important;box-shadow:0 0 0 3px var(--accent-glow) !important}
+.ai-send{
+  width:44px !important;height:44px !important;min-width:44px !important;min-height:44px !important;
+  border-radius:50% !important;padding:0 !important;
+}
+
+@media(min-width:641px){
+  .ai-panel{
+    width:min(400px,calc(100vw - 40px)) !important;
+    height:min(640px,calc(100vh - 120px)) !important;
+    bottom:90px !important;right:20px !important;
+    border-radius:28px !important;
+  }
+}
+@media(max-width:640px){
+  .ai-panel{
+    top:auto !important;left:8px !important;right:8px !important;
+    bottom:calc(var(--dock-h,72px) + 10px) !important;
+    width:auto !important;height:min(78dvh,640px) !important;
+    max-height:min(78dvh,640px) !important;
+    border-radius:24px !important;
+    margin:0 !important;
+  }
+  .ai-message-row.bot .ai-msg{border-radius:18px 18px 18px 7px !important}
+  .ai-message-row.user .ai-msg{border-radius:18px 18px 7px 18px !important}
+}
