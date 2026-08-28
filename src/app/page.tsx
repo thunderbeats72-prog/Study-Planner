@@ -18,7 +18,7 @@ import { useBackClose } from "@/lib/useBackClose";
 import type { TaskPatch } from "@/components/TaskEditor";
 import {
   IconBolt, IconBell, IconBook, IconCalendar, IconCheck, IconClock, IconExpand2, IconFlame,
-  IconFocus2, IconGear, IconHome, IconLeaf, IconLogo, IconMenu, IconPalette, IconPanelLeft,
+  IconFocus2, IconGear, IconHome, IconLeaf, IconLogo, IconPalette, IconPanelLeft,
   IconSpark, IconWarn,
 } from "@/components/icons";
 import ZenScene from "@/components/ZenScene";
@@ -850,16 +850,11 @@ export default function Home() {
   return (
     <>
       {/* One flex row: [ mark + titles ]  ←→  [ status chip ]. The group keeps
-          its own gap, and both ends are bounded so neither stretches. */}
+          its own gap, and both ends are bounded so neither stretches.
+          There is deliberately no hamburger button: the fixed bottom
+          navigation is the primary mobile navigation, so the app bar starts
+          at the logo and no slot is reserved for a menu trigger. */}
       <header className="mobile-header">
-        <button
-          className="mh-menu"
-          aria-label="Open navigation menu"
-          aria-expanded={drawerOpen}
-          onClick={() => setDrawerOpen(true)}
-        >
-          <IconMenu size={20} />
-        </button>
         <div className="mh-brand">
           <div className="brand-logo-icon brand-logo-sm" aria-hidden="true"><IconLogo size={14} /></div>
           <div className="mh-titles">
@@ -1130,8 +1125,9 @@ export default function Home() {
       </div>
 
       {/* Mobile bottom navigation — the primary page switcher on phones and
-          tablets. Fixed, safe-area aware, shown only ≤ 860px via CSS; the
-          hamburger drawer keeps the secondary controls. */}
+          tablets. Fixed, safe-area aware, shown only ≤ 860px via CSS. It is
+          the only navigation entry point on mobile now that the app bar has
+          no menu trigger. */}
       <nav className="mobile-bottom-nav" aria-label="Primary">
         {NAV.map((n) => (
           <button
