@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import StudyScene from "./StudyScene";
 import { THEMES, type AppState } from "@/lib/client";
 import { IconSpark } from "./icons";
 
@@ -39,6 +40,7 @@ export default function SettingsView({
   return (
     <div className="fade-in">
       <div className="page-header">
+        <StudyScene className="page-header-scene" />
         <div>
           <h1 className="page-title">Settings</h1>
           <p className="page-subtitle">Tune your schedule, timer, and appearance.</p>
