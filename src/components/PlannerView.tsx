@@ -268,7 +268,7 @@ export default function PlannerView({
   return (
     <div className="fade-in">
       <div className="page-header">
-        <StudyScene className="page-header-scene" />
+        <StudyScene variant="planner" className="page-header-scene" />
         <div>
           <h1 className="page-title">Study Planner</h1>
           <p className="page-subtitle">

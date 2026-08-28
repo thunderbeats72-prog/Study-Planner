@@ -28,7 +28,7 @@ export default function SubjectsView({
   return (
     <div className="fade-in">
       <div className="page-header">
-        <StudyScene className="page-header-scene" />
+        <StudyScene variant="subjects" className="page-header-scene" />
         <div>
           <h1 className="page-title">Subjects &amp; Lessons</h1>
           <p className="page-subtitle">
