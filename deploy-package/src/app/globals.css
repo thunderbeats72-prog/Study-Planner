@@ -6153,20 +6153,40 @@ body.mode-young .section-title::after{width:46px;height:3px;bottom:-8px}
          action buttons auto-sized.
 ════════════════════════════════════════════════════════════════════ */
 
-/* ── 1 · COLLAPSED RAIL — tight, aligned stack ─────────────────── */
+/* ── 1 · COLLAPSED RAIL — one compact, optically aligned stack ─── */
 @media(min-width:861px){
-  /* Toggle becomes a normal flex child: centred, small, no reserved gap. */
+  /* Match the rail's top inset to its side inset. The previous 20px sidebar
+     padding + 10px toggle margin left 30px of dead space above the stack. */
+  .app-wrapper.sb-collapsed .sidebar{padding-top:12px}
+
+  /* The first three controls now share one 4px rhythm. A visible quiet tile
+     makes the toggle's real hit area legible instead of spacing a bare 16px
+     glyph as though it were the full button. */
   .app-wrapper.sb-collapsed .sb-toggle{
-    position:static;top:auto;right:auto;left:auto;
-    margin:10px auto 6px;width:38px;height:38px;
+    position:static;inset:auto;
+    width:40px;height:40px;margin:0 auto 4px;
+    background:var(--row-bg);border-color:var(--glass-border);
   }
-  /* Brand block hugs the toggle: no 48px trampoline, small bottom gap. */
+  .app-wrapper.sb-collapsed .sb-toggle:hover{
+    background:var(--row-hover);border-color:var(--glass-border-hover);
+  }
+
+  /* In rail mode the expanded header separator has no section to divide.
+     Removing its 8px padding + margin is what brings the logo and Overview
+     onto the same compact rhythm as the toggle. */
   .app-wrapper.sb-collapsed .brand-header{
-    justify-content:center;gap:0;padding:0 0 8px;margin-bottom:2px;
+    justify-content:center;gap:0;
+    padding:0;margin:0 0 4px;border-bottom:0;
   }
-  /* Nav starts right under the brand; icon-only rows stay compact. */
-  .app-wrapper.sb-collapsed .nav-list{gap:5px;margin-top:4px}
+
+  /* No second margin above Overview; every later nav row uses the same gap. */
+  .app-wrapper.sb-collapsed .nav-list{gap:4px;margin-top:0}
   .app-wrapper.sb-collapsed .sidebar .nav-item{padding-top:9px;padding-bottom:9px}
+
+  /* Toggle, brand, and route glyphs use the same optical size and x-axis. */
+  .app-wrapper.sb-collapsed .sb-toggle svg,
+  .app-wrapper.sb-collapsed .brand-logo-icon svg,
+  .app-wrapper.sb-collapsed .sidebar .nav-item svg{width:18px;height:18px}
 }
 
 /* ── 2 · TRACKER BAR — compact pill on phones ──────────────────── */
@@ -6225,4 +6245,147 @@ body.mode-young .section-title::after{width:46px;height:3px;bottom:-8px}
   .tracker-bar .tracker-actions{gap:5px}
   .tracker-bar .tracker-actions .chip.chip-kind{display:none}
   .tracker-bar .tracker-actions .btn{min-height:28px;padding:4px 10px;font-size:.7rem}
+}
+
+
+/* ════════════════════════════════════════════════════════════════════
+   v21 — MOBILE TRACKER ALIGNMENT + SOLID SHIGUN CONVERSATION
+   The phone tracker uses a deliberate two-row grid instead of wrapping by
+   accident. Shigun is a solid app surface, not a glass card inside the app.
+════════════════════════════════════════════════════════════════════ */
+
+/* Shigun owns its material; do not inherit the generic glass-panel shell. */
+.ai-panel{
+  background-color:var(--surface-elevated)!important;
+  background-image:none!important;
+  -webkit-backdrop-filter:none!important;backdrop-filter:none!important;
+  border-color:var(--glass-border);
+}
+
+@media(max-width:640px){
+  /* ── Tracker: status grid above two consistently sized actions ── */
+  .tracker-bar{
+    flex-direction:column;flex-wrap:nowrap;align-items:stretch;
+    justify-content:flex-start;gap:7px;padding:8px 10px;
+  }
+  .tracker-bar .tracker-status{
+    display:flex;align-items:center;gap:6px;
+    width:100%;min-width:0;flex:0 0 auto;
+  }
+  .tracker-bar .tracker-labels{
+    display:flex;flex:1 1 auto;min-width:0;
+    flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;
+  }
+  .tracker-bar .tracker-actions{
+    display:flex;align-items:center;justify-content:flex-start;
+    width:100%;min-width:0;flex:0 0 auto;flex-wrap:wrap;
+    gap:6px;padding-left:14px;
+  }
+  .tracker-bar .tracker-actions .btn{
+    flex:0 0 auto;height:36px;min-height:36px;
+    padding:0 11px;border-radius:9px;gap:4px;
+    font-size:.7rem;line-height:1;white-space:nowrap;
+  }
+  /* Undo older “last button = icon square” rules. Zen and Clock In now use
+     the same height, baseline and horizontal padding. */
+  .tracker-bar .tracker-actions .tracker-zen{
+    display:inline-flex;width:auto;min-width:0;max-width:none;
+    height:36px;min-height:36px;flex:0 0 auto;aspect-ratio:auto;
+    padding:0 11px;gap:4px;font-size:.7rem;line-height:1;
+  }
+  .tracker-bar .tracker-actions .tracker-zen svg{width:13px;height:13px}
+
+  /* ── Chat: one full-height solid conversation surface ── */
+  .ai-scrim{display:none}
+  .ai-panel{
+    top:var(--header-h)!important;right:0!important;bottom:0!important;left:0!important;
+    width:100%!important;height:auto!important;max-height:none!important;margin:0!important;
+    border:0!important;border-radius:0!important;box-shadow:none!important;
+    background-color:var(--app-bg)!important;background-image:none!important;
+    -webkit-backdrop-filter:none!important;backdrop-filter:none!important;
+    animation:none!important;
+  }
+  /* Remove the legacy pseudo handle and the real handle. Both were rendering
+     together and consuming a large blank band above the header. */
+  .ai-panel::before{content:none!important;display:none!important}
+  .ai-sheet-handle{display:none!important}
+
+  .ai-head{
+    min-height:56px;flex:0 0 auto;padding:8px 12px;
+    background:var(--app-bg);border-bottom:1px solid var(--glass-border);
+    box-shadow:none;gap:0;
+  }
+  .ai-head::after{content:none;display:none}
+  .ai-head-main{align-items:center;gap:10px}
+  .shigun-avatar{width:36px;height:36px;flex-basis:36px;border-radius:11px;box-shadow:none}
+  .shigun-avatar-ring{display:none}
+  .ai-close{
+    width:40px;height:40px;flex-basis:40px;
+    background:transparent;border-color:transparent;border-radius:12px;
+  }
+
+  .ai-msgs{
+    flex:1 1 auto;min-height:0;padding:14px 12px 12px;gap:12px;
+    background:transparent;overflow-x:hidden;overflow-y:auto;
+    scrollbar-width:none;scroll-padding-block:12px;
+  }
+  .ai-msgs::-webkit-scrollbar{display:none}
+  .ai-message-row{align-items:flex-end;gap:6px}
+  /* The header already establishes the speaker. Repeating a glowing avatar
+     beside every answer made the narrow transcript fragmented. */
+  .ai-mini-avatar{display:none}
+  .ai-message-row .ai-msg{
+    padding:10px 12px;font-size:.84rem;line-height:1.5;
+    border-radius:14px;box-shadow:none;
+  }
+  .ai-message-row.bot .ai-msg{
+    max-width:calc(100% - 34px);border:1px solid var(--glass-border);
+    border-left:1px solid var(--glass-border);border-radius:14px 14px 14px 5px;
+    background:var(--surface-elevated);
+  }
+  .ai-message-row.user .ai-msg{
+    max-width:84%;border-radius:14px 14px 5px 14px;
+  }
+  /* Keep Copy available without a detached outlined square. Its existing
+     44px pseudo hit target remains active on coarse pointers. */
+  .ai-panel .ai-copy{
+    width:28px;height:28px;flex:0 0 28px;margin:0 0 1px;
+    border-color:transparent;background:transparent;border-radius:9px;
+    opacity:.55;
+  }
+
+  .ai-quick{
+    flex:0 0 auto;display:flex;align-items:center;flex-wrap:nowrap;
+    gap:6px;padding:6px 12px 7px;overflow-x:auto;overflow-y:hidden;
+    background:var(--app-bg);border-top:1px solid var(--glass-border);
+    box-shadow:none;scrollbar-width:none;scroll-snap-type:x proximity;
+  }
+  .ai-quick::after{content:none;display:none}
+  .ai-panel .ai-quick button{
+    flex:0 0 auto;height:36px;min-height:36px;padding:0 11px;
+    border-radius:999px;background:transparent;box-shadow:none;
+    -webkit-backdrop-filter:none;backdrop-filter:none;
+    font-size:.67rem;line-height:1;white-space:nowrap;scroll-snap-align:start;
+  }
+
+  .ai-input-row{
+    flex:0 0 auto;align-items:center;gap:8px;
+    padding:0 12px max(8px,env(safe-area-inset-bottom));
+    background:var(--app-bg);border-top:0;box-shadow:none;
+  }
+  .ai-chat-input{
+    height:44px!important;min-height:44px!important;max-height:120px;
+    padding:10px 12px!important;border-radius:14px!important;
+    background:var(--surface-elevated)!important;
+  }
+  .ai-send{
+    width:44px!important;height:44px!important;min-width:44px!important;min-height:44px!important;
+    flex:0 0 44px!important;padding:0!important;border-radius:14px!important;
+  }
+}
+
+/* The app header is hidden on short landscape phones, so chat owns the top. */
+@media(max-width:640px) and (max-height:500px) and (orientation:landscape){
+  .ai-panel{top:0!important}
+  .ai-quick{display:none}
 }
