@@ -6389,15 +6389,6 @@ body.mode-young .section-title::after{width:46px;height:3px;bottom:-8px}
   .ai-panel{top:0!important}
   .ai-quick{display:none}
 }
-nt;border-radius:14px!important;
-  }
-}
-
-/* The app header is hidden on short landscape phones, so chat owns the top. */
-@media(max-width:640px) and (max-height:500px) and (orientation:landscape){
-  .ai-panel{top:0!important}
-  .ai-quick{display:none}
-}
 
 /* ════════════════════════════════════════════════════════════════════
    v22 — ICON GEOMETRY: ICONS ARE GLYPHS, NOT IMAGES
@@ -6406,7 +6397,8 @@ nt;border-radius:14px!important;
    hairline or stretched to the row width. Icons now keep the square
    their width/height attributes already declared.
 ════════════════════════════════════════════════════════════════════ */
-svg{max-width:none}
+svg{overflow:visible;flex-shrink:0;max-width:none}
+.btn svg{width:1em;height:1em}
 .brand-logo-icon svg,
 .nav-item svg,
 .sb-toggle svg,
