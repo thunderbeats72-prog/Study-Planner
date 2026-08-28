@@ -3,8 +3,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "drizzle-kit push && next build",
+    "build": "next build",
     "build:app": "next build",
+    "build:db": "drizzle-kit push && next build",
     "start": "next start",
     "test": "tsx scripts/test-suite.ts",
     "lint": "eslint . --max-warnings=0",
