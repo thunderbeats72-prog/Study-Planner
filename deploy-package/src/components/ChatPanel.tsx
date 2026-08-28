@@ -98,12 +98,10 @@ export default function ChatPanel({
       {open && <button className="ai-scrim" aria-label="Close Shigun" onClick={() => setOpen(false)} />}
       {open && (
         <div
-          className={`ai-panel glass-panel${thinking ? " is-thinking" : ""}`}
+          className={`ai-panel${thinking ? " is-thinking" : ""}`}
           role="dialog" aria-modal="true" aria-label="Shigun study coach"
           onKeyDown={(e) => { if (e.key === "Escape") setOpen(false); }}
         >
-          <div className="ai-sheet-handle" aria-hidden="true" />
-
           {/* ── Header ── */}
           <div className="ai-head">
             <div className="ai-head-main">
