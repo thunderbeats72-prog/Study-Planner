@@ -6153,20 +6153,40 @@ body.mode-young .section-title::after{width:46px;height:3px;bottom:-8px}
          action buttons auto-sized.
 ════════════════════════════════════════════════════════════════════ */
 
-/* ── 1 · COLLAPSED RAIL — tight, aligned stack ─────────────────── */
+/* ── 1 · COLLAPSED RAIL — one compact, optically aligned stack ─── */
 @media(min-width:861px){
-  /* Toggle becomes a normal flex child: centred, small, no reserved gap. */
+  /* Match the rail's top inset to its side inset. The previous 20px sidebar
+     padding + 10px toggle margin left 30px of dead space above the stack. */
+  .app-wrapper.sb-collapsed .sidebar{padding-top:12px}
+
+  /* The first three controls now share one 4px rhythm. A visible quiet tile
+     makes the toggle's real hit area legible instead of spacing a bare 16px
+     glyph as though it were the full button. */
   .app-wrapper.sb-collapsed .sb-toggle{
-    position:static;top:auto;right:auto;left:auto;
-    margin:10px auto 6px;width:38px;height:38px;
+    position:static;inset:auto;
+    width:40px;height:40px;margin:0 auto 4px;
+    background:var(--row-bg);border-color:var(--glass-border);
   }
-  /* Brand block hugs the toggle: no 48px trampoline, small bottom gap. */
+  .app-wrapper.sb-collapsed .sb-toggle:hover{
+    background:var(--row-hover);border-color:var(--glass-border-hover);
+  }
+
+  /* In rail mode the expanded header separator has no section to divide.
+     Removing its 8px padding + margin is what brings the logo and Overview
+     onto the same compact rhythm as the toggle. */
   .app-wrapper.sb-collapsed .brand-header{
-    justify-content:center;gap:0;padding:0 0 8px;margin-bottom:2px;
+    justify-content:center;gap:0;
+    padding:0;margin:0 0 4px;border-bottom:0;
   }
-  /* Nav starts right under the brand; icon-only rows stay compact. */
-  .app-wrapper.sb-collapsed .nav-list{gap:5px;margin-top:4px}
+
+  /* No second margin above Overview; every later nav row uses the same gap. */
+  .app-wrapper.sb-collapsed .nav-list{gap:4px;margin-top:0}
   .app-wrapper.sb-collapsed .sidebar .nav-item{padding-top:9px;padding-bottom:9px}
+
+  /* Toggle, brand, and route glyphs use the same optical size and x-axis. */
+  .app-wrapper.sb-collapsed .sb-toggle svg,
+  .app-wrapper.sb-collapsed .brand-logo-icon svg,
+  .app-wrapper.sb-collapsed .sidebar .nav-item svg{width:18px;height:18px}
 }
 
 /* ── 2 · TRACKER BAR — compact pill on phones ──────────────────── */
