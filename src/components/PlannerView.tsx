@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import StudyScene from "./StudyScene";
 import {
   addDays, dayDiff, fmtDate, KIND_META, normalizeCheckpointTitle, parseDate, prettyDate, prettyLong, today, type AppState, type TaskRow,
 } from "@/lib/client";
@@ -267,6 +268,7 @@ export default function PlannerView({
   return (
     <div className="fade-in">
       <div className="page-header">
+        <StudyScene className="page-header-scene" />
         <div>
           <h1 className="page-title">Study Planner</h1>
           <p className="page-subtitle">
