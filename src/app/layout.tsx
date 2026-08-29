@@ -5,11 +5,11 @@ import "./study-planner-refresh.css";
 import "./pastel-ui-system.css";
 import "./study-planner-redesign.css";
 import "./practical-enhancements.css";
+/* ui-polish.css is the single authoritative finish layer: task rows,
+   the ⋮ menu, active/recording state, sliders and calendars are defined
+   ONLY there. The old pass/landing/final-fixes sheets were consolidated
+   into it on purpose — do not add a new override file. */
 import "./ui-polish.css";
-import "./ui-polish-pass.css";
-import "./ui-polish-landing.css";
-import "./final-ui-fixes.css";
-import "./task-actions-final.css";
 
 const inter = localFont({
   src: "./fonts/inter-latin-variable.woff2",

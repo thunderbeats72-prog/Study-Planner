@@ -544,8 +544,6 @@ body {
 .vtab.active::after { display: none; }
 .day-block { border-radius: var(--rd-radius-card); overflow: hidden; }
 .day-date { font-weight: 780; letter-spacing: -.02em; }
-.planner-days .task-row { padding: 13px 20px; }
-.task-title { font-weight: 700; letter-spacing: -.01em; }
 .chip-kind { background: var(--rd-lavender-soft); color: var(--nav-active-text); }
 .chip { border-radius: 999px; }
 
@@ -1589,47 +1587,11 @@ body::after { content: none !important; display: none !important; }
 .vtab.active { background: var(--surface); color: var(--accent); box-shadow: 0 1px 2px rgba(30, 27, 60, .06); }
 .planner-days .day-head {
   background: var(--surface) !important;
-  padding: 16px 20px 13px !important;
+  padding: 16px 20px 13px;
   border-bottom: 1px solid var(--glass-border);
 }
-.planner-days .task-row,
-.dashboard-tasks .task-row,
-.task-row {
-  background: transparent !important;
-  box-shadow: none !important;
-}
-.planner-days .task-row,
-.dashboard-tasks .task-row {
-  border: 0 !important;
-  border-bottom: 1px solid var(--glass-border) !important;
-}
-.planner-days .task-row.last-row,
-.planner-days .task-row:last-child,
-.dashboard-tasks .task-row:last-child {
-  border-bottom: 0 !important;
-}
-.planner-days .task-row:hover,
-.dashboard-tasks .task-row:hover,
-.task-row:hover .task-title {
-  background-color: transparent !important;
-  color: inherit !important;
-}
-.task-row-context, .task-row:hover .task-title { color: var(--text-main) !important; }
-.task-row.clean-list {
-  background: var(--surface) !important;
-  border: 1px solid var(--glass-border) !important;
-  border-radius: 14px !important;
-}
-.task-row.done { animation: none !important; }
-.task-row.done .task-title { color: var(--text-muted) !important; }
-.task-row.active-clock {
-  background: color-mix(in srgb, var(--success-accent) 6%, var(--surface)) !important;
-  border: 1px solid color-mix(in srgb, var(--success-accent) 26%, var(--glass-border)) !important;
-  box-shadow: none !important;
-}
-.cal-cell.today::after { animation: none !important; }
-.cal-cell.today { box-shadow: 0 0 0 2px var(--accent-glow) !important; }
-.cal-pill { box-shadow: none !important; }
+/* Rows, their hairlines, the calm active state and the calendar look are
+   consolidated in ui-polish.css — this layer no longer re-paints them. */
 
 /* ── Focus Studio: timer first, calm surfaces ─────────────────────────── */
 .study-clock-panel, .timer-panel, .ambient-panel, .rules-panel {
@@ -1667,21 +1629,8 @@ body::after { content: none !important; display: none !important; }
   color: var(--nav-active-text);
 }
 
-/* ── Calendar and secondary surfaces ──────────────────────────────────── */
-.cal-cell,
-.mini-cal-cell.has-tasks {
-  background: var(--row-bg) !important;
-  border-color: transparent !important;
-}
-.cal-cell.today,
-.mini-cal-cell.is-today {
-  background: var(--accent) !important;
-  color: #fff !important;
-  box-shadow: 0 0 0 3px var(--accent-glow) !important;
-}
-.cal-cell.today .mini-cal-dot,
+/* ── Secondary surfaces (calendar states live in ui-polish.css) ─────── */
 .mini-cal-cell.is-today .mini-cal-dot { background: #fff; }
-.cal-cell:hover { background: var(--row-hover) !important; box-shadow: none !important; }
 .theme-card { border: 1px solid var(--glass-border); }
 .theme-card.active { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
 .theme-card-check { background: var(--accent); box-shadow: none; }

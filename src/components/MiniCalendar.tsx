@@ -5,10 +5,13 @@ import { fmtDate, parseDate, today, type AppState } from "@/lib/client";
 import { IconChevron } from "./icons";
 
 /** Compact monthly calendar for the Dashboard — dates with planned tasks
- *  carry a soft dot; today gets the accent ring. Read-only at a glance. */
+ *  carry a soft dot; today gets the accent pill. Read-only at a glance.
+ *  Month navigation slides direction-aware (180ms) and the grid always holds
+ *  six weeks, so the card never changes height when months alternate. */
 export default function MiniCalendar({ state }: { state: AppState }) {
   const now = new Date();
   const [view, setView] = useState({ y: now.getFullYear(), m: now.getMonth() });
+  const [dir, setDir] = useState<1 | -1 | 0>(0);
   const t = today();
 
   const byDate = useMemo(() => {
@@ -24,12 +27,21 @@ export default function MiniCalendar({ state }: { state: AppState }) {
     ...Array(pad).fill(null),
     ...Array.from({ length: days }, (_, i) => fmtDate(new Date(view.y, view.m, i + 1))),
   ];
+  while (cells.length < 42) cells.push(null);
 
-  const shift = (delta: number) =>
+  const isCurrentMonth = view.y === now.getFullYear() && view.m === now.getMonth();
+  const shift = (delta: number) => {
+    setDir(delta > 0 ? 1 : -1);
     setView((v) => {
       const d = new Date(v.y, v.m + delta, 1);
       return { y: d.getFullYear(), m: d.getMonth() };
     });
+  };
+  const backToToday = () => {
+    const d = new Date();
+    setDir(d.getFullYear() * 12 + d.getMonth() > view.y * 12 + view.m ? -1 : 1);
+    setView({ y: d.getFullYear(), m: d.getMonth() });
+  };
 
   return (
     <div className="mini-cal">
@@ -38,6 +50,11 @@ export default function MiniCalendar({ state }: { state: AppState }) {
           {first.toLocaleDateString(undefined, { month: "long", year: "numeric" })}
         </span>
         <div className="mini-cal-nav">
+          {!isCurrentMonth && (
+            <button type="button" className="mini-cal-today" onClick={backToToday}>
+              Today
+            </button>
+          )}
           <button type="button" className="mini-cal-btn" aria-label="Previous month" onClick={() => shift(-1)}>
             <span style={{ transform: "rotate(90deg)", display: "inline-flex" }}><IconChevron size={13} /></span>
           </button>
@@ -46,12 +63,15 @@ export default function MiniCalendar({ state }: { state: AppState }) {
           </button>
         </div>
       </div>
-      <div className="mini-cal-grid">
+      <div
+        key={`${view.y}-${view.m}`}
+        className={`mini-cal-grid${dir > 0 ? " cal-slide-next" : dir < 0 ? " cal-slide-prev" : ""}`}
+      >
         {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
           <div key={i} className="mini-cal-dow">{d}</div>
         ))}
         {cells.map((d, i) => {
-          if (!d) return <div key={`e${i}`} className="mini-cal-cell empty" />;
+          if (!d) return <div key={`e${i}`} className="mini-cal-cell empty" aria-hidden="true" />;
           const count = byDate.get(d) || 0;
           const isToday = d === t;
           return (
@@ -61,7 +81,7 @@ export default function MiniCalendar({ state }: { state: AppState }) {
               title={count ? `${count} task${count > 1 ? "s" : ""} planned` : undefined}
             >
               <span className="mini-cal-num">{parseDate(d).getDate()}</span>
-              {count > 0 && <span className="mini-cal-dot" />}
+              {count > 0 && <span className="mini-cal-dot" aria-hidden="true" />}
             </div>
           );
         })}

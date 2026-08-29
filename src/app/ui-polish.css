@@ -1,29 +1,35 @@
 /*
-  Study Planner Pro — targeted UI/UX polish pass
-  Preserves the existing lavender/pastel system and only tightens hierarchy,
-  alignment, mobile task actions, onboarding density, and motion.
+  Study Planner Pro — the interaction & polish layer.
 
-  This file is imported LAST (see src/app/layout.tsx), so it is the layer
-  that resolves the cascade for the things it touches. Rules here should
-  stay small, specific and commented — anything structural belongs in
-  globals.css.
+  This file is the ONE authoritative source for the appearance of the
+  surfaces it owns:
+
+    · task-row geometry (list, dashboard, day sheets, mobile grid)
+    · task actions gutter (Clock in / Clock out / Done / ⋮) and the ⋮ menu
+    · active task / recording state (the quiet live language)
+    · onboarding slider appearance (track, thumb, badge, chips)
+    · calendar micro-interactions (mini + planner month grids)
+    · the small "ported" behaviour patches collected at the bottom
+
+  Earlier layers (globals.css + the theme system files) provide tokens,
+  the pastel identity and the base component skin. Nothing in a previous
+  layer is supposed to fight this file for the selectors above — the old
+  "final fixes" cascade (ui-polish-pass / landing / final-ui-fixes /
+  task-actions-final) was folded in and deleted on purpose. Do not create
+  a new override sheet for these components; edit them here.
+
+  Rules here avoid !important: they win by import order and deliberate
+  specificity. Hover effects are gated on (hover:hover) so touch devices
+  never show a stuck lit state, and every animation here is decoration —
+  each is switched off under prefers-reduced-motion without losing the
+  information it carries.
 */
 
 /* =========================
    OVERVIEW / DASHBOARD
    ========================= */
-.dash-today-grid {
-  grid-template-columns: minmax(0, 1fr) 280px !important;
-  gap: 18px !important;
-  align-items: start;
-}
-
-/* Overview intentionally does not duplicate the full calendar experience. */
-.dash-cal-card { display: none !important; }
-
-.dash-side-rail {
-  min-width: 0;
-  gap: 14px !important;
+.dash-today-card {
+  min-height: 0;
 }
 
 .dash-quote-card {
@@ -33,82 +39,181 @@
   justify-content: center;
 }
 
-.dash-today-card {
-  min-height: 0;
+/* Give the overview a tighter, more deliberate vertical rhythm. */
+.dash-hero { margin-bottom: 16px; }
+.recovery-panel { margin-bottom: 16px; }
+.momentum-strip { margin-top: 16px; }
+
+/* =========================
+   TASK ROWS — one geometry
+   =========================
+   A row is: [dot] [title + metadata (flexes)] [status chip] [actions] [⋮].
+   The dot, the type scale and the vertical rhythm are identical on the
+   Planner, the Overview and the day sheet, so the same row reads the same
+   everywhere. The row itself is not a button — the actions and the ⋮ are
+   the controls; the title block toggles the lesson brief where it can. */
+
+.task-row {
+  display: flex;
+  align-items: center;
+  gap: 10px 12px;
+  position: relative;
+  min-width: 0;
+  margin-bottom: 0;
+  padding: 12px 4px;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  transition: background .16s ease, border-color .16s ease, box-shadow .2s ease;
 }
 
-.dash-today-card .day-head {
-  padding-bottom: 13px;
-  margin-bottom: 4px;
-  border-bottom: 1px solid var(--glass-border);
+/* In a day block the rows are list lines with hairline separators, edge to
+   edge — not floating mini-cards (the old look that made the planner feel
+   heavy). */
+.planner-days .task-row,
+.day-modal .task-row {
+  padding: 12px 20px;
+  border-bottom-color: var(--glass-border);
+}
+.planner-days .task-row.last-row,
+.planner-days .task-row:last-child,
+.day-modal .task-row:last-child {
+  border-bottom-color: transparent;
 }
 
+/* The Overview keeps a softer inset so its rows sit inside the card. */
 .dash-today-card .task-row {
-  transition: transform .18s cubic-bezier(.22,1,.36,1),
-              border-color .18s ease,
-              background .18s ease,
-              box-shadow .18s ease;
+  padding: 12px 14px;
+  border-bottom-color: var(--glass-border);
 }
 
-@media (hover:hover) and (pointer:fine) {
-  .dash-today-card .task-row:hover {
-    transform: translateY(-1px);
-    border-color: color-mix(in srgb, var(--accent) 30%, var(--glass-border));
-    box-shadow: 0 6px 18px rgba(30,27,60,.06);
+.task-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+
+.task-main {
+  flex: 1 1 200px;
+  min-width: 0;
+  padding-right: 4px;
+}
+
+.task-title {
+  font-size: .85rem;
+  font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: -.01em;
+  color: var(--text-main);
+  min-width: 0;
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
+.task-sub {
+  font-size: .72rem;
+  line-height: 1.5;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-top: 2px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.chip-tight { margin-right: 5px; }
+
+/* A row only reacts with a barely-there surface tint — the title no longer
+   changes colour and the row never lifts (that was the "boxy, twitchy"
+   read). Hover exists only where hover is honest. */
+@media (hover: hover) and (pointer: fine) {
+  .task-row:hover { background: color-mix(in srgb, var(--row-hover) 62%, transparent); }
+  .task-row.active-clock:hover { background: color-mix(in srgb, var(--accent) 5.5%, var(--row-hover)); }
+}
+
+/* Status chip: a quiet caption on the right edge of the text column, the
+   same width on every row so the columns below line up. */
+.task-row > .chip {
+  flex: 0 0 auto;
+  align-self: center;
+  white-space: nowrap;
+}
+@media (min-width: 641px) {
+  .planner-days .task-row > .chip {
+    min-width: 74px;
+    justify-content: center;
+    margin-inline-start: auto;
   }
 }
 
-/* Give the overview a tighter, more deliberate vertical rhythm. */
-.dash-hero { margin-bottom: 16px !important; }
-.recovery-panel { margin-bottom: 16px !important; }
-.momentum-strip { margin-top: 16px !important; }
-
-@media (max-width:1080px) {
-  .dash-today-grid { grid-template-columns: 1fr !important; }
-  .dash-side-rail { display: grid; grid-template-columns: 1fr; }
-}
-
 /* =========================
-   TASK ROWS — the ⋮ control
+   TASK ACTIONS — Clock / Done / ⋮
    =========================
-   One affordance, one corner, every surface. The overflow button is a
-   compact vertical ⋮ pinned to the card's top-right, so its popover can
-   never cover the task title and opening it never moves the row. The row
-   gives the corner up explicitly — the text block and the primary actions
-   both stop short of it — instead of letting the menu float over content,
-   which is what made the old mobile version look broken. */
-.task-row { position: relative; }
+   One gutter, one height, fixed widths so the column of controls never
+   jumps when a label changes (Clock in → Clock out, Done → Undo). The ⋮
+   shares the gutter on desktop and moves to the corner on phones, where
+   the actions wrap into their own full-width band. */
 
-.task-more-wrap {
-  position: absolute;
-  top: 7px;
-  right: 7px;
-  z-index: 6;
+.task-row-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex: 0 0 auto;
+  min-width: 0;
+  order: 3;
 }
 
-.task-main { padding-right: 34px; }
+.task-row > .task-more-wrap {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+  order: 4;
+}
 
-.task-row .task-row-actions { margin-right: 32px; }
-
-.task-more {
-  display: inline-flex !important;
+.task-row-actions .btn {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
+  gap: 6px;
+  flex: 0 0 auto;
+  white-space: nowrap;
+  min-height: 32px;
+  padding: 5px 12px;
+  border-radius: 10px;
+}
+
+.task-row-actions > .btn.task-clock { min-width: 88px; }
+.task-row-actions > .btn.task-primary { min-width: 58px; }
+
+/* The ⋮ trigger: a 34px square, centred dots, quiet until asked for.
+   One affordance with hover / pressed / focus / open states and no chrome
+   until touched. */
+.task-more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
   padding: 0;
   border: 1px solid transparent;
-  border-radius: 9px;
+  border-radius: 10px;
   background: transparent;
   color: var(--text-dim);
   cursor: pointer;
-  transition: background .16s ease, color .16s ease, border-color .16s ease;
+  transition: background .16s ease, border-color .16s ease, color .16s ease, transform .14s cubic-bezier(.25, 1, .4, 1);
 }
 
 .task-more-dots {
-  display: grid;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   gap: 3px;
-  justify-items: center;
+  pointer-events: none;
 }
 
 .task-more-dots i {
@@ -116,14 +221,22 @@
   height: 3px;
   border-radius: 50%;
   background: currentColor;
+  display: block;
 }
 
-@media (hover:hover) and (pointer:fine) {
+@media (hover: hover) and (pointer: fine) {
   .task-more:hover {
     background: var(--row-hover);
     border-color: var(--glass-border);
     color: var(--accent);
   }
+}
+
+.task-more:active { transform: scale(.93); }
+
+.task-more:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .task-more[aria-expanded="true"] {
@@ -132,37 +245,51 @@
   color: var(--nav-active-text);
 }
 
-/* The popover: anchored under its own button, right-aligned so it grows
-   into the card rather than off the screen, and bounded by the viewport. */
+/* The popover. JS anchors it with viewport-aware fixed coordinates
+   (TaskActions.positionMenu) so it can never be pushed off-screen; the CSS
+   anchor below is only the first-frame fallback directly beneath the ⋮.
+   Appearance lives here; position/size are set inline by the component.
+   The menu is portalled to document.body (no ancestor can clip it) and stays
+   invisible until JS has placed it, so it never flashes at the wrong spot. */
 .task-menu {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
-  left: auto;
-  width: max-content;
-  min-width: 182px;
-  max-width: min(238px, calc(100vw - 28px));
-  padding: 5px;
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  width: 210px;
+  max-width: calc(100vw - 24px);
+  padding: 6px;
   border-radius: 14px;
   background: var(--surface-elevated);
   border: 1px solid var(--glass-border);
-  box-shadow: 0 12px 30px rgba(24,22,50,.14), 0 3px 10px rgba(24,22,50,.08);
-  z-index: 60;
+  box-shadow: 0 12px 30px rgba(24, 22, 50, .14), 0 3px 10px rgba(24, 22, 50, .08);
+  z-index: 1300;
+  visibility: hidden;
+  opacity: 0;
   transform-origin: top right;
-  animation: taskMenuPop .16s cubic-bezier(.22,1,.36,1) both;
+}
+
+.task-menu.is-open {
+  visibility: visible;
+  opacity: 1;
+  animation: taskMenuPop .16s cubic-bezier(.22, 1, .36, 1) both;
+}
+
+@keyframes taskMenuPop {
+  from { opacity: 0; transform: translateY(-4px) scale(.975); }
+  to   { opacity: 1; transform: none; }
 }
 
 .task-menu button {
   display: block;
   width: 100%;
-  min-height: 34px;
+  min-height: 36px;
   padding: 8px 11px;
   border: 0;
   border-radius: 10px;
   background: transparent;
   color: var(--text-main);
   font-family: inherit;
-  font-size: .79rem;
+  font-size: .78rem;
   font-weight: 650;
   line-height: 1.35;
   text-align: left;
@@ -172,234 +299,542 @@
   transition: background .14s ease, color .14s ease;
 }
 
-.task-menu button:hover { background: var(--row-hover); color: var(--accent); }
 .task-menu button + button { margin-top: 2px; }
 
-/* Phones: a real 44px touch target, and the action bar drops to its own
-   row so Clock in + Done stay full-size and tappable. */
-@media (max-width:640px) {
-  .task-more {
-    width: 40px;
-    height: 34px;
-    border-radius: 10px;
+@media (hover: hover) and (pointer: fine) {
+  .task-menu button:hover { background: var(--row-hover); color: var(--accent); }
+}
+
+.task-menu button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* The recall rating strip sits inside the row, spanning its full width. */
+.task-row > .rating-strip {
+  flex: 1 1 100%;
+  order: 10;
+  margin: 2px 0 8px;
+  min-width: 0;
+}
+
+/* Phones: the row becomes two bands — information above, one aligned
+   action bar below — and the ⋮ keeps the top-right corner as its own
+   comfortable 34px target. Title wraps naturally; nothing scrolls sideways. */
+@media (max-width: 640px) {
+  .task-row {
+    display: grid;
+    grid-template-columns: 10px minmax(0, 1fr);
+    grid-template-areas:
+      "dot main"
+      "actions actions";
+    align-items: start;
+    gap: 8px 10px;
+    padding: 13px 12px;
   }
 
-  .task-main { padding-right: 42px; }
+  .planner-days .task-row,
+  .day-modal .task-row,
+  .dash-today-card .task-row { padding: 13px 12px; }
 
-  .task-row .task-row-actions {
-    position: relative;
-    display: flex;
+  .planner-days .day-head { padding: 13px 12px; }
+
+  .task-row > .task-dot { grid-area: dot; margin-top: 6px; }
+  .task-row > .task-main { grid-area: main; width: auto; min-width: 0; padding-right: 40px; }
+
+  .task-row > .chip { display: none; }
+
+  .task-row > .task-row-actions {
+    grid-area: actions;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     width: 100%;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 7px;
-    margin-right: 0;
-    padding-top: 30px;
+    margin: 0;
+    padding-top: 2px;
+    gap: 8px;
   }
 
-  .task-row .task-row-actions > .btn.task-clock,
-  .task-row .task-row-actions > .task-clock-button,
-  .task-row .task-row-actions > .btn.task-primary {
-    flex: 1 1 0;
+  .task-row > .task-row-actions .btn {
+    width: 100%;
     min-width: 0;
-    min-height: 40px;
+    /* keep the shared --tap floor explicit so the band never shrinks under it */
+    min-height: 44px;
+    font-size: .74rem;
+    justify-content: center;
   }
 
-  .task-menu { max-width: calc(100vw - 24px); }
-
-  .task-menu button {
-    min-height: 42px;
-    padding: 10px 12px;
-    font-size: .8rem;
+  .task-row > .task-more-wrap {
+    position: absolute;
+    top: 9px;
+    right: 8px;
+    order: 0;
   }
 }
 
-@keyframes taskMenuPop {
-  from { opacity: 0; transform: translateY(-4px) scale(.97); }
-  to   { opacity: 1; transform: none; }
+/* Very narrow phones: two actions must never squeeze each other's labels. */
+@media (max-width: 360px) {
+  .task-row > .task-row-actions { gap: 6px; }
+  .task-row > .task-row-actions .btn { font-size: .72rem; padding-inline: 8px; }
 }
 
 /* =========================
-   TASK ROWS — active (clocked-in) state
+   ACTIVE TASK — the recording state
    =========================
-   The recording row used to carry a saturated green border, a gradient
-   fill and an animated conic rim around its whole day card. That read as
-   an error, not as "this is the task you are on". The state is now a hair
-   of accent on the edge, a faint tint, and one small pulsing dot. */
-.task-row.active-clock,
-.task-row.clean-list.active-clock,
-.task-row.active-clock:hover {
-  border-color: color-mix(in srgb, var(--success-accent) 30%, var(--glass-border));
-  background: color-mix(in srgb, var(--success-accent) 5%, transparent);
-  box-shadow: none;
+   The live row is a whisper: a 2px accent edge on the row's left, a faint
+   tint, and one tiny green recording dot on the metadata line. No animated
+   border, no rotating rim, no wash, no flashing. When Clock Out lands, the
+   class simply leaves and the row returns to rest — the accumulated studied
+   time remains visible in the metadata line. */
+
+.task-row.active-clock {
+  background: color-mix(in srgb, var(--accent) 3.5%, var(--surface));
+  box-shadow: inset 2px 0 0 color-mix(in srgb, var(--accent) 68%, transparent);
 }
 
-/* List rows (Planner, Overview) have no box to outline — a left accent bar
-   plus the tint says the same thing without redrawing the row. */
-.planner-days .task-row.active-clock,
-.planner-days .task-row.active-clock:hover,
-.task-row.clean-list.active-clock {
-  border-color: transparent;
-  border-bottom-color: var(--glass-border);
-  box-shadow: inset 2px 0 0 color-mix(in srgb, var(--success-accent) 55%, transparent);
+.dash-today-card .task-row.active-clock {
+  background: color-mix(in srgb, var(--accent) 4.5%, var(--surface));
+}
+
+/* The subject dot gets a static halo — presence, not a pulse. The pulsing
+   signal belongs exclusively to the small recording dot. */
+.task-row.active-clock .task-dot {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--success-accent) 13%, transparent);
 }
 
 .task-row.active-clock .task-title { color: var(--text-main); }
 
-.task-row.active-clock .task-dot {
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--success-accent) 16%, transparent);
-  animation: liveDotPulse 1.9s ease-in-out infinite;
-}
-
-@keyframes liveDotPulse {
-  0%, 100% { transform: scale(1); opacity: 1; }
-  50%      { transform: scale(1.18); opacity: .7; }
-}
-
-/* Retire the rotating rim beam on the card that owns the session. */
-.glass-panel:not(.ai-panel).day-block:has(.task-row.active-clock)::after,
-.glass-panel:not(.ai-panel).up-next.live::after {
-  animation: none;
-  opacity: 0;
-}
-
-/* The quiet inline marker in the subtitle line. */
+/* "● Recording 00:06" — text that lives ON the metadata line, not a badge
+   with its own box. */
 .task-live-badge {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  margin-left: 7px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: .64rem;
-  font-weight: 800;
-  letter-spacing: .2px;
+  margin-left: 4px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  font-size: .68rem;
+  font-weight: 700;
+  letter-spacing: .02em;
+  line-height: 1.5;
   white-space: nowrap;
-  vertical-align: 1px;
+  vertical-align: baseline;
   color: var(--success-accent);
-  background: color-mix(in srgb, var(--success-accent) 11%, transparent);
 }
 
 .task-live-badge:not(.is-recording) {
-  color: var(--text-dim);
-  background: var(--row-hover);
+  color: var(--text-muted);
+  font-weight: 600;
 }
 
-.task-live-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
-.task-live-badge.is-recording .task-live-dot { animation: liveDotPulse 1.9s ease-in-out infinite; }
-.task-live-time { font-size: .64rem; font-variant-numeric: tabular-nums; opacity: .92; }
+.task-live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  background: currentColor;
+}
+
+.task-live-badge.is-recording .task-live-dot {
+  animation: recDotPulse 2s ease-in-out infinite;
+}
+
+/* One calm 2s breathing curve, shared by every recording dot in the app. */
+@keyframes recDotPulse {
+  0%, 100% { opacity: .5; transform: scale(.92); }
+  50%      { opacity: 1;  transform: scale(1); }
+}
+
+.task-live-time {
+  font-family: var(--font-jetbrains-mono), ui-monospace, "SFMono-Regular", monospace;
+  font-size: .68rem;
+  font-variant-numeric: tabular-nums;
+  opacity: .92;
+}
 
 /* =========================
-   TRACKER BAR — stable geometry
+   CLOCK OUT — intentional, never alarming
    =========================
-   Clocked in → Paused → Clocked out must not shuffle the row. The primary
-   verb keeps one fixed-width slot, so only its label changes. */
-.tracker-bar .tracker-actions .act-in,
-.tracker-bar .tracker-actions .act-toggle {
-  min-width: 72px;
-  justify-content: center;
+   The active red button keeps its semantic danger colour, holds a stable
+   width, and carries the same quiet dot. The button itself never animates. */
+
+.task-clock.clock-live { min-width: 94px; }
+
+.clock-live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+  flex: 0 0 auto;
+  background: currentColor;
+  animation: recDotPulse 2s ease-in-out infinite;
 }
 
-/* The primary verb took over the old `.act-pause` slot, so it inherits the
-   same compact phone metrics as Break and Clock Out. */
-@media (max-width:640px) {
-  .tracker-bar .tracker-actions .act-toggle,
-  .tracker-bar .tracker-actions .act-in {
-    padding: 6px 9px;
-    font-size: .62rem;
+.tracker-bar .act-out { animation: none; }
+
+/* =========================
+   ONBOARDING SLIDERS
+   =========================
+   The slider is a real 9px rail inside a 32px grab strip (so the hit area
+   is touch-friendly without the control looking heavy). The fill is a
+   registered @property on the track, which lets preset jumps and keyboard
+   steps glide while the thumb is being dragged 1:1 (dragging removes the
+   transition for that frame-perfect tracking). The thumb presses gently —
+   never a bounce, never a glow show. All slider cards share one width and
+   one vertical rhythm inside the schedule grid. */
+
+@property --ob-range-fill {
+  syntax: "<percentage>";
+  inherits: true;
+  initial-value: 0%;
+}
+
+.ob-range-card {
+  padding: 15px 16px 14px;
+  border-radius: 18px;
+  border: 1px solid var(--glass-border);
+  background: linear-gradient(180deg, var(--surface) 0%, var(--row-bg) 100%);
+  box-shadow: var(--shadow-sm);
+  min-width: 0;
+  transition: border-color .18s ease, box-shadow .18s ease, background .18s ease;
+}
+
+.ob-range-card.is-dragging {
+  border-color: color-mix(in srgb, var(--accent) 34%, var(--glass-border));
+  background: linear-gradient(180deg, var(--surface) 0%, color-mix(in srgb, var(--accent) 2.5%, var(--row-bg)) 100%);
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--text-main) 5%, transparent),
+              0 8px 22px -14px color-mix(in srgb, var(--text-main) 30%, transparent);
+}
+
+.ob-range-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+
+.ob-range-copy { flex: 1 1 auto; min-width: 0; }
+
+.ob-range-card .ob-range-copy label {
+  display: block;
+  margin: 0 0 4px;
+  min-height: 0;
+  font-size: .74rem;
+  font-weight: 800;
+  letter-spacing: .6px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.ob-range-hint {
+  font-size: .78rem;
+  line-height: 1.45;
+  font-weight: 600;
+  color: var(--text-muted);
+  overflow-wrap: break-word;
+}
+
+/* Value badge: fixed-measure, tabular, and it fades its digits in whenever
+   a committed value change re-mounts it (see the key on <output> in
+   Onboarding.tsx). While dragging, the key is stable so the badge reads as
+   one continuous, quiet surface instead of flickering at 60fps. */
+.ob-range-value {
+  flex: 0 0 auto;
+  align-self: flex-start;
+  min-width: 76px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  text-align: center;
+  font-size: .82rem;
+  font-weight: 800;
+  letter-spacing: -.2px;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface-solid));
+  border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
+  box-shadow: none;
+  transition: background .18s ease, border-color .18s ease, color .18s ease;
+  animation: obValueSwap .16s ease both;
+}
+
+@keyframes obValueSwap {
+  from { opacity: .4; transform: translateY(1.5px); }
+  to   { opacity: 1;  transform: none; }
+}
+
+.ob-range-card.is-dragging .ob-range-value {
+  animation: none;
+  background: color-mix(in srgb, var(--accent) 15%, var(--surface-solid));
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+/* The input is the 32px strip; the visible rail is its 9px track. */
+.ob-range-card .ob-range-input {
+  --ob-track-h: 9px;
+  --ob-track-bg: color-mix(in srgb, var(--text-main) 12%, transparent);
+  width: 100%;
+  height: 32px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  /* pan-y keeps vertical page scrolling alive when a finger lands on the
+     slider; the horizontal drag belongs to the control. */
+  touch-action: pan-y;
+  transition: --ob-range-fill .18s cubic-bezier(.25, 1, .4, 1);
+}
+
+/* While dragging, the rail tracks the thumb with zero animation delay… */
+.ob-range-card.is-dragging .ob-range-input,
+.ob-range-card.is-dragging .ob-range-input::-webkit-slider-runnable-track {
+  transition-duration: 0s;
+}
+
+.ob-range-card .ob-range-input::-webkit-slider-runnable-track {
+  height: var(--ob-track-h);
+  border-radius: 999px;
+  background: linear-gradient(90deg,
+    var(--accent) 0%,
+    var(--accent-light) var(--ob-range-fill, 0%),
+    var(--ob-track-bg) var(--ob-range-fill, 0%),
+    var(--ob-track-bg) 100%);
+  box-shadow: inset 0 1px 2px color-mix(in srgb, var(--text-main) 10%, transparent);
+  transition: --ob-range-fill .18s cubic-bezier(.25, 1, .4, 1);
+}
+
+.ob-range-card .ob-range-input::-moz-range-track {
+  height: var(--ob-track-h);
+  border-radius: 999px;
+  background: var(--ob-track-bg);
+  box-shadow: inset 0 1px 2px color-mix(in srgb, var(--text-main) 10%, transparent);
+}
+
+.ob-range-card .ob-range-input::-moz-range-progress {
+  height: var(--ob-track-h);
+  border-radius: 999px 0 0 999px;
+  background: linear-gradient(90deg, var(--accent), var(--accent-light));
+}
+
+.ob-range-card .ob-range-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  margin-top: calc((var(--ob-track-h) - 22px) / 2);
+  border-radius: 50%;
+  border: 2px solid var(--surface-solid);
+  background: var(--accent-gradient);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--text-main) 26%, transparent),
+              0 2px 6px color-mix(in srgb, var(--accent) 24%, transparent);
+  transition: transform .16s ease, box-shadow .16s ease;
+}
+
+.ob-range-card .ob-range-input::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid var(--surface-solid);
+  background: var(--accent-gradient);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--text-main) 26%, transparent),
+              0 2px 6px color-mix(in srgb, var(--accent) 24%, transparent);
+  transition: transform .16s ease, box-shadow .16s ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .ob-range-card .ob-range-input:hover:not(:active)::-webkit-slider-thumb {
+    transform: scale(1.05);
+    box-shadow: 0 1px 2px color-mix(in srgb, var(--text-main) 26%, transparent),
+                0 3px 9px color-mix(in srgb, var(--accent) 30%, transparent);
+  }
+  .ob-range-card .ob-range-input:hover:not(:active)::-moz-range-thumb {
+    transform: scale(1.05);
+    box-shadow: 0 1px 2px color-mix(in srgb, var(--text-main) 26%, transparent),
+                0 3px 9px color-mix(in srgb, var(--accent) 30%, transparent);
   }
 }
 
-/* While clocked in the tracker bar grows a conic rim-light that rotates
-   continuously (globals.css, "live rim-light while clocked in"). A beam
-   circling the bar for the whole session is movement with no information
-   in it, so it holds still instead. */
-body.focus-live .tracker-bar::after { animation: none; }
+/* Pressed / dragging: a restrained scale-up and a firmer, tighter shadow. */
+.ob-range-card .ob-range-input:active { cursor: grabbing; }
+
+.ob-range-card .ob-range-input:active::-webkit-slider-thumb,
+.ob-range-card .ob-range-input.is-key-active::-webkit-slider-thumb {
+  transform: scale(1.1);
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--text-main) 28%, transparent),
+              0 3px 10px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.ob-range-card .ob-range-input:active::-moz-range-thumb {
+  transform: scale(1.1);
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--text-main) 28%, transparent),
+              0 3px 10px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+/* Keyboard focus: one clean double ring on the thumb, no outline box on
+   the strip. */
+.ob-range-card .ob-range-input:focus-visible { outline: none; }
+
+.ob-range-card .ob-range-input:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 3px var(--surface-solid),
+              0 0 0 5px color-mix(in srgb, var(--accent) 55%, transparent),
+              0 1px 2px color-mix(in srgb, var(--text-main) 26%, transparent);
+}
+
+.ob-range-card .ob-range-input:focus-visible::-moz-range-thumb {
+  box-shadow: 0 0 0 3px var(--surface-solid),
+              0 0 0 5px color-mix(in srgb, var(--accent) 55%, transparent),
+              0 1px 2px color-mix(in srgb, var(--text-main) 26%, transparent);
+}
+
+/* Dark themes need a lighter rail or the unfilled half disappears. */
+body.theme-dark .ob-range-card .ob-range-input,
+body.theme-obsidian .ob-range-card .ob-range-input,
+body.theme-nebula .ob-range-card .ob-range-input {
+  --ob-track-bg: rgba(255, 255, 255, .16);
+}
+
+body.theme-dark .ob-range-value,
+body.theme-obsidian .ob-range-value,
+body.theme-nebula .ob-range-value {
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+.ob-range-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+  font-size: .7rem;
+  font-weight: 700;
+  color: var(--text-dim);
+}
+
+.ob-range-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 12px;
+  padding-top: 13px;
+  border-top: 1px solid var(--glass-border);
+}
+
+.ob-range-chip {
+  min-width: 42px;
+  min-height: 32px;
+  padding: 6px 13px;
+  border-radius: 999px;
+  border: 1px solid var(--glass-border);
+  background: var(--surface-solid);
+  color: var(--text-muted);
+  font-size: .74rem;
+  font-weight: 750;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background .16s ease, border-color .16s ease, color .16s ease,
+              transform .14s cubic-bezier(.25, 1, .4, 1), box-shadow .16s ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .ob-range-chip:hover {
+    border-color: color-mix(in srgb, var(--accent) 48%, var(--glass-border));
+    background: var(--surface-hover);
+    color: var(--accent);
+    transform: translateY(-1px);
+  }
+}
+
+.ob-range-chip:active { transform: scale(.96); }
+
+.ob-range-chip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.ob-range-chip.active {
+  background: var(--nav-active-bg);
+  border-color: var(--nav-active-border);
+  color: var(--nav-active-text);
+  box-shadow: none;
+}
+
+/* Touch: a bigger grab strip and thumb, without inflating the card. The
+   44px chip floor from the tap-target layer still applies on coarse
+   pointers. */
+@media (pointer: coarse) {
+  .ob-range-card .ob-range-input { height: 40px; }
+  .ob-range-card .ob-range-input::-webkit-slider-thumb {
+    width: 26px;
+    height: 26px;
+    margin-top: calc((var(--ob-track-h) - 26px) / 2);
+  }
+  .ob-range-card .ob-range-input::-moz-range-thumb { width: 26px; height: 26px; }
+  .ob-range-chip { min-height: 40px; }
+}
+
+@media (max-width: 700px) {
+  .ob-range-head { gap: 10px; }
+  .ob-range-value { min-width: 68px; padding: 6px 10px; font-size: .78rem; }
+}
 
 /* =========================
-   PROGRAM / COURSE TEXT
+   ONBOARDING — FORM RHYTHM
    =========================
-   Long values such as "NMIMS CDOE MBA — Semester 1 (Marketing) — NMIMS"
-   appear in the sidebar, the drawer, the tracker and the review step. They
-   must wrap inside their own column, never squeeze a neighbour and never
-   force a one-word-per-line strip. */
-.brand-course {
-  display: block;
-  min-width: 0;
-  max-width: 100%;
-  line-height: 1.45;
-  white-space: normal;
-  overflow-wrap: break-word;
-  word-break: normal;
-  hyphens: none;
-}
+   Long course/institution strings must never stretch a neighbour or force
+   a one-word-per-line strip; the lead paragraph keeps real markup at a full
+   measure; the schedule grid keeps two equal columns and full-width sliders. */
 
-.tracker-task {
-  overflow-wrap: break-word;
-  word-break: normal;
-  hyphens: none;
-}
-
-.ob-summary-row {
-  align-items: baseline;
-  gap: 16px;
-}
-
-.ob-summary-row span:first-child { flex: 0 0 auto; }
-
-.ob-summary-row span:last-child {
-  min-width: 0;
-  text-align: right;
-  line-height: 1.45;
-  overflow-wrap: break-word;
-  word-break: normal;
-}
-
-/* =========================
-   ONBOARDING
-   ========================= */
-/* The lead paragraph is real markup again. It used to be replaced by a
-   `font-size:0` + ::after hack to drop "nursery" from the sentence; since
-   `max-width:60ch` resolves against the element's OWN font size, that
-   collapsed the measure to zero and rendered one or two words per line. */
-.ob-card > p {
+.ob-card > p,
+.ob-card > .ob-lead,
+.ob-card > h1 + .ob-lead,
+.ob-card > h1 + p {
   width: 100%;
   max-width: min(68ch, 100%);
   overflow-wrap: break-word;
 }
 
-/* MBA / NMIMS and other degree flows: use the available card width instead
-   of leaving a tall, narrow single-column form on desktop. */
 /* 48px matches the wizard overlay's own horizontal padding, so the card
    can never be wider than the space it was given. */
 .ob-card {
-  width: min(920px, calc(100vw - 48px)) !important;
+  width: min(920px, calc(100vw - 48px));
   margin-inline: auto;
 }
 
 .ob-card .ob-schedule-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   column-gap: 16px;
   row-gap: 14px;
 }
 
+.ob-card .ob-schedule-grid > .ob-field { min-width: 0; }
+
 .ob-card .ob-schedule-grid > .ob-field:last-child {
   grid-column: 1 / -1;
 }
+
+.ob-details-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.ob-details-grid > .ob-field-span-full { grid-column: 1 / -1; }
 
 .ob-field,
 .ob-range-card,
 .ob-choice-card,
 .ob-sub-row,
 .ob-program-card,
-.ob-program-item {
+.ob-program-item,
+.ob-review-grid,
+.ob-review-card,
+.ob-details-grid,
+.ob-schedule-grid {
   min-width: 0;
 }
 
-/* Labels sit on a shared baseline above every field: a label that wraps to
-   two lines no longer pushes its own input below the one beside it, so
-   Institution and Specialisation line up exactly. Scoped to real form
-   fields — the slider and choice cards set their own label rhythm. */
+/* Labels sit on a shared baseline above every field so two-line labels
+   cannot push their input below the neighbour's. */
 .ob-schedule-grid > .ob-field > label {
   display: block;
   min-height: 2.4em;
@@ -417,7 +852,19 @@ body.focus-live .tracker-bar::after { animation: none; }
 
 .ob-field textarea { resize: vertical; }
 
-/* Selected-programme summary: one bounded box, so a long name wraps inside
+.ob-level-btn,
+.ob-level-title,
+.ob-level-btn small,
+.brand-course,
+.ob-review-value,
+.ob-program-name,
+.ob-summary-row > span:last-child {
+  min-width: 0;
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
+/* Selected-programme summary: one bounded box so a long name wraps inside
    it instead of stretching the form beside it. */
 .ob-program-card {
   display: flex;
@@ -441,8 +888,6 @@ body.focus-live .tracker-bar::after { animation: none; }
   line-height: 1.4;
   letter-spacing: -.2px;
   color: var(--text-main);
-  overflow-wrap: break-word;
-  word-break: normal;
 }
 
 .ob-program-meta {
@@ -465,243 +910,351 @@ body.focus-live .tracker-bar::after { animation: none; }
 
 .ob-program-item strong {
   display: block;
+  min-width: 0;
   font-size: .84rem;
   font-weight: 750;
   line-height: 1.4;
   color: var(--text-main);
   overflow-wrap: break-word;
+}
+
+.ob-summary-row {
+  align-items: baseline;
+  gap: 16px;
+}
+
+.ob-summary-row span:first-child { flex: 0 0 auto; }
+
+.ob-summary-row span:last-child {
+  min-width: 0;
+  text-align: right;
+  line-height: 1.45;
+  overflow-wrap: break-word;
   word-break: normal;
 }
 
 .ob-card .ob-level-grid {
-  grid-template-columns: repeat(2, minmax(0,1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: 100%;
+  min-width: 0;
   gap: 12px;
 }
+
+.ob-card .ob-level-grid > * { min-width: 0; }
 
 .ob-level-btn {
   min-width: 0;
   min-height: 92px;
-  transition: transform .18s cubic-bezier(.22,1,.36,1),
+  transition: transform .18s cubic-bezier(.22, 1, .36, 1),
               border-color .18s ease,
               box-shadow .18s ease,
               background .18s ease;
 }
 
-.ob-level-title,
-.ob-level-btn small { overflow-wrap: break-word; }
-
-@media (hover:hover) and (pointer:fine) {
+@media (hover: hover) and (pointer: fine) {
   .ob-level-btn:hover { transform: translateY(-2px); }
 }
 
-/* ── Range controls ───────────────────────────────────────────────────
-   Hierarchy: title → helper text → value badge → track → presets, all in
-   one card so the group reads as a single control. The track is a real
-   10px rounded rail with a filled/unfilled split; the input itself is a
-   26px strip so the thumb is easy to grab on a phone. The old version
-   leaned on three stacked accent glows, which is now a single soft ring
-   on hover/drag only. */
-.ob-range-card {
-  padding: 15px 16px 14px;
-  border-radius: 18px;
-}
-
-.ob-range-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 14px;
-  margin-bottom: 13px;
-}
-
-.ob-range-copy { flex: 1 1 auto; min-width: 0; }
-
-.ob-range-card .ob-range-copy label {
-  display: block;
-  min-height: 0;
-  margin-bottom: 5px;
-  font-size: .74rem;
-  font-weight: 800;
-  letter-spacing: .6px;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-
-.ob-range-hint {
-  font-size: .79rem;
-  line-height: 1.5;
-  font-weight: 600;
-  color: var(--text-muted);
-  overflow-wrap: break-word;
-}
-
-.ob-range-value {
-  flex: 0 0 auto;
-  align-self: flex-start;
-  min-width: 76px;
-  padding: 7px 12px;
-  border-radius: 999px;
-  text-align: center;
-  font-size: .82rem;
-  font-weight: 800;
-  letter-spacing: -.2px;
-  font-variant-numeric: tabular-nums;
-  color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 11%, var(--surface-solid));
-  border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
-  box-shadow: none;
-}
-
-.ob-range-card .ob-range-input {
-  --ob-track-h: 10px;
-  --ob-track-bg: color-mix(in srgb, var(--text-main) 12%, transparent);
-  width: 100%;
-  height: 26px;
-  margin: 0;
-  padding: 0;
-  border: none;
-  outline: none;
-  background: transparent;
-  cursor: pointer;
-  appearance: none;
-  -webkit-appearance: none;
-  touch-action: pan-x;
-  /* Registered in globals.css via @property, so the fill percentage animates
-     as the thumb moves or a preset chip jumps the value. */
-  transition: --ob-range-fill .22s cubic-bezier(.25,1,.4,1);
-}
-
-.ob-range-card .ob-range-input::-webkit-slider-runnable-track {
-  height: var(--ob-track-h);
-  border-radius: 999px;
-  background: linear-gradient(90deg,
-    var(--accent) 0%,
-    var(--accent-light) var(--ob-range-fill, 0%),
-    var(--ob-track-bg) var(--ob-range-fill, 0%),
-    var(--ob-track-bg) 100%);
-  box-shadow: inset 0 1px 2px color-mix(in srgb, var(--text-main) 10%, transparent);
-  transition: --ob-range-fill .22s cubic-bezier(.25,1,.4,1);
-}
-
-.ob-range-card .ob-range-input::-moz-range-track {
-  height: var(--ob-track-h);
-  border-radius: 999px;
-  background: linear-gradient(90deg,
-    var(--accent) 0%,
-    var(--accent-light) var(--ob-range-fill, 0%),
-    var(--ob-track-bg) var(--ob-range-fill, 0%),
-    var(--ob-track-bg) 100%);
-  box-shadow: inset 0 1px 2px color-mix(in srgb, var(--text-main) 10%, transparent);
-}
-
-.ob-range-card .ob-range-input::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 22px;
-  height: 22px;
-  margin-top: calc((var(--ob-track-h) - 22px) / 2);
-  border-radius: 50%;
-  border: 2px solid var(--surface-solid);
-  background: var(--accent-gradient);
-  box-shadow: 0 1px 2px color-mix(in srgb, var(--text-main) 26%, transparent),
-              0 2px 6px color-mix(in srgb, var(--accent) 26%, transparent);
-  transition: transform .16s var(--spring-soft), box-shadow .16s ease;
-}
-
-.ob-range-card .ob-range-input::-moz-range-thumb {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  border: 2px solid var(--surface-solid);
-  background: var(--accent-gradient);
-  box-shadow: 0 1px 2px color-mix(in srgb, var(--text-main) 26%, transparent),
-              0 2px 6px color-mix(in srgb, var(--accent) 26%, transparent);
-  transition: transform .16s var(--spring-soft), box-shadow .16s ease;
-}
-
-@media (hover:hover) and (pointer:fine) {
-  .ob-range-card .ob-range-input:hover::-webkit-slider-thumb,
-  .ob-range-card .ob-range-input:hover::-moz-range-thumb {
-    transform: scale(1.06);
-    box-shadow: 0 1px 2px color-mix(in srgb, var(--text-main) 26%, transparent),
-                0 3px 9px color-mix(in srgb, var(--accent) 32%, transparent);
-  }
-}
-
-.ob-range-card .ob-range-input:active { cursor: grabbing; }
-
-.ob-range-card .ob-range-input:active::-webkit-slider-thumb,
-.ob-range-card .ob-range-input:active::-moz-range-thumb {
-  transform: scale(1.1);
-  box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 15%, transparent),
-              0 2px 8px color-mix(in srgb, var(--accent) 30%, transparent);
-}
-
-.ob-range-card .ob-range-input:focus-visible { outline: none; }
-
-.ob-range-card .ob-range-input:focus-visible::-webkit-slider-thumb,
-.ob-range-card .ob-range-input:focus-visible::-moz-range-thumb {
-  box-shadow: 0 0 0 3px var(--surface-solid),
-              0 0 0 6px color-mix(in srgb, var(--accent) 55%, transparent);
-}
-
-/* Dark themes need a lighter rail or the unfilled half disappears. */
-body.theme-dark .ob-range-card .ob-range-input,
-body.theme-obsidian .ob-range-card .ob-range-input,
-body.theme-nebula .ob-range-card .ob-range-input {
-  --ob-track-bg: rgba(255,255,255,.16);
-}
-
-body.theme-dark .ob-range-value,
-body.theme-obsidian .ob-range-value,
-body.theme-nebula .ob-range-value {
-  background: color-mix(in srgb, var(--accent) 20%, transparent);
-}
-
-/* Bigger thumb and strip on touch, where there is no hover to aim with. */
-@media (pointer:coarse) {
-  .ob-range-card .ob-range-input { height: 34px; }
-  .ob-range-card .ob-range-input::-webkit-slider-thumb {
-    width: 26px; height: 26px;
-    margin-top: calc((var(--ob-track-h) - 26px) / 2);
-  }
-  .ob-range-card .ob-range-input::-moz-range-thumb { width: 26px; height: 26px; }
-}
-
-.ob-range-meta {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 9px;
-  font-size: .7rem;
-  font-weight: 700;
-  color: var(--text-dim);
-}
-
-.ob-range-presets {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 7px;
-  margin-top: 13px;
-  padding-top: 13px;
-  border-top: 1px solid var(--glass-border);
-}
-
-.ob-range-chip { min-height: 32px; }
-
-@media (max-width:700px) {
+@media (max-width: 700px) {
   /* Fill the overlay exactly: the shell stops being shrink-to-fit, so the
-     step rail, the heading, the paragraph and the cards all share one
-     left/right edge and nothing can overflow sideways. */
+     step rail, heading, paragraph and cards share one left/right edge. */
   .ob-shell { width: 100%; }
-  .ob-card { width: 100% !important; max-width: 100%; }
-  .ob-card .ob-schedule-grid { grid-template-columns: 1fr !important; }
+  .ob-card { width: 100%; max-width: 100%; }
+  .ob-card .ob-schedule-grid { grid-template-columns: 1fr; }
   .ob-card .ob-schedule-grid > .ob-field:last-child { grid-column: auto; }
   .ob-card .ob-level-grid { grid-template-columns: 1fr; }
+  .ob-details-grid { grid-template-columns: 1fr; }
+  .ob-details-grid > .ob-field-span-full { grid-column: auto; }
   .ob-program-card { gap: 12px 18px; }
   .ob-program-meta { grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); }
-  .ob-range-head { gap: 10px; }
-  .ob-range-value { min-width: 68px; padding: 6px 10px; font-size: .78rem; }
+}
+
+/* =========================
+   CALENDARS — micro-interactions
+   =========================
+   Both the dashboard mini calendar and the planner month grid share one
+   language: 32px square nav buttons, a quiet hover/press on day cells, a
+   clear today treatment, a selected-day state in the planner, direction-
+   aware month slides (190ms), and a small "Today" return pill when you are
+   browsing another month. The grids always render six weeks, so the card
+   height never jumps between months. */
+
+@keyframes calSlideNext {
+  from { opacity: 0; transform: translateX(14px); }
+  to   { opacity: 1; transform: none; }
+}
+
+@keyframes calSlidePrev {
+  from { opacity: 0; transform: translateX(-14px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.cal-grid.cal-slide-next,
+.mini-cal-grid.cal-slide-next { animation: calSlideNext .19s cubic-bezier(.33, 1, .68, 1) both; }
+
+.cal-grid.cal-slide-prev,
+.mini-cal-grid.cal-slide-prev { animation: calSlidePrev .19s cubic-bezier(.33, 1, .68, 1) both; }
+
+/* Shared month-navigation button. */
+.cal-nav-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cal-nav-btn,
+.mini-cal-btn {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  border-radius: 10px;
+  border: 1px solid var(--glass-border);
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .15s ease, border-color .15s ease, color .15s ease, transform .14s cubic-bezier(.25, 1, .4, 1);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .cal-nav-btn:hover,
+  .mini-cal-btn:hover {
+    color: var(--accent);
+    border-color: var(--nav-active-border);
+    background: color-mix(in srgb, var(--accent) 7%, var(--surface));
+  }
+}
+
+.cal-nav-btn:active,
+.mini-cal-btn:active { transform: scale(.94); }
+
+.cal-nav-btn:focus-visible,
+.mini-cal-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.cal-nav-ico { display: inline-flex; }
+.cal-nav-ico--prev { transform: rotate(90deg); }
+.cal-nav-ico--next { transform: rotate(-90deg); }
+
+/* The "back to today" pill: quiet, small, only rendered when off-month. */
+.cal-today-btn,
+.mini-cal-today {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  margin-right: 2px;
+  padding: 3px 11px;
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: .68rem;
+  font-weight: 750;
+  letter-spacing: .01em;
+  cursor: pointer;
+  transition: background .15s ease, border-color .15s ease, color .15s ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .cal-today-btn:hover,
+  .mini-cal-today:hover {
+    color: var(--accent);
+    border-color: var(--nav-active-border);
+    background: color-mix(in srgb, var(--accent) 6%, transparent);
+  }
+}
+
+.cal-today-btn:active,
+.mini-cal-today:active { transform: scale(.96); }
+
+.cal-today-btn:focus-visible,
+.mini-cal-today:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ── Planner month grid cells ── */
+.cal-grid { gap: 7px; }
+
+.cal-dow {
+  font-size: .66rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--text-dim);
+  text-align: center;
+  padding: 4px 0;
+}
+
+.cal-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 80px;
+  padding: 7px 8px;
+  border-radius: 13px;
+  border: 1px solid transparent;
+  background: color-mix(in srgb, var(--row-bg) 92%, var(--surface));
+  transition: background .16s ease, border-color .16s ease, box-shadow .18s ease;
+}
+
+.cal-cell.empty {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  pointer-events: none;
+  cursor: default;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .cal-cell:not(.empty):hover {
+    background: var(--row-hover);
+    border-color: var(--glass-border);
+  }
+  .cal-cell.has-tasks:hover {
+    background: color-mix(in srgb, var(--cell-tint, var(--accent)) 14%, var(--row-hover));
+  }
+}
+
+.cal-cell:not(.empty):active {
+  background: var(--row-hover);
+  box-shadow: inset 0 1px 4px color-mix(in srgb, var(--text-main) 9%, transparent);
+}
+
+.cal-cell:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Days with work carry a soft wash of their first subject colour. */
+.cal-cell.has-tasks {
+  background: color-mix(in srgb, var(--cell-tint, var(--accent)) 8%, var(--row-bg));
+}
+
+/* Today: one clear, calm treatment — a ring + tint, never a pulsing beam. */
+.cal-cell.today {
+  border-color: var(--accent);
+  background: var(--nav-active-bg);
+  box-shadow: 0 0 0 1px var(--nav-active-border) inset;
+}
+
+/* Selected day (the day sheet is open for it). */
+.cal-cell.is-selected {
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  background: var(--row-hover);
+  box-shadow: 0 0 0 2px var(--accent-glow);
+}
+
+.cal-cell.today.is-selected {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.cal-num {
+  font-size: .72rem;
+  font-weight: 800;
+  margin-bottom: 3px;
+  color: var(--text-main);
+}
+
+.cal-pill {
+  font-size: .6rem;
+  font-weight: 700;
+  line-height: 1.3;
+  padding: 2px 5px;
+  border-radius: 5px;
+  margin-bottom: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .28);
+}
+
+.cal-more {
+  font-size: var(--fs-micro, .6rem);
+  font-weight: 700;
+  color: var(--text-muted);
+  padding-left: 2px;
+}
+
+/* ── Dashboard mini calendar ── */
+.mini-cal-head { margin-bottom: 11px; }
+.mini-cal-nav { display: flex; align-items: center; gap: 5px; }
+.mini-cal-grid { grid-template-columns: repeat(7, 1fr); gap: 3px; }
+
+.mini-cal-cell {
+  min-height: 30px;
+  transition: background .15s ease, box-shadow .15s ease;
+}
+
+.mini-cal-cell:not(.empty):not(.is-today):hover { background: var(--row-hover); }
+
+.mini-cal-cell.is-today { box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 26%, transparent); }
+
+.mini-cal-dot { bottom: 3px; }
+
+/* Phones: keep both calendars readable without horizontal scrolling. */
+@media (max-width: 640px) {
+  .cal-grid { gap: 4px; }
+  .cal-cell { min-height: 52px; padding: 4px; border-radius: 11px; }
+  .cal-num { font-size: .66rem; margin-bottom: 2px; }
+  .cal-pill { display: block; font-size: .55rem; padding: 1px 4px; margin-bottom: 2px; }
+  .cal-more { font-size: .55rem; margin-top: 1px; }
+  .cal-nav-row { align-items: center; }
+}
+
+@media (max-width: 420px) {
+  .mini-cal-grid { gap: 2px; }
+  .mini-cal-cell { font-size: .68rem; min-height: 28px; }
+}
+
+/* =========================
+   TRACKER BAR — stable geometry
+   =========================
+   Clocked in → Paused → Clocked out must not shuffle the row. The primary
+   verb keeps one fixed-width slot, so only its label changes. */
+.tracker-bar .tracker-actions .act-in,
+.tracker-bar .tracker-actions .act-toggle {
+  min-width: 72px;
+  justify-content: center;
+}
+
+@media (max-width: 640px) {
+  .tracker-bar .tracker-actions .act-toggle,
+  .tracker-bar .tracker-actions .act-in {
+    padding: 6px 9px;
+    font-size: .62rem;
+  }
+}
+
+@media (min-width: 861px) {
+  .tracker-status { flex: 1 1 auto; min-width: 0; }
+  .tracker-actions { flex: 0 0 auto; min-width: 0; align-items: center; }
+  .tracker-actions .btn { white-space: nowrap; }
+  .tracker-task { min-width: 0; max-width: min(42vw, 520px); }
+}
+
+/* =========================
+   PROGRAM / COURSE TEXT
+   ========================= */
+.brand-course {
+  display: block;
+  max-width: 100%;
+  line-height: 1.45;
+  white-space: normal;
+  hyphens: none;
+}
+
+.tracker-task {
+  overflow-wrap: break-word;
+  word-break: normal;
+  hyphens: none;
 }
 
 /* =========================
@@ -711,7 +1264,7 @@ body.theme-nebula .ob-range-value {
    step back, and the glow is a constant rather than a pulse. */
 .zen .zen-digits {
   animation: none;
-  text-shadow: 0 0 44px rgba(255,255,255,.1);
+  text-shadow: 0 0 44px rgba(255, 255, 255, .1);
 }
 
 .zen-status {
@@ -729,12 +1282,12 @@ body.theme-nebula .ob-range-value {
   height: 6px;
   border-radius: 50%;
   flex-shrink: 0;
-  background: rgba(255,255,255,.38);
+  background: rgba(255, 255, 255, .38);
 }
 
 .zen-status-dot[data-live="true"] {
   background: #5EE0A8;
-  animation: liveDotPulse 1.9s ease-in-out infinite;
+  animation: recDotPulse 2s ease-in-out infinite;
 }
 
 .zen-kicker {
@@ -753,32 +1306,33 @@ body.theme-nebula .ob-range-value {
   gap: 10px;
 }
 
-.zen-actions .btn { min-width: 136px; justify-content: center; }
+.zen-actions .btn { min-width: 122px; justify-content: center; }
 
 .zen-actions .zen-secondary {
-  background: rgba(255,255,255,.06) !important;
-  border-color: rgba(255,255,255,.13) !important;
-  color: rgba(255,255,255,.74) !important;
-  box-shadow: none !important;
+  background: rgba(255, 255, 255, .06);
+  border-color: rgba(255, 255, 255, .13);
+  color: rgba(255, 255, 255, .74);
+  box-shadow: none;
   font-weight: 650;
 }
 
 .zen-actions .zen-secondary:hover {
-  background: rgba(255,255,255,.11) !important;
-  color: rgba(255,255,255,.94) !important;
+  background: rgba(255, 255, 255, .11);
+  color: rgba(255, 255, 255, .94);
 }
 
 /* Clock Out stays a secondary control but reads a little warmer than
    Exit Zen, so the two are never confused at a glance. */
 .zen-actions .zen-clock-out {
-  border-color: rgba(255,255,255,.22) !important;
-  color: rgba(255,255,255,.9) !important;
+  border-color: rgba(255, 255, 255, .22);
+  color: rgba(255, 255, 255, .9);
 }
 
 .zen-hint { max-width: 40ch; font-size: .76rem; opacity: .78; }
 
-@media (max-width:480px) {
-  .zen-actions .btn { flex: 1 1 100%; min-width: 0; }
+@media (max-width: 520px) {
+  .zen-actions { gap: 7px; }
+  .zen-actions .btn { flex: 1 1 100%; min-width: 0; min-height: 44px; }
 }
 
 /* =========================
@@ -786,51 +1340,98 @@ body.theme-nebula .ob-range-value {
    ========================= */
 .btn:focus-visible,
 .ob-level-btn:focus-visible,
+.ob-range-chip:focus-visible,
 .task-more:focus-visible,
 .task-menu button:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
-@media (hover:hover) and (pointer:fine) {
-  .dash-today-card .task-row::after,
-  .ob-level-btn::after {
-    content: "";
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    width: 38%;
-    left: -55%;
-    pointer-events: none;
-    transform: skewX(-16deg);
-    background: linear-gradient(105deg, transparent, rgba(255,255,255,.16), transparent);
-  }
-  .dash-today-card .task-row:hover::after,
-  .ob-level-btn:hover::after {
-    animation: uiSheen .55s ease both;
-  }
+/* =========================
+   PORTED BEHAVIOUR PATCHES
+   =========================
+   Rules carried over from the retired "final fixes" layers that change
+   onboarding behaviour (not just appearance). They live here so the whole
+   onboarding contract sits behind one file. */
+
+/* MBA / degree flows must not be asked exam-only questions. The institution
+   input is the reliable marker for the degree details branch; hide generic
+   attempt + preparation fields there (they remain available to competitive
+   exam paths, where they actually affect planning). */
+.ob-details-grid:has(input[placeholder*="NMIMS CDOE"]) > .ob-field:nth-child(4),
+.ob-details-grid:has(input[placeholder*="NMIMS CDOE"]) > .ob-field:nth-child(5) {
+  display: none;
 }
 
-@keyframes uiSheen {
-  from { left: -55%; }
-  to   { left: 125%; }
+.ob-details-grid:has(input[placeholder*="NMIMS CDOE"]) {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-/* Motion is decoration: every animation added above is switched off here,
-   including the live-session dot and the menu entrance. */
+.ob-details-grid:has(input[placeholder*="NMIMS CDOE"]) > .ob-field:last-child {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 680px) {
+  .ob-details-grid:has(input[placeholder*="NMIMS CDOE"]) { grid-template-columns: 1fr; }
+  .ob-details-grid:has(input[placeholder*="NMIMS CDOE"]) > .ob-field:last-child { grid-column: auto; }
+}
+
+/* The Step 4 programme summary is intentionally removed from the onboarding
+   presentation (the underlying programme/state data stays untouched, so
+   removing the card does not hide information the planner needs). The
+   .ob-program-card styling above remains for any other surface. */
+.ob-card .ob-program-card { display: none; }
+
+/* =========================
+   MOTION CONTRACTS
+   =========================
+   Animation is decoration only: every loop and slide added by this layer
+   collapses under prefers-reduced-motion, and the live recording state
+   keeps conveying "on" through colour, text and the static dot. */
 @media (prefers-reduced-motion: reduce) {
-  .task-menu,
-  .dash-today-card .task-row,
-  .ob-level-btn,
-  .dash-today-card .task-row::after,
-  .ob-level-btn::after,
-  .task-row.active-clock .task-dot,
+  .task-menu.is-open,
   .task-live-badge.is-recording .task-live-dot,
+  .clock-live-dot,
   .zen-status-dot[data-live="true"],
+  .cal-grid[class*="cal-slide"],
+  .mini-cal-grid[class*="cal-slide"],
   .ob-range-card .ob-range-input::-webkit-slider-thumb,
   .ob-range-card .ob-range-input::-moz-range-thumb,
-  .ob-range-card .ob-range-input::-webkit-slider-runnable-track {
+  .ob-range-card .ob-range-input::-webkit-slider-runnable-track,
+  .ob-range-card .ob-range-input,
+  .ob-range-value,
+  .ob-range-chip,
+  .ob-range-card,
+  .task-row,
+  .task-row.active-clock,
+  .cal-cell,
+  .mini-cal-cell,
+  .cal-nav-btn,
+  .mini-cal-btn {
     animation: none !important;
     transition: none !important;
   }
+
+  /* The recording dot must still READ as recording without its pulse. */
+  .task-live-badge.is-recording .task-live-dot,
+  .clock-live-dot {
+    opacity: 1;
+    transform: none;
+  }
+
+  .cal-nav-btn:active,
+  .mini-cal-btn:active,
+  .task-more:active,
+  .ob-range-chip:active { transform: none; }
+
+  .ob-range-card .ob-range-input:active::-webkit-slider-thumb,
+  .ob-range-card .ob-range-input:active::-moz-range-thumb { transform: scale(1); }
+}
+
+/* Touch devices never see stuck hover states for the surfaces defined
+   above — every hover rule here is already gated on (hover:hover), and
+   the press states below carry the feedback instead. */
+@media (hover: none) {
+  .ob-range-chip.active { color: var(--nav-active-text); }
+  .cal-cell:not(.empty):active { background: var(--row-hover); }
 }

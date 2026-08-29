@@ -1,7 +1,9 @@
 "use client";
 
 import React, { useCallback, useEffect, useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import TaskClockButton from "./TaskClockButton";
+import { isMenuNavKey, nextMenuIndex } from "@/lib/menuNav";
 import type { SubjectRow, TaskRow } from "@/lib/client";
 
 let activeMenuId: string | null = null;
@@ -23,10 +25,12 @@ export default function TaskActions({ task, subject, activeTaskId, clockSessionA
   const menuId = useId();
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
+  const [menuPlaced, setMenuPlaced] = useState(false);
   const [ratingOpen, setRatingOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
-  const closeMenu = useCallback(() => { releaseMenu(menuId); setMenuOpen(false); }, [menuId]);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const closeMenu = useCallback(() => { releaseMenu(menuId); setMenuOpen(false); setMenuPlaced(false); }, [menuId]);
 
   const positionMenu = useCallback(() => {
     const trigger = triggerRef.current;
@@ -35,7 +39,7 @@ export default function TaskActions({ task, subject, activeTaskId, clockSessionA
     const width = 210;
     const gap = 8;
     const margin = 12;
-    const menuHeight = Math.min(240, Math.max(120, wrapRef.current?.querySelector<HTMLElement>("[role=menu]")?.offsetHeight || 180));
+    const menuHeight = Math.min(240, Math.max(120, menuRef.current?.offsetHeight || 180));
     let left = rect.right - width;
     left = Math.max(margin, Math.min(left, window.innerWidth - width - margin));
     const below = rect.bottom + gap;
@@ -44,6 +48,7 @@ export default function TaskActions({ task, subject, activeTaskId, clockSessionA
       ? below
       : Math.max(margin, above);
     setMenuStyle({ position: "fixed", top, left, right: "auto", width: `min(${width}px, calc(100vw - ${margin * 2}px))` });
+    setMenuPlaced(true);
   }, []);
 
   useEffect(() => () => releaseMenu(menuId), [menuId]);
@@ -55,7 +60,8 @@ export default function TaskActions({ task, subject, activeTaskId, clockSessionA
       event.stopPropagation(); closeMenu(); triggerRef.current?.focus();
     };
     const onClick = (event: MouseEvent) => {
-      if (wrapRef.current?.contains(event.target as Node)) return;
+      const target = event.target as Node;
+      if (wrapRef.current?.contains(target) || menuRef.current?.contains(target)) return;
       closeMenu();
     };
     const onViewportChange = () => positionMenu();
@@ -86,12 +92,12 @@ export default function TaskActions({ task, subject, activeTaskId, clockSessionA
     setMenuOpen(true);
   };
   const onMenuKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+    if (!isMenuNavKey(event.key)) return;
     event.preventDefault();
     const items = Array.from(wrapRef.current?.querySelectorAll<HTMLButtonElement>("[role=menuitem]") || []);
     const index = items.indexOf(document.activeElement as HTMLButtonElement);
-    const next = event.key === "Home" ? 0 : event.key === "End" ? items.length - 1 : event.key === "ArrowDown" ? (index + 1 + items.length) % items.length : (index - 1 + items.length) % items.length;
-    items[next]?.focus();
+    const next = nextMenuIndex(event.key, index, items.length);
+    if (next != null) items[next]?.focus();
   };
 
   const done = task.status === "done";
@@ -107,12 +113,18 @@ export default function TaskActions({ task, subject, activeTaskId, clockSessionA
       <button ref={triggerRef} type="button" className="task-more" aria-label="More task actions" aria-haspopup="menu" aria-expanded={menuOpen} aria-controls={menuOpen ? `${menuId}-menu` : undefined} onClick={toggleMenu}>
         <span className="task-more-dots" aria-hidden="true"><i /><i /><i /></span>
       </button>
-      {menuOpen && <div id={`${menuId}-menu`} className="task-menu glass-panel" style={menuStyle} role="menu" aria-label="More task actions" onKeyDown={onMenuKeyDown}>
+      {menuOpen && (() => {
+        // Portalled to <body> in the browser so no scrollable/filtered ancestor
+        // can clip or re-anchor the fixed popover; inline where there is no DOM.
+        const node = <div ref={menuRef} id={`${menuId}-menu`} className={`task-menu glass-panel${menuPlaced ? " is-open" : ""}`} style={menuStyle} role="menu" aria-label="More task actions" onKeyDown={onMenuKeyDown}>
         <button type="button" role="menuitem" onClick={() => { closeMenu(); onEdit(task.id); }}>Edit task</button>
         {skipped && <button type="button" role="menuitem" onClick={() => { closeMenu(); onTaskStatus(task.id, "pending"); }}>Reopen</button>}
         {!done && !skipped && <button type="button" role="menuitem" onClick={() => { closeMenu(); onTaskStatus(task.id, "skipped"); }}>Skip task</button>}
         {subject && !skipped && onSkipSubject && <button type="button" role="menuitem" onClick={() => { closeMenu(); onSkipSubject(subject.id, task.date); }}>Skip {subject.name} today</button>}
-      </div>}
+      </div>;
+        const container = typeof document === "undefined" ? null : document.body;
+        return container ? createPortal(node, container) : node;
+      })()}
     </div>
 
     <div className="task-row-actions">

@@ -28,7 +28,7 @@ import {
 } from "../src/lib/recovery";
 import { validateQuickAdd, QUICK_ADD_KINDS } from "../src/lib/quickAdd";
 import type { TaskRow } from "../src/lib/client";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import React from "react";
 import TestRenderer, { act } from "react-test-renderer";
@@ -38,6 +38,9 @@ import {
   type SessionCommand, type SessionSnapshot,
 } from "../src/lib/studySession";
 import TaskActions from "../src/components/TaskActions";
+import { OnboardingSlider } from "../src/components/Onboarding";
+import { taskSessionMinutes, formatMinutesShort, formatStudied, taskStudiedSuffix } from "../src/lib/studyTime";
+import { MENU_NAV_KEYS, isMenuNavKey, nextMenuIndex } from "../src/lib/menuNav";
 import type { SubjectRow } from "../src/lib/client";
 
 let passed = 0;
@@ -921,8 +924,129 @@ async function runTests() {
     "The onboarding paragraph is no longer collapsed by a font-size:0 replacement");
   check(/\.task-more\s*\{[^}]*display:\s*inline-flex/.test(polishCss),
     "The ⋮ button is shown on desktop as well as on phones");
-  check(polishCss.includes("prefers-reduced-motion") && polishCss.includes("liveDotPulse"),
-    "The live-session animation is defined and switched off for reduced motion");
+  check(polishCss.includes("prefers-reduced-motion") && polishCss.includes("recDotPulse"),
+    "The live-session dot pulse is defined once and switched off for reduced motion");
+
+
+  console.log("\n--- 17. Study-Time Aggregation, Slider & Consolidation Contract ---");
+  /* Logged study minutes: the row label is derived from saved sessions. */
+  check(taskSessionMinutes([
+    { taskId: 5, minutes: 6.75 }, { taskId: 7, minutes: 30 }, { taskId: 5, minutes: 6.75 },
+  ], 5) === 13.5, "Multiple sessions for one task accumulate to their real total");
+  check(taskSessionMinutes([{ taskId: 1, minutes: 0.1 }, { taskId: 1, minutes: 0.2 }], 1) === 0.3,
+    "Float noise (0.1 + 0.2) never leaks into the displayed minutes");
+  check(taskSessionMinutes([{ taskId: null, minutes: 10 }, { taskId: 2, minutes: 5 }], 2) === 5,
+    "Sessions without a task never contaminate a task total");
+  check(taskSessionMinutes([], 9) === 0, "A task with no sessions has zero studied time");
+  check(formatMinutesShort(13.5) === "13.5m" && formatMinutesShort(14) === "14m" && formatMinutesShort(0.05) === "0.1m",
+    "Minutes format keeps fractions honest (never rounds 13.5 up to 14)");
+  check(formatStudied(13.5) === "13.5m studied" && formatStudied(0) === "",
+    'Wording is "studied" and stays silent when nothing has been saved yet');
+  check(taskStudiedSuffix([{ taskId: 8, minutes: 20 }, { taskId: 8, minutes: 6.5 }], { id: 8 }) === "26.5m studied",
+    "The row suffix shows the live session sum right after Clock Out");
+  check(taskStudiedSuffix([], { id: 8, actualMinutes: 45 }) === "45m studied",
+    "A legacy task still shows its persisted actualMinutes");
+  check(taskStudiedSuffix([], { id: 8, actualMinutes: 0 }) === "", "No data, no label — nothing is ever faked");
+
+  /* ⋮ keyboard model */
+  check(isMenuNavKey("ArrowDown") && isMenuNavKey("Home") && !isMenuNavKey("Tab"),
+    "Menu navigation recognises arrows + Home/End only");
+  check(nextMenuIndex("ArrowDown", 2, 3) === 0 && nextMenuIndex("ArrowUp", 0, 3) === 2,
+    "Arrow focus wraps around the menu instead of escaping it");
+  check(nextMenuIndex("Home", 2, 4) === 0 && nextMenuIndex("End", 2, 4) === 3, "Home/End jump to the ends");
+  check(nextMenuIndex("ArrowDown", 0, 0) === null && MENU_NAV_KEYS.length === 4,
+    "An empty menu swallows navigation without going out of bounds");
+
+  /* Onboarding slider component contract */
+  const prevActEnv = (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT;
+  (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  let sliderValue: number | null = null;
+  let sliderTree!: TestRenderer.ReactTestRenderer;
+  await act(async () => {
+    sliderTree = TestRenderer.create(React.createElement(OnboardingSlider, {
+      label: "Daily hours", value: 2.5, valueLabel: "2.5 hours", min: 0.5, max: 8, step: 0.25,
+      minLabel: "30 min", maxLabel: "8 hours", presets: [
+        { label: "1 hour", value: 1 }, { label: "2 hours", value: 2 }, { label: "4 hours", value: 4 },
+      ],
+      onChange: (v: number) => { sliderValue = v; },
+    }));
+  });
+  {
+    const root = sliderTree.root;
+    const input = root.findByProps({ className: "ob-range-input" });
+    const card = root.findAll((n) => String(n.props.className || "").startsWith("ob-range-card"))[0];
+    check(!!input && input.props.type === "range" && input.props.value === 2.5,
+      "The slider stays a real range input with the committed value");
+    const fill = String((input.props.style as Record<string, string> | undefined)?.["--ob-range-fill"] || "");
+    check(fill.startsWith("26.6"), "The filled rail is driven by --ob-range-fill from the actual value", fill);
+    check(!!root.findByProps({ className: "ob-range-value" }) && String(root.findByProps({ className: "ob-range-value" }).children.join("")) === "2.5 hours",
+      "The value badge shows the readable label");
+    const chips = root.findAll((n) => String(n.props.className || "").startsWith("ob-range-chip"));
+    check(chips.length === 3, "Preset chips render beside the slider");
+    act(() => { chips[2].props.onClick(); });
+    check(sliderValue === 4, "A preset chip commits its own value through onChange");
+    act(() => { input.props.onChange({ target: { value: "3.25" } }); });
+    check(sliderValue === 3.25, "Dragging the thumb reports numbers, not strings");
+    act(() => { input.props.onPointerDown({}); });
+    check(String(card.props.className).includes("is-dragging"),
+      "While the finger is down the card switches to 1:1 tracking (no animated lag)");
+    act(() => { input.props.onPointerUp({}); });
+    check(!String(card.props.className).includes("is-dragging"), "Lifting the finger settles the card back");
+    check(input.props["aria-valuetext"] === "2.5 hours" && input.props["onBlur"] !== undefined && input.props.style !== undefined,
+      "Screen readers get the label and the pointer state stays recoverable on blur");
+  }
+  await act(async () => { sliderTree.unmount(); });
+  {
+    let presetTree!: TestRenderer.ReactTestRenderer;
+    await act(async () => {
+      presetTree = TestRenderer.create(React.createElement(OnboardingSlider, {
+        label: "Daily hours", value: 4, valueLabel: "4 hours", min: 0.5, max: 8, step: 0.25,
+        minLabel: "30 min", maxLabel: "8 hours", presets: [{ label: "4 hours", value: 4 }], onChange: () => {},
+      }));
+    });
+    const chip = presetTree.root.findAll((n) => String(n.props.className || "").startsWith("ob-range-chip"))[0];
+    check(chip.props["aria-pressed"] === true && String(chip.props.className).includes("active"),
+      "The matching preset chip is visibly AND semantically pressed");
+    await act(async () => { presetTree.unmount(); });
+  }
+
+  /* CSS consolidation audit: one authoritative finish layer */
+  const retired = ["ui-polish-pass.css", "ui-polish-landing.css", "final-ui-fixes.css", "task-actions-final.css"];
+  check(retired.every((f) => !existsSync(join(process.cwd(), "src/app", f))),
+    "The retired override sheets are really gone (no cascade archaeology)");
+  const layoutSrc = readFileSync(join(process.cwd(), "src/app/layout.tsx"), "utf8");
+  check((layoutSrc.match(/import "\.\/[^"]+\.css";/g) || []).length === 6,
+    "Exactly six stylesheets load, ui-polish.css last");
+  const flat = (css: string) => css.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\s+/g, "");
+  const priorLayers = ["globals.css", "study-planner-refresh.css", "pastel-ui-system.css", "study-planner-redesign.css", "practical-enhancements.css"]
+    .map((f) => flat(readFileSync(join(process.cwd(), "src/app", f), "utf8")));
+  check(priorLayers.every((css) => !css.includes(".task-row.active-clock{background")),
+    "No earlier layer paints the active row — ui-polish owns the recording state");
+  check(priorLayers.every((css) => !css.includes(".ob-range-card.ob-range-input::-webkit-slider-thumb")),
+    "No earlier layer skins the slider thumb — ui-polish owns the slider");
+  check(polishCss.includes(".planner-days .task-row") && polishCss.includes("grid-template-areas"),
+    "Row geometry (desktop list + mobile bands) lives in the one finish layer");
+  const polishCode = polishCss.replace(/\/\*[\s\S]*?\*\//g, "");
+  check((polishCode.match(/!important/g) || []).length <= 2,
+    "The finish layer wins with specificity and order, not !important (only reduced-motion guards may use it)");
+  check(polishCss.includes("@media (prefers-reduced-motion: reduce)") && polishCss.includes("cal-slide-next") && polishCss.includes("cal-slide-prev"),
+    "Month slide is direction-aware and bound by the reduced-motion contract");
+  check(polishCss.includes("(hover: hover)") && polishCss.includes("(hover: none)"),
+    "Hover feedback is gated so touch devices never show stuck lit states");
+
+  /* The studied line + calm active state are wired in BOTH views */
+  const plannerSrc = readFileSync(join(process.cwd(), "src/components/PlannerView.tsx"), "utf8");
+  const dashboardSrc = readFileSync(join(process.cwd(), "src/components/Dashboard.tsx"), "utf8");
+  check(plannerSrc.includes("taskStudiedSuffix") && dashboardSrc.includes("taskStudiedSuffix"),
+    "Planner and Dashboard derive the studied minutes from the same shared helper");
+  check(!/m\s+logged/.test(plannerSrc) && !/logged`/.test(dashboardSrc),
+    'Task rows say "studied", never "logged"');
+  check(plannerSrc.includes("!!clockSessionActive && activeTaskId === task.id") && dashboardSrc.includes("!!clockSessionActive && activeTaskId === task.id"),
+    "The active/recording row shows only while a session is really open");
+  check(plannerSrc.includes("cal-slide-next") && plannerSrc.includes("42") && dashboardSrc.includes("MiniCalendar"),
+    "Calendars slide direction-aware with a stable six-week grid, and the overview calendar is restored");
+  if (prevActEnv === undefined) delete (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT;
+  else (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = prevActEnv;
 
   console.log("\n==================================================");
   console.log(`TEST SUITE RESULTS: ${passed} PASSED, ${failed} FAILED`);
