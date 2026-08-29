@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import StudyScene from "./StudyScene";
 import { today, type AppState } from "@/lib/client";
-import { mmss, type ClockApi, type TimerApi, type TimerMode } from "@/lib/useTimer";
+import { mmss, type TimerMode } from "@/lib/useTimer";
+import type { StudySessionApi } from "@/lib/studySession";
 import { playSound, setVolume, stopSound, currentSound } from "@/lib/sound";
 import { IconCheck, IconClock, IconExpand, IconVolume } from "./icons";
 
@@ -25,67 +26,26 @@ const MODES: { id: TimerMode; label: string }[] = [
 ];
 
 export default function FocusView({
-  state, timer, clock, onCompleteTask, onZen, onClockLink,
+  state, session, onCompleteTask, onZen,
 }: {
   state: AppState;
-  timer: TimerApi;
-  clock: ClockApi;
+  /** The ONE study session: focus timer + study clock, always in step. */
+  session: StudySessionApi;
   onCompleteTask: (id: number) => void;
   onZen: () => void;
-  /** Called when the focus timer changes the linked study-clock state. */
-  onClockLink: (message: string) => void;
 }) {
   const [sound, setSound] = useState(() => currentSound());
   const [vol, setVol] = useState(0.3);
-  const [longBreakAfter, setLongBreakAfter] = useState(4);
-  const focusOwnsClock = useRef(false);
-  const previousTimerMode = useRef<TimerMode>(timer.mode);
+  const { timer, clock } = session;
   const t = today();
   const todayTasks = state.tasks.filter((x) => x.date === t);
 
   useEffect(() => { setVolume(vol); }, [vol]);
 
-  // "Long break after N focus blocks" — a local preference (the server
-  // settings table doesn't store it), defaulting to the classic 4. Read
-  // async after mount so no setState runs synchronously in the effect.
-  useEffect(() => {
-    const id = window.setTimeout(() => {
-      try {
-        const raw = localStorage.getItem("spp-long-break-after");
-        if (raw) setLongBreakAfter(Math.min(8, Math.max(2, Number(raw) || 4)));
-      } catch { /* private mode */ }
-    }, 0);
-    return () => window.clearTimeout(id);
-  }, []);
-
-  // Keep the two timing systems in one workflow. A focus block ending is
-  // study time, so the study clock is paused before the break begins. The
-  // break itself is deliberately excluded from logged study time.
-  useEffect(() => {
-    if (timer.mode === "short" || timer.mode === "long") {
-      if (timer.mode !== previousTimerMode.current && clock.sessionActive && !clock.onBreak) {
-        clock.takeBreak();
-        onClockLink("Focus block complete — study clock paused for your break.");
-      }
-    }
-    previousTimerMode.current = timer.mode;
-  }, [timer.mode, clock, onClockLink]);
-
-  // Auto-flow: when a focus block ends, roll into a short break; a long
-  // break arrives every Nth block. When a break ends, return to focus.
-  useEffect(() => {
-    if (timer.running || timer.mode === "stopwatch" || timer.mode === "custom") return;
-    if (timer.seconds !== 0) return;
-    const id = window.setTimeout(() => {
-      if (timer.mode === "pomodoro") {
-        const n = Math.max(2, longBreakAfter);
-        timer.setMode(timer.cycles > 0 && timer.cycles % n === 0 ? "long" : "short");
-      } else {
-        timer.setMode("pomodoro");
-      }
-    }, 900);
-    return () => window.clearTimeout(id);
-  }, [timer, longBreakAfter]);
+  /* The focus/clock synchronisation used to live here — and only here, so
+     Zen and the tracker bar could drift out of step with it. It now lives
+     in `useStudySession` (src/lib/studySession.ts), which also owns the
+     block → break → block auto-flow, so this view is presentation only. */
 
   const pick = (id: string) => {
     setSound(id);
@@ -114,70 +74,6 @@ export default function FocusView({
     : timer.seconds < timer.total;
   const timerStateLabel = timer.running ? (timer.isBreak ? "BREAK" : "FOCUSED") : timerInProgress ? "PAUSED" : "READY";
   const selectedSoundLabel = SOUNDS.find((x) => x.id === sound)?.label || "Sound Off";
-
-  /**
-   * One focus control owns the whole study session. Start/Resume starts the
-   * study clock, Pause pauses both, and Reset ends a clock session that was
-   * created by Focus. This removes the orphaned-clock problem where learners
-   * had to remember a second manual Clock Out action.
-   */
-  const toggleTimerLinked = () => {
-    if (timer.running) {
-      timer.pause();
-      if (clock.running) {
-        clock.pause();
-        onClockLink("Focus paused — study clock paused too.");
-      }
-      return;
-    }
-
-    if (timer.isBreak) {
-      timer.start();
-      return;
-    }
-
-    timer.start();
-
-    if (clock.onBreak) {
-      clock.endBreak();
-      onClockLink("Break ended — study clock resumed with your focus timer.");
-    } else if (!clock.sessionActive) {
-      const firstTask = state.tasks.find((x) => x.date === t && x.status === "pending")
-        || state.tasks.find((x) => x.date === t)
-        || null;
-      clock.clockIn({ taskId: firstTask?.id ?? null, subjectId: firstTask?.subjectId ?? null });
-      focusOwnsClock.current = true;
-      onClockLink(firstTask
-        ? `Study clock started on “${firstTask.title.slice(0, 40)}” — focus time is being recorded.`
-        : "Study clock started — focus time is being recorded.");
-    } else if (!clock.running) {
-      clock.resume();
-      onClockLink("Study clock resumed with your focus timer.");
-    }
-  };
-
-  const resetLinked = () => {
-    timer.reset();
-    if (focusOwnsClock.current && clock.sessionActive) {
-      clock.clockOut();
-      focusOwnsClock.current = false;
-      onClockLink("Focus reset — study session closed and saved.");
-    } else if (clock.running) {
-      clock.pause();
-      onClockLink("Focus reset — study clock paused.");
-    }
-  };
-
-  const changeModeLinked = (mode: TimerMode) => {
-    if (timer.running) {
-      timer.pause();
-      if (clock.running) clock.pause();
-    }
-    if (mode === "short" || mode === "long") {
-      if (clock.sessionActive && !clock.onBreak) clock.takeBreak();
-    }
-    timer.setMode(mode);
-  };
 
   return (
     <div className="fade-in focus-view">
@@ -248,28 +144,21 @@ export default function FocusView({
         </div>
 
         <div className="clock-actions">
+          {/* One row, one geometry: the primary verb keeps its slot whether
+              the session is running, paused or on a break. */}
           <div className="clock-action-buttons">
-            {!clock.sessionActive && (
-              <button className="btn btn-primary" type="button" onClick={() => clock.clockIn()}>Clock In</button>
-            )}
+            <button
+              className={`btn ${session.active ? "btn-secondary" : "btn-primary"} clock-toggle`}
+              type="button"
+              onClick={session.toggle}
+            >
+              {session.active ? "Pause" : clock.sessionActive ? "Resume" : "Start session"}
+            </button>
             {clock.running && (
-              <>
-                <button className="btn btn-secondary" type="button" onClick={clock.pause}>Pause</button>
-                <button className="btn btn-secondary" type="button" onClick={clock.takeBreak}>Take a Break</button>
-                <button className="btn btn-danger" type="button" onClick={() => { clock.clockOut(); focusOwnsClock.current = false; }}>Clock Out</button>
-              </>
+              <button className="btn btn-secondary" type="button" onClick={session.takeBreak}>Take a Break</button>
             )}
-            {!clock.running && !clock.onBreak && clock.sessionActive && (
-              <>
-                <button className="btn btn-primary" type="button" onClick={clock.resume}>Resume</button>
-                <button className="btn btn-danger" type="button" onClick={() => { clock.clockOut(); focusOwnsClock.current = false; }}>Clock Out</button>
-              </>
-            )}
-            {clock.onBreak && (
-              <>
-                <button className="btn btn-primary" type="button" onClick={clock.endBreak}>Resume Studying</button>
-                <button className="btn btn-danger" type="button" onClick={() => { clock.clockOut(); focusOwnsClock.current = false; }}>Clock Out</button>
-              </>
+            {clock.sessionActive && (
+              <button className="btn btn-danger" type="button" onClick={session.endSession}>Clock Out</button>
             )}
           </div>
           {clockTask && (
@@ -280,7 +169,7 @@ export default function FocusView({
           )}
         </div>
         <p className="panel-lead clock-save-note">
-          Focus controls the clock for you. You only need to Clock Out manually when you started the study clock yourself.
+          One session: starting focus starts the clock, pausing pauses both, and a break never counts as study time.
         </p>
       </section>
 
@@ -306,7 +195,7 @@ export default function FocusView({
               <button key={m.id} type="button"
                 className={`btn btn-sm ${timer.mode === m.id ? "btn-primary" : "btn-secondary"}`}
                 aria-pressed={timer.mode === m.id}
-                onClick={() => changeModeLinked(m.id)}>{m.label}</button>
+                onClick={() => session.setMode(m.id)}>{m.label}</button>
             ))}
           </div>
 
@@ -341,10 +230,10 @@ export default function FocusView({
           </div>
 
           <div className="flex-row gap-md timer-controls">
-            <button className="btn btn-primary btn-lg" type="button" onClick={toggleTimerLinked}>
-              {timer.running ? "Pause" : timer.isBreak ? "Start Break" : timerInProgress ? "Resume Focus" : "Start Focus"}
+            <button className="btn btn-primary btn-lg" type="button" onClick={session.toggle}>
+              {session.active ? "Pause" : timer.isBreak ? "Start Break" : timerInProgress ? "Resume" : "Start Focus"}
             </button>
-            <button className="btn btn-secondary btn-lg" type="button" onClick={resetLinked}>Reset</button>
+            <button className="btn btn-secondary btn-lg" type="button" onClick={session.reset}>Reset</button>
           </div>
           <p className="panel-lead timer-footnote">
             Start Focus = start study clock. Pause = pause both. Focus ends = break starts and study time stops. Reset closes a Focus-owned session.

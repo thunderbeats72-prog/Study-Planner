@@ -33,6 +33,12 @@ import { join } from "node:path";
 import React from "react";
 import TestRenderer, { act } from "react-test-renderer";
 import { useStudyClock, type ClockApi } from "../src/lib/useTimer";
+import {
+  effectKinds, isBreakMode, planSession,
+  type SessionCommand, type SessionSnapshot,
+} from "../src/lib/studySession";
+import TaskActions from "../src/components/TaskActions";
+import type { SubjectRow } from "../src/lib/client";
 
 let passed = 0;
 let failed = 0;
@@ -728,6 +734,195 @@ async function runTests() {
   check(enhancementCss.includes("--tap"), "Touch targets use the shared tap token");
   const globalsCss = readFileSync(join(process.cwd(), "src/app/globals.css"), "utf8");
   check(globalsCss.includes("--tap:44px"), "The shared touch floor is 44px");
+
+  console.log("\n--- 14. Focus ↔ Study Clock Synchronization ---");
+  /* The focus timer and the study clock are one session. These assertions
+     run the same pure planner the app runs (src/lib/studySession.ts), so
+     they cover the real code path rather than a copy of it. */
+  const snap = (over: Partial<SessionSnapshot> = {}): SessionSnapshot => ({
+    timerRunning: false, timerIsBreak: false, clockRunning: false,
+    clockSessionActive: false, clockOnBreak: false, focusOwnsClock: false, ...over,
+  });
+  const planEffects = (command: SessionCommand, state: SessionSnapshot = snap()) =>
+    effectKinds(planSession(state, command));
+  const live = snap({
+    timerRunning: true, clockRunning: true, clockSessionActive: true, focusOwnsClock: true,
+  });
+
+  let effects = planEffects({ type: "start" });
+  check(effects.includes("timer.start") && effects.includes("clock.in") && effects.includes("own.focus"),
+    "Start Focus starts the focus timer and the study clock in one action");
+  check(!planEffects({ type: "start" }, snap({ clockSessionActive: true, clockRunning: true })).includes("clock.in"),
+    "Starting again never restarts a clock that is already recording");
+
+  effects = planEffects({ type: "start" }, snap({ timerIsBreak: true, clockSessionActive: true, clockOnBreak: true, focusOwnsClock: true }));
+  check(effects.includes("timer.start") && !effects.includes("clock.endBreak") && !effects.includes("clock.resume"),
+    "Starting a break countdown never puts the study clock back on the bill");
+  effects = planEffects({ type: "pause" }, live);
+  check(effects.includes("timer.pause") && effects.includes("clock.pause"),
+    "Pause Focus pauses the study clock too");
+  effects = planEffects({ type: "start" }, snap({ clockSessionActive: true, focusOwnsClock: true }));
+  check(effects.includes("timer.start") && effects.includes("clock.resume"),
+    "Resume Focus resumes the study clock too");
+  check(planEffects({ type: "toggle" }, live).includes("clock.pause")
+    && planEffects({ type: "toggle" }, snap({ clockSessionActive: true })).includes("clock.resume"),
+    "One toggle drives both timers in either direction");
+
+  effects = planEffects({ type: "blockComplete" }, live);
+  check(effects.includes("clock.break") && !effects.includes("clock.out"),
+    "A finished focus block parks the clock on break instead of ending the session");
+  effects = planEffects({ type: "breakComplete" }, snap({ clockSessionActive: true, clockOnBreak: true, focusOwnsClock: true }));
+  check(effects.includes("timer.start") && effects.includes("clock.endBreak"),
+    "A finished break restarts focus and the study clock together");
+  check(planEffects({ type: "breakComplete" }, snap({ clockSessionActive: true, clockOnBreak: true })).length === 0,
+    "A clock the learner started by hand is never restarted by focus");
+
+  effects = planEffects({ type: "endSession" }, live);
+  check(effects.includes("timer.pause") && effects.includes("clock.out") && effects.includes("own.clear"),
+    "Clock Out stops the focus timer, saves the minutes and releases the session");
+
+  effects = planEffects({ type: "break" }, live);
+  check(effects.includes("timer.pause") && effects.includes("clock.break"),
+    "A manual break rests both timers, so nothing keeps billing");
+  effects = planEffects({ type: "setMode", mode: "short" }, live);
+  check(effects.includes("timer.pause") && effects.includes("clock.break") && effects.includes("timer.setMode"),
+    "Switching into a break mode takes the clock off the bill");
+  check(isBreakMode("short") && isBreakMode("long") && !isBreakMode("pomodoro") && !isBreakMode("stopwatch"),
+    "Only the short and long modes count as breaks");
+
+  // The invariant: the two timers of a focus-owned session may never drift.
+  check(planEffects({ type: "reconcile" }, live).length === 0, "A session already in step needs no repair");
+  check(planEffects({ type: "reconcile" },
+    snap({ timerRunning: true, clockSessionActive: true, focusOwnsClock: true })).join(",") === "clock.resume",
+    "A running focus timer over a paused clock resumes the clock");
+  check(planEffects({ type: "reconcile" },
+    snap({ clockRunning: true, clockSessionActive: true, focusOwnsClock: true })).join(",") === "clock.pause",
+    "A paused focus timer over a recording clock stops the clock");
+  check(planEffects({ type: "reconcile" },
+    snap({ timerRunning: true, timerIsBreak: true, clockRunning: true, clockSessionActive: true, focusOwnsClock: true })).join(",") === "clock.break",
+    "Break mode on the focus timer takes the clock off the bill");
+  check(planEffects({ type: "reconcile" }, snap({ timerRunning: true, clockSessionActive: true })).length === 0,
+    "The invariant never touches a clock the learner owns themselves");
+
+  console.log("\n--- 15. Task Row Overflow Menu (⋮) ---");
+  const menuWindow = (globalThis as { window?: unknown }).window;
+  const menuDocument = (globalThis as { document?: unknown }).document;
+  /* Node has no window event target, so the popover's outside-click and
+     Escape listeners need one. Both are recorded so the Escape path can be
+     exercised, and both are removed again afterwards. */
+  const keyHandlers: ((event: { key: string; stopPropagation: () => void }) => void)[] = [];
+  Object.assign(globalThis, { window: globalThis, document: { activeElement: null }, IS_REACT_ACT_ENVIRONMENT: true });
+  (globalThis as { addEventListener: unknown }).addEventListener = (type: string, fn: unknown) => {
+    if (type === "keydown") keyHandlers.push(fn as (event: { key: string; stopPropagation: () => void }) => void);
+  };
+  (globalThis as { removeEventListener: unknown }).removeEventListener = () => undefined;
+
+  const noop = () => undefined;
+  const accounting: SubjectRow = {
+    id: 2, userId: 1, name: "Accounting", color: "#6366f1", difficulty: "Medium",
+    units: 6, weight: 1, position: 0,
+  };
+  let editedTaskId: number | null = null;
+  const menuProps = {
+    subject: accounting,
+    activeTaskId: null,
+    clockSessionActive: false,
+    onTaskStatus: noop,
+    onFocusTask: noop,
+    onClockOut: noop,
+    onEdit: (id: number) => { editedTaskId = id; },
+    onSkipSubject: noop,
+  };
+  const quietConsoleError = () => {
+    const original = console.error;
+    console.error = (...args: unknown[]) => {
+      if (String(args[0] || "").includes("react-test-renderer is deprecated")) return;
+      original(...args);
+    };
+    return () => { console.error = original; };
+  };
+  const mountRow = async (id: number) => {
+    let instance!: TestRenderer.ReactTestRenderer;
+    const restore = quietConsoleError();
+    await act(async () => {
+      instance = TestRenderer.create(
+        React.createElement(TaskActions, { ...menuProps, task: mkTask({ id, title: "Financial Accounting", subjectId: 2 }) })
+      );
+    });
+    restore();
+    return instance;
+  };
+  const triggerOf = (instance: TestRenderer.ReactTestRenderer) =>
+    instance.root.findAll((node) => node.props["aria-label"] === "More task actions")[0];
+  const menusIn = (instance: TestRenderer.ReactTestRenderer) =>
+    instance.root.findAll((node) => node.props.role === "menu");
+  const itemsIn = (instance: TestRenderer.ReactTestRenderer) =>
+    instance.root.findAll((node) => node.props.role === "menuitem");
+  /** Opening the popover schedules a focus hop on a 0ms timer; flush it
+      inside act() so React never reports an un-wrapped update. */
+  const openMenu = async (instance: TestRenderer.ReactTestRenderer) => {
+    await act(async () => { triggerOf(instance).props.onClick(); });
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 5)); });
+  };
+
+  const row = await mountRow(91);
+  check(!!triggerOf(row), "Every task row carries a ⋮ options button");
+  check(triggerOf(row).props["aria-haspopup"] === "menu" && triggerOf(row).props["aria-expanded"] === false,
+    "The ⋮ button announces itself as a closed menu");
+  check(menusIn(row).length === 0, "The popover is closed until it is asked for");
+
+  await openMenu(row);
+  check(menusIn(row).length === 1 && triggerOf(row).props["aria-expanded"] === true,
+    "Tapping ⋮ opens the popover");
+  check(itemsIn(row).map((node) => String(node.children.join(""))).join("|")
+    === "Edit task|Skip task|Skip Accounting today",
+    "Only the secondary actions live inside the popover");
+  const primaryLabels = row.root
+    .findAll((node) => typeof node.type === "string" && node.type === "button")
+    .map((node) => String(node.children.join("")))
+    .filter((label) => label === "Clock in" || label === "Done");
+  check(primaryLabels.join("|") === "Clock in|Done", "Clock in and Done stay visible outside the popover");
+
+  await act(async () => { itemsIn(row)[0].props.onClick(); });
+  check(editedTaskId === 91, "Edit task routes to the task editor");
+  check(menusIn(row).length === 0, "Choosing an action closes the popover");
+
+  await openMenu(row);
+  check(menusIn(row).length === 1 && keyHandlers.length > 0, "Reopening registers the keyboard handler");
+  await act(async () => { keyHandlers[keyHandlers.length - 1]({ key: "Escape", stopPropagation: noop }); });
+  check(menusIn(row).length === 0, "Escape closes the popover");
+
+  const firstRow = await mountRow(93);
+  const secondRow = await mountRow(94);
+  await openMenu(firstRow);
+  await openMenu(secondRow);
+  check(menusIn(firstRow).length === 0 && menusIn(secondRow).length === 1,
+    "Only one task menu can be open at a time");
+
+  await act(async () => { [row, firstRow, secondRow].forEach((instance) => instance.unmount()); });
+  delete (globalThis as { addEventListener?: unknown }).addEventListener;
+  delete (globalThis as { removeEventListener?: unknown }).removeEventListener;
+  if (menuWindow === undefined) delete (globalThis as { window?: unknown }).window;
+  else (globalThis as { window?: unknown }).window = menuWindow;
+  if (menuDocument === undefined) delete (globalThis as { document?: unknown }).document;
+  else (globalThis as { document?: unknown }).document = menuDocument;
+
+  console.log("\n--- 16. Onboarding Contract & Polish Guards ---");
+  const coursesRoute = readFileSync(join(process.cwd(), "src/app/api/courses/route.ts"), "utf8");
+  check(coursesRoute.includes('level.id !== "nursery"') && coursesRoute.includes('levelId !== "nursery"'),
+    "Nursery / Pre-School stays out of the onboarding level and course contract");
+  const onboardingSource = readFileSync(join(process.cwd(), "src/components/Onboarding.tsx"), "utf8");
+  check(!/from nursery/i.test(onboardingSource),
+    "The Level step copy no longer advertises nursery / pre-school");
+  check(onboardingSource.includes("From school and higher education through doctoral research"),
+    "The Level step explains itself in real markup");
+  const polishCss = readFileSync(join(process.cwd(), "src/app/ui-polish.css"), "utf8");
+  check(!/font-size:\s*0\s*!important/.test(polishCss),
+    "The onboarding paragraph is no longer collapsed by a font-size:0 replacement");
+  check(/\.task-more\s*\{[^}]*display:\s*inline-flex/.test(polishCss),
+    "The ⋮ button is shown on desktop as well as on phones");
+  check(polishCss.includes("prefers-reduced-motion") && polishCss.includes("liveDotPulse"),
+    "The live-session animation is defined and switched off for reduced motion");
 
   console.log("\n==================================================");
   console.log(`TEST SUITE RESULTS: ${passed} PASSED, ${failed} FAILED`);

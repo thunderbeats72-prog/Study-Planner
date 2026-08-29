@@ -2,6 +2,11 @@
   Study Planner Pro — targeted UI/UX polish pass
   Preserves the existing lavender/pastel system and only tightens hierarchy,
   alignment, mobile task actions, onboarding density, and motion.
+
+  This file is imported LAST (see src/app/layout.tsx), so it is the layer
+  that resolves the cascade for the things it touches. Rules here should
+  stay small, specific and commented — anything structural belongs in
+  globals.css.
 */
 
 /* =========================
@@ -64,110 +69,312 @@
 }
 
 /* =========================
-   MOBILE TASK ACTIONS
-   ========================= */
+   TASK ROWS — the ⋮ control
+   =========================
+   One affordance, one corner, every surface. The overflow button is a
+   compact vertical ⋮ pinned to the card's top-right, so its popover can
+   never cover the task title and opening it never moves the row. The row
+   gives the corner up explicitly — the text block and the primary actions
+   both stop short of it — instead of letting the menu float over content,
+   which is what made the old mobile version look broken. */
+.task-row { position: relative; }
+
+.task-more-wrap {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  z-index: 6;
+}
+
+.task-main { padding-right: 34px; }
+
+.task-row .task-row-actions { margin-right: 32px; }
+
+.task-more {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: background .16s ease, color .16s ease, border-color .16s ease;
+}
+
+.task-more-dots {
+  display: grid;
+  gap: 3px;
+  justify-items: center;
+}
+
+.task-more-dots i {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+@media (hover:hover) and (pointer:fine) {
+  .task-more:hover {
+    background: var(--row-hover);
+    border-color: var(--glass-border);
+    color: var(--accent);
+  }
+}
+
+.task-more[aria-expanded="true"] {
+  background: var(--nav-active-bg);
+  border-color: var(--nav-active-border);
+  color: var(--nav-active-text);
+}
+
+/* The popover: anchored under its own button, right-aligned so it grows
+   into the card rather than off the screen, and bounded by the viewport. */
+.task-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  left: auto;
+  width: max-content;
+  min-width: 182px;
+  max-width: min(238px, calc(100vw - 28px));
+  padding: 5px;
+  border-radius: 14px;
+  background: var(--surface-elevated);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 12px 30px rgba(24,22,50,.14), 0 3px 10px rgba(24,22,50,.08);
+  z-index: 60;
+  transform-origin: top right;
+  animation: taskMenuPop .16s cubic-bezier(.22,1,.36,1) both;
+}
+
+.task-menu button {
+  display: block;
+  width: 100%;
+  min-height: 34px;
+  padding: 8px 11px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-main);
+  font-family: inherit;
+  font-size: .79rem;
+  font-weight: 650;
+  line-height: 1.35;
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+  transition: background .14s ease, color .14s ease;
+}
+
+.task-menu button:hover { background: var(--row-hover); color: var(--accent); }
+.task-menu button + button { margin-top: 2px; }
+
+/* Phones: a real 44px touch target, and the action bar drops to its own
+   row so Clock in + Done stay full-size and tappable. */
 @media (max-width:640px) {
-  .task-row {
-    position: relative;
-    padding: 13px 12px 14px !important;
-    padding-right: 14px !important;
+  .task-more {
+    width: 40px;
+    height: 34px;
+    border-radius: 10px;
   }
 
-  .task-row-actions {
+  .task-main { padding-right: 42px; }
+
+  .task-row .task-row-actions {
     position: relative;
+    display: flex;
     width: 100%;
-    display: flex !important;
     align-items: center;
     justify-content: flex-end;
     gap: 7px;
-    padding-top: 32px;
-    margin-top: 2px;
+    margin-right: 0;
+    padding-top: 30px;
   }
 
-  /* The overflow action becomes a compact vertical anchor in the card's
-     top-right corner instead of a fourth inline button. */
-  .task-more-wrap {
-    position: absolute !important;
-    top: 0;
-    right: 0;
-    z-index: 8;
-  }
-
-  .task-more {
-    width: 34px !important;
-    height: 30px !important;
-    min-width: 34px !important;
-    padding: 0 !important;
-    border-radius: 9px !important;
-    font-size: 16px !important;
-    line-height: 1 !important;
-    letter-spacing: 0 !important;
-    box-shadow: 0 2px 7px rgba(30,27,60,.05);
-  }
-
-  .task-menu {
-    position: absolute !important;
-    top: calc(100% + 7px) !important;
-    right: 0 !important;
-    left: auto !important;
-    width: min(220px, calc(100vw - 42px)) !important;
-    min-width: 190px;
-    max-width: calc(100vw - 42px);
-    z-index: 80 !important;
-    padding: 5px !important;
-    border-radius: 14px !important;
-    box-shadow: 0 14px 34px rgba(30,27,60,.15), 0 4px 12px rgba(30,27,60,.08) !important;
-    animation: taskMenuPop .18s cubic-bezier(.22,1,.36,1) both;
-    transform-origin: top right;
-  }
-
-  .task-menu button {
-    min-height: 42px;
-    padding: 10px 12px !important;
-    border-radius: 10px !important;
-    font-size: .78rem !important;
-    text-align: left;
-  }
-
-  .task-row-actions > .btn.task-clock,
-  .task-row-actions > .btn.task-primary,
-  .task-row-actions > .task-clock-button {
+  .task-row .task-row-actions > .btn.task-clock,
+  .task-row .task-row-actions > .task-clock-button,
+  .task-row .task-row-actions > .btn.task-primary {
+    flex: 1 1 0;
+    min-width: 0;
     min-height: 40px;
   }
 
-  .task-row-actions > .btn.task-clock,
-  .task-row-actions > .task-clock-button {
-    flex: 1 1 0;
-  }
+  .task-menu { max-width: calc(100vw - 24px); }
 
-  .task-row-actions > .btn.task-primary {
-    flex: 1 1 0;
+  .task-menu button {
+    min-height: 42px;
+    padding: 10px 12px;
+    font-size: .8rem;
   }
 }
 
 @keyframes taskMenuPop {
-  from { opacity:0; transform: translateY(-4px) scale(.97); }
-  to { opacity:1; transform:none; }
+  from { opacity: 0; transform: translateY(-4px) scale(.97); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* =========================
+   TASK ROWS — active (clocked-in) state
+   =========================
+   The recording row used to carry a saturated green border, a gradient
+   fill and an animated conic rim around its whole day card. That read as
+   an error, not as "this is the task you are on". The state is now a hair
+   of accent on the edge, a faint tint, and one small pulsing dot. */
+.task-row.active-clock,
+.task-row.clean-list.active-clock,
+.task-row.active-clock:hover {
+  border-color: color-mix(in srgb, var(--success-accent) 30%, var(--glass-border));
+  background: color-mix(in srgb, var(--success-accent) 5%, transparent);
+  box-shadow: none;
+}
+
+/* List rows (Planner, Overview) have no box to outline — a left accent bar
+   plus the tint says the same thing without redrawing the row. */
+.planner-days .task-row.active-clock,
+.planner-days .task-row.active-clock:hover,
+.task-row.clean-list.active-clock {
+  border-color: transparent;
+  border-bottom-color: var(--glass-border);
+  box-shadow: inset 2px 0 0 color-mix(in srgb, var(--success-accent) 55%, transparent);
+}
+
+.task-row.active-clock .task-title { color: var(--text-main); }
+
+.task-row.active-clock .task-dot {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--success-accent) 16%, transparent);
+  animation: liveDotPulse 1.9s ease-in-out infinite;
+}
+
+@keyframes liveDotPulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50%      { transform: scale(1.18); opacity: .7; }
+}
+
+/* Retire the rotating rim beam on the card that owns the session. */
+.glass-panel:not(.ai-panel).day-block:has(.task-row.active-clock)::after,
+.glass-panel:not(.ai-panel).up-next.live::after {
+  animation: none;
+  opacity: 0;
+}
+
+/* The quiet inline marker in the subtitle line. */
+.task-live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: 7px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: .64rem;
+  font-weight: 800;
+  letter-spacing: .2px;
+  white-space: nowrap;
+  vertical-align: 1px;
+  color: var(--success-accent);
+  background: color-mix(in srgb, var(--success-accent) 11%, transparent);
+}
+
+.task-live-badge:not(.is-recording) {
+  color: var(--text-dim);
+  background: var(--row-hover);
+}
+
+.task-live-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.task-live-badge.is-recording .task-live-dot { animation: liveDotPulse 1.9s ease-in-out infinite; }
+.task-live-time { font-size: .64rem; font-variant-numeric: tabular-nums; opacity: .92; }
+
+/* =========================
+   TRACKER BAR — stable geometry
+   =========================
+   Clocked in → Paused → Clocked out must not shuffle the row. The primary
+   verb keeps one fixed-width slot, so only its label changes. */
+.tracker-bar .tracker-actions .act-in,
+.tracker-bar .tracker-actions .act-toggle {
+  min-width: 72px;
+  justify-content: center;
+}
+
+/* The primary verb took over the old `.act-pause` slot, so it inherits the
+   same compact phone metrics as Break and Clock Out. */
+@media (max-width:640px) {
+  .tracker-bar .tracker-actions .act-toggle,
+  .tracker-bar .tracker-actions .act-in {
+    padding: 6px 9px;
+    font-size: .62rem;
+  }
+}
+
+/* While clocked in the tracker bar grows a conic rim-light that rotates
+   continuously (globals.css, "live rim-light while clocked in"). A beam
+   circling the bar for the whole session is movement with no information
+   in it, so it holds still instead. */
+body.focus-live .tracker-bar::after { animation: none; }
+
+/* =========================
+   PROGRAM / COURSE TEXT
+   =========================
+   Long values such as "NMIMS CDOE MBA — Semester 1 (Marketing) — NMIMS"
+   appear in the sidebar, the drawer, the tracker and the review step. They
+   must wrap inside their own column, never squeeze a neighbour and never
+   force a one-word-per-line strip. */
+.brand-course {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  line-height: 1.45;
+  white-space: normal;
+  overflow-wrap: break-word;
+  word-break: normal;
+  hyphens: none;
+}
+
+.tracker-task {
+  overflow-wrap: break-word;
+  word-break: normal;
+  hyphens: none;
+}
+
+.ob-summary-row {
+  align-items: baseline;
+  gap: 16px;
+}
+
+.ob-summary-row span:first-child { flex: 0 0 auto; }
+
+.ob-summary-row span:last-child {
+  min-width: 0;
+  text-align: right;
+  line-height: 1.45;
+  overflow-wrap: break-word;
+  word-break: normal;
 }
 
 /* =========================
    ONBOARDING
    ========================= */
-/* The API now removes nursery/pre-school from the onboarding contract. */
-.ob-card:has(.ob-level-grid) > p {
-  font-size: 0 !important;
-}
-.ob-card:has(.ob-level-grid) > p::after {
-  content: "From school and higher education through doctoral research, this tells the planner how deep the syllabus should go and how the language should be tuned.";
-  font-size: .88rem;
-  line-height: 1.55;
-  color: var(--text-muted);
+/* The lead paragraph is real markup again. It used to be replaced by a
+   `font-size:0` + ::after hack to drop "nursery" from the sentence; since
+   `max-width:60ch` resolves against the element's OWN font size, that
+   collapsed the measure to zero and rendered one or two words per line. */
+.ob-card > p {
+  width: 100%;
+  max-width: min(68ch, 100%);
+  overflow-wrap: break-word;
 }
 
 /* MBA / NMIMS and other degree flows: use the available card width instead
    of leaving a tall, narrow single-column form on desktop. */
+/* 48px matches the wizard overlay's own horizontal padding, so the card
+   can never be wider than the space it was given. */
 .ob-card {
-  width: min(920px, calc(100vw - 32px)) !important;
+  width: min(920px, calc(100vw - 48px)) !important;
+  margin-inline: auto;
 }
 
 .ob-card .ob-schedule-grid {
@@ -183,8 +390,87 @@
 .ob-field,
 .ob-range-card,
 .ob-choice-card,
-.ob-sub-row {
+.ob-sub-row,
+.ob-program-card,
+.ob-program-item {
   min-width: 0;
+}
+
+/* Labels sit on a shared baseline above every field: a label that wraps to
+   two lines no longer pushes its own input below the one beside it, so
+   Institution and Specialisation line up exactly. Scoped to real form
+   fields — the slider and choice cards set their own label rhythm. */
+.ob-schedule-grid > .ob-field > label {
+  display: block;
+  min-height: 2.4em;
+  margin-bottom: 6px;
+  line-height: 1.2;
+}
+
+.ob-field input,
+.ob-field select,
+.ob-field textarea {
+  width: 100%;
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
+.ob-field textarea { resize: vertical; }
+
+/* Selected-programme summary: one bounded box, so a long name wraps inside
+   it instead of stretching the form beside it. */
+.ob-program-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 14px 24px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  background: linear-gradient(180deg, var(--surface) 0%, var(--row-bg) 100%);
+  box-shadow: var(--shadow-sm);
+}
+
+.ob-program-main { flex: 1 1 250px; min-width: 0; }
+
+.ob-program-name {
+  display: block;
+  font-size: .98rem;
+  font-weight: 800;
+  line-height: 1.4;
+  letter-spacing: -.2px;
+  color: var(--text-main);
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
+.ob-program-meta {
+  flex: 1 1 250px;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  gap: 10px 18px;
+}
+
+.ob-field-label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: .66rem;
+  font-weight: 800;
+  letter-spacing: .6px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.ob-program-item strong {
+  display: block;
+  font-size: .84rem;
+  font-weight: 750;
+  line-height: 1.4;
+  color: var(--text-main);
+  overflow-wrap: break-word;
+  word-break: normal;
 }
 
 .ob-card .ob-level-grid {
@@ -193,6 +479,7 @@
 }
 
 .ob-level-btn {
+  min-width: 0;
   min-height: 92px;
   transition: transform .18s cubic-bezier(.22,1,.36,1),
               border-color .18s ease,
@@ -200,25 +487,298 @@
               background .18s ease;
 }
 
+.ob-level-title,
+.ob-level-btn small { overflow-wrap: break-word; }
+
 @media (hover:hover) and (pointer:fine) {
-  .ob-level-btn:hover {
-    transform: translateY(-2px);
+  .ob-level-btn:hover { transform: translateY(-2px); }
+}
+
+/* ── Range controls ───────────────────────────────────────────────────
+   Hierarchy: title → helper text → value badge → track → presets, all in
+   one card so the group reads as a single control. The track is a real
+   10px rounded rail with a filled/unfilled split; the input itself is a
+   26px strip so the thumb is easy to grab on a phone. The old version
+   leaned on three stacked accent glows, which is now a single soft ring
+   on hover/drag only. */
+.ob-range-card {
+  padding: 15px 16px 14px;
+  border-radius: 18px;
+}
+
+.ob-range-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 13px;
+}
+
+.ob-range-copy { flex: 1 1 auto; min-width: 0; }
+
+.ob-range-card .ob-range-copy label {
+  display: block;
+  min-height: 0;
+  margin-bottom: 5px;
+  font-size: .74rem;
+  font-weight: 800;
+  letter-spacing: .6px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.ob-range-hint {
+  font-size: .79rem;
+  line-height: 1.5;
+  font-weight: 600;
+  color: var(--text-muted);
+  overflow-wrap: break-word;
+}
+
+.ob-range-value {
+  flex: 0 0 auto;
+  align-self: flex-start;
+  min-width: 76px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  text-align: center;
+  font-size: .82rem;
+  font-weight: 800;
+  letter-spacing: -.2px;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 11%, var(--surface-solid));
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
+  box-shadow: none;
+}
+
+.ob-range-card .ob-range-input {
+  --ob-track-h: 10px;
+  --ob-track-bg: color-mix(in srgb, var(--text-main) 12%, transparent);
+  width: 100%;
+  height: 26px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  touch-action: pan-x;
+  /* Registered in globals.css via @property, so the fill percentage animates
+     as the thumb moves or a preset chip jumps the value. */
+  transition: --ob-range-fill .22s cubic-bezier(.25,1,.4,1);
+}
+
+.ob-range-card .ob-range-input::-webkit-slider-runnable-track {
+  height: var(--ob-track-h);
+  border-radius: 999px;
+  background: linear-gradient(90deg,
+    var(--accent) 0%,
+    var(--accent-light) var(--ob-range-fill, 0%),
+    var(--ob-track-bg) var(--ob-range-fill, 0%),
+    var(--ob-track-bg) 100%);
+  box-shadow: inset 0 1px 2px color-mix(in srgb, var(--text-main) 10%, transparent);
+  transition: --ob-range-fill .22s cubic-bezier(.25,1,.4,1);
+}
+
+.ob-range-card .ob-range-input::-moz-range-track {
+  height: var(--ob-track-h);
+  border-radius: 999px;
+  background: linear-gradient(90deg,
+    var(--accent) 0%,
+    var(--accent-light) var(--ob-range-fill, 0%),
+    var(--ob-track-bg) var(--ob-range-fill, 0%),
+    var(--ob-track-bg) 100%);
+  box-shadow: inset 0 1px 2px color-mix(in srgb, var(--text-main) 10%, transparent);
+}
+
+.ob-range-card .ob-range-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  margin-top: calc((var(--ob-track-h) - 22px) / 2);
+  border-radius: 50%;
+  border: 2px solid var(--surface-solid);
+  background: var(--accent-gradient);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--text-main) 26%, transparent),
+              0 2px 6px color-mix(in srgb, var(--accent) 26%, transparent);
+  transition: transform .16s var(--spring-soft), box-shadow .16s ease;
+}
+
+.ob-range-card .ob-range-input::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid var(--surface-solid);
+  background: var(--accent-gradient);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--text-main) 26%, transparent),
+              0 2px 6px color-mix(in srgb, var(--accent) 26%, transparent);
+  transition: transform .16s var(--spring-soft), box-shadow .16s ease;
+}
+
+@media (hover:hover) and (pointer:fine) {
+  .ob-range-card .ob-range-input:hover::-webkit-slider-thumb,
+  .ob-range-card .ob-range-input:hover::-moz-range-thumb {
+    transform: scale(1.06);
+    box-shadow: 0 1px 2px color-mix(in srgb, var(--text-main) 26%, transparent),
+                0 3px 9px color-mix(in srgb, var(--accent) 32%, transparent);
   }
 }
 
+.ob-range-card .ob-range-input:active { cursor: grabbing; }
+
+.ob-range-card .ob-range-input:active::-webkit-slider-thumb,
+.ob-range-card .ob-range-input:active::-moz-range-thumb {
+  transform: scale(1.1);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 15%, transparent),
+              0 2px 8px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.ob-range-card .ob-range-input:focus-visible { outline: none; }
+
+.ob-range-card .ob-range-input:focus-visible::-webkit-slider-thumb,
+.ob-range-card .ob-range-input:focus-visible::-moz-range-thumb {
+  box-shadow: 0 0 0 3px var(--surface-solid),
+              0 0 0 6px color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+/* Dark themes need a lighter rail or the unfilled half disappears. */
+body.theme-dark .ob-range-card .ob-range-input,
+body.theme-obsidian .ob-range-card .ob-range-input,
+body.theme-nebula .ob-range-card .ob-range-input {
+  --ob-track-bg: rgba(255,255,255,.16);
+}
+
+body.theme-dark .ob-range-value,
+body.theme-obsidian .ob-range-value,
+body.theme-nebula .ob-range-value {
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+/* Bigger thumb and strip on touch, where there is no hover to aim with. */
+@media (pointer:coarse) {
+  .ob-range-card .ob-range-input { height: 34px; }
+  .ob-range-card .ob-range-input::-webkit-slider-thumb {
+    width: 26px; height: 26px;
+    margin-top: calc((var(--ob-track-h) - 26px) / 2);
+  }
+  .ob-range-card .ob-range-input::-moz-range-thumb { width: 26px; height: 26px; }
+}
+
+.ob-range-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 9px;
+  font-size: .7rem;
+  font-weight: 700;
+  color: var(--text-dim);
+}
+
+.ob-range-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 13px;
+  padding-top: 13px;
+  border-top: 1px solid var(--glass-border);
+}
+
+.ob-range-chip { min-height: 32px; }
+
 @media (max-width:700px) {
-  .ob-card {
-    width: min(100%, calc(100vw - 20px)) !important;
-  }
-  .ob-card .ob-schedule-grid {
-    grid-template-columns: 1fr !important;
-  }
-  .ob-card .ob-schedule-grid > .ob-field:last-child {
-    grid-column: auto;
-  }
-  .ob-card .ob-level-grid {
-    grid-template-columns: 1fr;
-  }
+  /* Fill the overlay exactly: the shell stops being shrink-to-fit, so the
+     step rail, the heading, the paragraph and the cards all share one
+     left/right edge and nothing can overflow sideways. */
+  .ob-shell { width: 100%; }
+  .ob-card { width: 100% !important; max-width: 100%; }
+  .ob-card .ob-schedule-grid { grid-template-columns: 1fr !important; }
+  .ob-card .ob-schedule-grid > .ob-field:last-child { grid-column: auto; }
+  .ob-card .ob-level-grid { grid-template-columns: 1fr; }
+  .ob-program-card { gap: 12px 18px; }
+  .ob-program-meta { grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); }
+  .ob-range-head { gap: 10px; }
+  .ob-range-value { min-width: 68px; padding: 6px 10px; font-size: .78rem; }
+}
+
+/* =========================
+   ZEN — hierarchy refinements
+   =========================
+   The composition stays. The timer is the hero, the secondary controls
+   step back, and the glow is a constant rather than a pulse. */
+.zen .zen-digits {
+  animation: none;
+  text-shadow: 0 0 44px rgba(255,255,255,.1);
+}
+
+.zen-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: .8rem;
+  font-weight: 650;
+  letter-spacing: .01em;
+  opacity: .72;
+}
+
+.zen-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: rgba(255,255,255,.38);
+}
+
+.zen-status-dot[data-live="true"] {
+  background: #5EE0A8;
+  animation: liveDotPulse 1.9s ease-in-out infinite;
+}
+
+.zen-kicker {
+  max-width: 42ch;
+  text-overflow: ellipsis;
+  overflow-wrap: break-word;
+  line-height: 1.5;
+  opacity: .78;
+}
+
+.zen-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.zen-actions .btn { min-width: 136px; justify-content: center; }
+
+.zen-actions .zen-secondary {
+  background: rgba(255,255,255,.06) !important;
+  border-color: rgba(255,255,255,.13) !important;
+  color: rgba(255,255,255,.74) !important;
+  box-shadow: none !important;
+  font-weight: 650;
+}
+
+.zen-actions .zen-secondary:hover {
+  background: rgba(255,255,255,.11) !important;
+  color: rgba(255,255,255,.94) !important;
+}
+
+/* Clock Out stays a secondary control but reads a little warmer than
+   Exit Zen, so the two are never confused at a glance. */
+.zen-actions .zen-clock-out {
+  border-color: rgba(255,255,255,.22) !important;
+  color: rgba(255,255,255,.9) !important;
+}
+
+.zen-hint { max-width: 40ch; font-size: .76rem; opacity: .78; }
+
+@media (max-width:480px) {
+  .zen-actions .btn { flex: 1 1 100%; min-width: 0; }
 }
 
 /* =========================
@@ -252,16 +812,24 @@
 }
 
 @keyframes uiSheen {
-  from { left:-55%; }
-  to { left:125%; }
+  from { left: -55%; }
+  to   { left: 125%; }
 }
 
+/* Motion is decoration: every animation added above is switched off here,
+   including the live-session dot and the menu entrance. */
 @media (prefers-reduced-motion: reduce) {
   .task-menu,
   .dash-today-card .task-row,
   .ob-level-btn,
   .dash-today-card .task-row::after,
-  .ob-level-btn::after {
+  .ob-level-btn::after,
+  .task-row.active-clock .task-dot,
+  .task-live-badge.is-recording .task-live-dot,
+  .zen-status-dot[data-live="true"],
+  .ob-range-card .ob-range-input::-webkit-slider-thumb,
+  .ob-range-card .ob-range-input::-moz-range-thumb,
+  .ob-range-card .ob-range-input::-webkit-slider-runnable-track {
     animation: none !important;
     transition: none !important;
   }

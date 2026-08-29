@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { mmss } from "@/lib/useTimer";
 
 /**
  * The ONE clock button every task row shares — on the Overview, the
@@ -51,5 +52,21 @@ export default function TaskClockButton({
     <button className="btn btn-xs btn-secondary task-clock" onClick={() => onFocusTask(taskId)}>
       Clock in
     </button>
+  );
+}
+
+/**
+ * The quiet "this row is being recorded" marker, shown in the task's
+ * subtitle line on every surface that lists tasks. Deliberately small —
+ * the row's tint and pulsing dot already carry the state, so this only
+ * has to confirm it and give the elapsed time somewhere readable to live.
+ */
+export function TaskLiveBadge({ seconds, running }: { seconds?: number; running?: boolean }) {
+  return (
+    <span className={`task-live-badge${running ? " is-recording" : ""}`}>
+      <span className="task-live-dot" aria-hidden="true" />
+      {running ? "Recording" : "Paused"}
+      {!!seconds && <span className="mono task-live-time">{mmss(seconds)}</span>}
+    </span>
   );
 }

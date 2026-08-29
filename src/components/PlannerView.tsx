@@ -8,6 +8,7 @@ import {
 import { IconSpark, IconClose, IconChevron } from "./icons";
 import TaskEditor, { type TaskPatch } from "./TaskEditor";
 import TaskActions from "./TaskActions";
+import { TaskLiveBadge } from "./TaskClockButton";
 import QuickAdd from "./QuickAdd";
 import { useBackClose } from "@/lib/useBackClose";
 import type { QuickAddPayload } from "@/lib/quickAdd";
@@ -17,7 +18,7 @@ type RenderTaskOptions = { showLessonBrief?: boolean; lastRow?: boolean };
 
 export default function PlannerView({
   state, onTaskStatus, onTaskUpdate, onSkipSubject, onFocusTask, activeTaskId, activeClockSeconds,
-  clockSessionActive, onClockOut, onAskTutor, replanning, onReplan, onAddTask,
+  clockRunning, clockSessionActive, onClockOut, onAskTutor, replanning, onReplan, onAddTask,
 }: {
   state: AppState;
   onTaskStatus: (id: number, status: string, rating?: number) => void;
@@ -26,6 +27,7 @@ export default function PlannerView({
   onFocusTask: (taskId: number) => void;
   activeTaskId?: number | null;
   activeClockSeconds?: number;
+  clockRunning?: boolean;
   clockSessionActive?: boolean;
   onClockOut: () => void;
   onAskTutor: (q: string) => void;
@@ -151,7 +153,7 @@ export default function PlannerView({
                 ? ` · ${task.detail}`
                 : ""}
               {taskLogged(task.id) ? ` · ${fmtMin(taskLogged(task.id))} logged` : task.actualMinutes ? ` · ${task.actualMinutes}m logged` : ""}
-              {activeTaskId === task.id && activeClockSeconds ? ` · live +${Math.floor(activeClockSeconds / 60)}m ${activeClockSeconds % 60}s` : ""}
+              {activeTaskId === task.id && <TaskLiveBadge seconds={activeClockSeconds} running={clockRunning} />}
             </div>
           </div>
           <span className={`chip chip-${task.status}`}>{task.status}</span>
