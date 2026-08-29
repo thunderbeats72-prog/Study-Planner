@@ -22,13 +22,34 @@ export default function TaskActions({ task, subject, activeTaskId, clockSessionA
 }) {
   const menuId = useId();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
   const [ratingOpen, setRatingOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const closeMenu = useCallback(() => { releaseMenu(menuId); setMenuOpen(false); }, [menuId]);
+
+  const positionMenu = useCallback(() => {
+    const trigger = triggerRef.current;
+    if (!trigger) return;
+    const rect = trigger.getBoundingClientRect();
+    const width = 210;
+    const gap = 8;
+    const margin = 12;
+    const menuHeight = Math.min(240, Math.max(120, wrapRef.current?.querySelector<HTMLElement>("[role=menu]")?.offsetHeight || 180));
+    let left = rect.right - width;
+    left = Math.max(margin, Math.min(left, window.innerWidth - width - margin));
+    const below = rect.bottom + gap;
+    const above = rect.top - menuHeight - gap;
+    const top = below + menuHeight <= window.innerHeight - margin
+      ? below
+      : Math.max(margin, above);
+    setMenuStyle({ position: "fixed", top, left, right: "auto", width: `min(${width}px, calc(100vw - ${margin * 2}px))` });
+  }, []);
+
   useEffect(() => () => releaseMenu(menuId), [menuId]);
   useEffect(() => {
     if (!menuOpen) return;
+    positionMenu();
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
       event.stopPropagation(); closeMenu(); triggerRef.current?.focus();
@@ -37,19 +58,32 @@ export default function TaskActions({ task, subject, activeTaskId, clockSessionA
       if (wrapRef.current?.contains(event.target as Node)) return;
       closeMenu();
     };
+    const onViewportChange = () => positionMenu();
     window.addEventListener("click", onClick);
     window.addEventListener("keydown", onKey);
-    return () => { window.removeEventListener("click", onClick); window.removeEventListener("keydown", onKey); };
-  }, [menuOpen, closeMenu]);
+    window.addEventListener("resize", onViewportChange);
+    window.addEventListener("scroll", onViewportChange, true);
+    return () => {
+      window.removeEventListener("click", onClick);
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("resize", onViewportChange);
+      window.removeEventListener("scroll", onViewportChange, true);
+    };
+  }, [menuOpen, closeMenu, positionMenu]);
+
   useEffect(() => {
     if (!menuOpen) return;
-    const id = window.setTimeout(() => wrapRef.current?.querySelector<HTMLButtonElement>("[role=menuitem]")?.focus(), 0);
+    const id = window.setTimeout(() => {
+      positionMenu();
+      wrapRef.current?.querySelector<HTMLButtonElement>("[role=menuitem]")?.focus();
+    }, 0);
     return () => window.clearTimeout(id);
-  }, [menuOpen]);
+  }, [menuOpen, positionMenu]);
 
   const toggleMenu = () => {
     if (menuOpen) { closeMenu(); return; }
-    claimMenu(menuId, closeMenu); setMenuOpen(true);
+    claimMenu(menuId, closeMenu);
+    setMenuOpen(true);
   };
   const onMenuKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
@@ -73,7 +107,7 @@ export default function TaskActions({ task, subject, activeTaskId, clockSessionA
       <button ref={triggerRef} type="button" className="task-more" aria-label="More task actions" aria-haspopup="menu" aria-expanded={menuOpen} aria-controls={menuOpen ? `${menuId}-menu` : undefined} onClick={toggleMenu}>
         <span className="task-more-dots" aria-hidden="true"><i /><i /><i /></span>
       </button>
-      {menuOpen && <div id={`${menuId}-menu`} className="task-menu glass-panel" role="menu" aria-label="More task actions" onKeyDown={onMenuKeyDown}>
+      {menuOpen && <div id={`${menuId}-menu`} className="task-menu glass-panel" style={menuStyle} role="menu" aria-label="More task actions" onKeyDown={onMenuKeyDown}>
         <button type="button" role="menuitem" onClick={() => { closeMenu(); onEdit(task.id); }}>Edit task</button>
         {skipped && <button type="button" role="menuitem" onClick={() => { closeMenu(); onTaskStatus(task.id, "pending"); }}>Reopen</button>}
         {!done && !skipped && <button type="button" role="menuitem" onClick={() => { closeMenu(); onTaskStatus(task.id, "skipped"); }}>Skip task</button>}
