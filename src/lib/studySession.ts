@@ -83,8 +83,6 @@ export function planSession(snapshot: SessionSnapshot, command: SessionCommand):
 
     case "pause": {
       if (snapshot.timerRunning) fx.push({ kind: "timer.pause" });
-      /* Only the Focus-owned path controls the Study Clock. Manual clock-only
-         sessions are intentionally unaffected by Pause Focus. */
       if (snapshot.focusOwnsClock && snapshot.clockRunning) fx.push({ kind: "clock.pause" });
       if (snapshot.focusOwnsClock && snapshot.timerRunning && snapshot.clockRunning) {
         fx.push({ kind: "note", message: "Paused — focus timer and study clock stopped together." });
@@ -104,8 +102,11 @@ export function planSession(snapshot: SessionSnapshot, command: SessionCommand):
     }
 
     case "endSession": {
-      if (snapshot.timerRunning) fx.push({ kind: "timer.pause" });
-      if (snapshot.focusOwnsClock && snapshot.clockSessionActive) fx.push({ kind: "clock.out" });
+      /* Clock Out must work from every surface, including a plain Study Clock
+         session started from Planner. Only a Focus-owned session should also
+         stop the Focus countdown; a manual clock session remains independent. */
+      if (snapshot.focusOwnsClock && snapshot.timerRunning) fx.push({ kind: "timer.pause" });
+      if (snapshot.clockSessionActive) fx.push({ kind: "clock.out" });
       fx.push({ kind: "own.clear" });
       return fx;
     }
