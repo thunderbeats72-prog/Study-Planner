@@ -148,7 +148,7 @@ export default function PlannerView({
             </div>
             <div className="task-sub">
               <span className="chip chip-kind chip-tight">{kindLabel}</span>
-              {task.plannedMinutes} min
+              {` ${task.plannedMinutes} min`}
               {topic
                 ? ` · ${topic.unit} · ${topic.difficulty}`
                 : isCheckpoint
@@ -390,13 +390,11 @@ export default function PlannerView({
               </button>
             </div>
           </div>
-          <div className="cal-grid cal-dow-row">
-            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => <div className="cal-dow" key={d}>{d}</div>)}
-          </div>
           <div
             key={`${month.y}-${month.m}`}
             className={`cal-grid${calDir > 0 ? " cal-slide-next" : calDir < 0 ? " cal-slide-prev" : ""}`}
           >
+            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => <div className="cal-dow" key={d}>{d}</div>)}
             {cells.map((d, i) => {
               if (!d) return <div className="cal-cell empty" key={`e${i}`} aria-hidden="true" />;
               const list = dayTasks(d);

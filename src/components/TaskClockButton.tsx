@@ -69,8 +69,14 @@ export function TaskLiveBadge({ seconds, running }: { seconds?: number; running?
   return (
     <span className={`task-live-badge${running ? " is-recording" : ""}`}>
       <span className="task-live-dot" aria-hidden="true" />
-      {running ? "Recording" : "Paused"}
-      {!!seconds && <span className="mono task-live-time">{mmss(seconds)}</span>}
+      {running ? (
+        <>
+          Recording
+          <span className="mono task-live-time">{mmss(seconds ?? 0)}</span>
+        </>
+      ) : (
+        "Paused"
+      )}
     </span>
   );
 }
