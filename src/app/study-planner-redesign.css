@@ -321,27 +321,19 @@ body {
 @media (max-width: 1100px) { .page-header-scene { width: 200px; opacity: .8; } }
 .page-header > :not(.page-header-scene) { position: relative; z-index: 1; }
 
-/* Below the desktop breakpoint the header stacks, so the scene stops
-   floating over the title: it becomes a centred, non-overlapping block
-   that rides underneath the copy instead of behind it. */
+/* Phones/tablets: header illustrations stay hidden on narrow screens,
+   matching the v2 mobile contract in pastel-ui-system.css (header is a
+   full-width block, scene display:none). The old rule here re-enabled the
+   scene as a centred stacked block below the controls, which pushed a tall,
+   nearly-blank band into every sub-page header — the large empty gap on
+   Planner / Focus / Subjects / Settings on mobile. */
 @media (max-width: 860px) {
   .page-header {
-    display: flex !important;
-    flex-direction: column !important;
-    align-items: stretch !important;
-    gap: 12px !important;
+    display: block !important;
   }
   .page-header-scene {
-    position: static !important;
-    order: 3;
-    display: block !important;
-    width: min(230px, 62%) !important;
-    max-width: 100%;
-    margin: 2px auto 0 !important;
-    opacity: .8;
+    display: none !important;
   }
-  .page-header > :not(.page-header-scene) { position: static; }
-  .focus-zen-button { order: 2; }
 }
 
 /* The old pastel system drew a decorative corner blob on KPI cards;
