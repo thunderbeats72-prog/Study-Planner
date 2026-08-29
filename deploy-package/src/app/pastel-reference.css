@@ -1,0 +1,237 @@
+/* Pastel Study Planner reference layer — presentation only.
+   Keeps the existing application logic/components intact while bringing the
+   desktop and mobile experience closer to the supplied reference screens. */
+
+:root {
+  --reference-ink: #17213f;
+  --reference-muted: #68718d;
+  --reference-lavender: #7363ee;
+  --reference-lavender-soft: #f0edff;
+  --reference-border: #e9e8f3;
+  --reference-canvas: #fafaff;
+  --reference-card: rgba(255,255,255,.94);
+  --reference-shadow: 0 10px 35px rgba(62, 55, 130, .055);
+}
+
+/* Canvas / type */
+body.theme-default {
+  --app-bg: #fafaff;
+  --surface: rgba(255,255,255,.94);
+  --surface-solid: #fff;
+  --surface-elevated: #fff;
+  --surface-hover: #fbfaff;
+  --glass-border: #e9e8f3;
+  --glass-border-hover: #dcd9ee;
+  --text-main: #17213f;
+  --text-muted: #68718d;
+  --text-dim: #9ca4bb;
+  --accent: #7363ee;
+  --accent-hover: #6252dc;
+  --accent-light: #9a8ef7;
+  --accent-glow: rgba(115,99,238,.12);
+  --accent-gradient: linear-gradient(135deg,#7b6bf1 0%,#6654e6 100%);
+  --nav-active-bg: #f0edff;
+  --nav-active-text: #5e4fd5;
+  --nav-active-border: rgba(115,99,238,.12);
+  --row-bg: #f8f8fc;
+  --row-hover: #f3f1fb;
+  --input-bg: #fff;
+}
+
+body {
+  background-image:
+    radial-gradient(900px 360px at 50% -10%, rgba(150,139,246,.10), transparent 70%),
+    radial-gradient(600px 300px at 100% 45%, rgba(180,226,215,.08), transparent 70%);
+}
+
+/* Airier shell like the reference */
+.app-wrapper { gap: 24px; padding: 14px; }
+.sidebar {
+  width: 274px;
+  padding: 22px 14px;
+  border-radius: 24px;
+  box-shadow: 0 8px 30px rgba(40,38,80,.045);
+}
+.main-workspace { padding: 8px 8px 72px; }
+.glass-panel {
+  background: var(--reference-card);
+  border-color: var(--reference-border);
+  border-radius: 20px;
+  box-shadow: var(--reference-shadow);
+}
+.page-header { margin: 8px 0 24px; min-height: 76px; }
+.page-title { color: var(--reference-ink); font-size: clamp(1.8rem,2.4vw,2.35rem); letter-spacing: -1px; }
+.page-subtitle { color: var(--reference-muted); line-height: 1.65; }
+
+/* Soft navigation instead of a saturated active block */
+.nav-list { gap: 7px; }
+.nav-item { min-height: 44px; border-radius: 14px; font-size: .86rem; }
+.nav-item.active {
+  background: #f0edff;
+  color: #5e4fd5;
+  border-color: transparent;
+  box-shadow: none;
+}
+.nav-item:hover { background: #f7f5ff; }
+
+/* Compact premium session bar */
+.top-session-bar, .study-session-bar {
+  border-radius: 18px;
+  box-shadow: 0 8px 28px rgba(45,42,100,.05);
+}
+
+/* Dashboard hierarchy */
+.kpi-grid { gap: 14px; }
+.kpi-card { padding: 22px; min-height: 138px; }
+.kpi-value { font-size: 2rem; color: #182244; }
+.dash-grid-2 { gap: 16px; }
+.dash-card { padding: 22px; }
+.up-next { border-radius: 22px; padding: 22px 24px; background: linear-gradient(135deg,#fbfaff 0%,#f6f2ff 100%); }
+.momentum-strip { margin: 4px 0 16px; }
+.momentum-pill { border: 1px solid #eceaf5; background: rgba(255,255,255,.8); }
+
+/* Illustration-like study vignette in the header: lamp + books + plant.
+   It is CSS-only so it automatically inherits the active theme colors. */
+.page-header::after {
+  content: "";
+  width: 190px;
+  height: 100px;
+  flex: 0 0 190px;
+  margin-left: auto;
+  opacity: .92;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 72% 26%, rgba(255,255,255,.95) 0 10px, transparent 11px),
+    linear-gradient(165deg, transparent 0 54%, rgba(115,99,238,.13) 55% 58%, transparent 59%),
+    linear-gradient(180deg, transparent 0 68%, #e9d7c7 69% 75%, #c8b5ac 76% 81%, transparent 82%),
+    linear-gradient(155deg, transparent 0 45%, rgba(115,99,238,.28) 46% 49%, transparent 50%),
+    radial-gradient(ellipse at 68% 75%, rgba(115,99,238,.15) 0 28%, transparent 29%),
+    radial-gradient(ellipse at 28% 62%, rgba(99,185,154,.22) 0 22%, transparent 23%);
+  filter: drop-shadow(0 8px 18px rgba(92,78,170,.12));
+}
+
+/* Planner */
+.planner-tools { flex-wrap: wrap; }
+.day-block { padding: 18px 20px; border-radius: 20px; background: rgba(255,255,255,.72); }
+.task-row { min-height: 68px; padding: 12px 14px; border-radius: 14px; background: #fafafd; border-color: #efedf6; }
+.task-row:hover { background: #f7f5fd; }
+.task-title { font-size: .88rem; color: #1b2443; }
+.task-sub { line-height: 1.5; }
+.task-row-actions { display:flex; align-items:center; gap:6px; flex-wrap:wrap; justify-content:flex-end; }
+.task-row-actions .btn { min-height: 36px; }
+.vtabs { background: #f6f5fb; border-color: #eceaf4; }
+.vtab { min-height: 36px; display:flex; align-items:center; }
+.vtab.active { background:#fff; box-shadow:0 3px 10px rgba(60,55,120,.08); }
+
+/* Focus */
+.focus-view .page-header { min-height: 105px; }
+.focus-page-header::after { width:220px; flex-basis:220px; height:120px; }
+.study-clock-panel { padding: 28px; }
+.study-clock-display { border-radius: 22px; background: linear-gradient(180deg,#fbfcff,#f2faf8); border:1px solid #e7edf0; }
+.timer-panel { min-height: 100%; }
+.timer-ring-wrap { filter: drop-shadow(0 10px 28px rgba(115,99,238,.16)); }
+#t-digits { color:#1a2446; }
+.sound-option.is-selected { background: #f1edff; border-color: rgba(115,99,238,.28); }
+
+/* Settings */
+.section-card { padding: 24px; }
+.theme-grid .btn { min-height: 50px; justify-content:flex-start; }
+.input-field { min-height: 48px; border-radius: 13px; border-color:#e6e4ef; }
+.input-field:focus { border-color:#8b7cf2; box-shadow:0 0 0 4px rgba(115,99,238,.09); }
+
+/* Shared buttons */
+.btn { min-height: 42px; border-radius: 13px; font-weight: 700; }
+.btn-primary { box-shadow: 0 8px 20px rgba(108,92,231,.16); }
+.btn-secondary { background: rgba(255,255,255,.9); border-color:#e6e4ef; }
+
+/* Better focus rings */
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, [role="button"]:focus-visible {
+  outline: 3px solid rgba(115,99,238,.25);
+  outline-offset: 2px;
+}
+
+/* Tablet */
+@media (max-width: 1100px) {
+  .app-wrapper { gap: 14px; padding: 10px; }
+  .sidebar { width: 230px; }
+  .main-workspace { padding-inline: 4px; }
+  .dash-grid-2, .focus-grid-2 { grid-template-columns: 1fr; }
+  .page-header::after { width:150px; flex-basis:150px; }
+}
+
+/* Phone — intentionally a real layout transformation, not a scaled desktop */
+@media (max-width: 760px) {
+  .app-wrapper { display:block; padding: 0; }
+  .sidebar {
+    position: sticky; top: 0; z-index: 100;
+    width: 100%; height: auto; min-height: 0;
+    padding: 10px 12px;
+    border-radius: 0 0 18px 18px;
+    border-left: 0; border-right: 0; border-top: 0;
+  }
+  .brand-header { padding: 4px 42px 10px 4px; margin-bottom: 0; }
+  .brand-logo-icon { width:34px; height:34px; }
+  .nav-list {
+    display:grid; grid-template-columns:repeat(5,minmax(0,1fr));
+    gap:4px; margin-top:8px;
+  }
+  .nav-item {
+    min-height: 46px; padding: 7px 4px; justify-content:center;
+    flex-direction:column; gap:2px; font-size:.66rem; text-align:center;
+  }
+  .nav-item svg { width:18px; height:18px; }
+  .streak-card, .profile-card, .sidebar-streak, .sidebar-profile { display:none; }
+  .main-workspace { padding: 16px 12px 90px; }
+  .page-header { min-height:0; margin: 2px 0 18px; align-items:flex-start; }
+  .page-title { font-size: 1.65rem; letter-spacing:-.7px; }
+  .page-subtitle { font-size:.78rem; }
+  .page-header::after { display:none; }
+  .kpi-grid { grid-template-columns:1fr 1fr; gap:10px; }
+  .kpi-card { min-height:122px; padding:16px; }
+  .kpi-value { font-size:1.65rem; }
+  .dash-grid-2, .focus-grid-2 { grid-template-columns:1fr; gap:12px; }
+  .up-next { padding:18px; }
+  .up-next-actions { width:100%; margin-top:12px; }
+  .up-next-actions .btn { flex:1; }
+  .task-row { align-items:flex-start; padding:12px; }
+  .task-main { flex-basis:calc(100% - 24px); }
+  .task-row > .chip { margin-left:20px; }
+  .task-row-actions { width:100%; margin-left:20px; justify-content:flex-start; }
+  .task-row-actions .btn { min-height:40px; }
+  .planner-tools { width:100%; gap:8px; }
+  .vtabs { width:100%; justify-content:space-between; }
+  .vtab { flex:1; justify-content:center; padding-inline:8px; }
+  .planner-tools > .input-field, .planner-tools select { width:100%; }
+  .day-block { padding:14px; }
+  .cal-grid { gap:4px; }
+  .cal-cell { min-height:62px; padding:6px; }
+  .cal-pill { display:none; }
+  .focus-page-header { min-height:0; }
+  .study-clock-panel, .section-card { padding:18px; }
+  .study-clock-header { flex-direction:column; }
+  .study-clock-display { width:100%; min-height:150px; }
+  .clock-pickers { grid-template-columns:1fr; }
+  .clock-action-buttons { width:100%; display:grid; grid-template-columns:1fr 1fr; }
+  .clock-action-buttons .btn { width:100%; }
+  .timer-ring-wrap { width:230px; height:230px; }
+  .timer-controls { width:100%; }
+  .timer-controls .btn { flex:1; }
+  .mode-row { display:grid; grid-template-columns:repeat(2,1fr); }
+  .sound-grid { grid-template-columns:1fr 1fr; }
+  .grid-fit-300, .grid-2 { grid-template-columns:1fr; }
+  .theme-grid { grid-template-columns:1fr; }
+}
+
+@media (max-width: 420px) {
+  .kpi-grid { grid-template-columns:1fr; }
+  .nav-item { font-size:.61rem; }
+  .task-row-actions { margin-left:0; }
+  .task-row > .chip { margin-left:0; }
+  .clock-action-buttons { grid-template-columns:1fr; }
+  .sound-grid { grid-template-columns:1fr; }
+  .timer-ring-wrap { width:210px; height:210px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .glass-panel, .btn, .nav-item, .task-row { transition:none !important; }
+}
