@@ -71,20 +71,47 @@
   min-height:34px;padding:5px 12px;border-radius:999px;
   border:1px solid var(--glass-border);background:var(--row-bg);
   color:var(--text-main);font:inherit;font-size:.76rem;font-weight:700;cursor:pointer;
+  transition:background .16s ease,border-color .16s ease,color .16s ease,
+              transform .14s cubic-bezier(.25,1,.4,1),box-shadow .16s ease;
 }
-.qa-min-chip.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+/* Same tactile contract as every other chip control in the app: quiet
+   hover, spring press, and the shared gradient selected state. */
+@media (hover:hover) and (pointer:fine){
+  .qa-min-chip:not(.active):hover{
+    border-color:color-mix(in srgb,var(--accent) 45%,var(--glass-border));
+    background:var(--surface-hover);color:var(--accent);
+  }
+}
+.qa-min-chip:active{transform:scale(.96)}
+.qa-min-chip.active{
+  background:var(--accent-gradient);color:#fff;border-color:transparent;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.22),0 2px 8px var(--accent-glow);
+}
 .qa-min-chip:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .qa-min-input{width:76px;min-width:0}
 .qa-date-seg{display:flex;border:1px solid var(--glass-border);border-radius:10px;overflow:hidden}
 .qa-date-btn{
   flex:1;min-height:36px;border:0;background:var(--row-bg);
   color:var(--text-main);font:inherit;font-size:.78rem;font-weight:700;cursor:pointer;
+  transition:background .15s ease,color .15s ease,box-shadow .15s ease;
 }
-.qa-date-btn.active{background:var(--accent);color:#fff}
+.qa-date-btn:not(.active):hover{background:var(--row-hover);color:var(--accent)}
+.qa-date-btn:not(.active):active{background:var(--row-hover)}
+.qa-date-btn.active{
+  background:var(--accent-gradient);color:#fff;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.22);
+}
+.qa-date-btn:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .qa-error{font-size:.72rem;font-weight:600;color:var(--status-skipped-text)}
 .quick-add-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
 
 .day-head-side{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap}
+/* While the tray is open it is one predictable full-width sheet inside
+   whatever row opened it — the capture form never sizes itself to its
+   content and left-align raggedly beside the header text. */
+.day-head-side:has(.quick-add-panel),
+.planner-quickadd-row:has(.quick-add-panel){display:block}
+.quick-add-panel{width:100%}
 @media(max-width:640px){
   .quick-add-grid{grid-template-columns:1fr}
   .day-head-side{width:100%;justify-content:space-between}

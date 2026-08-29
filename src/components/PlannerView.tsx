@@ -414,7 +414,10 @@ export default function PlannerView({
                   <div className="cal-num">{parseDate(d).getDate()}</div>
                   {list.slice(0, 3).map((task) => {
                     const c = subjFor(task)?.color || (KIND_META[task.kind] || KIND_META.learn).color;
-                    return <div key={task.id} className="cal-pill" style={{ background: c, opacity: task.status === "done" ? 0.45 : 1 }}>{task.title}</div>;
+                    // Pills carry white text: light subject colours (amber,
+                    // lime, cyan…) are mixed toward ink just enough to keep
+                    // the hue readable — never a pastel square with a glow.
+                    return <div key={task.id} className="cal-pill" style={{ background: `color-mix(in srgb, ${c} 62%, #191631)`, opacity: task.status === "done" ? 0.45 : 1 }}>{task.title}</div>;
                   })}
                   {list.length > 3 && <div className="cal-more">+{list.length - 3} more</div>}
                 </div>

@@ -106,7 +106,35 @@ instead of stopping on a “voice model unavailable” error; the chat shows a
 clear non-error notice. One failed long-answer part switches the remaining
 parts to that local voice, so every later part keeps flowing.
 
-v20 PRACTICAL REAL-WORLD ENHANCEMENT (this build)
+v24 RESIDUAL POLISH — SIX GENUINE LEFTOVERS (this build)
+---------------------------------------------------------
+A full re-audit confirmed the v14–v23 layers hold up; only six real
+issues remained, each fixed in the file that owns it (no new CSS layer):
+ 1. FSRS rating strip (Again/Hard/Good/Easy) was auto-placed by the
+    phone grid into the 10px dot column — now spans the full row
+    (ui-polish.css mobile block).
+ 2. Ambient VOLUME slider in Focus Studio was the app's last raw native
+    range input — it now speaks the onboarding slider language (8px rail,
+    gradient fill via --vol-fill, pressed thumb, focus ring, dark-theme
+    track, 24px thumb on touch). globals.css + FocusView.tsx.
+ 3. The hero live chip used a literal "●" text bullet and stayed green
+    while paused/on-break — it now uses the real 6px recording dot
+    (pulsing only while recording), muted when paused, amber on break
+    (ui-polish.css live-state section + Dashboard.tsx).
+ 4. Calendar pills put white text on light subject colours (amber/lime/
+    cyan ≈ 2:1) — pill backgrounds now mix toward ink, hue preserved
+    (PlannerView.tsx).
+ 5. Quick Add duration chips + Today/Tomorrow segment had zero hover/
+    press/transition feedback and a second selected style — they now
+    share the app-wide tactile contract and gradient selected state
+    (practical-enhancements.css).
+ 6. The open Quick Add tray sized itself to its content inside header
+    rows — :has() now makes the open tray one predictable full-width
+    sheet (practical-enhancements.css).
+All checks green: typecheck, lint (0 warnings), 250/250 tests,
+build:app. deploy-package re-synced byte-exact from src/.
+
+v20 PRACTICAL REAL-WORLD ENHANCEMENT
 --------------------------------------------------
  - "WHAT SHOULD I DO NOW?" IS THE HERO: the Overview opens with one clear
    answer — the single best next task (overdue → revision → today → weak

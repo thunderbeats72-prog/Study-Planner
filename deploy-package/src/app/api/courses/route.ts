@@ -5,9 +5,17 @@ import { activeProvider } from "@/lib/ai";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  // Study Planner Pro starts at school level and above. Keep the nursery/
+  // pre-school catalog out of the onboarding contract rather than merely
+  // hiding the card in the UI.
+  const levels = LEVELS.filter((level) => level.id !== "nursery");
+  const levelCourses = Object.fromEntries(
+    Object.entries(LEVEL_COURSES).filter(([levelId]) => levelId !== "nursery")
+  );
+
   return NextResponse.json({
-    levels: LEVELS,
-    levelCourses: LEVEL_COURSES,
+    levels,
+    levelCourses,
     courses: Object.values(COURSE_DB).map((c) => ({
       id: c.id,
       name: c.name,

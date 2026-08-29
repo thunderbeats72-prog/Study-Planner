@@ -1,998 +1,126 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useId, useMemo, useRef, useState } from "react";
 import { api, addDays, today, dayDiff, prettyLong, type AppState } from "@/lib/client";
 import { countStudyDays, projectCompletionDate } from "@/lib/planner";
 import { IconCalendar, IconCheck, IconLock, IconLogo, IconTarget } from "./icons";
 
 type Level = { id: string; label: string; sub: string };
 type SeedSubject = { name: string; units: number; difficulty: string; color: string };
-type CurriculumSource = {
-  title: string; publisher: string; type: string; url?: string; note?: string;
-};
+type CurriculumSource = { title: string; publisher: string; type: string; url?: string; note?: string };
 type CourseMeta = { id: string; name: string; level: string; subjects: SeedSubject[] };
 type StepMeta = { key: string; label: string };
 type SliderPreset = { value: number; label: string };
-
-type OnboardingSliderProps = {
-  label: string;
-  value: number;
-  valueLabel: string;
-  hint?: string;
-  min: number;
-  max: number;
-  step: number;
-  minLabel: string;
-  maxLabel: string;
-  onChange: (value: number) => void;
-  presets?: SliderPreset[];
-  fullWidth?: boolean;
-};
-
-type ChoiceOption = {
-  id: string;
-  label: string;
-  description: string;
-};
-
-type OnboardingChoiceGroupProps = {
-  label: string;
-  hint?: string;
-  value: string;
-  options: readonly ChoiceOption[];
-  onChange: (value: string) => void;
-  columns?: number;
-  fullWidth?: boolean;
-};
+type OnboardingSliderProps = { label: string; value: number; valueLabel: string; hint?: string; min: number; max: number; step: number; minLabel: string; maxLabel: string; onChange: (value: number) => void; presets?: SliderPreset[]; fullWidth?: boolean };
+type ChoiceOption = { id: string; label: string; description: string };
+type OnboardingChoiceGroupProps = { label: string; hint?: string; value: string; options: readonly ChoiceOption[]; onChange: (value: string) => void; columns?: number; fullWidth?: boolean };
 
 const PALETTE = ["#6366f1", "#10b981", "#f59e0b", "#ef4444", "#06b6d4", "#ec4899", "#84cc16", "#8b5cf6"];
-const HOURS_PRESETS: SliderPreset[] = [
-  { value: 1, label: "1h" },
-  { value: 2, label: "2h" },
-  { value: 4, label: "4h" },
-  { value: 6, label: "6h" },
-  { value: 8, label: "8h" },
-];
-const SUBJECTS_PRESETS: SliderPreset[] = [
-  { value: 1, label: "1" },
-  { value: 2, label: "2" },
-  { value: 3, label: "3" },
-  { value: 4, label: "4" },
-];
-const BUFFER_PRESETS: SliderPreset[] = [
-  { value: 0, label: "0" },
-  { value: 3, label: "3" },
-  { value: 5, label: "5" },
-  { value: 7, label: "7" },
-  { value: 10, label: "10" },
-];
+const HOURS_PRESETS: SliderPreset[] = [{ value: 1, label: "1h" }, { value: 2, label: "2h" }, { value: 4, label: "4h" }, { value: 6, label: "6h" }, { value: 8, label: "8h" }];
+const SUBJECTS_PRESETS: SliderPreset[] = [{ value: 1, label: "1" }, { value: 2, label: "2" }, { value: 3, label: "3" }, { value: 4, label: "4" }];
+const BUFFER_PRESETS: SliderPreset[] = [{ value: 0, label: "0" }, { value: 3, label: "3" }, { value: 5, label: "5" }, { value: 7, label: "7" }, { value: 10, label: "10" }];
+const YEAR_LABELS: Record<string, string> = { "0": "Full course (all terms)", "1": "Year 1 / Semester 1-2", "2": "Year 2 / Semester 3-4", "3": "Year 3 / Semester 5-6", "4": "Year 4 / Semester 7-8" };
 const STEP_META: StepMeta[] = [
-  { key: "you", label: "You" },
-  { key: "level", label: "Level" },
-  { key: "course", label: "Course" },
-  { key: "details", label: "Details" },
-  { key: "subjects", label: "Syllabus" },
-  { key: "style", label: "Style" },
-  { key: "schedule", label: "Rhythm" },
-  { key: "review", label: "Review" },
+  { key: "you", label: "You" }, { key: "level", label: "Level" }, { key: "course", label: "Course" }, { key: "details", label: "Details" },
+  { key: "subjects", label: "Syllabus" }, { key: "style", label: "Style" }, { key: "schedule", label: "Rhythm" }, { key: "review", label: "Review" },
 ];
 const STUDY_DAY_OPTIONS: ChoiceOption[] = [
-  {
-    id: "all",
-    label: "All 7 days",
-    description: "Fastest route to finish the syllabus.",
-  },
-  {
-    id: "6days",
-    label: "6 days",
-    description: "Keeps one weekly day off for recovery.",
-  },
-  {
-    id: "weekdays",
-    label: "Weekdays",
-    description: "Weekends stay free or flexible.",
-  },
+  { id: "all", label: "All 7 days", description: "Fastest route to finish the syllabus." },
+  { id: "6days", label: "6 days", description: "Keeps one weekly day off for recovery." },
+  { id: "weekdays", label: "Weekdays", description: "Weekends stay free or flexible." },
 ];
 const STYLE_OPTIONS: ChoiceOption[] = [
-  {
-    id: "balanced",
-    label: "Balanced",
-    description: "A steady mix of theory, recall, and practice.",
-  },
-  {
-    id: "theory",
-    label: "Theory heavy",
-    description: "More reading and concept coverage in each lesson.",
-  },
-  {
-    id: "practice",
-    label: "Practice heavy",
-    description: "More applied work, problem-solving, and drills.",
-  },
+  { id: "balanced", label: "Balanced", description: "A steady mix of theory, recall, and practice." },
+  { id: "theory", label: "Theory heavy", description: "More reading and concept coverage in each lesson." },
+  { id: "practice", label: "Practice heavy", description: "More applied work, problem-solving, and drills." },
 ];
 const REVISION_OPTIONS: ChoiceOption[] = [
-  {
-    id: "0",
-    label: "No block",
-    description: "Use all available time for regular progression.",
-  },
-  {
-    id: "1",
-    label: "1 week",
-    description: "A short final revision sprint before the exam.",
-  },
-  {
-    id: "2",
-    label: "2 weeks",
-    description: "Balanced revision time without slowing coverage too much.",
-  },
-  {
-    id: "3",
-    label: "3 weeks",
-    description: "Best when you want repeated revision close to the exam.",
-  },
+  { id: "0", label: "No block", description: "Use all available time for regular progression." },
+  { id: "1", label: "1 week", description: "A short final revision sprint before the exam." },
+  { id: "2", label: "2 weeks", description: "Balanced revision time without slowing coverage too much." },
+  { id: "3", label: "3 weeks", description: "Best when you want repeated revision close to the exam." },
 ];
 const PLAN_MODE_OPTIONS: ChoiceOption[] = [
-  {
-    id: "syllabus",
-    label: "From scratch",
-    description: "Build the full syllabus from the ground up.",
-  },
-  {
-    id: "revision",
-    label: "Revision",
-    description: "Faster passes assuming you have studied once already.",
-  },
-  {
-    id: "mock",
-    label: "Mock heavy",
-    description: "More tests, fixes, and exam-style practice cycles.",
-  },
+  { id: "syllabus", label: "From scratch", description: "Build the full syllabus from the ground up." },
+  { id: "revision", label: "Revision", description: "Faster passes assuming you have studied once already." },
+  { id: "mock", label: "Mock heavy", description: "More tests, fixes, and exam-style practice cycles." },
 ];
 
-function compactNumber(value: number) {
-  return Number.isInteger(value) ? String(value) : value.toFixed(1).replace(/\.0$/, "");
-}
+function compactNumber(value: number) { return Number.isInteger(value) ? String(value) : value.toFixed(1).replace(/\.0$/, ""); }
+function formatHours(value: number) { const whole = Math.floor(value); const minutes = Math.round((value - whole) * 60); if (!minutes) return `${compactNumber(value)} hour${value === 1 ? "" : "s"}`; if (!whole) return `${minutes} min`; return `${whole}h ${minutes}m`; }
+function formatHoursCompact(value: number) { return `${compactNumber(value)}h`; }
+function studyDaysPerWeek(mode: string) { if (mode === "weekdays") return 5; if (mode === "6days") return 6; return 7; }
+function studyHourHint(hours: number, studyDaysMode: string) { const weeklyHours = Math.round(hours * studyDaysPerWeek(studyDaysMode) * 10) / 10; const rhythm = hours <= 1.5 ? "Gentle pace" : hours <= 3.5 ? "Sustainable pace" : hours <= 6.5 ? "Strong daily rhythm" : "Intensive push"; return `${rhythm} · about ${compactNumber(weeklyHours)}h/week`; }
+function subjectsPerDayHint(count: number) { if (count <= 1) return "Deep focus on one subject each day."; if (count === 2) return "Balanced variety without too much switching."; if (count <= 4) return "Good for mixed revision and syllabus coverage."; return "Fast rotation — useful close to exams."; }
+function bufferDaysHint(days: number) { if (days <= 0) return "No spare recovery days — every study day counts."; if (days <= 3) return "Lean buffer for small delays and busy days."; if (days <= 7) return "Healthy safety net for revision and catch-up."; return "Plenty of recovery room before the deadline."; }
 
-function formatHours(value: number) {
-  const whole = Math.floor(value);
-  const minutes = Math.round((value - whole) * 60);
-  if (!minutes) return `${compactNumber(value)} hour${value === 1 ? "" : "s"}`;
-  if (!whole) return `${minutes} min`;
-  return `${whole}h ${minutes}m`;
-}
-
-function formatHoursCompact(value: number) {
-  return `${compactNumber(value)}h`;
-}
-
-function studyDaysPerWeek(mode: string) {
-  if (mode === "weekdays") return 5;
-  if (mode === "6days") return 6;
-  return 7;
-}
-
-function studyHourHint(hours: number, studyDaysMode: string) {
-  const weeklyHours = Math.round(hours * studyDaysPerWeek(studyDaysMode) * 10) / 10;
-  const rhythm = hours <= 1.5
-    ? "Gentle pace"
-    : hours <= 3.5
-      ? "Sustainable pace"
-      : hours <= 6.5
-        ? "Strong daily rhythm"
-        : "Intensive push";
-  return `${rhythm} · about ${compactNumber(weeklyHours)}h/week`;
-}
-
-function subjectsPerDayHint(count: number) {
-  if (count <= 1) return "Deep focus on one subject each day.";
-  if (count === 2) return "Balanced variety without too much switching.";
-  if (count <= 4) return "Good for mixed revision and syllabus coverage.";
-  return "Fast rotation — useful close to exams.";
-}
-
-function bufferDaysHint(days: number) {
-  if (days <= 0) return "No spare recovery days — every study day counts.";
-  if (days <= 3) return "Lean buffer for small delays and busy days.";
-  if (days <= 7) return "Healthy safety net for revision and catch-up.";
-  return "Plenty of recovery room before the deadline.";
-}
-
-function OnboardingSlider({
-  label,
-  value,
-  valueLabel,
-  hint,
-  min,
-  max,
-  step,
-  minLabel,
-  maxLabel,
-  onChange,
-  presets = [],
-  fullWidth = false,
-}: OnboardingSliderProps) {
+export function OnboardingSlider({ label, value, valueLabel, hint, min, max, step, minLabel, maxLabel, onChange, presets = [], fullWidth = false }: OnboardingSliderProps) {
+  const inputId = useId();
+  /* The card carries a live "dragging" flag so the filled rail tracks the
+     thumb 1:1 while the finger is down (no animated lag mid-drag), and the
+     easing only plays for preset jumps and keyboard steps. Pointer capture
+     keeps the state honest even if the finger slides off the thumb. */
+  const [dragging, setDragging] = useState(false);
+  const stopDrag = () => setDragging(false);
   const fillPct = max === min ? 0 : ((value - min) / (max - min)) * 100;
   const sliderStyle = { "--ob-range-fill": `${fillPct}%` } as React.CSSProperties;
-
   return (
     <div className={`ob-field${fullWidth ? " ob-field-span-full" : ""}`}>
-      <div className="ob-range-card">
-        <div className="ob-range-head">
-          <div>
-            <label>{label}</label>
-            {hint && <div className="ob-range-hint">{hint}</div>}
-          </div>
-          <div className="ob-range-value">{valueLabel}</div>
-        </div>
-        <input
-          className="ob-range-input"
-          type="range"
-          min={min}
-          max={max}
-          step={step}
-          value={value}
-          onChange={(e) => onChange(Number(e.target.value))}
-          style={sliderStyle}
-        />
-        <div className="ob-range-meta">
-          <span>{minLabel}</span>
-          <span>{maxLabel}</span>
-        </div>
-        {!!presets.length && (
-          <div className="ob-range-presets">
-            {presets.map((preset) => {
-              const active = Math.abs(value - preset.value) < Math.max(step / 2, 0.01);
-              return (
-                <button
-                  key={`${label}-${preset.value}`}
-                  type="button"
-                  className={`ob-range-chip${active ? " active" : ""}`}
-                  onClick={() => onChange(preset.value)}
-                >
-                  {preset.label}
-                </button>
-              );
-            })}
-          </div>
-        )}
+      <div className={`ob-range-card${dragging ? " is-dragging" : ""}`}>
+        <div className="ob-range-head"><div className="ob-range-copy"><label htmlFor={inputId}>{label}</label>{hint && <div className="ob-range-hint">{hint}</div>}</div>{/* key={value} re-mounts the badge so its swap transition replays on each committed change; while dragging the key is stable so digits never flicker mid-glide */}<output className="ob-range-value" key={dragging ? "ob-value-static" : `ob-value-${value}`} htmlFor={inputId} aria-live="off">{valueLabel}</output></div>
+        <input id={inputId} className="ob-range-input" type="range" min={min} max={max} step={step} value={value} aria-valuetext={valueLabel} onChange={(e) => onChange(Number(e.target.value))} onPointerDown={() => setDragging(true)} onPointerUp={stopDrag} onPointerCancel={stopDrag} onLostPointerCapture={stopDrag} onBlur={stopDrag} style={sliderStyle} />
+        <div className="ob-range-meta" aria-hidden="true"><span>{minLabel}</span><span>{maxLabel}</span></div>
+        {!!presets.length && <div className="ob-range-presets" role="group" aria-label={`${label} presets`}>{presets.map((preset) => { const active = Math.abs(value - preset.value) < Math.max(step / 2, 0.01); return <button key={`${label}-${preset.value}`} type="button" className={`ob-range-chip${active ? " active" : ""}`} aria-pressed={active} onClick={() => onChange(preset.value)}>{preset.label}</button>; })}</div>}
       </div>
     </div>
   );
 }
 
-function OnboardingChoiceGroup({
-  label,
-  hint,
-  value,
-  options,
-  onChange,
-  columns = 1,
-  fullWidth = false,
-}: OnboardingChoiceGroupProps) {
-  return (
-    <div className={`ob-field${fullWidth ? " ob-field-span-full" : ""}`}>
-      <div className="ob-choice-card">
-        <label>{label}</label>
-        {hint && <div className="ob-range-hint">{hint}</div>}
-        <div
-          className={`ob-choice-grid${columns > 1 ? " compact-choices" : ""}`}
-          style={columns > 1 ? ({ "--ob-choice-cols": String(columns) } as React.CSSProperties) : undefined}
-        >
-          {options.map((option) => (
-            <button
-              key={`${label}-${option.id}`}
-              type="button"
-              className={`ob-choice-btn${value === option.id ? " selected" : ""}`}
-              onClick={() => onChange(option.id)}
-            >
-              <strong>{option.label}</strong>
-              <span>{option.description}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
+function OnboardingChoiceGroup({ label, hint, value, options, onChange, columns = 1, fullWidth = false }: OnboardingChoiceGroupProps) {
+  return <div className={`ob-field${fullWidth ? " ob-field-span-full" : ""}`}><div className="ob-choice-card"><label>{label}</label>{hint && <div className="ob-range-hint">{hint}</div>}<div className={`ob-choice-grid${columns > 1 ? " compact-choices" : ""}`} style={columns > 1 ? ({ "--ob-choice-cols": String(columns) } as React.CSSProperties) : undefined}>{options.map((option) => <button key={`${label}-${option.id}`} type="button" className={`ob-choice-btn${value === option.id ? " selected" : ""}`} onClick={() => onChange(option.id)}><strong>{option.label}</strong><span>{option.description}</span></button>)}</div></div></div>;
 }
 
-export default function Onboarding({
-  onDone, isRerun = false, initialName = "", onCancel,
-}: {
-  onDone: (s: AppState) => void;
-  isRerun?: boolean;
-  initialName?: string;
-  onCancel?: () => void;
-}) {
-  const [step, setStep] = useState(1);
-  const total = 8;
-  const [levels, setLevels] = useState<Level[]>([]);
-  const [levelCourses, setLevelCourses] = useState<Record<string, string[]>>({});
-  const [courses, setCourses] = useState<CourseMeta[]>([]);
-  const [provider, setProvider] = useState<string | null>(null);
-  const lastAssessmentRef = useRef("");
-  const [search, setSearch] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState("");
-
-  const [name, setName] = useState(initialName);
-  const [level, setLevel] = useState("");
-  const [course, setCourse] = useState("");
-  const [year, setYear] = useState("1");
-  const [subs, setSubs] = useState<SeedSubject[]>([]);
-  const [newSub, setNewSub] = useState("");
-  const [customName, setCustomName] = useState("");
-  const [goalText, setGoalText] = useState("");
-  const [suggesting, setSuggesting] = useState(false);
-  const [suggestSource, setSuggestSource] = useState("");
-  const [suggestSources, setSuggestSources] = useState<CurriculumSource[]>([]);
-  // adaptive course-detail fields
-  const [institution, setInstitution] = useState("");
-  const [specialisation, setSpecialisation] = useState("");
-  const [board, setBoard] = useState("CBSE");
-  const [attempt, setAttempt] = useState("first");
-  const [priorPrep, setPriorPrep] = useState("fresh");
-  const [weak, setWeak] = useState("-1");
-  const [style, setStyle] = useState("balanced");
-  const [revision, setRevision] = useState("1");
-  const [start, setStart] = useState(today());
-  const [exam, setExam] = useState(addDays(today(), 90));
-  const [hrs, setHrs] = useState(2);
-  const [spd, setSpd] = useState(2);
-  const [sdays, setSdays] = useState("all");
-  const [buffer, setBuffer] = useState(5);
-  const [planMode, setPlanMode] = useState("syllabus");
+export default function Onboarding({ onDone, isRerun = false, initialName = "", onCancel }: { onDone: (s: AppState) => void; isRerun?: boolean; initialName?: string; onCancel?: () => void; }) {
+  const [step, setStep] = useState(1); const total = 8; const [levels, setLevels] = useState<Level[]>([]); const [levelCourses, setLevelCourses] = useState<Record<string, string[]>>({}); const [courses, setCourses] = useState<CourseMeta[]>([]); const [provider, setProvider] = useState<string | null>(null); const lastAssessmentRef = useRef("");
+  const [search, setSearch] = useState(""); const [busy, setBusy] = useState(false); const [err, setErr] = useState("");
+  const [name, setName] = useState(initialName); const [level, setLevel] = useState(""); const [course, setCourse] = useState(""); const [year, setYear] = useState("1"); const [subs, setSubs] = useState<SeedSubject[]>([]); const [newSub, setNewSub] = useState(""); const [customName, setCustomName] = useState(""); const [goalText, setGoalText] = useState(""); const [suggesting, setSuggesting] = useState(false); const [suggestSource, setSuggestSource] = useState(""); const [suggestSources, setSuggestSources] = useState<CurriculumSource[]>([]);
+  const [institution, setInstitution] = useState(""); const [specialisation, setSpecialisation] = useState(""); const [board, setBoard] = useState("CBSE"); const [attempt, setAttempt] = useState("first"); const [priorPrep, setPriorPrep] = useState("fresh"); const [weak, setWeak] = useState("-1"); const [style, setStyle] = useState("balanced"); const [revision, setRevision] = useState("1"); const [start, setStart] = useState(today()); const [exam, setExam] = useState(addDays(today(), 90)); const [hrs, setHrs] = useState(2); const [spd, setSpd] = useState(2); const [sdays, setSdays] = useState("all"); const [buffer, setBuffer] = useState(5); const [planMode, setPlanMode] = useState("syllabus");
   const stepMeta = STEP_META[step - 1] || STEP_META[0];
 
-  useEffect(() => {
-    api<{ levels: Level[]; levelCourses: Record<string, string[]>; courses: CourseMeta[]; aiProvider: string | null }>(
-      "/api/courses"
-    ).then((d) => {
-      setLevels(d.levels); setLevelCourses(d.levelCourses); setCourses(d.courses); setProvider(d.aiProvider);
-    }).catch(() => setErr("Could not load the course catalog. Check the connection, then refresh and try again."));
-  }, []);
-
+  useEffect(() => { api<{ levels: Level[]; levelCourses: Record<string, string[]>; courses: CourseMeta[]; aiProvider: string | null }>("/api/courses").then((d) => { setLevels(d.levels); setLevelCourses(d.levelCourses); setCourses(d.courses); setProvider(d.aiProvider); }).catch(() => setErr("Could not load the course catalog. Check the connection, then refresh and try again.")); }, []);
   const courseById = useMemo(() => new Map(courses.map((c) => [c.id, c])), [courses]);
-  const visibleCourses = useMemo(() => {
-    const ids = levelCourses[level] || [];
-    let list = ids.map((i) => courseById.get(i)).filter(Boolean) as CourseMeta[];
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      list = courses.filter((c) => c.name.toLowerCase().includes(q));
-    }
-    return list;
-  }, [level, levelCourses, courseById, search, courses]);
-
-  const pickCourse = (id: string) => {
-    setCourse(id);
-    setSuggestSource("");
-    const c = courseById.get(id);
-    setSubs(c ? c.subjects.map((s) => ({ ...s })) : []);
-  };
-
-  const resolvedCourseName =
-    course === "custom" ? customName.trim() || "Custom Course" : courseById.get(course)?.name || "";
-
-  const isCompetitive = level === "competitive" || level === "professional";
-  const isDegree = level === "ug" || level === "pg";
-  const isSchool = level === "school" || level === "nursery";
-
-  /** Assemble every relevant detail so the engine can assess accurately. */
-  const buildAssessmentText = (title: string, goal: string) => {
-    const parts = [title.trim()];
-    if (specialisation.trim()) parts.push(`specialisation: ${specialisation.trim()}`);
-    if (institution.trim()) parts.push(`institution: ${institution.trim()}`);
-    if (isSchool && board) parts.push(`board: ${board}`);
-    const alreadyHasTerm = /\b(sem|semester|year)\b/i.test(`${title} ${goal} ${specialisation}`);
-    if (!alreadyHasTerm && isDegree && Number(year) >= 1) parts.push(`year ${year}`);
-    if (goal.trim()) parts.push(`goal: ${goal.trim()}`);
-    return parts.join(" — ");
-  };
-
-  /** Ask the engine to build a relevant subject list for any typed course. */
-  const suggestFor = async (typed: string, goal = goalText) => {
-    const titleText = typed.trim();
-    if (!titleText) return;
-    const assessmentText = buildAssessmentText(titleText, goal);
-    setCourse("custom");
-    setCustomName(titleText);
-    setSuggesting(true);
-    setErr("");
-    try {
-      const r = await api<{ subjects: SeedSubject[]; source: string; sources: CurriculumSource[] }>("/api/course-suggest", {
-        method: "POST",
-        body: JSON.stringify({ courseName: assessmentText, level }),
-        timeoutMs: 30_000,
-      });
-      setSubs(r.subjects.map((x) => ({ ...x })));
-      setSuggestSource(r.source);
-      setSuggestSources(r.sources || []);
-      lastAssessmentRef.current = `${level}\0${assessmentText}`;
-      setStep(4);
-    } catch {
-      setErr("Could not build the subject list. Add your subjects manually below.");
-      setStep(4);
-    } finally {
-      setSuggesting(false);
-    }
-  };
-
+  const visibleCourses = useMemo(() => { const ids = levelCourses[level] || []; let list = ids.map((i) => courseById.get(i)).filter(Boolean) as CourseMeta[]; if (search.trim()) { const q = search.toLowerCase(); list = courses.filter((c) => c.name.toLowerCase().includes(q)); } return list; }, [level, levelCourses, courseById, search, courses]);
+  const pickCourse = (id: string) => { setCourse(id); setSuggestSource(""); const c = courseById.get(id); setSubs(c ? c.subjects.map((s) => ({ ...s })) : []); };
+  const resolvedCourseName = course === "custom" ? customName.trim() || "Custom Course" : courseById.get(course)?.name || "";
+  const isCompetitive = level === "competitive" || level === "professional"; const isDegree = level === "ug" || level === "pg"; const isSchool = level === "school";
+  const buildAssessmentText = (title: string, goal: string) => { const parts = [title.trim()]; if (specialisation.trim()) parts.push(`specialisation: ${specialisation.trim()}`); if (institution.trim()) parts.push(`institution: ${institution.trim()}`); if (isSchool && board) parts.push(`board: ${board}`); const alreadyHasTerm = /\b(sem|semester|year)\b/i.test(`${title} ${goal} ${specialisation}`); if (!alreadyHasTerm && isDegree && Number(year) >= 1) parts.push(`year ${year}`); if (goal.trim()) parts.push(`goal: ${goal.trim()}`); return parts.join(" — "); };
+  const suggestFor = async (typed: string, goal = goalText) => { const titleText = typed.trim(); if (!titleText) return; const assessmentText = buildAssessmentText(titleText, goal); setCourse("custom"); setCustomName(titleText); setSuggesting(true); setErr(""); try { const r = await api<{ subjects: SeedSubject[]; source: string; sources: CurriculumSource[] }>("/api/course-suggest", { method: "POST", body: JSON.stringify({ courseName: assessmentText, level }), timeoutMs: 30_000 }); setSubs(r.subjects.map((x) => ({ ...x }))); setSuggestSource(r.source); setSuggestSources(r.sources || []); lastAssessmentRef.current = `${level}\0${assessmentText}`; setStep(4); } catch { setErr("Could not build the subject list. Add your subjects manually below."); setStep(4); } finally { setSuggesting(false); } };
   const totalUnits = subs.reduce((a, s) => a + (Number(s.units) || 0), 0);
   const availDays = Math.max(1, countStudyDays(start, exam, sdays));
-  // Capacity reflects the actual difficulty-weighted lesson engine instead of
-  // pretending every unit costs the same 50 minutes.
-  const estMinutes = subs.reduce((total, subject) => {
-    const perUnit = subject.difficulty === "Hard" ? 65 : subject.difficulty === "Easy" ? 40 : 50;
-    return total + (Number(subject.units) || 0) * perUnit;
-  }, 0);
-  const capacity = availDays * hrs * 60 * 0.78;
-  const feasible = capacity >= estMinutes;
-  const estHours = Math.round((estMinutes / 60) * 10) / 10;
-  // Use the scheduler's canonical study-day-aware projection. The old wizard
-  // added raw calendar days and could promise a date the generated plan did
-  // not match when weekends were disabled.
-  const projected = projectCompletionDate(start, Math.max(1, estMinutes), hrs, sdays);
+  const estMinutes = subs.reduce((totalM, subject) => { const perUnit = subject.difficulty === "Hard" ? 65 : subject.difficulty === "Easy" ? 40 : 50; return totalM + (Number(subject.units) || 0) * perUnit; }, 0);
+  const capacity = availDays * hrs * 60 * 0.78; const feasible = capacity >= estMinutes; const estHours = Math.round((estMinutes / 60) * 10) / 10; const projected = projectCompletionDate(start, Math.max(1, estMinutes), hrs, sdays);
 
-  const next = async () => {
-    setErr("");
-    if (step === 1 && !name.trim()) return setErr("Please enter your name to continue.");
-    if (step === 2 && !level) return setErr("Pick your level of study.");
-    if (step === 3 && !course) return setErr("Choose a course, search for yours, or add a custom one.");
-    if (step === 3 && course === "custom" && !customName.trim())
-      return setErr("Type the name of your course or exam first.");
-    // Step 4 = adaptive course details. Leaving it (re)assesses subjects so
-    // institution/specialisation/board actually influence the syllabus.
-    if (step === 4) {
-      const title = course === "custom" ? customName : (courseById.get(course)?.name || customName);
-      const assessmentText = buildAssessmentText(title, goalText);
-      const assessmentKey = `${level}\0${assessmentText}`;
-      // Search-to-details used to submit the exact same expensive AI request
-      // twice. Reassess only when the learner actually changed details.
-      if (title.trim() && lastAssessmentRef.current !== assessmentKey) {
-        setSuggesting(true);
-        try {
-          const r = await api<{ subjects: SeedSubject[]; source: string; sources: CurriculumSource[] }>("/api/course-suggest", {
-            method: "POST",
-            body: JSON.stringify({ courseName: assessmentText, level }),
-            timeoutMs: 30_000,
-          });
-          if (r.subjects?.length) {
-            setSubs(r.subjects.map((x) => ({ ...x })));
-            setSuggestSource(r.source);
-            setSuggestSources(r.sources || []);
-            lastAssessmentRef.current = assessmentKey;
-          }
-        } catch { /* keep whatever we have */ } finally { setSuggesting(false); }
-      }
-    }
-    if (step === 5 && subs.length === 0) return setErr("Add at least one subject.");
-    if (step === 7 && dayDiff(start, exam) < 1) return setErr("Your target date must be after the start date.");
-    setStep((s) => Math.min(total, s + 1));
-  };
+  const next = async () => { setErr(""); if (step === 1 && !name.trim()) return setErr("Please enter your name to continue."); if (step === 2 && !level) return setErr("Pick your level of study."); if (step === 3 && !course) return setErr("Choose a course, search for yours, or add a custom one."); if (step === 3 && course === "custom" && !customName.trim()) return setErr("Type the name of your course or exam first."); if (step === 4) { const title = course === "custom" ? customName : (courseById.get(course)?.name || customName); const assessmentText = buildAssessmentText(title, goalText); const assessmentKey = `${level}\0${assessmentText}`; if (title.trim() && lastAssessmentRef.current !== assessmentKey) { setSuggesting(true); try { const r = await api<{ subjects: SeedSubject[]; source: string; sources: CurriculumSource[] }>("/api/course-suggest", { method: "POST", body: JSON.stringify({ courseName: assessmentText, level }), timeoutMs: 30_000 }); if (r.subjects?.length) { setSubs(r.subjects.map((x) => ({ ...x }))); setSuggestSource(r.source); setSuggestSources(r.sources || []); lastAssessmentRef.current = assessmentKey; } } catch {} finally { setSuggesting(false); } } } if (step === 5 && subs.length === 0) return setErr("Add at least one subject."); if (step === 7 && dayDiff(start, exam) < 1) return setErr("Your target date must be after the start date."); setStep((s) => Math.min(total, s + 1)); };
   const back = () => { setErr(""); setStep((s) => Math.max(1, s - 1)); };
+  const addSubject = () => { const n = newSub.trim(); if (!n) return; setSubs((s) => [...s, { name: n, units: 6, difficulty: "Medium", color: PALETTE[s.length % PALETTE.length] }]); setNewSub(""); };
+  const launch = async () => { setBusy(true); setErr(""); try { const richName = [resolvedCourseName || "Custom Course", specialisation.trim() ? `(${specialisation.trim()})` : "", institution.trim() ? `— ${institution.trim()}` : ""].filter(Boolean).join(" "); const payload = { name: name.trim(), level, course: course || "custom", courseName: richName, year, institution: institution.trim(), specialisation: specialisation.trim(), board, attempt, priorPrep, subjects: subs.map((s, i) => ({ ...s, color: s.color || PALETTE[i % PALETTE.length] })), startDate: start, examDate: exam, dailyHours: hrs, subjectsPerDay: spd, studyDays: sdays, bufferDays: buffer, planMode, studyStyle: style, weakSubject: weak, revisionWeeks: Number(revision) }; const s = await api<AppState>("/api/onboard", { method: "POST", body: JSON.stringify(payload), timeoutMs: 115_000 }); onDone(s); } catch { setErr("Something went wrong while generating your plan. Please try again."); setBusy(false); } };
 
-  const addSubject = () => {
-    const n = newSub.trim();
-    if (!n) return;
-    setSubs((s) => [...s, { name: n, units: 6, difficulty: "Medium", color: PALETTE[s.length % PALETTE.length] }]);
-    setNewSub("");
-  };
-
-  const launch = async () => {
-    setBusy(true); setErr("");
-    try {
-      const richName = [
-        resolvedCourseName || "Custom Course",
-        specialisation.trim() ? `(${specialisation.trim()})` : "",
-        institution.trim() ? `— ${institution.trim()}` : "",
-      ].filter(Boolean).join(" ");
-      const payload = {
-        name: name.trim(), level, course: course || "custom",
-        courseName: richName,
-        year,
-        institution: institution.trim(), specialisation: specialisation.trim(),
-        board, attempt, priorPrep,
-        subjects: subs.map((s, i) => ({ ...s, color: s.color || PALETTE[i % PALETTE.length] })),
-        startDate: start, examDate: exam, dailyHours: hrs, subjectsPerDay: spd,
-        studyDays: sdays, bufferDays: buffer, planMode, studyStyle: style,
-        weakSubject: weak, revisionWeeks: Number(revision),
-      };
-      const s = await api<AppState>("/api/onboard", {
-        method: "POST",
-        body: JSON.stringify(payload),
-        timeoutMs: 115_000,
-      });
-      onDone(s);
-    } catch {
-      setErr("Something went wrong while generating your plan. Please try again.");
-      setBusy(false);
-    }
-  };
-
-  return (
-    <div className="ob-overlay">
-      <div className="ob-shell">
-        <div className="ob-brand-bar">
-          <div className="ob-brand-mark"><IconLogo size={20} /></div>
-          <div className="ob-brand-copy">
-            <div className="ob-brand-name">Study Planner Pro</div>
-            <div className="ob-brand-tag">Plan · focus · finish</div>
-          </div>
-        </div>
-
-        <div className="ob-progress" aria-label={`Step ${step} of ${total}`}>
-          {STEP_META.map((meta, i) => {
-            const n = i + 1;
-            const cls = n === step ? "current" : n < step ? "done" : "";
-            return (
-              <div key={meta.key} className={`ob-step${cls ? ` ${cls}` : ""}`} aria-current={n === step ? "step" : undefined}>
-                <span className="ob-step-node">{n < step ? <IconCheck size={11} /> : n}</span>
-                <span className="ob-step-label">{meta.label}</span>
-              </div>
-            );
-          })}
-        </div>
-
-        <div className="ob-card slide-in" key={step}>
-        <div className="ob-card-head">
-          <div className="ob-step-kicker">Step {step} of {total} · {stepMeta.label}</div>
-        </div>
-
-        {step === 1 && (
-          <>
-            <h1>Set up a study workspace that fits your day</h1>
-            <p>Your planner, daily schedule and Shigun&apos;s answers will use only your course, dates and study history.</p>
-            <div className="ob-feature-list" aria-label="Planner capabilities">
-              <div className="ob-feature">
-                <span className="ob-feature-icon"><IconTarget size={14} /></span>
-                <div>
-                  <strong>Clear priorities</strong>
-                  <span>Your hardest and most urgent topics rise to the top automatically.</span>
-                </div>
-              </div>
-              <div className="ob-feature">
-                <span className="ob-feature-icon"><IconCalendar size={14} /></span>
-                <div>
-                  <strong>A realistic week</strong>
-                  <span>A schedule built from your real hours and rhythm — not a generic template.</span>
-                </div>
-              </div>
-              <div className="ob-feature">
-                <span className="ob-feature-icon"><IconLock size={14} /></span>
-                <div>
-                  <strong>Private local data</strong>
-                  <span>Your plan, progress and history stay yours — never shared or sold.</span>
-                </div>
-              </div>
-            </div>
-            <label className="lbl">What should we call you?</label>
-            <input className="ob-name-input" autoFocus value={name} placeholder="e.g. Rakshit"
-              onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && next()} />
-            <div className="ob-hint ob-note-panel">
-              {provider ? `Cloud AI is ready via ${provider}. If it ever fails, the local planner and fallback tutoring still keep the workflow working.` : "Local planner is ready. Add a server-side AI key later if you want cloud-generated syllabus support too."}
-            </div>
-          </>
-        )}
-
-        {step === 2 && (
-          <>
-            <h1>Choose your study level</h1>
-            <p>From nursery to doctoral research, this tells the planner how deep the syllabus should go and how the language should be tuned.</p>
-            <div className="ob-level-grid">
-              {levels.map((l) => (
-                <button key={l.id} className={`ob-level-btn${level === l.id ? " selected" : ""}`}
-                  onClick={() => { setLevel(l.id); setCourse(""); setSubs([]); }}>
-                  <span className="ob-level-title">{l.label}</span>
-                  <small>{l.sub}</small>
-                </button>
-              ))}
-            </div>
-          </>
-        )}
-
-        {step === 3 && (
-          <>
-            <h1>Find your course or exam</h1>
-            <p>Pick a known programme or type your own. The planner will use it to assemble the right subject structure before scheduling begins.</p>
-            <input className="ob-course-search" placeholder="Search any course or exam..." value={search}
-              onChange={(e) => setSearch(e.target.value)} />
-            <div className="ob-list-meta">
-              <span>{visibleCourses.length} match{visibleCourses.length === 1 ? "" : "es"}</span>
-              <span>{search.trim() ? "Filtered from the full catalog" : "Suggested for your selected level"}</span>
-            </div>
-            <div className="ob-course-list">
-              {visibleCourses.map((c) => (
-                <button type="button" key={c.id} className={`ob-course-item${course === c.id ? " selected" : ""}`} onClick={() => pickCourse(c.id)}>
-                  <div className="ob-course-check">{course === c.id && <IconCheck size={11} />}</div>
-                  <span>{c.name}</span>
-                </button>
-              ))}
-              {search.trim().length > 1 && (
-                <button type="button" className="ob-course-item ob-course-item-accent" onClick={() => suggestFor(search)}>
-                  <div className="ob-course-check" />
-                  <span>{suggesting ? "Building your syllabus…" : <>Use <strong>&ldquo;{search.trim()}&rdquo;</strong> — AI will build the subject list</>}</span>
-                </button>
-              )}
-              <button type="button" className={`ob-course-item${course === "custom" ? " selected" : ""}`}
-                onClick={() => { setCourse("custom"); setCustomName(search.trim()); setSubs([]); }}>
-                <div className="ob-course-check">{course === "custom" && <IconCheck size={11} />}</div>
-                <span>Not listed? Let the AI build it from scratch</span>
-              </button>
-            </div>
-
-            {course === "custom" && (
-              <div className="slide-in ob-note-panel" style={{ marginBottom: 14 }}>
-                <label className="lbl">Course / exam title</label>
-                <div className="ob-add-sub-row">
-                  <input className="ob-add-sub-input" autoFocus placeholder="e.g. MBA in Marketing from NMIMS CDOE"
-                    value={customName} onChange={(e) => setCustomName(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && suggestFor(customName, goalText)} />
-                  <button className="ob-btn ob-btn-primary" style={{ padding: "10px 16px" }}
-                    disabled={suggesting || !customName.trim()} onClick={() => suggestFor(customName, goalText)}>
-                    {suggesting ? "Working…" : "AI: Assess & Build Subjects"}
-                  </button>
-                </div>
-                <label className="lbl" style={{ marginTop: 12 }}>Describe your goal (optional)</label>
-                <textarea className="input-field" rows={3} placeholder="e.g. I want to complete the course, prepare for exams, and revise weak topics"
-                  value={goalText} onChange={(e) => setGoalText(e.target.value)} />
-                <div className="ob-hint" style={{ marginTop: 8, marginBottom: 0 }}>
-                  The engine uses the course title first, then the goal as extra context. You can edit every subject on the next screen.
-                </div>
-              </div>
-            )}
-          </>
-        )}
-
-        {step === 4 && (
-          <>
-            <h1>Add the details that make it accurate</h1>
-            <p>These answers help the planner assess the <em>exact</em> syllabus — the right papers, board pattern, stream, and attempt context — instead of a generic version.</p>
-            <div className="ob-schedule-grid" style={{ gridTemplateColumns: "1fr" }}>
-              {isDegree && (
-                <>
-                  <div className="ob-field">
-                    <label>Institution / University (optional but improves accuracy)</label>
-                    <input className="input-field" placeholder="e.g. NMIMS CDOE, IGNOU, Delhi University"
-                      value={institution} onChange={(e) => setInstitution(e.target.value)} />
-                  </div>
-                  <div className="ob-field">
-                    <label>Specialisation / Stream</label>
-                    <input className="input-field" placeholder="e.g. Marketing, Finance, Computer Science"
-                      value={specialisation} onChange={(e) => setSpecialisation(e.target.value)} />
-                  </div>
-                  <div className="ob-field">
-                    <label>Year / Semester (narrows to that term)</label>
-                    <select value={year} onChange={(e) => setYear(e.target.value)}>
-                      <option value="0">Full course (all terms)</option>
-                      <option value="1">Year 1 / Semester 1-2</option>
-                      <option value="2">Year 2 / Semester 3-4</option>
-                      <option value="3">Year 3 / Semester 5-6</option>
-                      <option value="4">Year 4 / Semester 7-8</option>
-                    </select>
-                  </div>
-                </>
-              )}
-              {isSchool && (
-                <>
-                  <div className="ob-field">
-                    <label>Board</label>
-                    <select value={board} onChange={(e) => setBoard(e.target.value)}>
-                      <option>CBSE</option><option>ICSE</option><option>State Board</option>
-                      <option>IB</option><option>IGCSE / Cambridge</option>
-                    </select>
-                  </div>
-                  <div className="ob-field">
-                    <label>Stream (for class 11-12)</label>
-                    <select value={specialisation} onChange={(e) => setSpecialisation(e.target.value)}>
-                      <option value="">Not applicable</option>
-                      <option value="Science (PCM)">Science (PCM)</option>
-                      <option value="Science (PCB)">Science (PCB)</option>
-                      <option value="Commerce">Commerce</option>
-                      <option value="Arts / Humanities">Arts / Humanities</option>
-                    </select>
-                  </div>
-                </>
-              )}
-              {isCompetitive && (
-                <>
-                  <div className="ob-field">
-                    <label>Specific post / specialisation / optional subject</label>
-                    <input className="input-field" placeholder="e.g. UPSC optional: PSIR · SSC CGL · GATE CSE · CA Inter"
-                      value={specialisation} onChange={(e) => setSpecialisation(e.target.value)} />
-                  </div>
-                  <div className="ob-field">
-                    <label>Coaching / exam body (optional)</label>
-                    <input className="input-field" placeholder="e.g. ICAI, IBPS, UPSC, NTA"
-                      value={institution} onChange={(e) => setInstitution(e.target.value)} />
-                  </div>
-                  <div className="ob-field">
-                    <label>Which attempt is this?</label>
-                    <select value={attempt} onChange={(e) => setAttempt(e.target.value)}>
-                      <option value="first">First attempt</option>
-                      <option value="repeat">Repeat attempt</option>
-                      <option value="final">Final / last attempt</option>
-                    </select>
-                  </div>
-                  <div className="ob-field">
-                    <label>How much have you already prepared?</label>
-                    <select value={priorPrep} onChange={(e) => setPriorPrep(e.target.value)}>
-                      <option value="fresh">Starting fresh (0-20%)</option>
-                      <option value="partial">Partly done (20-60%)</option>
-                      <option value="revision">Mostly done (60%+)</option>
-                    </select>
-                  </div>
-                </>
-              )}
-              <div className="ob-field">
-                <label>Your goal (optional — shapes the plan&apos;s emphasis)</label>
-                <textarea className="input-field" rows={2}
-                  placeholder="e.g. Clear the exam in first attempt, focus on weak areas, finish syllabus then revise"
-                  value={goalText} onChange={(e) => setGoalText(e.target.value)} />
-              </div>
-            </div>
-            <div className="ob-hint ob-note-panel" style={{ marginTop: 4 }}>
-              {suggesting ? "Assessing your exact syllabus…" : "When you continue, I’ll use these details to build the precise subject list before scheduling starts."}
-            </div>
-          </>
-        )}
-
-        {step === 5 && (
-          <>
-            <h1>Review the syllabus structure</h1>
-            <p>{course && course !== "custom"
-              ? "We loaded a suggested syllabus. Fine-tune the units here — each unit turns into a scheduled lesson in your plan."
-              : "Add the subjects you want included. Each unit becomes an individually scheduled lesson."}</p>
-            <div className="ob-mini-stats" aria-label="Syllabus stats">
-              <div className="ob-mini-stat"><strong>{subs.length}</strong><span>subjects</span></div>
-              <div className="ob-mini-stat"><strong>{totalUnits}</strong><span>lesson units</span></div>
-              <div className="ob-mini-stat"><strong>{compactNumber(estHours)}</strong><span>est. hours</span></div>
-            </div>
-            <div className="ob-subs-grid">
-              {subs.map((s, i) => (
-                <div className="ob-sub-row" key={i}>
-                  <div style={{ width: 10, height: 10, borderRadius: 99, background: s.color || PALETTE[i % 8] }} />
-                  <input type="text" value={s.name}
-                    onChange={(e) => setSubs((p) => p.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))} />
-                  <input type="number" min={1} max={40} value={s.units}
-                    onChange={(e) => setSubs((p) => p.map((x, j) => (j === i ? { ...x, units: Number(e.target.value) } : x)))} />
-                  <select value={s.difficulty}
-                    onChange={(e) => setSubs((p) => p.map((x, j) => (j === i ? { ...x, difficulty: e.target.value } : x)))}>
-                    <option>Easy</option><option>Medium</option><option>Hard</option>
-                  </select>
-                  <button className="btn btn-xs btn-danger" onClick={() => setSubs((p) => p.filter((_, j) => j !== i))}>✕</button>
-                </div>
-              ))}
-              {!subs.length && <div style={{ fontSize: ".82rem", color: "var(--text-dim)", padding: "10px 2px" }}>No subjects yet — add one below.</div>}
-            </div>
-            <div className="ob-add-sub-row">
-              <input className="ob-add-sub-input" placeholder="+ Add a subject..." value={newSub}
-                onChange={(e) => setNewSub(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addSubject()} />
-              <button className="ob-btn ob-btn-primary" style={{ padding: "10px 18px" }} onClick={addSubject}>Add</button>
-            </div>
-            <div className="flex-row gap-sm" style={{ flexWrap: "wrap", marginTop: 10 }}>
-              <button className="btn btn-sm btn-secondary" disabled={suggesting}
-                onClick={() => suggestFor(resolvedCourseName, goalText)}>
-                {suggesting ? "Rebuilding…" : "↻ Re-assess subjects with AI"}
-              </button>
-              {suggestSource && (
-                <span className="chip chip-kind">source: {suggestSource}</span>
-              )}
-            </div>
-            {!!suggestSources.length && (
-              <div className="curriculum-sources" aria-label="Curriculum source details">
-                <div className="curriculum-sources-title">Source details used for this curriculum</div>
-                {suggestSources.map((source, index) => (
-                  <div className="curriculum-source" key={`${source.publisher}-${source.title}-${index}`}>
-                    <span className="curriculum-source-type">{source.type}</span>
-                    <div>
-                      {source.url ? (
-                        <a href={source.url} target="_blank" rel="noreferrer">{source.title}</a>
-                      ) : <strong>{source.title}</strong>}
-                      <div>{source.publisher}{source.note ? ` · ${source.note}` : ""}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-            <div className="ob-hint" style={{ marginTop: 10 }}>
-              {subs.length} subjects · <strong>{totalUnits} advanced lessons</strong> will be generated with prerequisites, key concepts, applied practice, and source references.
-            </div>
-          </>
-        )}
-
-        {step === 6 && (
-          <>
-            <h1>Tell me how you want to learn</h1>
-            <p>These choices only tune pacing and emphasis. The AI lesson generation and scheduler logic stay the same underneath.</p>
-            <div className="ob-schedule-grid">
-              <div className="ob-field ob-field-span-full">
-                <div className="ob-choice-card">
-                  <label>Weakest Subject</label>
-                  <div className="ob-range-hint">If one subject needs extra reinforcement, the planner can give it more attention.</div>
-                  <select value={weak} onChange={(e) => setWeak(e.target.value)}>
-                    <option value="-1">None / not sure</option>
-                    {subs.map((s, i) => <option key={i} value={String(i)}>{s.name}</option>)}
-                  </select>
-                </div>
-              </div>
-
-              <OnboardingChoiceGroup
-                label="Study Style"
-                hint="Choose the learning mix that feels most natural to you."
-                value={style}
-                options={STYLE_OPTIONS}
-                onChange={setStyle}
-                columns={3}
-                fullWidth
-              />
-
-              <OnboardingChoiceGroup
-                label="Revision Block"
-                hint="Reserve time near the end for a dedicated revision phase."
-                value={revision}
-                options={REVISION_OPTIONS}
-                onChange={setRevision}
-                columns={2}
-                fullWidth
-              />
-
-              <OnboardingChoiceGroup
-                label="Plan Mode"
-                hint="This changes how the schedule distributes time across lessons."
-                value={planMode}
-                options={PLAN_MODE_OPTIONS}
-                onChange={setPlanMode}
-                columns={3}
-                fullWidth
-              />
-            </div>
-          </>
-        )}
-
-        {step === 7 && (
-          <>
-            <h1>Set your study rhythm</h1>
-            <p>Use direct controls to shape a schedule that feels clean, realistic, and easy to follow day after day.</p>
-            <div className="ob-schedule-grid">
-              <div className="ob-field"><label>Start Date</label>
-                <input type="date" value={start} onChange={(e) => setStart(e.target.value)} /></div>
-              <div className="ob-field"><label>Exam / Target Date</label>
-                <input type="date" value={exam} onChange={(e) => setExam(e.target.value)} /></div>
-
-              <OnboardingSlider
-                label="Daily Study Hours"
-                value={hrs}
-                valueLabel={`${formatHoursCompact(hrs)}/day`}
-                hint={studyHourHint(hrs, sdays)}
-                min={0.5}
-                max={14}
-                step={0.5}
-                minLabel="30 min"
-                maxLabel="14h"
-                presets={HOURS_PRESETS}
-                onChange={setHrs}
-                fullWidth
-              />
-
-              <OnboardingSlider
-                label="Subjects per Day"
-                value={spd}
-                valueLabel={`${spd} subject${spd > 1 ? "s" : ""}`}
-                hint={subjectsPerDayHint(spd)}
-                min={1}
-                max={6}
-                step={1}
-                minLabel="1 subject"
-                maxLabel="6 subjects"
-                presets={SUBJECTS_PRESETS}
-                onChange={setSpd}
-              />
-
-              <OnboardingChoiceGroup
-                label="Study Days"
-                hint="Choose how many days per week you realistically want to study."
-                value={sdays}
-                options={STUDY_DAY_OPTIONS}
-                onChange={setSdays}
-                columns={3}
-                fullWidth
-              />
-
-              <OnboardingSlider
-                label="Buffer Days"
-                value={buffer}
-                valueLabel={`${buffer} day${buffer === 1 ? "" : "s"}`}
-                hint={bufferDaysHint(buffer)}
-                min={0}
-                max={30}
-                step={1}
-                minLabel="0 days"
-                maxLabel="30 days"
-                presets={BUFFER_PRESETS}
-                onChange={setBuffer}
-                fullWidth
-              />
-            </div>
-            <div className="ob-projection-card">
-              <div className="ob-projection-label">Projected Syllabus Completion</div>
-              <div className="ob-projection-date">{prettyLong(projected)}</div>
-              <div className={`ob-projection-note ${feasible ? "ok" : "warn"}`}>
-                {feasible
-                  ? `Comfortable — ${availDays} days available, ${Math.round(estMinutes / 60)}h of content.`
-                  : `Tight — needs ~${Math.round(estMinutes / 60)}h but you only have ~${Math.round(capacity / 60)}h. I'll compress lessons.`}
-              </div>
-            </div>
-          </>
-        )}
-
-        {step === 8 && (
-          <>
-            <h1>Review your setup</h1>
-            <p>Everything below is still editable. When you continue, the planner uses the same AI and ML pipeline as before — only the onboarding presentation has changed.</p>
-            <div className="ob-review-grid">
-              <div className="ob-review-card">
-                <div className="ob-review-title">Plan snapshot</div>
-                <div className="ob-summary-row"><span>Learner</span><span>{name}</span></div>
-                <div className="ob-summary-row"><span>Programme</span><span>{resolvedCourseName}</span></div>
-                {specialisation.trim() && <div className="ob-summary-row"><span>Specialisation</span><span>{specialisation}</span></div>}
-                {institution.trim() && <div className="ob-summary-row"><span>Institution</span><span>{institution}</span></div>}
-                <div className="ob-summary-row"><span>Subjects</span><span>{subs.length}</span></div>
-                <div className="ob-summary-row"><span>Lesson units</span><span>{totalUnits}</span></div>
-                <div className="ob-summary-row"><span>Estimated content</span><span>{compactNumber(estHours)}h</span></div>
-                <div className="ob-summary-row"><span>Window</span><span>{prettyLong(start)} → {prettyLong(exam)}</span></div>
-                <div className="ob-summary-row"><span>Daily commitment</span><span>{formatHours(hrs)} · {spd} subjects/day</span></div>
-                <div className="ob-summary-row"><span>Study days</span><span>{STUDY_DAY_OPTIONS.find((option) => option.id === sdays)?.label || "All 7 days"}</span></div>
-                <div className="ob-summary-row"><span>Revision block</span><span>{revision === "0" ? "None" : `Last ${revision} week(s)`}</span></div>
-                <div className="ob-summary-row"><span>Buffer days</span><span>{buffer}</span></div>
-              </div>
-
-              <div className="ob-review-card">
-                <div className="ob-review-title">What happens next</div>
-                <div className="ob-review-check"><span className="ob-review-check-icon"><IconCheck size={12} /></span><div>Break each subject into sequenced lessons with prerequisites and key concepts.</div></div>
-                <div className="ob-review-check"><span className="ob-review-check-icon"><IconCheck size={12} /></span><div>Balance the schedule using your hours, study days, weak subjects, and revision buffer.</div></div>
-                <div className="ob-review-check"><span className="ob-review-check-icon"><IconCheck size={12} /></span><div>Generate a calendar you can re-plan later without losing the underlying learning logic.</div></div>
-                <div className="ob-review-pulse">
-                  <strong>{feasible ? "Looks comfortable" : "This plan will be tight"}</strong>
-                  <span>
-                    {feasible
-                      ? `${availDays} study days available for about ${compactNumber(estHours)} hours of content.`
-                      : `You have about ${Math.round(capacity / 60)} usable hours for roughly ${compactNumber(estHours)} hours of content, so the scheduler will compress where needed.`}
-                  </span>
-                </div>
-                {busy && (
-                  <div className="ob-review-loading">
-                    SHIGUN is analysing your syllabus and sequencing {totalUnits} lessons… this takes a few seconds.
-                  </div>
-                )}
-              </div>
-            </div>
-          </>
-        )}
-
-        {err && <div className="ob-error-banner">{err}</div>}
-
-        <div className="ob-footer-strip mt-md">
-          <div className="ob-privacy">
-            <IconLock size={13} />
-            <span>Your workspace stays private — study data never leaves your account.</span>
-          </div>
-          <div className="ob-btn-row">
-            {step > 1 && <button className="ob-btn ob-btn-secondary" onClick={back} disabled={busy || suggesting}>Back</button>}
-            {step < total && <button className="ob-btn ob-btn-primary" onClick={next} disabled={suggesting}>{suggesting ? "Assessing…" : step === 4 ? "Assess & Continue" : "Continue"}</button>}
-            {step === total && (
-              <button className="ob-btn ob-btn-primary" onClick={launch} disabled={busy}>
-                {busy ? "Generating…" : isRerun ? "Wipe old plan & Generate New" : "Generate My AI Plan"}
-              </button>
-            )}
-          </div>
-        </div>
-        {isRerun && onCancel && (
-          <button className="ob-cancel-link" onClick={onCancel} disabled={busy}>
-            Cancel — keep my current plan
-          </button>
-        )}
-        </div>
-      </div>
+  return <div className="ob-overlay"><div className="ob-shell">
+    <div className="ob-brand-bar"><div className="ob-brand-mark"><IconLogo size={20} /></div><div className="ob-brand-copy"><div className="ob-brand-name">Study Planner Pro</div><div className="ob-brand-tag">Plan · focus · finish</div></div></div>
+    <div className="ob-progress" aria-label={`Step ${step} of ${total}`}>{STEP_META.map((meta, i) => { const n = i + 1; const cls = n === step ? "current" : n < step ? "done" : ""; return <div key={meta.key} className={`ob-step${cls ? ` ${cls}` : ""}`} aria-current={n === step ? "step" : undefined}><span className="ob-step-node">{n < step ? <IconCheck size={11} /> : n}</span><span className="ob-step-label">{meta.label}</span></div>; })}</div>
+    <div className="ob-card slide-in" key={step}>
+      <div className="ob-card-head"><div className="ob-step-kicker">Step {step} of {total} · {stepMeta.label}</div></div>
+      {step === 1 && (<><h1>Set up a study workspace that fits your day</h1><p>Your planner, daily schedule and Shigun&apos;s answers will use only your course, dates and study history.</p><div className="ob-feature-list" aria-label="Planner capabilities"><div className="ob-feature"><span className="ob-feature-icon"><IconTarget size={14} /></span><div><strong>Clear priorities</strong><span>Your hardest and most urgent topics rise to the top automatically.</span></div></div><div className="ob-feature"><span className="ob-feature-icon"><IconCalendar size={14} /></span><div><strong>A realistic week</strong><span>A schedule built from your real hours and rhythm — not a generic template.</span></div></div><div className="ob-feature"><span className="ob-feature-icon"><IconLock size={14} /></span><div><strong>Private local data</strong><span>Your plan, progress and history stay yours — never shared or sold.</span></div></div></div><label className="lbl">What should we call you?</label><input className="ob-name-input" autoFocus value={name} placeholder="e.g. Lakshit" onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && next()} /><div className="ob-hint ob-note-panel">{provider ? `Cloud AI is ready via ${provider}. If it ever fails, the local planner and fallback tutoring still keep the workflow working.` : "Local planner is ready. Add a server-side AI key later if you want cloud-generated syllabus support too."}</div></>)}
+      {step === 2 && (<><h1>Choose your study level</h1><p className="ob-lead">From school and higher education through doctoral research, this tells the planner how deep the syllabus should go and how the language should be tuned.</p><div className="ob-level-grid">{levels.map((l) => <button key={l.id} type="button" className={`ob-level-btn${level === l.id ? " selected" : ""}`} onClick={() => { setLevel(l.id); setCourse(""); setSubs([]); }}><span className="ob-level-title">{l.label}</span><small>{l.sub}</small></button>)}</div></>)}
+      {step === 3 && (<><h1>Find your course or exam</h1><p>Pick a known programme or type your own. The planner will use it to assemble the right subject structure before scheduling begins.</p><input className="ob-course-search" placeholder="Search any course or exam..." value={search} onChange={(e) => setSearch(e.target.value)} /><div className="ob-list-meta"><span>{visibleCourses.length} match{visibleCourses.length === 1 ? "" : "es"}</span><span>{search.trim() ? "Filtered from the full catalog" : "Suggested for your selected level"}</span></div><div className="ob-course-list">{visibleCourses.map((c) => <button type="button" key={c.id} className={`ob-course-item${course === c.id ? " selected" : ""}`} onClick={() => pickCourse(c.id)}><div className="ob-course-check">{course === c.id && <IconCheck size={11} />}</div><span>{c.name}</span></button>)}{search.trim().length > 1 && <button type="button" className="ob-course-item ob-course-item-accent" onClick={() => suggestFor(search)}><div className="ob-course-check" /><span>{suggesting ? "Building your syllabus…" : <>Use <strong>&ldquo;{search.trim()}&rdquo;</strong> — AI will build the subject list</>}</span></button>}<button type="button" className={`ob-course-item${course === "custom" ? " selected" : ""}`} onClick={() => { setCourse("custom"); setCustomName(search.trim()); setSubs([]); }}><div className="ob-course-check">{course === "custom" && <IconCheck size={11} />}</div><span>Not listed? Let the AI build it from scratch</span></button></div>{course === "custom" && <div className="slide-in ob-note-panel" style={{ marginBottom: 14 }}><label className="lbl">Course / exam title</label><div className="ob-add-sub-row"><input className="ob-add-sub-input" autoFocus placeholder="e.g. MBA in Marketing from NMIMS CDOE" value={customName} onChange={(e) => setCustomName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && suggestFor(customName, goalText)} /><button className="ob-btn ob-btn-primary" style={{ padding: "10px 16px" }} disabled={suggesting || !customName.trim()} onClick={() => suggestFor(customName, goalText)}>{suggesting ? "Working…" : "AI: Assess & Build Subjects"}</button></div><label className="lbl" style={{ marginTop: 12 }}>Describe your goal (optional)</label><textarea className="input-field" rows={3} placeholder="e.g. I want to complete the course, prepare for exams, and revise weak topics" value={goalText} onChange={(e) => setGoalText(e.target.value)} /><div className="ob-hint" style={{ marginTop: 8, marginBottom: 0 }}>The engine uses the course title first, then the goal as extra context. You can edit every subject on the next screen.</div></div>}</>)}
+      {step === 4 && (<><h1>Add the details that make it accurate</h1><p className="ob-lead">These answers help the planner assess the <em>exact</em> syllabus — the right papers, board pattern, stream, and attempt context — instead of a generic version.</p><div className="ob-schedule-grid ob-details-grid">{isDegree && <><div className="ob-field"><label>Institution / University (optional but improves accuracy)</label><input className="input-field" placeholder="e.g. NMIMS CDOE, IGNOU, Delhi University" value={institution} onChange={(e) => setInstitution(e.target.value)} /></div><div className="ob-field"><label>Specialisation / Stream</label><input className="input-field" placeholder="e.g. Marketing, Finance, Computer Science" value={specialisation} onChange={(e) => setSpecialisation(e.target.value)} /></div><div className="ob-field"><label>Year / Semester (narrows to that term)</label><select value={year} onChange={(e) => setYear(e.target.value)}>{Object.entries(YEAR_LABELS).map(([value, text]) => <option key={value} value={value}>{text}</option>)}</select></div></>}{isSchool && <><div className="ob-field"><label>Board</label><select value={board} onChange={(e) => setBoard(e.target.value)}><option>CBSE</option><option>ICSE</option><option>State Board</option><option>IB</option><option>IGCSE / Cambridge</option></select></div><div className="ob-field"><label>Stream (for class 11-12)</label><select value={specialisation} onChange={(e) => setSpecialisation(e.target.value)}><option value="">Not applicable</option><option value="Science (PCM)">Science (PCM)</option><option value="Science (PCB)">Science (PCB)</option><option value="Commerce">Commerce</option><option value="Arts / Humanities">Arts / Humanities</option></select></div></>}{isCompetitive && <><div className="ob-field"><label>Attempt</label><select value={attempt} onChange={(e) => setAttempt(e.target.value)}><option value="first">First attempt</option><option value="repeat">Repeat / re-attempt</option></select></div><div className="ob-field"><label>How much have you already prepared?</label><select value={priorPrep} onChange={(e) => setPriorPrep(e.target.value)}><option value="fresh">Starting fresh (0-20%)</option><option value="partial">Partly done (20-60%)</option><option value="revision">Mostly done (60%+)</option></select></div></>}<div className="ob-field ob-field-span-full"><label>Your goal (optional — shapes the plan&apos;s emphasis)</label><textarea className="input-field" rows={2} placeholder="e.g. Clear the exam in first attempt, focus on weak areas, finish syllabus then revise" value={goalText} onChange={(e) => setGoalText(e.target.value)} /></div></div><div className="ob-hint ob-note-panel" style={{ marginTop: 4 }}>{suggesting ? "Assessing your exact syllabus…" : "When you continue, I’ll use these details to build the precise subject list before scheduling starts."}</div></>)}
+      {step === 5 && (<><h1>Review the syllabus structure</h1><p>{course && course !== "custom" ? "We loaded a suggested syllabus. Fine-tune the units here — each unit turns into a scheduled lesson in your plan." : "Add the subjects you want included. Each unit becomes an individually scheduled lesson."}</p><div className="ob-mini-stats" aria-label="Syllabus stats"><div className="ob-mini-stat"><strong>{subs.length}</strong><span>subjects</span></div><div className="ob-mini-stat"><strong>{totalUnits}</strong><span>lesson units</span></div><div className="ob-mini-stat"><strong>{compactNumber(estHours)}</strong><span>est. hours</span></div></div><div className="ob-subs-grid">{subs.map((s, i) => <div className="ob-sub-row" key={i}><div style={{ width: 10, height: 10, borderRadius: 99, background: s.color || PALETTE[i % 8] }} /><input type="text" value={s.name} onChange={(e) => setSubs((p) => p.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))} /><input type="number" min={1} max={40} value={s.units} onChange={(e) => setSubs((p) => p.map((x, j) => (j === i ? { ...x, units: Number(e.target.value) } : x)))} /><select value={s.difficulty} onChange={(e) => setSubs((p) => p.map((x, j) => (j === i ? { ...x, difficulty: e.target.value } : x)))}><option>Easy</option><option>Medium</option><option>Hard</option></select><button className="btn btn-xs btn-danger" onClick={() => setSubs((p) => p.filter((_, j) => j !== i))}>✕</button></div>)}{!subs.length && <div style={{ fontSize: ".82rem", color: "var(--text-dim)", padding: "10px 2px" }}>No subjects yet — add one below.</div>}</div><div className="ob-add-sub-row"><input className="ob-add-sub-input" placeholder="+ Add a subject..." value={newSub} onChange={(e) => setNewSub(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addSubject()} /><button className="ob-btn ob-btn-primary" style={{ padding: "10px 18px" }} onClick={addSubject}>Add</button></div><div className="flex-row gap-sm" style={{ flexWrap: "wrap", marginTop: 10 }}><button className="btn btn-sm btn-secondary" disabled={suggesting} onClick={() => suggestFor(resolvedCourseName, goalText)}>{suggesting ? "Rebuilding…" : "↻ Re-assess subjects with AI"}</button>{suggestSource && <span className="chip chip-kind">source: {suggestSource}</span>}</div>{!!suggestSources.length && <div className="curriculum-sources" aria-label="Curriculum source details"><div className="curriculum-sources-title">Source details used for this curriculum</div>{suggestSources.map((source, index) => <div className="curriculum-source" key={`${source.publisher}-${source.title}-${index}`}><span className="curriculum-source-type">{source.type}</span><div>{source.url ? <a href={source.url} target="_blank" rel="noreferrer">{source.title}</a> : <strong>{source.title}</strong>}<div>{source.publisher}{source.note ? ` · ${source.note}` : ""}</div></div></div>)}</div>}<div className="ob-hint" style={{ marginTop: 10 }}>{subs.length} subjects · <strong>{totalUnits} advanced lessons</strong> will be generated with prerequisites, key concepts, applied practice, and source references.</div></>)}
+      {step === 6 && (<><h1>Tell me how you want to learn</h1><p>These choices only tune pacing and emphasis. The AI lesson generation and scheduler logic stay the same underneath.</p><div className="ob-schedule-grid"><div className="ob-field ob-field-span-full"><div className="ob-choice-card"><label>Weakest Subject</label><div className="ob-range-hint">If one subject needs extra reinforcement, the planner can give it more attention.</div><select value={weak} onChange={(e) => setWeak(e.target.value)}><option value="-1">None / not sure</option>{subs.map((s, i) => <option key={i} value={String(i)}>{s.name}</option>)}</select></div></div><OnboardingChoiceGroup label="Study Style" hint="Choose the learning mix that feels most natural to you." value={style} options={STYLE_OPTIONS} onChange={setStyle} columns={3} fullWidth /><OnboardingChoiceGroup label="Revision Block" hint="Reserve time near the end for a dedicated revision phase." value={revision} options={REVISION_OPTIONS} onChange={setRevision} columns={2} fullWidth /><OnboardingChoiceGroup label="Plan Mode" hint="This changes how the schedule distributes time across lessons." value={planMode} options={PLAN_MODE_OPTIONS} onChange={setPlanMode} columns={3} fullWidth /></div></>)}
+      {step === 7 && (<><h1>Set your study rhythm</h1><p>Use direct controls to shape a schedule that feels clean, realistic, and easy to follow day after day.</p><div className="ob-schedule-grid"><div className="ob-field"><label>Start Date</label><input type="date" value={start} onChange={(e) => setStart(e.target.value)} /></div><div className="ob-field"><label>Exam / Target Date</label><input type="date" value={exam} onChange={(e) => setExam(e.target.value)} /></div><OnboardingSlider label="Daily Study Hours" value={hrs} valueLabel={`${formatHoursCompact(hrs)}/day`} hint={studyHourHint(hrs, sdays)} min={0.5} max={14} step={0.5} minLabel="30 min" maxLabel="14h" presets={HOURS_PRESETS} onChange={setHrs} fullWidth /><OnboardingSlider label="Subjects per Day" value={spd} valueLabel={`${spd} subject${spd > 1 ? "s" : ""}`} hint={subjectsPerDayHint(spd)} min={1} max={6} step={1} minLabel="1 subject" maxLabel="6 subjects" presets={SUBJECTS_PRESETS} onChange={setSpd} fullWidth /><OnboardingChoiceGroup label="Study Days" hint="Choose how many days per week you realistically want to study." value={sdays} options={STUDY_DAY_OPTIONS} onChange={setSdays} columns={3} fullWidth /><OnboardingSlider label="Buffer Days" value={buffer} valueLabel={`${buffer} day${buffer === 1 ? "" : "s"}`} hint={bufferDaysHint(buffer)} min={0} max={30} step={1} minLabel="0 days" maxLabel="30 days" presets={BUFFER_PRESETS} onChange={setBuffer} fullWidth /></div><div className="ob-projection-card"><div className="ob-projection-label">Projected Syllabus Completion</div><div className="ob-projection-date">{prettyLong(projected)}</div><div className={`ob-projection-note ${feasible ? "ok" : "warn"}`}>{feasible ? `Comfortable — ${availDays} days available, ${Math.round(estMinutes / 60)}h of content.` : `Tight — needs ~${Math.round(estMinutes / 60)}h but you only have ~${Math.round(capacity / 60)}h. I'll compress lessons.`}</div></div></>)}
+      {step === 8 && (<><h1>Review your setup</h1><p>Everything below is still editable. When you continue, the planner uses the same AI and ML pipeline as before — only the onboarding presentation has changed.</p><div className="ob-review-grid"><div className="ob-review-card"><div className="ob-review-title">Plan snapshot</div><div className="ob-summary-row"><span>Learner</span><span>{name}</span></div><div className="ob-summary-row"><span>Programme</span><span className="ob-review-value">{resolvedCourseName}</span></div>{specialisation.trim() && <div className="ob-summary-row"><span>Specialisation</span><span className="ob-review-value">{specialisation}</span></div>}{institution.trim() && <div className="ob-summary-row"><span>Institution</span><span className="ob-review-value">{institution}</span></div>}<div className="ob-summary-row"><span>Subjects</span><span>{subs.length}</span></div><div className="ob-summary-row"><span>Lesson units</span><span>{totalUnits}</span></div><div className="ob-summary-row"><span>Estimated content</span><span>{compactNumber(estHours)}h</span></div><div className="ob-summary-row"><span>Window</span><span>{prettyLong(start)} → {prettyLong(exam)}</span></div><div className="ob-summary-row"><span>Daily commitment</span><span>{formatHours(hrs)} · {spd} subjects/day</span></div><div className="ob-summary-row"><span>Study days</span><span>{STUDY_DAY_OPTIONS.find((option) => option.id === sdays)?.label || "All 7 days"}</span></div><div className="ob-summary-row"><span>Revision block</span><span>{revision === "0" ? "None" : `Last ${revision} week(s)`}</span></div><div className="ob-summary-row"><span>Buffer days</span><span>{buffer}</span></div></div><div className="ob-review-card"><div className="ob-review-title">What happens next</div><div className="ob-review-check"><span className="ob-review-check-icon"><IconCheck size={12} /></span><div>Break each subject into sequenced lessons with prerequisites and key concepts.</div></div><div className="ob-review-check"><span className="ob-review-check-icon"><IconCheck size={12} /></span><div>Balance the schedule using your hours, study days, weak subjects, and revision buffer.</div></div><div className="ob-review-check"><span className="ob-review-check-icon"><IconCheck size={12} /></span><div>Generate a calendar you can re-plan later without losing the underlying learning logic.</div></div><div className="ob-review-pulse"><strong>{feasible ? "Looks comfortable" : "This plan will be tight"}</strong><span>{feasible ? `${availDays} study days available for about ${compactNumber(estHours)} hours of content.` : `You have about ${Math.round(capacity / 60)} usable hours for roughly ${compactNumber(estHours)} hours of content, so the scheduler will compress where needed.`}</span></div>{busy && <div className="ob-review-loading">SHIGUN is analysing your syllabus and sequencing {totalUnits} lessons… this takes a few seconds.</div>}</div></div></>)}
+      {err && <div className="ob-error-banner" role="alert">{err}</div>}
+      <div className="ob-footer-strip mt-md"><div className="ob-privacy"><IconLock size={13} /><span>Your workspace stays private — study data never leaves your account.</span></div><div className="ob-btn-row">{step > 1 && <button className="ob-btn ob-btn-secondary" type="button" onClick={back} disabled={busy || suggesting}>Back</button>}{step < total ? <button className="ob-btn ob-btn-primary" type="button" onClick={next} disabled={busy || suggesting}>{suggesting ? "Assessing…" : step === 4 ? "Assess & Continue" : "Continue"}</button> : <button className="ob-btn ob-btn-primary" type="button" onClick={launch} disabled={busy}>{busy ? "Generating…" : isRerun ? "Wipe old plan & Generate New" : "Generate My AI Plan"}</button>}</div></div>
+      {isRerun && onCancel && <button className="ob-cancel-link" type="button" onClick={onCancel} disabled={busy}>Cancel — keep my current plan</button>}
     </div>
-  );
+  </div></div>;
 }

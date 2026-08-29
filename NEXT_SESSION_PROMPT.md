@@ -3,6 +3,59 @@
 
 ---
 
+## v24 — RESIDUAL POLISH: SIX GENUINE LEFTOVERS (this session)
+
+Audited the whole cascade first (globals.css v1–v23 + the four theme sheets +
+ui-polish.css). The v14–v23 layers hold: task-row geometry, the ⋮ menu,
+onboarding sliders, both calendars, Zen, the rail, the mobile chrome, the chat
+and the tracker bar were all LEFT ALONE. Only six real issues remained — each
+fixed inside the file that owns the selector, no new CSS layer, no restyling
+of finished components:
+
+1. **FSRS rating strip broke on phones.** At ≤640px `.task-row` is a grid with
+   areas `"dot main" "actions actions"`; the strip had no area, so grid
+   auto-placement dropped it into the 10px dot column and the four
+   Again/Hard/Good/Easy buttons collapsed into a sliver. Fix (ui-polish.css,
+   same mobile block that owns the row grid): `.task-row > .rating-strip
+   { grid-column: 1 / -1; margin: 0 0 2px; }`.
+2. **Ambient volume slider was the last raw native control**
+   (`.vol-range` = `accent-color` only). It now speaks the onboarding slider
+   language: 8px rail in a 26px grab strip, gradient fill driven by
+   `--vol-fill` set inline from `vol` state (FocusView.tsx), 20px gradient
+   thumb (24px on touch) that presses to scale(1.1), double focus ring,
+   lighter unfilled track on dark/obsidian/nebula. Edited the
+   `.ambient-panel .vol-range` rule in place in globals.css.
+3. **Hero live chip over-claimed "live".** It rendered a literal `●` text
+   bullet (baseline-sitting, static) and stayed green for *paused* and
+   *on break*. Now the real 6px `.task-live-dot` with the shared 2s
+   `recDotPulse` **only while recording**; paused → muted (`is-idle`),
+   break → amber (`is-break`) — the same three states as the Focus Studio
+   chip. Rules live in ui-polish.css's live-state section (owner of the
+   recording language); markup in Dashboard.tsx. Reduced-motion guards
+   extended to the new selector.
+4. **Calendar pills were illegible for light subject colours.** White text on
+   the default palette's amber/lime/cyan is ≈2:1. `cal-pill` backgrounds are
+   now `color-mix(in srgb, C 62%, #191631)` inline in PlannerView.tsx — hue
+   identity survives, text passes. Day-cell tints stay raw (they carry no
+   text).
+5. **Quick Add chips had no tactile contract.** `.qa-min-chip` /
+   `.qa-date-btn` were the only buttons in the app with zero hover/press/
+   transition and a second, flat selected style. practical-enhancements.css
+   (their owner) gives them the shared quiet-hover + spring-press + gradient
+   selected state; date buttons get focus-visible rings.
+6. **Open Quick Add tray was content-width.** Inside `.day-head-side` /
+   `.planner-quickadd-row` it sized to its content and sat ragged beside the
+   header text. `:has(.quick-add-panel)` switches the host row to block and
+   the panel to width:100% — one predictable full-width sheet, only while
+   open (the repo already relies on `:has`, so no support change).
+
+Verification: cascade-checked in the built bundle
+(`.next/static/chunks/*.css` — confirm each new declaration wins), then
+`npm run typecheck`, `npm run lint` (0 warnings), `npm test` (250/250),
+`npm run build:app`. `deploy-package/src` re-synced byte-exact.
+
+---
+
 ## v19 — COLLAPSED RAIL: ONE HIGHLIGHT · SIDEBAR-SIZED ⌘K HINT · MOBILE APP BAR CONTRACT (this session)
 
 Three visual bugs, all styling/structure (no behaviour, data or routing changes):

@@ -265,8 +265,9 @@ export default function Dashboard({
 
               {heroLive ? (
                 <div className="now-live">
-                  <span className="up-next-live-chip">
-                    ● {clockRunning ? "clock running" : clockOnBreak ? "on break" : "paused"}
+                  <span className={`up-next-live-chip${clockRunning ? " is-recording" : clockOnBreak ? " is-break" : " is-idle"}`}>
+                    <span className="task-live-dot" aria-hidden="true" />
+                    {clockRunning ? "clock running" : clockOnBreak ? "on break" : "paused"}
                   </span>
                   <span className="mono now-live-timer" aria-label="Session time">{mmss(activeClockSeconds ?? 0)}</span>
                   <div className="flex-row gap-sm">

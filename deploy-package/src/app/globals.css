@@ -151,15 +151,8 @@ select.input-field{appearance:none;background-image:linear-gradient(45deg,transp
 .day-date{font-size:.95rem;font-weight:800;letter-spacing:-.3px}
 .day-meta{font-size:.74rem;color:var(--text-muted);font-weight:650}
 
-.task-row{display:flex;align-items:center;gap:8px 10px;padding:11px 14px;border-radius:10px;background:var(--row-bg);border:1px solid transparent;margin-bottom:6px;transition:background .15s ease,border-color .15s ease;flex-wrap:wrap}
-.task-main{flex:1 1 220px;min-width:0}
-.task-row > .chip,.task-row-actions > .btn{flex-shrink:0;flex-grow:0;white-space:nowrap;align-self:center}
-.task-row:hover{background:var(--row-hover);border-color:var(--glass-border)}
 .task-row.done{opacity:.55}
 .task-row.done .task-title{text-decoration:line-through}
-.task-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
-.task-title{font-size:.85rem;font-weight:700;line-height:1.35}
-.task-sub{font-size:.72rem;color:var(--text-muted);font-weight:600;margin-top:3px}
 
 .chip{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:99px;font-size:.64rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px;border:1px solid transparent;white-space:nowrap;flex-shrink:0}
 
@@ -173,7 +166,7 @@ select.input-field{appearance:none;background-image:linear-gradient(45deg,transp
 .vtab.active{background:var(--surface-solid);color:var(--accent);box-shadow:0 2px 8px rgba(0,0,0,.06)}
 
 /* calendar */
-.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}
+.cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px}
 .cal-dow{font-size:.68rem;font-weight:800;text-transform:uppercase;color:var(--text-muted);text-align:center;padding:4px 0}
 .cal-cell{min-height:88px;border-radius:var(--radius-md);background:var(--row-bg);border:1px solid transparent;padding:8px;cursor:pointer;transition:all .2s ease}
 .cal-cell:hover{border-color:var(--accent);background:var(--row-hover)}
@@ -286,67 +279,8 @@ select.input-field{appearance:none;background-image:linear-gradient(45deg,transp
 .ob-field label{display:block;font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:var(--text-muted);margin-bottom:6px}
 .ob-field input,.ob-field select{width:100%;padding:11px 13px;border-radius:var(--radius-md);border:1px solid var(--glass-border);background:var(--input-bg);color:var(--text-main);font-size:.86rem;font-weight:650;outline:none;font-family:inherit}
 .ob-field-span-full{grid-column:1 / -1}
-.ob-range-card{
-  padding:14px 15px;border-radius:var(--radius-lg);border:1px solid var(--glass-border);
-  background:linear-gradient(180deg,var(--surface) 0%,var(--row-bg) 100%);
-  box-shadow:var(--shadow-sm);
-}
 .ob-range-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px}
 .ob-range-head label{margin-bottom:4px}
-.ob-range-hint{font-size:.78rem;line-height:1.45;color:var(--text-muted);font-weight:600}
-.ob-range-value{
-  flex-shrink:0;padding:8px 12px;border-radius:999px;background:var(--accent-glow);color:var(--accent);
-  font-size:.84rem;font-weight:800;letter-spacing:-.2px;box-shadow:inset 0 1px 0 rgba(255,255,255,.22);
-}
-/* Registered property so the fill percentage ANIMATES smoothly when the
-   thumb moves or a preset chip jumps the value (gracefully instant in
-   older browsers). */
-@property --ob-range-fill{
-  syntax:"<percentage>";
-  inherits:true;
-  initial-value:0%;
-}
-.ob-range-card .ob-range-input{
-  width:100%;appearance:none;-webkit-appearance:none;height:18px;padding:0;border:none;outline:none;cursor:pointer;
-  border-radius:999px;touch-action:pan-x;
-  background:linear-gradient(90deg,var(--accent) 0%,var(--accent-light) var(--ob-range-fill,0%),var(--row-hover) var(--ob-range-fill,0%),var(--row-hover) 100%);
-  box-shadow:inset 0 1px 3px color-mix(in srgb,var(--text-main) 14%,transparent);
-  transition:--ob-range-fill .22s cubic-bezier(.25,1,.4,1);
-}
-.ob-range-card .ob-range-input::-webkit-slider-runnable-track{height:18px;border-radius:999px;background:transparent}
-.ob-range-card .ob-range-input::-moz-range-track{height:18px;border-radius:999px;background:transparent}
-.ob-range-card .ob-range-input::-webkit-slider-thumb{
-  -webkit-appearance:none;appearance:none;width:26px;height:26px;margin-top:-4px;border-radius:50%;
-  border:2.5px solid var(--surface-solid);background:var(--accent-gradient);
-  box-shadow:0 1px 3px color-mix(in srgb,var(--text-main) 30%,transparent),0 3px 10px var(--accent-glow),0 8px 22px var(--accent-glow);
-  transition:transform .18s var(--spring-soft),box-shadow .18s ease;
-}
-.ob-range-card .ob-range-input::-moz-range-thumb{
-  width:26px;height:26px;border-radius:50%;border:2.5px solid var(--surface-solid);background:var(--accent-gradient);
-  box-shadow:0 1px 3px color-mix(in srgb,var(--text-main) 30%,transparent),0 3px 10px var(--accent-glow),0 8px 22px var(--accent-glow);
-  transition:transform .18s var(--spring-soft),box-shadow .18s ease;
-}
-.ob-range-card .ob-range-input:hover::-webkit-slider-thumb{transform:scale(1.08);box-shadow:0 1px 3px color-mix(in srgb,var(--text-main) 30%,transparent),0 4px 12px var(--accent-glow),0 10px 26px var(--accent-glow)}
-.ob-range-card .ob-range-input:hover::-moz-range-thumb{transform:scale(1.08);box-shadow:0 1px 3px color-mix(in srgb,var(--text-main) 30%,transparent),0 4px 12px var(--accent-glow),0 10px 26px var(--accent-glow)}
-.ob-range-card .ob-range-input:active{cursor:grabbing}
-.ob-range-card .ob-range-input:active::-webkit-slider-thumb{transform:scale(1.16);box-shadow:0 0 0 7px var(--accent-glow),0 6px 16px var(--accent-glow),0 14px 34px var(--accent-glow)}
-.ob-range-card .ob-range-input:active::-moz-range-thumb{transform:scale(1.16);box-shadow:0 0 0 7px var(--accent-glow),0 6px 16px var(--accent-glow),0 14px 34px var(--accent-glow)}
-.ob-range-card .ob-range-input:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 4px var(--accent-glow),0 0 0 8px color-mix(in srgb,var(--accent) 30%,transparent),0 6px 16px var(--accent-glow)}
-.ob-range-card .ob-range-input:focus-visible::-moz-range-thumb{box-shadow:0 0 0 4px var(--accent-glow),0 0 0 8px color-mix(in srgb,var(--accent) 30%,transparent),0 6px 16px var(--accent-glow)}
-.ob-range-meta{display:flex;justify-content:space-between;gap:12px;margin-top:8px;font-size:.72rem;color:var(--text-dim);font-weight:700}
-.ob-range-presets{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
-.ob-range-chip{
-  padding:8px 14px;border-radius:999px;border:1.5px solid var(--glass-border);background:var(--surface-solid);
-  color:var(--text-muted);font-size:.74rem;font-weight:750;font-family:inherit;cursor:pointer;
-  box-shadow:0 1px 2px color-mix(in srgb,var(--text-main) 6%,transparent);
-  transition:background .18s ease,border-color .18s ease,color .18s ease,transform .18s ease,box-shadow .18s ease;
-}
-.ob-range-chip:hover{border-color:color-mix(in srgb,var(--accent) 55%,var(--glass-border));background:var(--surface-hover);color:var(--accent);transform:translateY(-1px)}
-.ob-range-chip.active{
-  background:var(--accent-gradient);color:#fff;border-color:transparent;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.22),0 2px 4px color-mix(in srgb,var(--text-main) 18%,transparent),0 6px 16px var(--accent-glow);
-}
-.ob-range-chip:active{transform:scale(.94)}
 .ob-choice-card{
   padding:14px 15px;border-radius:var(--radius-lg);border:1px solid var(--glass-border);
   background:linear-gradient(180deg,var(--surface) 0%,var(--row-bg) 100%);box-shadow:var(--shadow-sm);
@@ -519,7 +453,7 @@ body.theme-dark .tracker-bar,body.theme-obsidian .tracker-bar,body.theme-nebula 
   .ob-name-input,.ob-course-search,.ob-add-sub-input,.input-field,.ai-chat-input{font-size:16px}
   .cal-cell{min-height:62px;padding:5px}
   .timer-ring-wrap{width:220px;height:220px}
-  .task-row{flex-wrap:wrap;align-items:center}
+  .task-row{flex-wrap:nowrap;align-items:center}
   .task-row > .chip,.task-row-actions > .btn{flex-shrink:0;flex-grow:0}
   textarea.input-field{resize:vertical;min-height:86px}
 }
@@ -540,23 +474,12 @@ body.theme-dark .tracker-bar,body.theme-obsidian .tracker-bar,body.theme-nebula 
   .ai-quick button{flex-shrink:0}
   .ai-input-row{padding:10px 12px calc(10px + env(safe-area-inset-bottom));gap:8px}
   .ai-msg{max-width:92%;font-size:.82rem}
-  /* Structured mobile task card: title block on top (full width),
-     then one clean action row. No arbitrary wrap order. */
-  .task-row{position:relative;flex-wrap:wrap;gap:6px 8px;padding:12px;border-radius:var(--radius-md);background:var(--surface);border:1px solid var(--glass-border)}
-  .task-row > .task-dot{position:absolute;left:12px;top:19px;margin:0}
-  /* Title block ALWAYS takes the full card width on phones */
-  .task-main{flex:1 1 100%;width:100%;min-width:100%;order:-1;margin-bottom:4px;padding-left:22px}
-  .task-row .task-title{font-size:.84rem;line-height:1.35}
-  .task-row .task-sub{font-size:.68rem;line-height:1.5;margin-top:3px}
-  .task-row > .chip{order:1;font-size:.58rem;padding:3px 8px;margin-right:auto}
-  .task-row-actions > .btn{flex:0 0 auto;white-space:nowrap;padding:7px 11px;font-size:.7rem;min-height:30px}
   .vtabs{width:100%;display:grid;grid-template-columns:repeat(3,1fr)}
   .vtab{text-align:center;padding:8px 6px}
   .page-header > .flex-row{width:100%}
   .page-header select.input-field{width:100%!important}
   .cal-grid{gap:4px}
   .cal-cell{min-height:54px;border-radius:var(--radius-md);padding:4px}
-  .cal-pill{display:none}
   .modal-overlay{padding:0;align-items:flex-end}
   .modal-box{max-height:88vh;border-radius:var(--radius-xl) 20px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom));width:100%;max-width:100%}
   .modal-box::before{content:"";display:block;width:38px;height:4px;border-radius:99px;background:var(--text-dim);opacity:.4;margin:0 auto 14px}
@@ -589,9 +512,6 @@ body.theme-dark .tracker-bar,body.theme-obsidian .tracker-bar,body.theme-nebula 
   .ob-field input,.ob-field select{padding:11px 10px;font-size:.82rem}
   .ob-field label{letter-spacing:.4px}
 }
-
-.task-row.active-clock{position:relative;border-color:rgba(34,197,94,.4);background:linear-gradient(135deg,var(--row-hover),rgba(34,197,94,.06))}
-
 
 .glass-panel{animation:panelIn .3s var(--spring-soft) backwards}
 @keyframes panelIn{from{opacity:.001;transform:translateY(6px)}to{opacity:1;transform:none}}
@@ -641,7 +561,6 @@ body.theme-dark .tracker-bar,body.theme-obsidian .tracker-bar,body.theme-nebula 
   .nav-item{transition:background .2s ease,color .2s ease,transform .15s ease}
   .nav-item:active{transform:scale(.96)}
   .chip{transition:transform .15s ease}
-  .task-row:hover .task-title{color:var(--accent)}
 }
 
 
@@ -665,11 +584,6 @@ body.theme-dark .tracker-bar,body.theme-obsidian .tracker-bar,body.theme-nebula 
 
 
 
-.task-dot {
-  width: 10px;
-  height: 10px;
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-}
 .kpi-card {
   position: relative;
   border-left: none;
@@ -704,11 +618,6 @@ body { transition: background-color .5s ease, color .3s ease; }
 }
 .cmdk-item:hover .cmdk-label, .cmdk-item.active .cmdk-label, .cmdk-item:hover .cmdk-hint, .cmdk-item.active .cmdk-hint {
   color: #fff !important;
-}
-.task-row.active-clock {
-  border-color: var(--success-accent);
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), var(--row-hover));
-  box-shadow: 0 8px 24px rgba(34, 197, 94, 0.1);
 }
 ::-webkit-scrollbar {
   width: 6px;
@@ -797,10 +706,6 @@ body.theme-dark,body.theme-obsidian,body.theme-nebula{
 }
 .ai-fab:hover{transform:scale(1.05)}
 .ai-fab:active{transform:scale(.93)}
-
-/* ── Task rows: glass lift on hover, spring settle ── */
-.task-row{transition:background .2s ease,border-color .2s ease,transform .35s var(--spring),box-shadow .3s ease}
-.task-row:active{background:var(--row-hover)}
 
 /* ── Modal + palette: iOS sheet spring-up ── */
 .modal-box{animation:sheetUp .32s var(--spring-soft)}
@@ -906,11 +811,6 @@ body.theme-dark,body.theme-obsidian,body.theme-nebula{
 
 .ob-btn:active{transform:scale(.95)}
 
-/* ── Calendar cells: glass tiles with lift ── */
-.cal-cell{transition:background .15s ease,border-color .15s ease}
-.cal-cell:hover{border-color:var(--glass-border-hover);background:var(--row-hover)}
-.cal-cell:active{background:var(--row-hover)}
-
 /* ── Select dropdowns: match glass inputs ── */
 select.input-field{
   backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
@@ -936,12 +836,11 @@ button{-webkit-tap-highlight-color:transparent}
 ================================================== */
 @media (hover: none) and (pointer: coarse){
   /* Disable hover-lift illusions that would "stick" after tap */
-  .btn:hover,.chip:hover,.task-row:hover,.kpi-card:hover,.cal-cell:hover,
+  .btn:hover,.chip:hover,.kpi-card:hover,
   .ob-level-btn:hover,.ai-quick button:hover,.streak-badge:hover,.vtab:hover{transform:none}
   /* Stronger, faster press feedback instead */
   .btn:active{transform:scale(.93);transition-duration:.06s}
   .vtab:active,.chip:active,.ai-quick button:active{transform:scale(.9)}
-  .task-row:active{transform:scale(.985);background:var(--row-hover)}
   .cal-cell:active,.ob-level-btn:active{transform:scale(.96)}
   .kpi-card:active{transform:scale(.975)}
   /* Comfortable 44px-equivalent tap targets (Apple HIG) */
@@ -993,15 +892,6 @@ button{-webkit-tap-highlight-color:transparent}
 
 /* ── Premium micro-choreography ─────────────────────────────── */
 
-/* Task rows cascade in — 30ms stagger, first 8 rows */
-.day-block .task-row,.modal-box .task-row{animation:rowIn .32s var(--spring-soft) backwards}
-.day-block .task-row:nth-child(2),.modal-box .task-row:nth-child(2){animation-delay:.03s}
-.day-block .task-row:nth-child(3),.modal-box .task-row:nth-child(3){animation-delay:.06s}
-.day-block .task-row:nth-child(4),.modal-box .task-row:nth-child(4){animation-delay:.09s}
-.day-block .task-row:nth-child(5),.modal-box .task-row:nth-child(5){animation-delay:.12s}
-.day-block .task-row:nth-child(6),.modal-box .task-row:nth-child(6){animation-delay:.15s}
-.day-block .task-row:nth-child(7),.modal-box .task-row:nth-child(7){animation-delay:.18s}
-.day-block .task-row:nth-child(8),.modal-box .task-row:nth-child(8){animation-delay:.21s}
 @keyframes rowIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
 
 /* Done: ease into rest rather than snapping */
@@ -1188,11 +1078,6 @@ img,svg,video,canvas{max-width:100%;height:auto}
   .kpi-grid{grid-template-columns:repeat(2,1fr);gap:10px}
   .kpi-card{padding:14px}
   .day-block{padding:12px 11px;margin-bottom:10px}
-  .task-row{padding:11px 10px}
-  .task-row-actions > .btn{padding:6px 9px;font-size:.67rem}
-  .cal-grid{gap:3px}
-  .cal-cell{min-height:44px;padding:3px;border-radius:var(--radius-sm)}
-  .cal-cell .cal-num{font-size:.68rem}
   .vtab{padding:8px 4px;font-size:.72rem}
   .modal-box{padding:14px 12px calc(16px + env(safe-area-inset-bottom))}
   .ai-panel{
@@ -1303,9 +1188,6 @@ img,svg,video,canvas{max-width:100%;height:auto}
 }
 .btn:active::after{opacity:1;transition:opacity .06s ease}
 
-/* 5. Task completion: row exhales — brief lift then settle */
-.task-row.done{animation:taskSettle .5s var(--spring-soft)}
-@keyframes taskSettle{0%{transform:scale(1)}30%{transform:scale(1.008)}100%{transform:scale(1)}}
 
 /* 6. Sidebar nav: icons nudge on hover, spring on select */
 .nav-item svg{transition:transform .25s var(--spring)}
@@ -1320,10 +1202,6 @@ img,svg,video,canvas{max-width:100%;height:auto}
 /* 8. Chips: status changes cross-fade */
 .chip{transition:background .3s ease,color .3s ease,transform .2s var(--spring)}
 
-/* 9. Calendar: today's cell carries a quiet living pulse */
-.cal-cell.today{position:relative;border-color:var(--accent)}
-.cal-cell.today::after{content:"";position:absolute;inset:-1px;border-radius:inherit;border:1px solid var(--accent);opacity:0;animation:todayPulse 3.2s ease-in-out infinite;pointer-events:none}
-@keyframes todayPulse{0%,100%{opacity:0;transform:scale(1)}45%{opacity:.5;transform:scale(1.015)}}
 
 /* 10. Modal: content stagger — header, body, actions arrive in order */
 .modal-box > *:nth-child(1){animation:rowIn .3s var(--spring-soft) .05s backwards}
@@ -1530,10 +1408,6 @@ html{scrollbar-gutter:stable}
 /* ── Keyboard hints: consistent kbd styling ── */
 .cmdk-kbd,kbd{font-family:var(--font-jetbrains-mono),ui-monospace,monospace;box-shadow:inset 0 -1.5px 0 var(--glass-border-hover)}
 
-/* ── Selection states: table/list rows ── */
-.task-row.selected{border-color:var(--accent);background:var(--color-primary-soft)}
-body.theme-dark .task-row.selected,body.theme-obsidian .task-row.selected,body.theme-nebula .task-row.selected{background:var(--nav-active-bg)}
-
 /* ── Dividers: soft gradient hairlines for section breaks ── */
 .divider{height:1px;border:none;margin:18px 0;background:linear-gradient(90deg,transparent,var(--glass-border) 20%,var(--glass-border) 80%,transparent)}
 
@@ -1547,9 +1421,6 @@ body.theme-dark .task-row.selected,body.theme-obsidian .task-row.selected,body.t
 
 /* ═══ MOTION REFINEMENT — physics polish across themes ═══ */
 
-/* Live clock row: soft heartbeat on the active dot */
-.task-row.active-clock .task-dot{animation:heartbeat 2s ease-in-out infinite}
-@keyframes heartbeat{0%,100%{transform:scale(1)}25%{transform:scale(1.25)}40%{transform:scale(1)}}
 
 /* Streak: flame warms up as streak grows (data-attr hook) */
 .streak-badge[data-hot="true"]{background:var(--status-pending-bg);color:var(--status-pending-text)}
@@ -1730,9 +1601,7 @@ body.mode-focused .pulse-dot.live::after{animation:none;transition:none}
 
 /* Task action rows on phones: consistent order & spacing */
 @media(max-width:640px){
-  .task-row > .chip{order:1;margin-right:auto}
-  .task-row-actions{order:2}
-  .task-row .task-sub{display:flex;flex-wrap:wrap;gap:2px 6px;align-items:center}
+.task-row .task-sub{display:flex;flex-wrap:wrap;gap:2px 6px;align-items:center}
 }
 
 /* Extra polish: title clamps to 2 lines with ellipsis on very small screens */
@@ -1840,7 +1709,7 @@ body::before{
 .kpi-value,.day-meta,.tracker-bar .mono{transition:color .4s ease}
 
 /* 9. Focus ring on cards for keyboard users — glows, not jumps */
-.ob-level-btn:focus-visible,.task-row:focus-within{box-shadow:0 0 0 3px var(--accent-glow)}
+.ob-level-btn:focus-visible{box-shadow:0 0 0 3px var(--accent-glow)}
 
 /* 10. mode-young: gloss becomes slightly more playful (longer sweep) */
 body.mode-young .kpi-card::before{background:linear-gradient(105deg,transparent,rgba(255,255,255,.24),transparent)}
@@ -1868,7 +1737,7 @@ body.mode-focused::before{animation:none;opacity:.4}
 }
 
 /* Blueprint: component uniformity — one card language everywhere */
-.task-row,.kpi-card,.day-block{border-radius:var(--radius-md)}
+.kpi-card,.day-block{border-radius:var(--radius-md)}
 
 /* Progressive disclosure affordance */
 .more-options-toggle{
@@ -1885,28 +1754,8 @@ body.mode-focused::before{animation:none;opacity:.4}
 ═══════════════════════════════════════════════════════════════ */
 
 @media(max-width:640px){
-  /* Task cards: ONE action row — Done (primary), Clock in, then "..."
-     which reveals Edit / Skip subject / Skip on tap */
-  .task-row-actions > .btn,.task-row > .chip{display:none}
-  .task-row > .chip.chip-kind{display:inline-flex}
-  .task-row-actions > .btn.task-primary,.task-row-actions > .btn.task-clock,.task-row-actions > .btn.task-more{display:inline-flex}
-  .task-row.expanded-actions .task-row-actions > .btn{display:inline-flex}
-  .task-row.expanded-actions > .chip{display:inline-flex}
-  /* PENDING chip hidden on phones — the card state already says it */
-  .task-row > .chip.chip-pending{display:none !important}
-  .task-row.expanded-actions > .chip.chip-pending{display:inline-flex !important}
-
-  /* Calmer card visuals */
-  .task-row{padding:13px 14px;gap:8px}
-  .task-row .task-sub{opacity:.85}
   .day-block{padding:14px 13px}
   .day-head .day-meta{font-size:.72rem}
-}
-
-/* The "..." more button: ONLY visible on mobile (<640px), hidden on desktop */
-.task-more{display:none !important;font-weight:800;letter-spacing:1px}
-@media(max-width:640px){
-  .task-row-actions > .btn.task-more{display:inline-flex !important}
 }
 
 /* Softer light canvas: barely-warm porcelain, calmer than pure grey */
@@ -1920,10 +1769,6 @@ body.mode-focused::before{animation:none;opacity:.4}
 /* Headings: slightly warmer ink, tighter rhythm */
 .day-date{font-size:.98rem;font-weight:700;letter-spacing:-.3px}
 
-/* Card entrance on mobile: subtle rise, fast */
-@media(max-width:640px){
-  .day-block .task-row{animation:rowIn .26s var(--spring-soft) backwards}
-}
 
 
 /* ═══ INTELLIGENCE CARD — calm analytics, progressive disclosure ═══ */
@@ -1962,29 +1807,9 @@ body.mode-focused::before{animation:none;opacity:.4}
   scrollbar-gutter:stable;
   touch-action:pan-y;
 }
-.modal-box .task-row{flex-wrap:wrap;row-gap:8px;overflow:hidden}
-.modal-box .task-main{flex:1 1 100%;min-width:0}
-.modal-box .task-row-actions > .btn,.modal-box .task-row > .chip{flex:0 0 auto}
-.modal-box .task-row-actions > .btn:last-of-type{margin-right:0}
 
-/* Calendar grid: premium pass */
-.cal-cell{position:relative;transition:background .18s ease,border-color .18s ease,box-shadow .22s ease}
-.cal-cell:hover{box-shadow:var(--shadow-md);z-index:2}
-.cal-pill{transition:transform .18s var(--spring-soft)}
-.cal-cell:hover .cal-pill{transform:translateX(1.5px)}
 /* Weekend headers slightly dimmed — visual rhythm */
 .cal-grid > .cal-dow:first-child,.cal-grid > .cal-dow:last-child{opacity:.6}
-/* Month cells cascade in */
-.cal-grid .cal-cell{animation:calIn .35s var(--spring-soft) backwards}
-.cal-grid .cal-cell:nth-child(7n+2){animation-delay:.02s}
-.cal-grid .cal-cell:nth-child(7n+3){animation-delay:.04s}
-.cal-grid .cal-cell:nth-child(7n+4){animation-delay:.06s}
-.cal-grid .cal-cell:nth-child(7n+5){animation-delay:.08s}
-.cal-grid .cal-cell:nth-child(7n+6){animation-delay:.1s}
-.cal-grid .cal-cell:nth-child(7n){animation-delay:.12s}
-@keyframes calIn{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:none}}
-/* Task-count dot cluster on busy days */
-.cal-cell .cal-more{font-size:.6rem;font-weight:700;color:var(--accent)}
 
 /* ═══ DASHBOARD PREMIUM REFINEMENT ═══ */
 .kpi-card{background:linear-gradient(180deg,var(--surface) 0%,var(--surface) 88%,var(--row-bg) 100%)}
@@ -2057,10 +1882,6 @@ body.mode-focused::before{animation:none;opacity:.4}
   .glass-panel{border-radius:var(--radius-md)}
   .day-block{padding:12px 11px;margin-bottom:9px}
   .day-date{font-size:.9rem}
-  .task-row{padding:11px 12px;margin-bottom:5px}
-  .task-row .task-title{font-size:.8rem;line-height:1.3}
-  .task-row .task-sub{font-size:.64rem}
-  .task-row-actions > .btn{padding:5px 10px;font-size:.66rem;min-height:28px}
   .tracker-bar{padding:10px 12px;margin-bottom:14px}
   .tracker-bar .mono{font-size:.95rem}
   .page-header{margin-bottom:12px}
@@ -2716,24 +2537,10 @@ button,a,.nav-item,.vtab,.cal-cell,.chip,.task-row,.rate-btn,input,select{touch-
   .up-next-timer{font-size:1.02rem}
 }
 
-/* ── Live dot on every red "Clock out" button ── */
-.clock-live-dot{
-  width:7px;height:7px;border-radius:50%;background:currentColor;display:inline-block;
-  margin-right:6px;vertical-align:1px;
-  animation:clockLivePulse 1.6s ease-in-out infinite;
-}
-@keyframes clockLivePulse{
-  0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(239,68,68,.45)}
-  60%{opacity:.55;box-shadow:0 0 0 5px rgba(239,68,68,0)}
-}
-/* The tracker-bar Clock Out breathes gently so it is impossible to miss */
-.act-out{animation:actOutBreath 2.6s ease-in-out infinite}
-@keyframes actOutBreath{
-  0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,0)}
-  50%{box-shadow:0 0 0 4px rgba(239,68,68,.18)}
-}
+/* The live dot on red "Clock out" buttons is defined once, in ui-polish.css
+   (one 2s opacity breath, shared with the row badge). */
 @media(prefers-reduced-motion:reduce){
-  .clock-live-dot,.act-out,.up-next-live-chip{animation:none!important}
+  .up-next-live-chip{animation:none!important}
 }
 
 /* ── Tracker bar (mobile): recording = ONLY session controls ──
@@ -3152,8 +2959,6 @@ svg{flex-shrink:0;vertical-align:middle}
 
 /* ── 6. Task rows on phones: colour dot lines up with line 1 ─────── */
 @media(max-width:640px){
-  .task-row > .task-dot{left:12px;top:19px}
-  .task-main{padding-left:22px}
   .brief-chev{margin-left:6px}
 
   /* Lesson title first, actions second: the action group never squeezes
@@ -3253,7 +3058,6 @@ svg{flex-shrink:0;vertical-align:middle}
 .ai-send:active{transform:scale(var(--press-md))}
 .voice-btn:active,.voice-replay:active,.ai-close:active,.toast-close:active,
 .sb-toggle:active{transform:scale(var(--press-lg))}
-.task-row:active{transform:scale(.992);background:var(--row-hover)}
 .kpi-card:active{transform:scale(var(--press-sm))}
 
 /* Entrances settle instead of flying: shorter travel, stagger untouched.
@@ -3606,11 +3410,11 @@ body.theme-dark .pulse-dot.live,body.theme-obsidian .pulse-dot.live,body.theme-n
 ────────────────────────────────────────────────────────────────────── */
 @media (hover:none){
   .btn:hover,.btn-primary:hover,.btn-secondary:hover,.btn-danger:hover,
-  .nav-item:hover,.task-row:hover,.kpi-card:hover,.cal-cell:hover,
+  .nav-item:hover,.kpi-card:hover,
   .ob-level-btn:hover,.ob-choice-btn:hover,.ob-course-item:hover,.ob-feature:hover,
   .ai-quick button:hover,.rate-btn:hover,.day-block:hover,.tilt-card:hover,
   .glass-panel:hover,.streak-badge:hover,.voice-btn:hover,.voice-replay:hover,
-  .ai-close:hover,.toast-close:hover,.sb-toggle:hover,.ob-range-chip:hover,
+  .ai-close:hover,.toast-close:hover,.sb-toggle:hover,
   .heat-cell:hover,.up-next:hover,.cmdk-item:hover,.tracker-bar:hover,
   .ob-btn-primary:hover,.ob-btn-secondary:hover,.ai-fab:hover,
   .input-field:hover:not(:focus){
@@ -3621,11 +3425,6 @@ body.theme-dark .pulse-dot.live,body.theme-obsidian .pulse-dot.live,body.theme-n
   .nav-item:hover:not(.active){background:transparent;color:var(--text-muted)}
   .sidebar .nav-item.active:hover{background:var(--accent-gradient) !important;color:#fff !important}
   .nav-item:hover svg{transform:none}
-  .task-row:hover{background:var(--row-bg);border-color:transparent}
-  .task-row:hover .task-title{color:inherit}
-  .cal-cell:hover{border-color:transparent;background:var(--row-bg);box-shadow:none;z-index:auto}
-  .cal-cell.today:hover{border-color:var(--accent)}
-  .cal-cell:hover .cal-pill{transform:none}
   .kpi-card:hover,.day-block:hover{
     border-color:color-mix(in srgb,var(--glass-border) 78%,transparent);
     box-shadow:var(--glass-edge-top),var(--glass-edge-bot),var(--glass-edge-side),var(--glass-depth);
@@ -3645,8 +3444,6 @@ body.theme-dark .pulse-dot.live,body.theme-obsidian .pulse-dot.live,body.theme-n
   .ob-course-item:hover{border-color:transparent;background:var(--surface-solid)}
   .ob-course-item.selected:hover{border-color:var(--accent)}
   .ob-feature:hover{border-color:var(--glass-border);box-shadow:none}
-  .ob-range-chip:hover{border-color:var(--glass-border);background:var(--surface-solid);color:var(--text-muted)}
-  .ob-range-chip.active:hover{background:var(--accent-gradient);color:#fff;border-color:transparent}
   .ob-btn-secondary:hover{background:var(--surface-solid)}
   .ai-quick button:hover{background:var(--surface);color:var(--text-muted);border-color:var(--glass-border)}
   .rate-btn:hover,.rate-again:hover,.rate-hard:hover,.rate-good:hover,.rate-easy:hover{
@@ -3676,7 +3473,6 @@ body.theme-dark .pulse-dot.live,body.theme-obsidian .pulse-dot.live,body.theme-n
   .nav-item:active{background:var(--row-hover);color:var(--text-main)}
   .nav-item.active:active{background:var(--accent-gradient);color:#fff}
   .cmdk-item:active{background:var(--row-hover)}
-  .cal-cell:active{background:var(--row-hover);border-color:var(--accent)}
   .ai-quick button:active{background:var(--accent-glow);color:var(--accent);border-color:var(--nav-active-border)}
   .rate-btn:active{background:var(--nav-active-bg);color:var(--nav-active-text)}
   .ob-course-item:active{background:var(--row-hover)}
@@ -3897,9 +3693,6 @@ body.theme-switching{animation:themeBlink .7s ease}
 .nav-item.active::before{animation:navPip .4s var(--spring-soft)}
 .vtab{transition:all .32s ease}
 .vtab.active::after{animation:tabInk .45s var(--spring-soft)}
-.cal-cell{transition:all .32s ease}
-.cal-grid .cal-cell{animation:calIn .5s var(--spring-soft) backwards}
-.task-row{transition:background .26s ease,border-color .26s ease,transform .45s var(--spring),box-shadow .4s ease}
 .input-field{transition:border-color .28s ease,box-shadow .28s ease}
 .chip{transition:background .4s ease,color .4s ease,transform .3s var(--spring)}
 
@@ -4402,28 +4195,6 @@ body.theme-mint,body.theme-sunset,body.theme-silver-lavender,body.theme-default{
 .day-block:hover .day-head::after,.section-card:hover .section-head::after{opacity:.7}
 
 @keyframes lgBeam{to{--lg-angle:360deg}}
-/* The card that OWNS the running session gets the rim beam — pure CSS via
-   :has(), so no state has to be threaded through the component tree. */
-.glass-panel:not(.ai-panel).up-next.live::after,
-.glass-panel:not(.ai-panel).day-block:has(.task-row.active-clock)::after{
-  content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:1;
-  /* Out-specify the hover sheen that also lives on this ::after (it is the
-     one pseudo-element the base card owns) and neutralise its geometry. */
-  width:auto;left:auto;right:auto;top:auto;bottom:auto;
-  transform:none;transition:none;
-  padding:1.5px;
-  background:conic-gradient(from var(--lg-angle),
-    transparent 0deg,
-    color-mix(in srgb,var(--success-accent) 75%,transparent) 55deg,
-    color-mix(in srgb,var(--accent) 70%,transparent) 110deg,
-    transparent 190deg,transparent 360deg);
-  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
-  mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
-  -webkit-mask-composite:xor;mask-composite:exclude;
-  animation:lgBeam 6s linear infinite;
-  opacity:.9;
-}
-.up-next.live{border-left-color:transparent}
 /* Loader: a halo that actually rotates, so the first frame has a heartbeat. */
 .loader-ring{position:relative}
 .loader-ring::before{
@@ -4446,7 +4217,6 @@ body.theme-mint,body.theme-sunset,body.theme-silver-lavender,body.theme-default{
   content:"";position:absolute;left:0;right:0;top:1px;height:40%;border-radius:99px;
   background:linear-gradient(180deg,rgba(255,255,255,.5),rgba(255,255,255,0));pointer-events:none;
 }
-.cal-pill{box-shadow:inset 0 1px 0 rgba(255,255,255,.32),0 1px 2px color-mix(in srgb,var(--text-main) 14%,transparent)}
 /* Heatmap: five levels become a ramp instead of five flat paints. */
 .heat-cell{box-shadow:inset 0 0 0 .5px color-mix(in srgb,var(--text-main) 6%,transparent)}
 .heat-cell.l1{background-image:linear-gradient(150deg,color-mix(in srgb,var(--accent) 38%,transparent),color-mix(in srgb,var(--accent) 20%,transparent))}
@@ -4557,7 +4327,6 @@ body.theme-mint,body.theme-sunset,body.theme-silver-lavender,body.theme-default{
 /* Task rows: one gutter rhythm everywhere (only the modal used to get one),
    and the Done CTA always owns the right edge. */
 .task-row{row-gap:var(--sp-1)}
-.task-row-actions > .task-primary{margin-inline-start:auto}
 .modal-box .task-row{row-gap:8px}
 /* Segmented control + day heads: predictable, not hand-tuned. */
 @media(min-width:641px){.vtabs{width:fit-content;max-width:100%}}
@@ -4966,42 +4735,6 @@ body.mode-young .section-title::after{width:46px;height:3px;bottom:-8px}
   opacity:.6;
 }
 
-/* ── Clean Vertical Task Row (no split buttons, full-width info) ── */
-.task-row.clean-list{
-  flex-direction:column;align-items:stretch;gap:8px;
-  padding:14px 16px;border-radius:var(--radius-md);
-  background:linear-gradient(180deg,var(--surface) 0%,var(--row-bg) 100%);
-  border:1px solid var(--glass-border);box-shadow:var(--shadow-sm);
-  transition:all .2s ease;
-}
-.task-row.clean-list:hover{
-  border-color:var(--glass-border-hover);box-shadow:var(--shadow-md);
-  transform:translateY(-1px);
-}
-.task-row.clean-list .task-main{
-  flex:1 1 auto;width:100%;min-width:0;padding-left:22px;
-}
-.task-row.clean-list .task-dot{
-  position:absolute;left:16px;top:18px;width:10px;height:10px;
-}
-.task-row.clean-list .task-row-actions{
-  display:flex;align-items:center;gap:8px;flex-wrap:wrap;
-  justify-content:flex-end;padding-top:4px;border-top:1px dashed var(--glass-border);
-  margin-top:4px;
-}
-.task-row.clean-list .task-title{font-size:.9rem;line-height:1.35}
-.task-row.clean-list .task-sub{font-size:.74rem;color:var(--text-muted);margin-top:3px}
-
-/* Mobile: clean list stays vertical but buttons wrap cleanly */
-@media(max-width:640px){
-  .task-row.clean-list{
-    padding:13px 14px;gap:6px;
-  }
-  .task-row.clean-list .task-row-actions{
-    justify-content:flex-start;gap:6px;padding-top:8px;margin-top:6px;
-  }
-  .task-row.clean-list .btn-xs{padding:6px 10px;font-size:.7rem;min-height:30px;flex:0 0 auto}
-}
 
 /* ── Enhanced Mobile / Interface Adjustments ── */
 @media(max-width:640px){
@@ -5014,12 +4747,6 @@ body.mode-young .section-title::after{width:46px;height:3px;bottom:-8px}
 .timer-card .liquid-card{border-top:3px solid transparent;
   border-image:linear-gradient(90deg,var(--accent),var(--color-ai)) 1;
 }
-
-/* Clean list format for the Dashboard task list only.
-   The planner rows intentionally do NOT stack: their action buttons are direct
-   children of .task-row (no .task-row-actions wrapper), so a flex-direction:column
-   there put the dot, title, status chip and every button on its own line. */
-.dashboard-tasks .task-row{flex-direction:column;align-items:stretch;gap:6px}
 
 /* Gradient text on section headings */
 .section-head h3{font-family:var(--font-display);font-weight:750;letter-spacing:-.5px}
@@ -5382,7 +5109,87 @@ body.mode-young .section-title::after{width:46px;height:3px;bottom:-8px}
 .sound-option:not(.is-selected) .sound-option-indicator{opacity:0}
 .ambient-panel .vol-label{margin:0 0 7px;font-size:var(--fs-xs)}
 .ambient-panel .vol-label strong{color:var(--text-main);font-weight:800}
-.ambient-panel .vol-range{display:block;width:100%;height:24px;margin:0;accent-color:var(--accent);cursor:pointer}
+/* Volume speaks the same slider language as the onboarding controls: a
+   8px rail inside a 26px grab strip, filled to --vol-fill (set inline by
+   FocusView from its own state), one gradient thumb that presses gently.
+   The old control was a raw accent-color range — the app's one remaining
+   OS-native input. */
+.ambient-panel .vol-range{
+  --vol-track-h:8px;
+  display:block;width:100%;height:26px;margin:0;padding:0;
+  border:none;outline:none;background:transparent;cursor:pointer;
+  appearance:none;-webkit-appearance:none;
+  touch-action:pan-y;
+}
+.ambient-panel .vol-range::-webkit-slider-runnable-track{
+  height:var(--vol-track-h);border-radius:999px;
+  background:linear-gradient(90deg,
+    var(--accent) 0%,
+    var(--accent-light) var(--vol-fill,30%),
+    color-mix(in srgb,var(--text-main) 12%,transparent) var(--vol-fill,30%),
+    color-mix(in srgb,var(--text-main) 12%,transparent) 100%);
+  box-shadow:inset 0 1px 2px color-mix(in srgb,var(--text-main) 10%,transparent);
+}
+.ambient-panel .vol-range::-moz-range-track{
+  height:var(--vol-track-h);border-radius:999px;
+  background:color-mix(in srgb,var(--text-main) 12%,transparent);
+  box-shadow:inset 0 1px 2px color-mix(in srgb,var(--text-main) 10%,transparent);
+}
+.ambient-panel .vol-range::-moz-range-progress{
+  height:var(--vol-track-h);border-radius:999px 0 0 999px;
+  background:linear-gradient(90deg,var(--accent),var(--accent-light));
+}
+.ambient-panel .vol-range::-webkit-slider-thumb{
+  -webkit-appearance:none;appearance:none;
+  width:20px;height:20px;margin-top:calc((var(--vol-track-h) - 20px)/2);
+  border-radius:50%;border:2px solid var(--surface-solid);background:var(--accent-gradient);
+  box-shadow:0 1px 2px color-mix(in srgb,var(--text-main) 26%,transparent),
+             0 2px 6px color-mix(in srgb,var(--accent) 24%,transparent);
+  transition:transform .16s ease,box-shadow .16s ease;
+}
+.ambient-panel .vol-range::-moz-range-thumb{
+  width:20px;height:20px;border-radius:50%;border:2px solid var(--surface-solid);
+  background:var(--accent-gradient);
+  box-shadow:0 1px 2px color-mix(in srgb,var(--text-main) 26%,transparent),
+             0 2px 6px color-mix(in srgb,var(--accent) 24%,transparent);
+  transition:transform .16s ease,box-shadow .16s ease;
+}
+.ambient-panel .vol-range:active{cursor:grabbing}
+.ambient-panel .vol-range:active::-webkit-slider-thumb{
+  transform:scale(1.1);
+  box-shadow:0 1px 3px color-mix(in srgb,var(--text-main) 28%,transparent),
+             0 3px 10px color-mix(in srgb,var(--accent) 30%,transparent);
+}
+.ambient-panel .vol-range:active::-moz-range-thumb{transform:scale(1.1)}
+.ambient-panel .vol-range:focus-visible{outline:none}
+.ambient-panel .vol-range:focus-visible::-webkit-slider-thumb{
+  box-shadow:0 0 0 3px var(--surface-solid),
+             0 0 0 5px color-mix(in srgb,var(--accent) 55%,transparent),
+             0 1px 2px color-mix(in srgb,var(--text-main) 26%,transparent);
+}
+.ambient-panel .vol-range:focus-visible::-moz-range-thumb{
+  box-shadow:0 0 0 3px var(--surface-solid),
+             0 0 0 5px color-mix(in srgb,var(--accent) 55%,transparent),
+             0 1px 2px color-mix(in srgb,var(--text-main) 26%,transparent);
+}
+/* Dark themes need a lighter unfilled half or it disappears. */
+body.theme-dark .ambient-panel .vol-range::-webkit-slider-runnable-track,
+body.theme-obsidian .ambient-panel .vol-range::-webkit-slider-runnable-track,
+body.theme-nebula .ambient-panel .vol-range::-webkit-slider-runnable-track{
+  background:linear-gradient(90deg,
+    var(--accent) 0%,
+    var(--accent-light) var(--vol-fill,30%),
+    rgba(255,255,255,.16) var(--vol-fill,30%),
+    rgba(255,255,255,.16) 100%);
+}
+body.theme-dark .ambient-panel .vol-range::-moz-range-track,
+body.theme-obsidian .ambient-panel .vol-range::-moz-range-track,
+body.theme-nebula .ambient-panel .vol-range::-moz-range-track{background:rgba(255,255,255,.16)}
+@media(pointer:coarse){
+  .ambient-panel .vol-range{height:34px}
+  .ambient-panel .vol-range::-webkit-slider-thumb{width:24px;height:24px;margin-top:calc((var(--vol-track-h) - 24px)/2)}
+  .ambient-panel .vol-range::-moz-range-thumb{width:24px;height:24px}
+}
 .ambient-current{display:flex;align-items:center;gap:7px;margin-top:8px;color:var(--text-dim);font-size:var(--fs-micro);font-weight:650}
 .ambient-current-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 3px var(--accent-glow)}
 .rules-list{
@@ -5518,52 +5325,6 @@ body.mode-young .section-title::after{width:46px;height:3px;bottom:-8px}
 }
 .tracker-actions .chip.chip-kind{color:var(--accent)}
 
-/* ── Tracker bar · live rim-light while clocked in ──────────────── */
-@supports (mask-composite:exclude){
-  body.focus-live .tracker-bar::after{
-    inset:0;opacity:.85;padding:1.5px;
-    background:conic-gradient(from var(--lg-angle),
-      transparent 0deg,
-      color-mix(in srgb,var(--success-accent) 75%,transparent) 55deg,
-      color-mix(in srgb,var(--accent) 70%,transparent) 110deg,
-      transparent 190deg,transparent 360deg);
-    -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
-    mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
-    -webkit-mask-composite:xor;mask-composite:exclude;
-    animation:lgBeam 6s linear infinite;
-  }
-}
-
-/* ── Task rows · one actions gutter, right-aligned, wraps as a block ── */
-.task-row-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-@media(min-width:641px){
-  .task-row{flex-wrap:nowrap}
-  .task-row-actions{justify-content:flex-end;margin-inline-start:auto}
-}
-@media(max-width:640px){
-  .task-row-actions{order:2;flex:1 1 auto;justify-content:flex-end}
-}
-
-/* ── Task rows · quiet glass gloss + live rim ───────────────────── */
-.task-row{box-shadow:inset 0 1px 0 var(--lg-rim-faint)}
-.task-row.active-clock{
-  box-shadow:inset 0 1px 0 var(--lg-rim-faint),
-    inset 0 0 0 1px color-mix(in srgb,var(--success-accent) 26%,transparent);
-}
-@media(hover:hover) and (pointer:fine){
-  .task-row{transition:border-color .18s ease,box-shadow .18s ease,transform .18s var(--spring-soft),background .18s ease}
-  .task-row:hover{
-    border-color:color-mix(in srgb,var(--glass-border-hover) 88%,transparent);
-    box-shadow:inset 0 1px 0 var(--lg-rim),0 2px 8px color-mix(in srgb,var(--text-main) 8%,transparent);
-    transform:translateY(-1px);
-  }
-}
-
-/* ── Dashboard list · the absolute dot anchors to its own row ───── */
-.task-row.clean-list{
-  position:relative;
-  box-shadow:inset 0 1px 0 var(--lg-rim-faint),var(--shadow-sm);
-}
 
 /* ── Focus studio · normal-sentence label + liquid ring halo ────── */
 #t-label{text-transform:none;letter-spacing:.02em}
@@ -5607,78 +5368,6 @@ body.mode-young .section-title::after{width:46px;height:3px;bottom:-8px}
   padding:var(--sp-3) var(--sp-3) 12px;
   margin-bottom:0;
   border-bottom:1px solid var(--glass-border);
-}
-.planner-days .task-row{
-  padding:11px var(--sp-3);
-  margin:0;
-  border-radius:0;
-  background:transparent;
-  border:1px solid transparent;
-  border-bottom:1px solid var(--glass-border);
-  box-shadow:none;
-  gap:12px;
-}
-.planner-days .task-row.last-row{border-bottom:none}
-.planner-days .task-row:hover{background:var(--row-hover);border-color:transparent;transform:none;box-shadow:none}
-.planner-days .task-row.active-clock,.planner-days .task-row.active-clock:hover{border-color:var(--success-accent);border-bottom-color:var(--success-accent)}
-.planner-days .rating-strip,.planner-days .planner-lesson-brief{margin:8px var(--sp-3)}
-@media(min-width:641px){
-  .planner-days .task-row{flex-wrap:nowrap}
-}
-
-/* 2) Dashboard "Today's Study Load" — same list language (was a stack of
-      bordered cards with a dashed divider). */
-.task-row.clean-list{
-  flex-direction:row;align-items:center;gap:12px;
-  padding:12px var(--sp-4);
-  border-radius:0;
-  background:transparent;
-  border:1px solid transparent;
-  border-bottom:1px solid var(--glass-border);
-  box-shadow:none;
-  transition:background .15s ease;
-}
-.task-row.clean-list:hover{background:var(--row-hover);border-color:transparent;transform:none;box-shadow:none}
-.task-row.clean-list:last-child{border-bottom:none}
-.task-row.clean-list .task-main{flex:1 1 auto;width:auto;min-width:0;padding-left:0}
-.task-row.clean-list .task-dot{position:static;width:10px;height:10px;flex-shrink:0;align-self:center}
-.task-row.clean-list .task-row-actions{
-  display:flex;align-items:center;justify-content:flex-end;gap:6px;
-  padding-top:0;margin-top:0;border-top:none;flex-shrink:0;
-}
-.task-row.clean-list .task-row-actions > .task-primary{margin-inline-start:0}
-
-/* 3) One aligned, consistent row-control bar for every task row.
-      Buttons share a height, the clock button is a stable width so the
-      column of CTAs never jumps, and Done owns the right edge. */
-.task-row-actions{display:flex;align-items:center;gap:6px;flex-shrink:0}
-.task-row-actions > .btn{min-height:30px;padding:4px 11px}
-.task-row-actions > .btn.task-clock{min-width:88px}
-.task-row-actions > .btn.task-primary{min-width:58px}
-.task-row-actions > .btn.task-more{width:32px;min-width:32px;padding:4px 0}
-
-/* 4) Mobile: one even, full-width action bar (Done · Clock · ⋯) with the
-      extras revealed by ⋯ wrapping into clean rows underneath. */
-@media(max-width:640px){
-  .task-row-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;width:100%;margin-left:0}
-  .task-row-actions > .btn{width:100%;min-width:0;padding:7px 6px}
-  .task-row-actions > .task-primary{order:-2}
-  .task-row-actions > .task-clock{order:-1}
-  .task-row-actions > .btn.task-more{width:100%;min-width:0}
-  .task-row.clean-list .task-row-actions{width:100%}
-}
-
-/* 5) Calendar: colour and topics at a glance — on phones the pills were
-      hidden entirely, leaving a plain number grid. Now every day with
-      tasks shows a soft tint of its first subject plus tiny coloured
-      topic pills, and the "+n more" hint stays readable. */
-.cal-cell.has-tasks{background:color-mix(in srgb,var(--cell-tint,var(--accent)) 9%,var(--row-bg))}
-.cal-cell.has-tasks:hover{background:color-mix(in srgb,var(--cell-tint,var(--accent)) 15%,var(--row-hover))}
-@media(max-width:640px){
-  .cal-cell{min-height:52px;padding:4px}
-  .cal-num{font-size:.66rem;margin-bottom:2px}
-  .cal-pill{display:block;font-size:.55rem;line-height:1.25;padding:1px 4px;margin-bottom:2px;border-radius:4px}
-  .cal-more{font-size:.55rem;margin-top:1px}
 }
 
 /* Zen linked-mode hint under the action buttons */
@@ -5904,25 +5593,8 @@ body.mode-young .section-title::after{width:46px;height:3px;bottom:-8px}
     padding:12px 13px 11px;
   }
   .planner-days .day-head .daybar{flex:1 1 100%;margin:0}
-  .planner-days .task-row{padding:11px 13px}
   .day-date{font-size:.88rem;letter-spacing:-.01em}
   .day-meta{font-size:.68rem;margin-top:2px}
-}
-
-/* ─────────────────────────────────────────────────────────────
-   5 · TASK ROW DESKTOP COLUMN ALIGNMENT
-   Aligns the status chips and button columns across all rows in a day,
-   preventing weekly checkpoint or single-subject rows from drifting.
-───────────────────────────────────────────────────────────── */
-@media(min-width:641px){
-  .planner-days .task-row{flex-wrap:nowrap;display:flex;align-items:center;gap:12px}
-  .planner-days .task-row .task-main{flex:1 1 auto;min-width:0}
-  .planner-days .task-row > .chip{flex-shrink:0;min-width:68px;text-align:center;justify-content:center;margin-inline-start:auto}
-  .planner-days .task-row .task-row-actions{flex-shrink:0;min-width:350px;justify-content:flex-end;display:flex;align-items:center;gap:6px}
-  .planner-days .task-row .task-row-actions > .task-primary{margin-inline-start:0}
-  .task-row.clean-list{display:flex;align-items:center;gap:12px}
-  .task-row.clean-list .task-main{flex:1 1 auto;min-width:0}
-  .task-row.clean-list .task-row-actions{flex-shrink:0;min-width:350px;justify-content:flex-end}
 }
 
 /* Dock breathing room: the last row of a list must clear the capsule. */
