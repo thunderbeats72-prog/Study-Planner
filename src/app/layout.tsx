@@ -6,6 +6,7 @@ import "./pastel-ui-system.css";
 import "./study-planner-redesign.css";
 import "./practical-enhancements.css";
 import "./ui-polish.css";
+import "./ui-polish-pass.css";
 
 const inter = localFont({
   src: "./fonts/inter-latin-variable.woff2",
