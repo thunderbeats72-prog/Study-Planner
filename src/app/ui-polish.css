@@ -85,10 +85,12 @@
   border-bottom-color: transparent;
 }
 
-/* The Overview keeps a softer inset so its rows sit inside the card. */
+/* The Overview keeps a softer inset so its rows sit inside the card. The
+   separator stays a hairline, but is strengthened just enough that the list
+   reads as a fitted column instead of a faint, disconnected line. */
 .dash-today-card .task-row {
   padding: 12px 14px;
-  border-bottom-color: var(--glass-border);
+  border-bottom-color: color-mix(in srgb, var(--glass-border-hover) 70%, var(--glass-border));
 }
 
 .task-dot {
