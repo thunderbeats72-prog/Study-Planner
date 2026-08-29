@@ -90,34 +90,7 @@
   .day-head-side{width:100%;justify-content:space-between}
 }
 
-/* ── 4. TASK ACTIONS — one [Done]/[Start] flow, extras behind ⋯ ────── */
-.task-row{position:relative}
-.task-more-wrap{position:relative;display:inline-flex}
-/* The old ⋯ toggle was mobile-only and dead on desktop; the new menu is a
-   real popover everywhere. This layer loads LAST, so it wins the cascade. */
-.task-more{display:inline-flex !important}
-@media(max-width:640px){
-  .task-row-actions .task-more{display:inline-flex !important}
-}
-.task-menu{
-  position:absolute;top:calc(100% + 6px);right:0;z-index:60;
-  min-width:200px;max-width:min(260px,calc(100vw - 32px));
-  display:flex;flex-direction:column;gap:2px;
-  padding:6px;border-radius:14px;
-  background:var(--surface-elevated);
-  border:1px solid var(--glass-border);
-  box-shadow:0 12px 32px rgba(10,12,26,.18);
-}
-.task-menu button{
-  width:100%;text-align:left;min-height:38px;padding:8px 12px;border-radius:9px;
-  border:0;background:transparent;color:var(--text-main);
-  font:inherit;font-size:.8rem;font-weight:600;cursor:pointer;
-}
-.task-menu button:hover{background:var(--row-hover)}
-.task-menu button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
-
-/* The recall rating strip sits inside the row now, spanning its width. */
-.task-row > .rating-strip{flex:1 1 100%;order:10;margin:2px 0 8px;min-width:0}
+/* ── 4. TASK ACTIONS — appearance consolidated into ui-polish.css ──── */
 
 /* ── 5. PLANNER — workload glance ───────────────────────────────────── */
 .workload-strip{

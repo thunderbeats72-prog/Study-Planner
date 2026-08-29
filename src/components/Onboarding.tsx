@@ -54,17 +54,23 @@ function studyHourHint(hours: number, studyDaysMode: string) { const weeklyHours
 function subjectsPerDayHint(count: number) { if (count <= 1) return "Deep focus on one subject each day."; if (count === 2) return "Balanced variety without too much switching."; if (count <= 4) return "Good for mixed revision and syllabus coverage."; return "Fast rotation — useful close to exams."; }
 function bufferDaysHint(days: number) { if (days <= 0) return "No spare recovery days — every study day counts."; if (days <= 3) return "Lean buffer for small delays and busy days."; if (days <= 7) return "Healthy safety net for revision and catch-up."; return "Plenty of recovery room before the deadline."; }
 
-function OnboardingSlider({ label, value, valueLabel, hint, min, max, step, minLabel, maxLabel, onChange, presets = [], fullWidth = false }: OnboardingSliderProps) {
+export function OnboardingSlider({ label, value, valueLabel, hint, min, max, step, minLabel, maxLabel, onChange, presets = [], fullWidth = false }: OnboardingSliderProps) {
   const inputId = useId();
+  /* The card carries a live "dragging" flag so the filled rail tracks the
+     thumb 1:1 while the finger is down (no animated lag mid-drag), and the
+     easing only plays for preset jumps and keyboard steps. Pointer capture
+     keeps the state honest even if the finger slides off the thumb. */
+  const [dragging, setDragging] = useState(false);
+  const stopDrag = () => setDragging(false);
   const fillPct = max === min ? 0 : ((value - min) / (max - min)) * 100;
   const sliderStyle = { "--ob-range-fill": `${fillPct}%` } as React.CSSProperties;
   return (
     <div className={`ob-field${fullWidth ? " ob-field-span-full" : ""}`}>
-      <div className="ob-range-card">
-        <div className="ob-range-head"><div className="ob-range-copy"><label htmlFor={inputId}>{label}</label>{hint && <div className="ob-range-hint">{hint}</div>}</div><output className="ob-range-value" htmlFor={inputId}>{valueLabel}</output></div>
-        <input id={inputId} className="ob-range-input" type="range" min={min} max={max} step={step} value={value} aria-valuetext={valueLabel} onChange={(e) => onChange(Number(e.target.value))} style={sliderStyle} />
+      <div className={`ob-range-card${dragging ? " is-dragging" : ""}`}>
+        <div className="ob-range-head"><div className="ob-range-copy"><label htmlFor={inputId}>{label}</label>{hint && <div className="ob-range-hint">{hint}</div>}</div>{/* key={value} re-mounts the badge so its swap transition replays on each committed change; while dragging the key is stable so digits never flicker mid-glide */}<output className="ob-range-value" key={dragging ? "ob-value-static" : `ob-value-${value}`} htmlFor={inputId} aria-live="off">{valueLabel}</output></div>
+        <input id={inputId} className="ob-range-input" type="range" min={min} max={max} step={step} value={value} aria-valuetext={valueLabel} onChange={(e) => onChange(Number(e.target.value))} onPointerDown={() => setDragging(true)} onPointerUp={stopDrag} onPointerCancel={stopDrag} onLostPointerCapture={stopDrag} onBlur={stopDrag} style={sliderStyle} />
         <div className="ob-range-meta" aria-hidden="true"><span>{minLabel}</span><span>{maxLabel}</span></div>
-        {!!presets.length && <div className="ob-range-presets" role="group" aria-label={`${label} presets`}>{presets.map((preset) => { const active = Math.abs(value - preset.value) < Math.max(step / 2, 0.01); return <button key={`${label}-${preset.value}`} type="button" className={`ob-range-chip${active ? " active" : ""}`} onClick={() => onChange(preset.value)}>{preset.label}</button>; })}</div>}
+        {!!presets.length && <div className="ob-range-presets" role="group" aria-label={`${label} presets`}>{presets.map((preset) => { const active = Math.abs(value - preset.value) < Math.max(step / 2, 0.01); return <button key={`${label}-${preset.value}`} type="button" className={`ob-range-chip${active ? " active" : ""}`} aria-pressed={active} onClick={() => onChange(preset.value)}>{preset.label}</button>; })}</div>}
       </div>
     </div>
   );

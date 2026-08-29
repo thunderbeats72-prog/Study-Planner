@@ -74,13 +74,10 @@ body { background-attachment:fixed; color:var(--text-main); }
 .dash-card,.day-block { padding:20px; border-radius:var(--radius-card); }
 .up-next { padding:19px 20px; border-radius:20px; background:linear-gradient(120deg,color-mix(in srgb,var(--accent) 9%,var(--surface)),var(--surface)); }
 .momentum-strip { border-radius:15px; }
-.task-row { border-radius:14px; background:color-mix(in srgb,var(--row-bg) 92%,var(--surface)); }
-.dashboard-tasks .task-row { background:transparent; border-radius:0; border-bottom:1px solid var(--glass-border); }
 
 .planner-days { gap:14px; }
 .planner-days .day-block { padding:0; overflow:hidden; }
 .planner-days .day-head { padding:17px 19px 13px; margin:0; background:linear-gradient(100deg,color-mix(in srgb,var(--accent) 7%,var(--surface)),var(--surface)); }
-.planner-days .task-row { margin:8px 14px; padding:12px 14px; }
 .focus-grid-2 { gap:16px; }
 .study-clock-panel,.timer-panel,.ambient-panel,.rules-panel { border-radius:var(--radius-card); }
 .timer-stage { border-radius:22px; background:radial-gradient(circle at 50% 42%,var(--accent-glow),transparent 52%),var(--surface); }
@@ -90,15 +87,12 @@ body { background-attachment:fixed; color:var(--text-main); }
 .theme-grid .btn { min-height:48px; }
 .subs-wrap { gap:16px; }
 .subject-lessons { margin-top:13px; }
-.cal-cell { border-radius:13px; background:color-mix(in srgb,var(--row-bg) 92%,var(--surface)); }
-.cal-cell.today { background:var(--nav-active-bg); }
 .kan-col { border-radius:18px; background:color-mix(in srgb,var(--row-bg) 70%,var(--surface)); }
 
 @media (max-width:1200px) {
   .app-wrapper { gap:14px; }
   .sidebar { width:226px; }
   .page-header { padding-right:245px; }
-  .planner-days .task-row .task-row-actions { min-width:0; }
 }
 @media (max-width:1024px) {
   .sidebar { width:210px; }
@@ -119,7 +113,6 @@ body { background-attachment:fixed; color:var(--text-main); }
   .dash-card { padding:15px; }
   .up-next { padding:15px; border-radius:17px; }
   .planner-days .day-head { padding:14px; }
-  .planner-days .task-row { margin:7px 10px; }
   .timer-stage { min-height:250px; }
   .timer-ring-wrap { width:min(72vw,235px)!important; height:min(72vw,235px)!important; }
 }
@@ -131,7 +124,6 @@ body { background-attachment:fixed; color:var(--text-main); }
   .kpi-label { font-size:.56rem; }
   .kpi-value { font-size:1.45rem; }
   .kpi-sub { font-size:.62rem; line-height:1.35; }
-  .task-row { padding:11px; }
   .planner-tools,.day-head,.tracker-bar { gap:8px; }
   .btn { min-height:42px; }
 }
@@ -231,11 +223,6 @@ body { background-attachment:fixed; color:var(--text-main); }
   .planner-days { gap:12px !important; }
   .planner-days .day-block { overflow:hidden; }
   .planner-days .day-head { padding:15px !important; }
-  .planner-days .task-row { display:flex !important; align-items:flex-start !important; flex-wrap:wrap !important; gap:9px !important; margin:8px !important; padding:13px !important; }
-  .planner-days .task-row .task-main { flex:1 1 calc(100% - 18px) !important; width:calc(100% - 18px) !important; min-width:0 !important; }
-  .planner-days .task-row > .chip { order:2; margin:0 !important; min-width:0 !important; }
-  .planner-days .task-row .task-row-actions { order:3; display:grid !important; grid-template-columns:repeat(2,minmax(0,1fr)) !important; width:100% !important; min-width:0 !important; gap:7px !important; }
-  .planner-days .task-row .task-row-actions .btn { width:100% !important; min-width:0 !important; padding-inline:8px !important; }
 
   /* A bottom dock that keeps all five destinations touch-sized and legible. */
   .sidebar {
