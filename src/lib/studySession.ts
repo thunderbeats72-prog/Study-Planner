@@ -82,19 +82,30 @@ export function planSession(snapshot: SessionSnapshot, command: SessionCommand):
     }
 
     case "pause": {
+      /* One Pause freezes the whole session. A recording clock is paused even
+         when the learner clocked in manually (task row / tracker bar): the
+         session controls always present ONE verb, so that verb must never
+         leave half the session running. Background sync (reconcile) stays
+         owner-scoped — it never touches a manual clock on its own. */
       if (snapshot.timerRunning) fx.push({ kind: "timer.pause" });
-      if (snapshot.focusOwnsClock && snapshot.clockRunning) fx.push({ kind: "clock.pause" });
-      if (snapshot.focusOwnsClock && snapshot.timerRunning && snapshot.clockRunning) {
+      if (snapshot.clockRunning) fx.push({ kind: "clock.pause" });
+      if (snapshot.timerRunning && snapshot.clockRunning) {
         fx.push({ kind: "note", message: "Paused — focus timer and study clock stopped together." });
       }
       return fx;
     }
 
     case "toggle":
-      return planSession(snapshot, snapshot.timerRunning ? { type: "pause" } : { type: "start" });
+      return planSession(
+        snapshot,
+        snapshot.timerRunning || snapshot.clockRunning ? { type: "pause" } : { type: "start" }
+      );
 
     case "break": {
-      if (!snapshot.focusOwnsClock || !snapshot.clockSessionActive || snapshot.clockOnBreak) return fx;
+      /* An explicit "Take a break" applies to whichever session is open —
+         Focus-owned or manually clocked in. Only the automatic break flow
+         (blockComplete/breakComplete) stays owner-scoped. */
+      if (!snapshot.clockSessionActive || snapshot.clockOnBreak) return fx;
       if (snapshot.timerRunning) fx.push({ kind: "timer.pause" });
       fx.push({ kind: "clock.break" });
       fx.push({ kind: "note", message: "On a break — study time is paused." });
@@ -102,10 +113,13 @@ export function planSession(snapshot: SessionSnapshot, command: SessionCommand):
     }
 
     case "endSession": {
-      /* Clock Out must work from every surface, including a plain Study Clock
-         session started from Planner. Only a Focus-owned session should also
-         stop the Focus countdown; a manual clock session remains independent. */
-      if (snapshot.focusOwnsClock && snapshot.timerRunning) fx.push({ kind: "timer.pause" });
+      if (snapshot.timerRunning) fx.push({ kind: "timer.pause" });
+      /* Clock Out ends the WHOLE session regardless of who opened it.
+         Pause/reconcile stay owner-scoped (a manual clock is never paused by
+         Pause Focus), but an explicit Clock Out must always close an open
+         session — task rows and the tracker bar clock in manually, and their
+         Clock Out button used to be a no-op because of the old ownership
+         gate here. */
       if (snapshot.clockSessionActive) fx.push({ kind: "clock.out" });
       fx.push({ kind: "own.clear" });
       return fx;
@@ -300,7 +314,11 @@ export function useStudySession({
     timer,
     clock,
     focusOwnsClock,
-    active: focusOwnsClock && (timer.running || clock.running),
+    /* "Active" means anything in the session is currently moving. A manual
+       clock-in counts too: every Pause/Resume control reads this flag, and a
+       recording session must always present "Pause" — never a misleading
+       "Resume" next to a running clock. */
+    active: timer.running || clock.running,
     start, pause, toggle, takeBreak, endSession, reset, setMode, run,
   };
 }

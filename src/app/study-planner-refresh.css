@@ -146,7 +146,7 @@ body.theme-dark,body.theme-obsidian,body.theme-nebula{
 .planner-days .task-row{padding:12px 18px}
 .planner-days .task-row .task-title{font-size:.84rem}
 .planner-days .task-row .task-sub{font-size:.68rem}
-.planner-days .task-row .task-row-actions{min-width:330px}
+.planner-days .task-row .task-row-actions{min-width:170px}
 
 /* ---------------- Focus / Zen ---------------- */
 .focus-page-header{min-height:92px}

@@ -1163,7 +1163,9 @@ export default function Home() {
           {page === "dashboard" && (
             <Dashboard state={state} onTaskStatus={setTaskStatus} onTaskUpdate={updateTask}
               onSkipSubject={skipSubjectForDay} onFocusTask={focusTask}
-              activeTaskId={clock.taskId} activeClockSeconds={clock.elapsed}
+              /* clock.taskId survives Clock Out (the Focus Studio pickers
+                 reuse it) — a row is only ACTIVE while a session is open. */
+              activeTaskId={clock.sessionActive ? clock.taskId : null} activeClockSeconds={clock.elapsed}
               clockRunning={clock.running} clockSessionActive={clock.sessionActive} clockOnBreak={clock.onBreak}
               onClockOut={clockOutNow} onPauseOrResume={pauseOrResume}
               replanning={busy} onReplan={replan} onStartFocus={startFocusSession}
@@ -1172,7 +1174,7 @@ export default function Home() {
           {page === "planner" && (
             <PlannerView state={state} onTaskStatus={setTaskStatus} onTaskUpdate={updateTask}
               onSkipSubject={skipSubjectForDay} onFocusTask={focusTask}
-              activeTaskId={clock.taskId} activeClockSeconds={clock.elapsed}
+              activeTaskId={clock.sessionActive ? clock.taskId : null} activeClockSeconds={clock.elapsed}
               clockRunning={clock.running} clockSessionActive={clock.sessionActive}
               onClockOut={clockOutNow}
               onAskTutor={askTutor} replanning={busy} onReplan={replan}

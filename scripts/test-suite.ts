@@ -781,6 +781,19 @@ async function runTests() {
   check(effects.includes("timer.pause") && effects.includes("clock.out") && effects.includes("own.clear"),
     "Clock Out stops the focus timer, saves the minutes and releases the session");
 
+  /* Manual sessions (task-row Clock in / tracker Clock In) must obey the
+     same explicit verbs. Clock Out on a manual session used to be a no-op
+     because of an ownership gate — that regression must never return. */
+  const manual = snap({ clockRunning: true, clockSessionActive: true });
+  check(planEffects({ type: "endSession" }, manual).includes("clock.out"),
+    "Clock Out closes a manually started session in one tap");
+  check(planEffects({ type: "pause" }, manual).includes("clock.pause"),
+    "One Pause freezes a manually started session too");
+  check(planEffects({ type: "toggle" }, manual).includes("clock.pause"),
+    "Toggle reads a recording manual session as Pause, never as Start");
+  check(planEffects({ type: "break" }, manual).includes("clock.break"),
+    "Take a Break works for a manually started session");
+
   effects = planEffects({ type: "break" }, live);
   check(effects.includes("timer.pause") && effects.includes("clock.break"),
     "A manual break rests both timers, so nothing keeps billing");

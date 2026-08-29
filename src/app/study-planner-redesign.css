@@ -1622,11 +1622,7 @@ body::after { content: none !important; display: none !important; }
 }
 .task-row.done { animation: none !important; }
 .task-row.done .task-title { color: var(--text-muted) !important; }
-.task-row.active-clock {
-  background: color-mix(in srgb, var(--success-accent) 6%, var(--surface)) !important;
-  border: 1px solid color-mix(in srgb, var(--success-accent) 26%, var(--glass-border)) !important;
-  box-shadow: none !important;
-}
+/* (active-clock treatment consolidated in final-ui-fixes.css) */
 .cal-cell.today::after { animation: none !important; }
 .cal-cell.today { box-shadow: 0 0 0 2px var(--accent-glow) !important; }
 .cal-pill { box-shadow: none !important; }

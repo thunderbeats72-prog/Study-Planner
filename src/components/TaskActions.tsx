@@ -69,7 +69,12 @@ export default function TaskActions({ task, subject, activeTaskId, clockSessionA
   };
 
   return <>
-    <div className="task-more-wrap" ref={wrapRef}>
+    {/* The ⋮ is a CARD-level control: a direct child of .task-row (which is
+        position:relative), so its absolute top-right anchor is the card
+        corner — never the action row. It must not share a layout column
+        with Clock in / Clock out, and its hit area can never sit on top of
+        them. */}
+    <div className="task-more-wrap" ref={wrapRef} onClick={(event) => event.stopPropagation()}>
       <button ref={triggerRef} type="button" className="task-more" aria-label="More task actions" aria-haspopup="menu" aria-expanded={menuOpen} aria-controls={menuOpen ? `${menuId}-menu` : undefined} onClick={toggleMenu}>
         <span className="task-more-dots" aria-hidden="true"><i /><i /><i /></span>
       </button>
@@ -80,7 +85,6 @@ export default function TaskActions({ task, subject, activeTaskId, clockSessionA
         {subject && !skipped && onSkipSubject && <button type="button" role="menuitem" onClick={() => { closeMenu(); onSkipSubject(subject.id, task.date); }}>Skip {subject.name} today</button>}
       </div>}
     </div>
-
     <div className="task-row-actions">
       <TaskClockButton taskId={task.id} activeTaskId={activeTaskId} sessionActive={clockSessionActive} onFocusTask={onFocusTask} onClockOut={onClockOut} />
       <button type="button" className={`btn btn-xs task-primary ${done ? "btn-secondary" : "btn-primary"}`} aria-expanded={ratingOpen || undefined} onClick={handleDone}>{done ? "Undo" : "Done"}</button>

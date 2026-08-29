@@ -92,13 +92,8 @@
 
 /* ── 4. TASK ACTIONS — one [Done]/[Start] flow, extras behind ⋯ ────── */
 .task-row{position:relative}
-.task-more-wrap{position:relative;display:inline-flex}
-/* The old ⋯ toggle was mobile-only and dead on desktop; the new menu is a
-   real popover everywhere. This layer loads LAST, so it wins the cascade. */
-.task-more{display:inline-flex !important}
-@media(max-width:640px){
-  .task-row-actions .task-more{display:inline-flex !important}
-}
+/* ⋮ trigger geometry is owned by ui-polish.css / final-ui-fixes.css; this
+   layer only provides the menu's base chrome below. */
 .task-menu{
   position:absolute;top:calc(100% + 6px);right:0;z-index:60;
   min-width:200px;max-width:min(260px,calc(100vw - 32px));

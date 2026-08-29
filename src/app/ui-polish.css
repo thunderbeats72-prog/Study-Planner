@@ -79,31 +79,43 @@
    which is what made the old mobile version look broken. */
 .task-row { position: relative; }
 
+/* The wrap is a DIRECT child of .task-row (never of .task-row-actions), so
+   this absolute anchor is the card corner itself. The row reserves a right
+   gutter (below) so the button can never sit on top of Clock out / Done. */
 .task-more-wrap {
   position: absolute;
-  top: 7px;
-  right: 7px;
+  top: 10px;
+  right: 10px;
+  width: 32px;
+  height: 32px;
   z-index: 6;
 }
 
-.task-main { padding-right: 34px; }
-
-.task-row .task-row-actions { margin-right: 32px; }
+/* Desktop/tablet single-line rows: give the corner its own lane. */
+@media (min-width:641px) {
+  .task-row,
+  .planner-days .task-row,
+  .task-row.clean-list,
+  .modal-box .task-row { padding-right: 50px; }
+}
 
 .task-more {
   display: inline-flex !important;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   padding: 0;
-  border: 1px solid transparent;
-  border-radius: 9px;
-  background: transparent;
-  color: var(--text-dim);
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: 0 1px 3px rgba(30,27,60,.05);
+  color: var(--text-muted);
   cursor: pointer;
-  transition: background .16s ease, color .16s ease, border-color .16s ease;
+  transition: background .16s ease, color .16s ease, border-color .16s ease, transform .14s ease;
 }
+
+.task-more:active { transform: scale(.94); }
 
 .task-more-dots {
   display: grid;
@@ -175,11 +187,18 @@
 .task-menu button:hover { background: var(--row-hover); color: var(--accent); }
 .task-menu button + button { margin-top: 2px; }
 
-/* Phones: a real 44px touch target, and the action bar drops to its own
+/* Phones: a real 34-36px visual target, and the action bar drops to its own
    row so Clock in + Done stay full-size and tappable. */
 @media (max-width:640px) {
+  .task-more-wrap {
+    top: 8px;
+    right: 8px;
+    width: 34px;
+    height: 34px;
+  }
+
   .task-more {
-    width: 40px;
+    width: 34px;
     height: 34px;
     border-radius: 10px;
   }
@@ -194,7 +213,7 @@
     justify-content: flex-end;
     gap: 7px;
     margin-right: 0;
-    padding-top: 30px;
+    padding-top: 3px;
   }
 
   .task-row .task-row-actions > .btn.task-clock,
@@ -202,7 +221,7 @@
   .task-row .task-row-actions > .btn.task-primary {
     flex: 1 1 0;
     min-width: 0;
-    min-height: 40px;
+    min-height: 42px;
   }
 
   .task-menu { max-width: calc(100vw - 24px); }
@@ -226,41 +245,14 @@
    fill and an animated conic rim around its whole day card. That read as
    an error, not as "this is the task you are on". The state is now a hair
    of accent on the edge, a faint tint, and one small pulsing dot. */
-.task-row.active-clock,
-.task-row.clean-list.active-clock,
-.task-row.active-clock:hover {
-  border-color: color-mix(in srgb, var(--success-accent) 30%, var(--glass-border));
-  background: color-mix(in srgb, var(--success-accent) 5%, transparent);
-  box-shadow: none;
-}
-
-/* List rows (Planner, Overview) have no box to outline — a left accent bar
-   plus the tint says the same thing without redrawing the row. */
-.planner-days .task-row.active-clock,
-.planner-days .task-row.active-clock:hover,
-.task-row.clean-list.active-clock {
-  border-color: transparent;
-  border-bottom-color: var(--glass-border);
-  box-shadow: inset 2px 0 0 color-mix(in srgb, var(--success-accent) 55%, transparent);
-}
-
+/* The active ROW treatment (accent edge + faint tint, zero animation) is
+   consolidated in final-ui-fixes.css — the one authoritative layer. Here we
+   own only the inline "Recording" badge and its softly pulsing dot. */
 .task-row.active-clock .task-title { color: var(--text-main); }
-
-.task-row.active-clock .task-dot {
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--success-accent) 16%, transparent);
-  animation: liveDotPulse 1.9s ease-in-out infinite;
-}
 
 @keyframes liveDotPulse {
   0%, 100% { transform: scale(1); opacity: 1; }
   50%      { transform: scale(1.18); opacity: .7; }
-}
-
-/* Retire the rotating rim beam on the card that owns the session. */
-.glass-panel:not(.ai-panel).day-block:has(.task-row.active-clock)::after,
-.glass-panel:not(.ai-panel).up-next.live::after {
-  animation: none;
-  opacity: 0;
 }
 
 /* The quiet inline marker in the subtitle line. */

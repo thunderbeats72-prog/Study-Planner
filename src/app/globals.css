@@ -590,7 +590,7 @@ body.theme-dark .tracker-bar,body.theme-obsidian .tracker-bar,body.theme-nebula 
   .ob-field label{letter-spacing:.4px}
 }
 
-.task-row.active-clock{position:relative;border-color:rgba(34,197,94,.4);background:linear-gradient(135deg,var(--row-hover),rgba(34,197,94,.06))}
+/* .task-row.active-clock — one final treatment lives in final-ui-fixes.css */
 
 
 .glass-panel{animation:panelIn .3s var(--spring-soft) backwards}
@@ -705,11 +705,7 @@ body { transition: background-color .5s ease, color .3s ease; }
 .cmdk-item:hover .cmdk-label, .cmdk-item.active .cmdk-label, .cmdk-item:hover .cmdk-hint, .cmdk-item.active .cmdk-hint {
   color: #fff !important;
 }
-.task-row.active-clock {
-  border-color: var(--success-accent);
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), var(--row-hover));
-  box-shadow: 0 8px 24px rgba(34, 197, 94, 0.1);
-}
+/* (active-clock visual state is owned by final-ui-fixes.css) */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -1547,9 +1543,7 @@ body.theme-dark .task-row.selected,body.theme-obsidian .task-row.selected,body.t
 
 /* ═══ MOTION REFINEMENT — physics polish across themes ═══ */
 
-/* Live clock row: soft heartbeat on the active dot */
-.task-row.active-clock .task-dot{animation:heartbeat 2s ease-in-out infinite}
-@keyframes heartbeat{0%,100%{transform:scale(1)}25%{transform:scale(1.25)}40%{transform:scale(1)}}
+/* Live clock row: the quiet dot treatment is owned by ui-polish.css */
 
 /* Streak: flame warms up as streak grows (data-attr hook) */
 .streak-badge[data-hot="true"]{background:var(--status-pending-bg);color:var(--status-pending-text)}
@@ -1622,7 +1616,6 @@ body.theme-nebula .ai-panel,body.theme-nebula .cmdk,body.theme-nebula .modal-box
 .modal-box:focus{outline:none}
 
 /* mode guards for new decorative pieces */
-body.mode-focused .task-row.active-clock .task-dot{animation:none}
 @media (prefers-reduced-motion: reduce){
   .toast,.ob-card,.chip-done{animation:none !important}
 }
@@ -1889,7 +1882,7 @@ body.mode-focused::before{animation:none;opacity:.4}
      which reveals Edit / Skip subject / Skip on tap */
   .task-row-actions > .btn,.task-row > .chip{display:none}
   .task-row > .chip.chip-kind{display:inline-flex}
-  .task-row-actions > .btn.task-primary,.task-row-actions > .btn.task-clock,.task-row-actions > .btn.task-more{display:inline-flex}
+  .task-row-actions > .btn.task-primary,.task-row-actions > .btn.task-clock{display:inline-flex}
   .task-row.expanded-actions .task-row-actions > .btn{display:inline-flex}
   .task-row.expanded-actions > .chip{display:inline-flex}
   /* PENDING chip hidden on phones — the card state already says it */
@@ -1903,11 +1896,8 @@ body.mode-focused::before{animation:none;opacity:.4}
   .day-head .day-meta{font-size:.72rem}
 }
 
-/* The "..." more button: ONLY visible on mobile (<640px), hidden on desktop */
-.task-more{display:none !important;font-weight:800;letter-spacing:1px}
-@media(max-width:640px){
-  .task-row-actions > .btn.task-more{display:inline-flex !important}
-}
+/* The ⋮ menu trigger is a card-level control on every viewport now; its one
+   authoritative treatment lives in final-ui-fixes.css. */
 
 /* Softer light canvas: barely-warm porcelain, calmer than pure grey */
 :root{--app-bg:#F6F6F9}
@@ -2238,9 +2228,8 @@ html{scroll-behavior:smooth}
 body.focus-live::after{
   content:"";position:fixed;top:0;left:0;right:0;height:2.5px;z-index:1000;
   background:linear-gradient(90deg,transparent,var(--success-accent),transparent);
-  animation:focusSweep 3s ease-in-out infinite;
+  opacity:.75; /* static — the recording cue must not pulse or flash */
 }
-@keyframes focusSweep{0%,100%{opacity:.5}50%{opacity:1}}
 body.focus-live .tracker-bar{border-color:rgba(22,163,122,.3)}
 
 /* Live timer emphasis while running */
@@ -4402,27 +4391,9 @@ body.theme-mint,body.theme-sunset,body.theme-silver-lavender,body.theme-default{
 .day-block:hover .day-head::after,.section-card:hover .section-head::after{opacity:.7}
 
 @keyframes lgBeam{to{--lg-angle:360deg}}
-/* The card that OWNS the running session gets the rim beam — pure CSS via
-   :has(), so no state has to be threaded through the component tree. */
-.glass-panel:not(.ai-panel).up-next.live::after,
-.glass-panel:not(.ai-panel).day-block:has(.task-row.active-clock)::after{
-  content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:1;
-  /* Out-specify the hover sheen that also lives on this ::after (it is the
-     one pseudo-element the base card owns) and neutralise its geometry. */
-  width:auto;left:auto;right:auto;top:auto;bottom:auto;
-  transform:none;transition:none;
-  padding:1.5px;
-  background:conic-gradient(from var(--lg-angle),
-    transparent 0deg,
-    color-mix(in srgb,var(--success-accent) 75%,transparent) 55deg,
-    color-mix(in srgb,var(--accent) 70%,transparent) 110deg,
-    transparent 190deg,transparent 360deg);
-  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
-  mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
-  -webkit-mask-composite:xor;mask-composite:exclude;
-  animation:lgBeam 6s linear infinite;
-  opacity:.9;
-}
+/* The rotating rim beam that used to circle the card owning the running
+   session has been retired: the active task now signals with a calm accent
+   edge + tint (see final-ui-fixes.css), never a moving border. */
 .up-next.live{border-left-color:transparent}
 /* Loader: a halo that actually rotates, so the first frame has a heartbeat. */
 .loader-ring{position:relative}
@@ -4864,8 +4835,6 @@ body.theme-mint,body.theme-sunset,body.theme-silver-lavender,body.theme-default{
    K · GUARDS
 ──────────────────────────────────────────────────────────────────────── */
 /* mode-focused (PG/professional): the app is a tool, not a showpiece. */
-body.mode-focused .up-next.live::after,
-body.mode-focused .day-block:has(.task-row.active-clock)::after,
 body.mode-focused .loader-ring::before,
 body.mode-focused .section-title::after,
 body.mode-focused .momentum-pill,
@@ -4881,14 +4850,11 @@ body.mode-focused .btn-primary{background-position:50% 0}
 /* mode-young: bigger, rounder, slower — the gloss keeps up with it. */
 body.mode-young .nav-list::before,body.mode-young .nav-list::after{border-radius:20px}
 body.mode-young .section-card{padding:var(--sp-5) var(--sp-4)}
-body.mode-young .up-next.live::after,
-body.mode-young .day-block:has(.task-row.active-clock)::after{padding:2.5px}
 body.mode-young .section-title::after{width:46px;height:3px;bottom:-8px}
 
 @media (prefers-reduced-motion: reduce){
   .tracker-bar,.mobile-header,.sidebar,body::after,.section-card,.day-block,
   .dash-card,.kpi-card{animation:none !important}
-  .up-next.live::after,.day-block:has(.task-row.active-clock)::after,
   .loader-ring::before{animation:none;opacity:.7}
   .glass-panel:not(.ai-panel){transition:none;--spec-o:0}
   .section-title::after{animation:none}
@@ -5544,12 +5510,8 @@ body.mode-young .section-title::after{width:46px;height:3px;bottom:-8px}
   .task-row-actions{order:2;flex:1 1 auto;justify-content:flex-end}
 }
 
-/* ── Task rows · quiet glass gloss + live rim ───────────────────── */
+/* ── Task rows · quiet glass gloss (live rim owned by final-ui-fixes) ── */
 .task-row{box-shadow:inset 0 1px 0 var(--lg-rim-faint)}
-.task-row.active-clock{
-  box-shadow:inset 0 1px 0 var(--lg-rim-faint),
-    inset 0 0 0 1px color-mix(in srgb,var(--success-accent) 26%,transparent);
-}
 @media(hover:hover) and (pointer:fine){
   .task-row{transition:border-color .18s ease,box-shadow .18s ease,transform .18s var(--spring-soft),background .18s ease}
   .task-row:hover{
@@ -5620,7 +5582,7 @@ body.mode-young .section-title::after{width:46px;height:3px;bottom:-8px}
 }
 .planner-days .task-row.last-row{border-bottom:none}
 .planner-days .task-row:hover{background:var(--row-hover);border-color:transparent;transform:none;box-shadow:none}
-.planner-days .task-row.active-clock,.planner-days .task-row.active-clock:hover{border-color:var(--success-accent);border-bottom-color:var(--success-accent)}
+/* (.planner-days active-clock border treatment retired — final-ui-fixes.css owns the live state) */
 .planner-days .rating-strip,.planner-days .planner-lesson-brief{margin:8px var(--sp-3)}
 @media(min-width:641px){
   .planner-days .task-row{flex-wrap:nowrap}
@@ -5649,22 +5611,18 @@ body.mode-young .section-title::after{width:46px;height:3px;bottom:-8px}
 .task-row.clean-list .task-row-actions > .task-primary{margin-inline-start:0}
 
 /* 3) One aligned, consistent row-control bar for every task row.
-      Buttons share a height, the clock button is a stable width so the
-      column of CTAs never jumps, and Done owns the right edge. */
+      Buttons share a height and the clock button is a stable width so the
+      column of CTAs never jumps. The ⋮ lives OUTSIDE this bar now — it is a
+      card-corner control (see final-ui-fixes.css). */
 .task-row-actions{display:flex;align-items:center;gap:6px;flex-shrink:0}
 .task-row-actions > .btn{min-height:30px;padding:4px 11px}
 .task-row-actions > .btn.task-clock{min-width:88px}
 .task-row-actions > .btn.task-primary{min-width:58px}
-.task-row-actions > .btn.task-more{width:32px;min-width:32px;padding:4px 0}
 
-/* 4) Mobile: one even, full-width action bar (Done · Clock · ⋯) with the
-      extras revealed by ⋯ wrapping into clean rows underneath. */
+/* 4) Mobile: one even, full-width action bar (Clock · Done). */
 @media(max-width:640px){
-  .task-row-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;width:100%;margin-left:0}
+  .task-row-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;width:100%;margin-left:0}
   .task-row-actions > .btn{width:100%;min-width:0;padding:7px 6px}
-  .task-row-actions > .task-primary{order:-2}
-  .task-row-actions > .task-clock{order:-1}
-  .task-row-actions > .btn.task-more{width:100%;min-width:0}
   .task-row.clean-list .task-row-actions{width:100%}
 }
 
@@ -5918,11 +5876,13 @@ body.mode-young .section-title::after{width:46px;height:3px;bottom:-8px}
   .planner-days .task-row{flex-wrap:nowrap;display:flex;align-items:center;gap:12px}
   .planner-days .task-row .task-main{flex:1 1 auto;min-width:0}
   .planner-days .task-row > .chip{flex-shrink:0;min-width:68px;text-align:center;justify-content:center;margin-inline-start:auto}
-  .planner-days .task-row .task-row-actions{flex-shrink:0;min-width:350px;justify-content:flex-end;display:flex;align-items:center;gap:6px}
+  /* The ⋮ no longer occupies this column, so the reserved lane is the
+     stable width of Clock + Done only. */
+  .planner-days .task-row .task-row-actions{flex-shrink:0;min-width:170px;justify-content:flex-end;display:flex;align-items:center;gap:6px}
   .planner-days .task-row .task-row-actions > .task-primary{margin-inline-start:0}
   .task-row.clean-list{display:flex;align-items:center;gap:12px}
   .task-row.clean-list .task-main{flex:1 1 auto;min-width:0}
-  .task-row.clean-list .task-row-actions{flex-shrink:0;min-width:350px;justify-content:flex-end}
+  .task-row.clean-list .task-row-actions{flex-shrink:0;min-width:170px;justify-content:flex-end}
 }
 
 /* Dock breathing room: the last row of a list must clear the capsule. */

@@ -1,4 +1,10 @@
-/* Final targeted QA pass — keep the existing Study Planner Pro identity. */
+/* Final targeted QA pass — keep the existing Study Planner Pro identity.
+   This file is the ONE authoritative layer for:
+     · task-row geometry (desktop + mobile)
+     · the card-corner ⋮ control
+     · the active / clocked-in treatment
+   Earlier layers no longer re-declare these, so what you read here is what
+   renders. */
 
 /* --------------------------------------------------------------------------
    Planner task geometry
@@ -10,9 +16,8 @@
 }
 
 .task-main {
-  min-width: 0 !important;
+  min-width: 0;
   max-width: 100%;
-  padding-right: 46px !important;
 }
 
 .task-title {
@@ -27,90 +32,51 @@
 }
 
 .task-row-actions {
-  /* NOT positioned here: the ⋮ more button below is absolutely positioned and
-     its containing block must be the task ROW, not this actions gutter. When
-     it anchored to this box, ui-polish-landing.css had also zeroed the box's
-     reserved right padding, so the corner button overlapped the right-aligned
-     Clock/Done targets and swallowed the taps aimed at them (a visible "Clock
-     out" that silently opened the ⋮ menu instead of clocking out). */
-  position: static !important;
-  z-index: 4;
-  display: grid !important;
-  grid-template-columns: minmax(0,auto) minmax(0,auto) !important;
-  align-items: center !important;
-  justify-content: end !important;
-  gap: 7px !important;
-  min-width: 0 !important;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 0;
 }
 
 .task-row-actions .task-clock,
 .task-row-actions .task-primary {
-  position: relative;
-  z-index: 30;
-  pointer-events: auto !important;
   touch-action: manipulation;
 }
 
-/* Reserve a dedicated corner lane so Clock/Done never sit under the ⋮ button.
-   The more button lives at the row's top-right (anchored to .task-row, above),
-   so the actions gutter must stop short of it on desktop. (Needs the same
-   specificity as the earlier `.task-row .task-row-actions` override and this
-   file loads last, so it wins.) On mobile the actions are already on their own
-   bottom row and the corner is free, so no extra inset is needed there. */
-@media (min-width: 641px) {
-  .task-row .task-row-actions {
-    padding-right: 44px !important;
-  }
-}
-
+/* Clock in ↔ Clock out share one stable footprint: no width jump, no row
+   reflow when the state flips. */
+.task-clock { min-width: 94px; }
 .task-clock.clock-live {
-  min-width: 94px;
-  box-shadow: 0 2px 8px color-mix(in srgb,var(--danger-accent) 10%,transparent) !important;
+  box-shadow: 0 2px 8px color-mix(in srgb,var(--danger-accent) 10%,transparent);
 }
 
-/* More button owns the top-right corner; it should never occupy a layout
-   column or cover the clock-out target. */
-.task-more-wrap {
-  position: absolute !important;
-  top: 7px !important;
-  right: 7px !important;
-  width: 32px !important;
-  height: 32px !important;
-  z-index: 50 !important;
-}
-
-.task-more {
-  width: 32px !important;
-  height: 32px !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  border-radius: 10px !important;
-  background: var(--surface) !important;
-  border: 1px solid var(--glass-border) !important;
-  box-shadow: 0 1px 3px rgba(30,27,60,.05);
-  color: var(--text-muted) !important;
-}
-
-.task-more-dots {
-  gap: 3px !important;
-}
-
-.task-more-dots i {
-  width: 3px !important;
-  height: 3px !important;
-}
-
+/* ⋮ owns the top-right corner of the CARD (the wrap is a direct child of
+   .task-row). It never shares a layout column with Clock in / Clock out and
+   never covers them: single-line rows reserve a right gutter in
+   ui-polish.css. */
 .task-menu {
-  top: calc(100% + 6px) !important;
-  right: 0 !important;
-  left: auto !important;
-  z-index: 80 !important;
+  top: calc(100% + 6px);
+  right: 0;
+  left: auto;
+  z-index: 80;
 }
+
+/* Planner day cards clip their rounded corners with overflow:hidden, which
+   would also clip a menu opened on the last row. Release the clip only
+   while a menu is actually open inside the card. */
+.planner-days .day-block:has(.task-menu),
+.dash-today-card:has(.task-menu) {
+  overflow: visible !important;
+}
+
+/* And lift the owning card/row above later siblings so the popover never
+   opens behind the next card. */
+.planner-days .day-block:has(.task-menu),
+.dash-today-card:has(.task-menu) { position: relative; z-index: 90; }
+.task-row:has(.task-menu) { z-index: 90; }
 
 /* --------------------------------------------------------------------------
-   Active / clocked-in state — no animated outline, no wash, no flashing.
-   The live state is communicated by a 2px accent edge and a quiet dot only.
+   Active / clocked-in state — THE final treatment. No animated outline, no
+   wash, no flashing. A 2px accent edge, a very faint tint and a quiet dot.
    -------------------------------------------------------------------------- */
 .task-row.active-clock {
   background: color-mix(in srgb,var(--accent) 3%,var(--surface)) !important;
@@ -130,22 +96,26 @@
   box-shadow: 0 0 0 3px color-mix(in srgb,var(--accent) 10%,transparent);
 }
 
+/* Planner list rows keep their hairline bottom edge while active. */
+.planner-days .task-row.active-clock {
+  border-left: none !important;
+  border-right: none !important;
+  border-top: none !important;
+  border-bottom: 1px solid var(--glass-border) !important;
+}
+.planner-days .task-row.active-clock.last-row { border-bottom: none !important; }
+
 .task-live-badge {
   animation: none !important;
   box-shadow: none !important;
   white-space: nowrap;
 }
 
-.task-live-dot {
+/* The one permitted motion: an extremely subtle breathing dot, and only
+   while actually recording. Paused badges hold still. */
+.task-live-badge .task-live-dot { animation: none; }
+.task-live-badge.is-recording .task-live-dot {
   animation: calmRecordingDot 2s ease-in-out infinite;
-}
-
-/* The Clock Out button's own live dot uses the SAME quiet pulse. It was still
-   running the loud 1.6s red breathing-ring (`clockLivePulse`) from globals, so
-   one active task pulsed two different ways at once. One calm recording signal. */
-.task-clock.clock-live .clock-live-dot {
-  animation: calmRecordingDot 2s ease-in-out infinite;
-  box-shadow: none !important;
 }
 
 @keyframes calmRecordingDot {
@@ -154,17 +124,19 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .task-live-dot,
-  .task-clock.clock-live .clock-live-dot { animation:none !important; }
+  .task-live-badge.is-recording .task-live-dot { animation:none !important; }
+  .task-row.active-clock { transition:none !important; }
 }
 
 /* --------------------------------------------------------------------------
-   Mobile rows — title/information first, controls in one aligned footer.
+   Mobile rows — title/information first, ⋮ in the corner, then one aligned
+   action footer. Balanced from 320px up; no horizontal overflow.
    -------------------------------------------------------------------------- */
 @media (max-width:640px) {
   .planner-days .task-row,
   .dashboard-tasks .task-row,
-  .dash-today-card .task-row {
+  .dash-today-card .task-row,
+  .modal-box .task-row {
     display:grid !important;
     grid-template-columns:10px minmax(0,1fr) !important;
     grid-template-areas:
@@ -173,29 +145,34 @@
     align-items:start !important;
     gap:7px 9px !important;
     padding:12px !important;
-    padding-right:12px !important;
     min-width:0 !important;
   }
 
   .planner-days .task-row .task-dot,
   .dashboard-tasks .task-row .task-dot,
-  .dash-today-card .task-row .task-dot {
+  .dash-today-card .task-row .task-dot,
+  .modal-box .task-row .task-dot {
     grid-area:dot !important;
+    position:static !important;
     margin-top:7px !important;
   }
 
   .planner-days .task-row .task-main,
   .dashboard-tasks .task-row .task-main,
-  .dash-today-card .task-row .task-main {
+  .dash-today-card .task-row .task-main,
+  .modal-box .task-row .task-main {
     grid-area:main !important;
     width:auto !important;
-    padding-right:38px !important;
     min-width:0 !important;
+    margin:0 !important;
+    padding-left:0 !important;
+    padding-right:38px !important;
   }
 
   .planner-days .task-row .task-row-actions,
   .dashboard-tasks .task-row .task-row-actions,
-  .dash-today-card .task-row .task-row-actions {
+  .dash-today-card .task-row .task-row-actions,
+  .modal-box .task-row .task-row-actions {
     grid-area:actions !important;
     display:grid !important;
     grid-template-columns:minmax(0,1fr) minmax(0,1fr) !important;
@@ -203,7 +180,7 @@
     min-width:0 !important;
     margin:0 !important;
     gap:8px !important;
-    padding-top:3px !important;
+    padding:3px 0 0 !important;
   }
 
   .planner-days .task-row .task-row-actions .task-clock,
@@ -211,54 +188,44 @@
   .dashboard-tasks .task-row .task-row-actions .task-clock,
   .dashboard-tasks .task-row .task-row-actions .task-primary,
   .dash-today-card .task-row .task-row-actions .task-clock,
-  .dash-today-card .task-row .task-row-actions .task-primary {
+  .dash-today-card .task-row .task-row-actions .task-primary,
+  .modal-box .task-row .task-row-actions .task-clock,
+  .modal-box .task-row .task-row-actions .task-primary {
     width:100% !important;
     min-width:0 !important;
     min-height:42px !important;
     justify-content:center;
   }
 
-  /* Give the more button an independent corner lane. */
-  .task-more-wrap {
-    top:8px !important;
-    right:8px !important;
-  }
-
-  .task-more { width:34px !important; height:34px !important; }
+  /* The expanded recall-rating strip spans the full card. */
+  .task-row > .rating-strip { grid-column:1 / -1; }
 
   .task-row.active-clock {
     padding-left:11px !important;
   }
 }
 
-/* Very narrow phones: never let two actions squeeze each other. */
+/* Tablet band (641–860px): the pastel layer stacks planner rows as cards
+   with `padding:13px !important` — keep the ⋮ corner lane clear of the
+   title there too. */
+@media (min-width:641px) and (max-width:860px) {
+  .planner-days .task-row .task-main,
+  .dashboard-tasks .task-row .task-main,
+  .dash-today-card .task-row .task-main { padding-right:38px !important; }
+}
+
+/* Very narrow phones: never let the two actions squeeze each other. */
 @media (max-width:360px) {
   .task-row-actions { gap:6px !important; }
   .task-row-actions .btn { font-size:.72rem !important; padding-inline:7px !important; }
 }
 
 /* --------------------------------------------------------------------------
-   MBA / degree onboarding: do not ask exam-only questions.
-   The institution input is a reliable marker for the degree details branch.
-   Hide generic attempt + preparation fields there; they remain available to
-   competitive-exam paths where they actually affect planning.
-   -------------------------------------------------------------------------- */
-.ob-details-grid:has(input[placeholder*="NMIMS CDOE"]) > .ob-field:nth-child(4),
-.ob-details-grid:has(input[placeholder*="NMIMS CDOE"]) > .ob-field:nth-child(5) {
-  display:none !important;
-}
+   MBA / degree onboarding. Exam-only questions (Attempt, prior preparation)
+   are no longer rendered for degree programmes — that is decided in
+   Onboarding.tsx from the level metadata, not hidden here with CSS.
 
-/* After removing those two degree-only-inapplicable fields, let the goal
-   remain a full-width field and keep the form grid balanced. */
-.ob-details-grid:has(input[placeholder*="NMIMS CDOE"]) {
-  grid-template-columns:repeat(2,minmax(0,1fr)) !important;
-}
-
-.ob-details-grid:has(input[placeholder*="NMIMS CDOE"]) > .ob-field:last-child {
-  grid-column:1 / -1 !important;
-}
-
-/* Program summary: one clean title line area, then evenly aligned metadata. */
+   Program summary: one clean title line area, then evenly aligned metadata. */
 .ob-program-card {
   display:grid !important;
   grid-template-columns:minmax(0,1fr) !important;
@@ -292,12 +259,6 @@
 }
 
 @media (max-width:680px) {
-  .ob-details-grid:has(input[placeholder*="NMIMS CDOE"]) {
-    grid-template-columns:1fr !important;
-  }
-  .ob-details-grid:has(input[placeholder*="NMIMS CDOE"]) > .ob-field:last-child {
-    grid-column:auto !important;
-  }
   .ob-program-meta { grid-template-columns:1fr 1fr !important; gap:12px !important; }
 }
 
