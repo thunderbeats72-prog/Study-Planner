@@ -1,0 +1,378 @@
+/* Final targeted QA pass — keep the existing Study Planner Pro identity. */
+
+/* --------------------------------------------------------------------------
+   Planner task geometry
+   -------------------------------------------------------------------------- */
+.task-row {
+  position: relative;
+  min-width: 0;
+  overflow: visible;
+}
+
+.task-main {
+  min-width: 0 !important;
+  max-width: 100%;
+  padding-right: 46px !important;
+}
+
+.task-title {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+.task-sub {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.task-row-actions {
+  position: relative;
+  z-index: 4;
+  display: grid !important;
+  grid-template-columns: minmax(0,auto) minmax(0,auto) !important;
+  align-items: center !important;
+  justify-content: end !important;
+  gap: 7px !important;
+  min-width: 0 !important;
+}
+
+.task-row-actions .task-clock,
+.task-row-actions .task-primary {
+  position: relative;
+  z-index: 30;
+  pointer-events: auto !important;
+  touch-action: manipulation;
+}
+
+.task-clock.clock-live {
+  min-width: 94px;
+  box-shadow: 0 2px 8px color-mix(in srgb,var(--danger-accent) 10%,transparent) !important;
+}
+
+/* More button owns the top-right corner; it should never occupy a layout
+   column or cover the clock-out target. */
+.task-more-wrap {
+  position: absolute !important;
+  top: 7px !important;
+  right: 7px !important;
+  width: 32px !important;
+  height: 32px !important;
+  z-index: 50 !important;
+}
+
+.task-more {
+  width: 32px !important;
+  height: 32px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 10px !important;
+  background: var(--surface) !important;
+  border: 1px solid var(--glass-border) !important;
+  box-shadow: 0 1px 3px rgba(30,27,60,.05);
+  color: var(--text-muted) !important;
+}
+
+.task-more-dots {
+  gap: 3px !important;
+}
+
+.task-more-dots i {
+  width: 3px !important;
+  height: 3px !important;
+}
+
+.task-menu {
+  top: calc(100% + 6px) !important;
+  right: 0 !important;
+  left: auto !important;
+  z-index: 80 !important;
+}
+
+/* --------------------------------------------------------------------------
+   Active / clocked-in state — no animated outline, no wash, no flashing.
+   The live state is communicated by a 2px accent edge and a quiet dot only.
+   -------------------------------------------------------------------------- */
+.task-row.active-clock {
+  background: color-mix(in srgb,var(--accent) 3%,var(--surface)) !important;
+  border: 1px solid color-mix(in srgb,var(--accent) 18%,var(--glass-border)) !important;
+  box-shadow: inset 2px 0 0 var(--accent) !important;
+  animation: none !important;
+  transform: none !important;
+}
+
+.task-row.active-clock::before,
+.task-row.active-clock::after {
+  display: none !important;
+}
+
+.task-row.active-clock .task-dot {
+  animation: none !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb,var(--accent) 10%,transparent);
+}
+
+.task-live-badge {
+  animation: none !important;
+  box-shadow: none !important;
+  white-space: nowrap;
+}
+
+.task-live-dot {
+  animation: calmRecordingDot 2s ease-in-out infinite;
+}
+
+@keyframes calmRecordingDot {
+  0%,100% { opacity:.55; transform:scale(.95); }
+  50% { opacity:1; transform:scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .task-live-dot { animation:none !important; }
+}
+
+/* --------------------------------------------------------------------------
+   Mobile rows — title/information first, controls in one aligned footer.
+   -------------------------------------------------------------------------- */
+@media (max-width:640px) {
+  .planner-days .task-row,
+  .dashboard-tasks .task-row,
+  .dash-today-card .task-row {
+    display:grid !important;
+    grid-template-columns:10px minmax(0,1fr) !important;
+    grid-template-areas:
+      "dot main"
+      "actions actions" !important;
+    align-items:start !important;
+    gap:7px 9px !important;
+    padding:12px !important;
+    padding-right:12px !important;
+    min-width:0 !important;
+  }
+
+  .planner-days .task-row .task-dot,
+  .dashboard-tasks .task-row .task-dot,
+  .dash-today-card .task-row .task-dot {
+    grid-area:dot !important;
+    margin-top:7px !important;
+  }
+
+  .planner-days .task-row .task-main,
+  .dashboard-tasks .task-row .task-main,
+  .dash-today-card .task-row .task-main {
+    grid-area:main !important;
+    width:auto !important;
+    padding-right:38px !important;
+    min-width:0 !important;
+  }
+
+  .planner-days .task-row .task-row-actions,
+  .dashboard-tasks .task-row .task-row-actions,
+  .dash-today-card .task-row .task-row-actions {
+    grid-area:actions !important;
+    display:grid !important;
+    grid-template-columns:minmax(0,1fr) minmax(0,1fr) !important;
+    width:100% !important;
+    min-width:0 !important;
+    margin:0 !important;
+    gap:8px !important;
+    padding-top:3px !important;
+  }
+
+  .planner-days .task-row .task-row-actions .task-clock,
+  .planner-days .task-row .task-row-actions .task-primary,
+  .dashboard-tasks .task-row .task-row-actions .task-clock,
+  .dashboard-tasks .task-row .task-row-actions .task-primary,
+  .dash-today-card .task-row .task-row-actions .task-clock,
+  .dash-today-card .task-row .task-row-actions .task-primary {
+    width:100% !important;
+    min-width:0 !important;
+    min-height:42px !important;
+    justify-content:center;
+  }
+
+  /* Give the more button an independent corner lane. */
+  .task-more-wrap {
+    top:8px !important;
+    right:8px !important;
+  }
+
+  .task-more { width:34px !important; height:34px !important; }
+
+  .task-row.active-clock {
+    padding-left:11px !important;
+  }
+}
+
+/* Very narrow phones: never let two actions squeeze each other. */
+@media (max-width:360px) {
+  .task-row-actions { gap:6px !important; }
+  .task-row-actions .btn { font-size:.72rem !important; padding-inline:7px !important; }
+}
+
+/* --------------------------------------------------------------------------
+   MBA / degree onboarding: do not ask exam-only questions.
+   The institution input is a reliable marker for the degree details branch.
+   Hide generic attempt + preparation fields there; they remain available to
+   competitive-exam paths where they actually affect planning.
+   -------------------------------------------------------------------------- */
+.ob-details-grid:has(input[placeholder*="NMIMS CDOE"]) > .ob-field:nth-child(4),
+.ob-details-grid:has(input[placeholder*="NMIMS CDOE"]) > .ob-field:nth-child(5) {
+  display:none !important;
+}
+
+/* After removing those two degree-only-inapplicable fields, let the goal
+   remain a full-width field and keep the form grid balanced. */
+.ob-details-grid:has(input[placeholder*="NMIMS CDOE"]) {
+  grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+}
+
+.ob-details-grid:has(input[placeholder*="NMIMS CDOE"]) > .ob-field:last-child {
+  grid-column:1 / -1 !important;
+}
+
+/* Program summary: one clean title line area, then evenly aligned metadata. */
+.ob-program-card {
+  display:grid !important;
+  grid-template-columns:minmax(0,1fr) !important;
+  gap:12px !important;
+  min-width:0 !important;
+}
+
+.ob-program-main,
+.ob-program-meta,
+.ob-program-item { min-width:0 !important; }
+
+.ob-program-name {
+  display:block;
+  max-width:100%;
+  overflow-wrap:anywhere !important;
+  word-break:normal !important;
+  line-height:1.25 !important;
+}
+
+.ob-program-meta {
+  display:grid !important;
+  grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+  gap:18px !important;
+}
+
+.ob-program-item strong {
+  display:block;
+  min-width:0;
+  overflow-wrap:anywhere;
+  line-height:1.3;
+}
+
+@media (max-width:680px) {
+  .ob-details-grid:has(input[placeholder*="NMIMS CDOE"]) {
+    grid-template-columns:1fr !important;
+  }
+  .ob-details-grid:has(input[placeholder*="NMIMS CDOE"]) > .ob-field:last-child {
+    grid-column:auto !important;
+  }
+  .ob-program-meta { grid-template-columns:1fr 1fr !important; gap:12px !important; }
+}
+
+@media (max-width:460px) {
+  .ob-program-meta { grid-template-columns:1fr !important; }
+}
+
+/* --------------------------------------------------------------------------
+   Onboarding sliders — quieter, tactile controls that blend with the card.
+   -------------------------------------------------------------------------- */
+.ob-range-card {
+  border-color:var(--glass-border) !important;
+  box-shadow:none !important;
+  background:color-mix(in srgb,var(--surface) 98%,var(--accent) 2%) !important;
+}
+
+.ob-range-head {
+  align-items:flex-start !important;
+  gap:14px !important;
+}
+
+.ob-range-value {
+  flex:0 0 auto;
+  padding:5px 10px !important;
+  border-radius:999px !important;
+  background:var(--nav-active-bg) !important;
+  color:var(--nav-active-text) !important;
+  border:1px solid var(--nav-active-border) !important;
+}
+
+.ob-range-input {
+  width:100% !important;
+  height:8px !important;
+  border-radius:999px !important;
+  appearance:none !important;
+  -webkit-appearance:none !important;
+  background:linear-gradient(90deg,var(--accent) var(--ob-range-fill,0%),color-mix(in srgb,var(--row-bg) 88%,var(--surface)) var(--ob-range-fill,0%)) !important;
+  outline:none !important;
+  cursor:pointer;
+}
+
+.ob-range-input::-webkit-slider-runnable-track {
+  height:8px;
+  border-radius:999px;
+  background:transparent;
+}
+
+.ob-range-input::-moz-range-track {
+  height:8px;
+  border-radius:999px;
+  background:transparent;
+}
+
+.ob-range-input::-webkit-slider-thumb {
+  appearance:none;
+  -webkit-appearance:none;
+  width:24px;
+  height:24px;
+  margin-top:-8px;
+  border-radius:50%;
+  border:3px solid var(--surface);
+  background:var(--accent);
+  box-shadow:0 2px 8px color-mix(in srgb,var(--accent) 24%,transparent),0 0 0 1px color-mix(in srgb,var(--accent) 34%,transparent);
+  transition:transform .15s ease,box-shadow .15s ease;
+}
+
+.ob-range-input::-moz-range-thumb {
+  width:18px;
+  height:18px;
+  border-radius:50%;
+  border:3px solid var(--surface);
+  background:var(--accent);
+  box-shadow:0 2px 8px color-mix(in srgb,var(--accent) 24%,transparent),0 0 0 1px color-mix(in srgb,var(--accent) 34%,transparent);
+}
+
+.ob-range-input:hover::-webkit-slider-thumb,
+.ob-range-input:focus-visible::-webkit-slider-thumb {
+  transform:scale(1.08);
+  box-shadow:0 3px 10px color-mix(in srgb,var(--accent) 28%,transparent),0 0 0 3px var(--accent-glow);
+}
+
+.ob-range-input:focus-visible { box-shadow:0 0 0 3px var(--accent-glow) !important; }
+
+.ob-range-presets { gap:7px !important; }
+.ob-range-chip {
+  min-width:42px !important;
+  min-height:34px !important;
+  border-radius:999px !important;
+  background:var(--row-bg) !important;
+  border:1px solid var(--glass-border) !important;
+  color:var(--text-muted) !important;
+  transition:transform .14s ease,background .14s ease,border-color .14s ease,color .14s ease;
+}
+.ob-range-chip:hover { transform:translateY(-1px); }
+.ob-range-chip.active {
+  background:var(--nav-active-bg) !important;
+  color:var(--nav-active-text) !important;
+  border-color:var(--nav-active-border) !important;
+  box-shadow:none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ob-range-input::-webkit-slider-thumb,
+  .ob-range-chip { transition:none !important; }
+}
