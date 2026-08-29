@@ -884,7 +884,7 @@ export function languageCapabilityReply(query: string): string | null {
 export type TutorContext = {
   name: string; courseName: string; level: string; examDate: string; daysLeft: number; dailyHours: number;
   subjects: { id: number; name: string; difficulty: string; done: number; total: number }[];
-  today: { title: string; kind: string; minutes: number; status: string }[];
+  today: { title: string; kind: string; minutes: number; status: string; reason?: string }[];
   progressPct: number; streak: number; hoursThisWeek: number; overdue: number;
 };
 export type TutorReply = { text: string; action?: { type: string; payload?: unknown } };
@@ -1541,7 +1541,7 @@ export function instantTutorReply(q: string, ctx: TutorContext): TutorReply | nu
     const pending = ctx.today.filter((task) => task.status === "pending");
     if (!pending.length) return { text: "Nothing is pending for today. Use the extra time for active recall or a short mixed practice set." };
     const list = pending.slice(0, 6).map((task, index) => `${index + 1}. **${task.title}** (${task.minutes} min)`).join("\n");
-    return { text: `Here is your priority order for today:\n\n${list}\n\nSay *“start timer”* when you are ready.` };
+    return { text: `Here is your priority order for today:\n\n${list}\n\nStart with the first one — say *“start timer”* when you are ready.` };
   }
   if (/how am i doing|my progress|progress report|performance/.test(n)) {
     return {
@@ -1634,8 +1634,12 @@ export function tutorSystemPrompt(ctx: TutorContext): string {
     weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: "Asia/Kolkata",
   });
   const todayPlan = ctx.today.length
-    ? ctx.today.slice(0, 8).map((task, index) => `${index + 1}. ${task.title} (${task.minutes} min, ${task.status})`).join("\n")
+    ? ctx.today.slice(0, 8).map((task, index) => `${index + 1}. ${task.title} (${task.minutes} min, ${task.status}${task.reason ? `, ${task.reason}` : ""})`).join("\n")
     : "Nothing scheduled today.";
+  const firstPending = ctx.today.find((task) => task.status === "pending");
+  const recommendedLine = firstPending
+    ? `Recommended next task: ${firstPending.title} (${firstPending.minutes} min). When the learner asks what to study now or next, recommend exactly this task first.\n`
+    : "Nothing pending today — recommend a short recall or practice session instead of inventing work.\n";
   const subjectLines = ctx.subjects.length
     ? ctx.subjects.slice(0, 10).map((subject) => `- ${subject.name}: ${subject.done}/${subject.total} lessons (${subject.difficulty})`).join("\n")
     : "- (no subjects loaded yet)";
@@ -1668,9 +1672,10 @@ Days left: ${ctx.daysLeft} (exam: ${ctx.examDate}) | Progress: ${ctx.progressPct
 Streak: ${ctx.streak} days | This week: ${ctx.hoursThisWeek}h studied vs ${ctx.dailyHours * 7}h target
 Overdue tasks: ${ctx.overdue}
 
-Today's plan (ML-scheduled):
+Today's plan (ML-scheduled, ALREADY IN PRIORITY ORDER — the first pending item is the best next step):
 ${todayPlan}
 
+${recommendedLine}
 Subjects (ML-tracked):
 ${subjectLines}
 
@@ -1711,7 +1716,16 @@ Theme aliases: default/light/clean/white → default | lavender/silver → silve
 emerald → mint | champagne → sunset | midnight/dark/black → dark | "previous" → silver-lavender.
 Rules: emit ONE tag max, only when the learner clearly requests that specific action.
 Never claim you cannot control themes, timers, navigation or replanning — you always can.
-For pure study questions, emit no tag.`;
+For pure study questions, emit no tag.
+
+ACTION SAFETY — the tags above execute state changes immediately, so treat them like a
+dangerous tool: a QUESTION is never an action. If the learner asks about an action
+("how do I re-plan?", "should I re-plan?", "what is dark mode?", "how do I stop the
+timer?", "should I pause?"), ANSWER the question in words and emit no tag. Only a clear,
+direct imperative request ("re-plan my week", "stop the timer", "switch to dark mode")
+may carry a tag. Vague suggestions ("make my workload lighter", "I only have 30 minutes
+today") are answered with advice — never with a re-plan tag unless the learner
+explicitly asks you to re-plan.`;
 }
 
 /**

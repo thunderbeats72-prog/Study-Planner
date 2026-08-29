@@ -21,6 +21,15 @@ import {
   demoAddSession, demoAddTask, demoDeleteTask, demoFallbackState, demoPatchTask,
   demoResetMutations, demoSessionMinutesForTask,
 } from "../src/lib/demoState";
+import { nextAction, prioritizeTasks, weakestSubjectIds } from "../src/lib/prioritization";
+import {
+  backlogFor, backlogToDate, canFitToday, dailyCapacityMinutes, pendingOnDate,
+  spreadAcrossDays, suggestedRecovery, todayOverload, GENTLE_EXTRA_PER_DAY,
+} from "../src/lib/recovery";
+import { validateQuickAdd, QUICK_ADD_KINDS } from "../src/lib/quickAdd";
+import type { TaskRow } from "../src/lib/client";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import React from "react";
 import TestRenderer, { act } from "react-test-renderer";
 import { useStudyClock, type ClockApi } from "../src/lib/useTimer";
@@ -94,6 +103,13 @@ async function runTests() {
   check(parseCommand("should I pause?") === undefined, "Question about pause is not a command");
   check(parseCommand("explain how the timer works") === undefined, "How-to question is not a command");
   check(parseCommand("what are my weak points?") === undefined, "Weak-points question is not a command");
+  check(parseCommand("what is dark mode?") === undefined, "Question about dark mode never changes the theme");
+  check(parseCommand("should I re-plan my week?") === undefined, "Should-I question never re-plans");
+  check(parseCommand("how do I stop the timer?") === undefined, "Question about stopping never stops the timer");
+  check(parseCommand("make today's workload lighter") === undefined, "Vague workload request is answered, not executed");
+  check(parseCommand("re-plan my week")?.type === "replan", "Clear imperative re-plan still executes");
+  check(parseCommand("stop the timer")?.type === "stopTimer", "Clear imperative stop still executes");
+  check(parseCommand("switch to dark mode")?.type === "theme" && parseCommand("switch to dark mode")?.payload === "dark", "Clear imperative theme change still executes");
 
   console.log("\n--- 2d. Localized instant plan/progress replies ---");
   {
@@ -398,6 +414,19 @@ async function runTests() {
   now += 10 * 60_000;
   await act(async () => { clock.clockOut(); renderer.unmount(); });
   check(loggedMinutes.reduce((sum, minutes) => sum + minutes, 0) === beforeBreakClockOut, "Clocking out on break does not log break time");
+
+  // Switching lessons mid-session banks the ACTIVE minutes of the previous
+  // lesson — the running session's partial time is never silently eaten.
+  await act(async () => {
+    renderer = TestRenderer.create(React.createElement(Probe));
+  });
+  const beforeSwitch = loggedMinutes.reduce((sum, minutes) => sum + minutes, 0);
+  await act(async () => { clock.clockIn({ taskId: 1 }); });
+  now += 40_000;
+  await act(async () => { clock.clockIn({ taskId: 2 }); });
+  const afterSwitch = loggedMinutes.reduce((sum, minutes) => sum + minutes, 0);
+  check(Math.abs(afterSwitch - beforeSwitch - 40 / 60) < 0.02, "Switching lessons banks the active 40-second segment");
+  await act(async () => { clock.clockOut(); renderer.unmount(); });
   Date.now = originalNow;
   if (originalWindow === undefined) delete (globalThis as { window?: unknown }).window;
   else (globalThis as { window?: unknown }).window = originalWindow;
@@ -587,6 +616,118 @@ async function runTests() {
   let passthroughCode = 0;
   try { await passthrough(new Request("https://app.test/api/x")); } catch { passthroughCode = 500; }
   check(passthroughCode === 500, "Non-database errors are rethrown untouched");
+
+  console.log("\n--- 10. Task Prioritization (What should I do now?) ---");
+  const T = "2026-08-29";
+  const mkTask = (patch: Partial<TaskRow>): TaskRow => ({
+    id: 1, userId: 1, date: T, subjectId: null, topicId: null,
+    kind: "learn", title: "Task", detail: "", plannedMinutes: 30,
+    actualMinutes: 0, status: "pending", position: 0, ...patch,
+  });
+  let ranked = prioritizeTasks([
+    mkTask({ id: 1, date: T }),
+    mkTask({ id: 2, date: "2026-08-27" }),
+    mkTask({ id: 3, date: "2026-08-28" }),
+  ], T);
+  check(ranked[0].id === 2 && ranked[0].reason === "overdue", "Overdue task comes first");
+  check(ranked[1].id === 3, "Older overdue work outranks newer overdue work");
+  check(ranked[0].priorityLabel === "Start here", "Top task is labelled Start here");
+  ranked = prioritizeTasks([
+    mkTask({ id: 11, date: "2026-09-05" }),
+    mkTask({ id: 12, date: T }),
+  ], T);
+  check(ranked[0].id === 12 && ranked[0].reason === "due-today", "Today's task outranks a normal future task");
+  ranked = prioritizeTasks([
+    mkTask({ id: 21, kind: "learn", date: T }),
+    mkTask({ id: 22, kind: "revise", date: T }),
+  ], T);
+  check(ranked[0].id === 22 && ranked[0].reason === "revision", "Revision due gets appropriate priority");
+  ranked = prioritizeTasks([
+    mkTask({ id: 31, status: "done", date: "2026-08-27" }),
+    mkTask({ id: 32, status: "skipped", date: "2026-08-27" }),
+    mkTask({ id: 33, date: T }),
+  ], T);
+  check(ranked.length === 1 && ranked[0].id === 33, "Completed and skipped tasks are excluded");
+  ranked = prioritizeTasks([
+    mkTask({ id: 41, subjectId: 1, date: "2026-09-12" }),
+    mkTask({ id: 42, subjectId: 2, date: "2026-09-12" }),
+  ], T, { weakSubjectIds: [2] });
+  check(ranked[0].id === 42 && ranked[0].reason === "weak-subject", "Weak-subject tasks are prioritised");
+  const detA = prioritizeTasks([mkTask({ id: 51, date: T }), mkTask({ id: 52, date: T })], T).map((x) => x.id).join(",");
+  const detB = prioritizeTasks([mkTask({ id: 52, date: T }), mkTask({ id: 51, date: T })], T).map((x) => x.id).join(",");
+  check(detA === detB && detA === "51,52", "Ordering is deterministic regardless of input order");
+  const pair = nextAction([mkTask({ id: 61, date: T }), mkTask({ id: 62, date: T })], T);
+  check(pair.now?.id === 61 && pair.next?.id === 62, "nextAction exposes the NOW/NEXT pair");
+  const partial = prioritizeTasks([mkTask({ id: 63, date: T, actualMinutes: 10 })], T);
+  check(partial[0].priorityLabel === "Continue with this", "Partially-started task reads as Continue");
+  check(weakestSubjectIds([{ id: 1, done: 2, total: 4 }, { id: 2, done: 0, total: 4 }]).join(",") === "2",
+    "weakestSubjectIds finds the lowest-completion subject");
+
+  console.log("\n--- 11. Quick Add Validation ---");
+  const good = validateQuickAdd({ title: "Physics — Current Electricity", minutes: 30, date: T, subjectId: 2, kind: "practice" });
+  check(good.valid, "Valid quick-add input passes");
+  const noTitle = validateQuickAdd({ title: "   ", minutes: 30, date: T, subjectId: null, kind: "practice" });
+  check(!noTitle.valid && !!noTitle.errors.title, "Missing title is rejected");
+  check(!validateQuickAdd({ title: "X", minutes: 0, date: T, subjectId: null, kind: "practice" }).valid, "Zero minutes is rejected");
+  check(!validateQuickAdd({ title: "X", minutes: 999, date: T, subjectId: null, kind: "practice" }).valid, "Absurd duration is rejected");
+  check(!validateQuickAdd({ title: "X", minutes: 12.5, date: T, subjectId: null, kind: "practice" }).valid, "Fractional minutes are rejected");
+  check(!validateQuickAdd({ title: "X", minutes: 30, date: "2026-02-31", subjectId: null, kind: "practice" }).valid,
+    "Impossible dates are rejected");
+  check(!validateQuickAdd({ title: "X", minutes: 30, date: T, subjectId: -3, kind: "practice" }).valid,
+    "Invalid subject ids are rejected");
+  check(!validateQuickAdd({ title: "X", minutes: 30, date: T, subjectId: null, kind: "buffer" }).valid,
+    "Scheduler-internal task kinds are rejected");
+  const withSubject = validateQuickAdd({ title: "X", minutes: 30, date: T, subjectId: 7, kind: "learn" });
+  check(withSubject.valid, "A valid subject association passes through");
+  check(!(QUICK_ADD_KINDS as readonly string[]).includes("buffer"), "Quick add never creates buffer tasks");
+
+  console.log("\n--- 12. Backlog Recovery & Realistic Redistribution ---");
+  const capacity = 120; // a 2-hour day
+  const backlogTasks = [
+    mkTask({ id: 71, date: "2026-08-25", plannedMinutes: 60 }),
+    mkTask({ id: 72, date: "2026-08-26", plannedMinutes: 60 }),
+    mkTask({ id: 73, date: "2026-08-28", plannedMinutes: 30 }),
+  ];
+  const todayPlan = [mkTask({ id: 74, date: T, plannedMinutes: 120 })];
+  const all = [...todayPlan, ...backlogTasks];
+  const backlog = backlogFor(all, T);
+  check(backlog.count === 3 && backlog.minutes === 150, "Backlog counts only pending past-dated work");
+  check(pendingOnDate(all, T).minutes === 120, "Today's pending minutes are measured separately");
+  check(dailyCapacityMinutes({ dailyHours: 2 }) === 120, "Daily capacity derives from settings");
+  check(todayOverload(all, T, capacity) === 150, "Overload = today's plan + backlog beyond capacity");
+  check(!canFitToday(all, T, capacity), "A 150-minute backlog does not fit a full 2-hour day");
+  check(canFitToday(todayPlan, T, capacity), "An empty backlog always fits");
+  const pace = suggestedRecovery(180, 20);
+  check(pace !== null && pace.minutesPerDay === GENTLE_EXTRA_PER_DAY && pace.days === 6,
+    "Suggested recovery: +30 min/day for 6 days");
+  check(suggestedRecovery(0, 20) === null, "No overload → no recovery needed");
+  const spread = spreadAcrossDays(all, T, capacity);
+  check(spread.assignments.length === backlogTasks.length, "Every backlog task is represented in the spread");
+  check(spread.assignments.every((a) => a.date > T), "Spread moves work forward, never backward");
+  const load = new Map<string, number>();
+  for (const assignment of spread.assignments) {
+    const minutes = all.find((task) => task.id === assignment.id)?.plannedMinutes ?? 0;
+    load.set(assignment.date, (load.get(assignment.date) || 0) + minutes);
+  }
+  check([...load.values()].every((minutes) => minutes <= capacity), "Spread never overloads a day beyond capacity");
+  const spreadAgain = spreadAcrossDays(all, T, capacity);
+  check(JSON.stringify(spread.assignments) === JSON.stringify(spreadAgain.assignments), "Spread assignment is deterministic");
+  const dateByTask = new Map(spread.assignments.map((assignment) => [assignment.id, assignment.date]));
+  check((dateByTask.get(71) || "z") <= (dateByTask.get(73) || "z"), "Oldest overdue task is placed no later than newer ones");
+  const toTomorrow = backlogToDate(all, T, "2026-08-30");
+  check(toTomorrow.length === 3 && toTomorrow.every((assignment) => assignment.date === "2026-08-30"),
+    "Move-to-tomorrow targets every backlog task");
+
+  console.log("\n--- 13. Responsive & Accessibility Static Checks ---");
+  const enhancementCss = readFileSync(join(process.cwd(), "src/app/practical-enhancements.css"), "utf8");
+  check(enhancementCss.includes("@media(max-width:640px)"), "Enhancement CSS carries the phone breakpoint");
+  check(enhancementCss.includes("clamp(") && enhancementCss.includes("minmax(") && enhancementCss.includes("auto-fit"),
+    "Enhancement layouts use fluid sizing (clamp/minmax/auto-fit)");
+  check(enhancementCss.includes("prefers-reduced-motion"), "Reduced motion is respected");
+  check(enhancementCss.includes("prefers-contrast"), "High contrast is respected");
+  check(enhancementCss.includes("--tap"), "Touch targets use the shared tap token");
+  const globalsCss = readFileSync(join(process.cwd(), "src/app/globals.css"), "utf8");
+  check(globalsCss.includes("--tap:44px"), "The shared touch floor is 44px");
 
   console.log("\n==================================================");
   console.log(`TEST SUITE RESULTS: ${passed} PASSED, ${failed} FAILED`);

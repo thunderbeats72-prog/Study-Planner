@@ -7,6 +7,7 @@ import type { TutorContext } from "./ai";
 import { advancedTopicMetadata } from "./curriculum";
 import { dateDistanceDays, isIsoDate } from "./validation";
 import { fsrsInit, fsrsReview, masteryDelta, type ReviewRating } from "./ml";
+import { prioritizeTasks, weakestSubjectIds } from "./prioritization";
 
 /** Transaction handle type as produced by `db.transaction(cb)`. */
 export type DbTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -239,6 +240,33 @@ export function buildContext(s: St, today = todayStr()): TutorContext {
     .filter((x) => diffDays(weekAgo, x.date) >= 0 && diffDays(x.date, today) >= 0)
     .reduce((a, x) => a + x.minutes, 0) / 60;
   const hoursThisWeek = Math.round(hoursRaw * 100) / 100;
+  // The AI sees the SAME priority order the Dashboard hero shows, so
+  // "what should I do next?" is answered by one shared utility — never
+  // two competing rankings. Done tasks stay in the list (marked done)
+  // so the tutor can report on the whole day; they sort after pending.
+  const weakIds = weakestSubjectIds(subs);
+  const todaysRanked = prioritizeTasks(
+    s.tasks.filter((task) => task.date === today),
+    today,
+    { weakSubjectIds: weakIds }
+  );
+  const rankById = new Map(todaysRanked.map((ranked, index) => [ranked.id, index]));
+  const todayContext = s.tasks
+    .filter((task) => task.date === today)
+    .slice()
+    .sort((a, b) => (rankById.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (rankById.get(b.id) ?? Number.MAX_SAFE_INTEGER)
+      || a.position - b.position
+      || a.id - b.id)
+    .map((task) => {
+      const ranked = todaysRanked.find((item) => item.id === task.id);
+      return {
+        title: task.title,
+        kind: task.kind,
+        minutes: task.plannedMinutes,
+        status: task.status,
+        reason: ranked?.reason,
+      };
+    });
   return {
     name: s.user.name,
     courseName: s.user.courseName,
@@ -247,9 +275,7 @@ export function buildContext(s: St, today = todayStr()): TutorContext {
     daysLeft: Math.max(0, diffDays(today, s.settings.examDate)),
     dailyHours: s.settings.dailyHours,
     subjects: subs,
-    today: s.tasks
-      .filter((t) => t.date === today)
-      .map((t) => ({ title: t.title, kind: t.kind, minutes: t.plannedMinutes, status: t.status })),
+    today: todayContext,
     progressPct: Math.round((doneCount / totalTopics) * 100),
     streak: s.user.streak,
     hoursThisWeek,

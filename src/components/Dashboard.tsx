@@ -3,14 +3,21 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import StudyScene from "./StudyScene";
 import MiniCalendar from "./MiniCalendar";
-import { api, addDays, dayDiff, mdToHtml, prettyLong, today, KIND_META, normalizeCheckpointTitle, type AppState } from "@/lib/client";
+import { api, addDays, dayDiff, mdToHtml, prettyLong, today, KIND_META, normalizeCheckpointTitle, type AppState, type TaskRow } from "@/lib/client";
 import { mmss } from "@/lib/useTimer";
 import {
   IconSpark, IconCalendar, IconTarget, IconClock, IconFlame, IconPlay, IconLeaf, IconRocket,
 } from "./icons";
 import TaskEditor, { type TaskPatch } from "./TaskEditor";
-import TaskClockButton from "./TaskClockButton";
+import TaskActions from "./TaskActions";
+import QuickAdd from "./QuickAdd";
 import Heatmap from "./Heatmap";
+import { prioritizeTasks, weakestSubjectIds, reasonLabel } from "@/lib/prioritization";
+import {
+  backlogFor, backlogToDate, canFitToday, dailyCapacityMinutes, pendingOnDate,
+  spreadAcrossDays, suggestedRecovery, todayOverload,
+} from "@/lib/recovery";
+import type { QuickAddPayload } from "@/lib/quickAdd";
 
 /** v13 — KPI digits count up to their new value instead of snapping.
  *  Returns a formatted string (integers stay clean, tenths when needed). */
@@ -56,10 +63,15 @@ function dailyQuote(dateKey: string) {
   return QUOTES[hash % QUOTES.length];
 }
 
+/** Checkpoints are cross-subject mock tasks rendered without a subject. */
+function isCheckpointTask(task: TaskRow): boolean {
+  return task.title.toLowerCase().includes("checkpoint") || (task.kind === "mock" && !task.subjectId);
+}
+
 export default function Dashboard({
   state, onTaskStatus, onTaskUpdate, onSkipSubject, onFocusTask, activeTaskId, activeClockSeconds,
   clockRunning, clockSessionActive, clockOnBreak, onClockOut, onPauseOrResume, replanning, onReplan,
-  onStartFocus,
+  onStartFocus, onAddTask, onMoveTasks,
 }: {
   state: AppState;
   onTaskStatus: (id: number, status: string, rating?: number) => void;
@@ -76,12 +88,14 @@ export default function Dashboard({
   replanning: boolean;
   onReplan: () => void;
   onStartFocus: () => void;
+  onAddTask: (input: QuickAddPayload) => void;
+  onMoveTasks: (moves: { id: number; date: string }[], message: string) => void;
 }) {
   const [insights, setInsights] = useState<string>("");
   const [intel, setIntel] = useState<{
     upNext?: { id: number; title: string; minutes: number; kind: string; subjectId: number | null } | null;
     focusSuggestion?: { startHour: number; endHour: number; isNow: boolean } | null;
-    pace: { global: number; samples: number; bySubject: { id: number; name: string; color: string; pace: number }[] };
+    pace: { global: number; samples: number; bySubject: { id: number; name: string; color: string; pace: number }[] } | null;
     weekdays: number[] | null;
     peakHour: number | null;
     tomorrowRisk: number;
@@ -92,7 +106,6 @@ export default function Dashboard({
   const [intelOpen, setIntelOpen] = useState(false);
   const [loadingIns, setLoadingIns] = useState(true);
   const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
-  const [moreActionsId, setMoreActionsId] = useState<number | null>(null);
   const t = today();
   const ctx = state.context;
   const quote = dailyQuote(t);
@@ -161,6 +174,34 @@ export default function Dashboard({
   const totalPlannedMin = todayTasks.reduce((a, x) => a + x.plannedMinutes, 0);
   const loggedTodayMin = state.sessions.filter((s) => s.date === t).reduce((a, s) => a + s.minutes, 0);
 
+  // ── "What should I do now?" — one shared priority order ──────────────
+  const capacity = dailyCapacityMinutes(state.settings);
+  const backlog = useMemo(() => backlogFor(state.tasks, t), [state.tasks, t]);
+  const ranked = useMemo(
+    () => prioritizeTasks(state.tasks, t, {
+      weakSubjectIds: weakestSubjectIds(ctx.subjects),
+      subjectWeights: Object.fromEntries(state.subjects.map((subject) => [subject.id, subject.weight])),
+      remainingTodayMinutes: Math.max(0, capacity - pendingOnDate(state.tasks, t).minutes),
+    }),
+    [state.tasks, t, ctx.subjects, state.subjects, capacity]
+  );
+  const top = ranked[0] || null;
+  const second = ranked[1] || null;
+  const todayPendingMin = pendingOnDate(state.tasks, t).minutes;
+  const overload = todayOverload(state.tasks, t, capacity);
+  const canFit = canFitToday(state.tasks, t, capacity);
+  const recoveryPace = suggestedRecovery(overload, Math.max(1, ctx.daysLeft));
+  const spreadPlan = useMemo(
+    () => spreadAcrossDays(state.tasks, t, capacity, { lastDate: state.settings.examDate }).assignments,
+    [state.tasks, t, capacity, state.settings.examDate]
+  );
+  const moveToday = useMemo(() => backlogToDate(state.tasks, t, t), [state.tasks, t]);
+  const moveTomorrow = useMemo(() => backlogToDate(state.tasks, t, addDays(t, 1)), [state.tasks, t]);
+
+  // The hero card doubles as the live session control for the top task.
+  const heroLive = !!clockSessionActive && top != null && activeTaskId === top.id;
+  const topTitle = top ? (isCheckpointTask(top) ? normalizeCheckpointTitle(top.title) : top.title) : "";
+
   // Momentum: this-week vs last-week study minutes, avg session length,
   // and completion rate over the past 7 days — small honest trends.
   const momentum = useMemo(() => {
@@ -196,89 +237,238 @@ export default function Dashboard({
 
   return (
     <div className="fade-in">
-      {/* ── Hero greeting — course info, study scene, Start Focus ── */}
+      {/* ── HERO: NOW / NEXT / TODAY / RECOVERY — the actionable answer,
+             not a stats wall. ── */}
       <section className="dash-hero glass-panel">
         <div className="dash-hero-bg" aria-hidden="true" />
         <div className="dash-hero-copy">
           <div className="dash-hero-eyebrow">
             <span className="streak-badge dash-hero-streak"><IconFlame /> {state.user.streak} day streak</span>
+            <span className="sr-only">{greeting}, {state.user.name}.</span>
           </div>
-          <h1 className="dash-hero-title">
-            Hey {state.user.name}! <span className="wave-emoji" aria-hidden="true">👋</span>
-          </h1>
-          <span className="sr-only">{greeting}</span>
-          <p className="dash-hero-sub">
-            {state.user.courseName} · {ctx.daysLeft} days to {prettyLong(state.settings.examDate)} · {ctx.progressPct}% syllabus done
-          </p>
-          <div className="dash-hero-actions">
-            <button className="btn btn-primary btn-lg" onClick={onStartFocus}>
-              <IconPlay size={15} /> Start Focus
-            </button>
-            <button className="btn btn-secondary btn-lg" onClick={onReplan} disabled={replanning}>
-              <IconSpark size={15} />{replanning ? "Re-planning…" : "Re-plan with AI"}
-            </button>
-          </div>
+
+          {top ? (
+            <>
+              <div className="now-label">
+                {top.priorityLabel}
+                <span className="now-label-sep" aria-hidden="true">·</span>
+                {reasonLabel(top.reason)}
+              </div>
+              <h1 className="dash-hero-title now-title">{topTitle}</h1>
+              <p className="dash-hero-sub">
+                {KIND_META[top.kind]?.label || "Task"} · {top.plannedMinutes} min
+                {state.subjects.find((subject) => subject.id === top.subjectId)
+                  ? ` · ${state.subjects.find((subject) => subject.id === top.subjectId)!.name}`
+                  : ""}
+                {taskLogged(top.id) ? ` · ${fmtMin(taskLogged(top.id))} already logged` : ""}
+              </p>
+
+              {heroLive ? (
+                <div className="now-live">
+                  <span className="up-next-live-chip">
+                    ● {clockRunning ? "clock running" : clockOnBreak ? "on break" : "paused"}
+                  </span>
+                  <span className="mono now-live-timer" aria-label="Session time">{mmss(activeClockSeconds ?? 0)}</span>
+                  <div className="flex-row gap-sm">
+                    {!clockOnBreak && (
+                      <button className="btn btn-sm btn-secondary" onClick={onPauseOrResume}>
+                        {clockRunning ? "Pause" : "Resume"}
+                      </button>
+                    )}
+                    <button className="btn btn-sm btn-danger act-out" onClick={onClockOut}>
+                      Clock Out
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="dash-hero-actions now-actions">
+                  <button className="btn btn-primary btn-lg" onClick={() => onFocusTask(top.id)}>
+                    <IconPlay size={15} /> {clockSessionActive ? "Switch to this" : "Start"}
+                  </button>
+                  <button className="btn btn-secondary btn-lg" onClick={onStartFocus}>
+                    Start Focus
+                  </button>
+                </div>
+              )}
+
+              {second && !heroLive && (
+                <div className="now-next">
+                  <span className="now-next-label">Next</span>
+                  <span className="now-next-title">{second.title}</span>
+                  <span className="now-next-meta">{second.plannedMinutes} min</span>
+                  <button
+                    className="btn btn-xs btn-secondary now-next-start"
+                    type="button"
+                    onClick={() => onFocusTask(second.id)}
+                  >
+                    Start
+                  </button>
+                </div>
+              )}
+
+              <div className="now-planline">
+                {todayTasks.length
+                  ? `Today: ${doneToday}/${todayTasks.length} done · ${todayPendingMin} min left`
+                  : "No plan yet today — add a task or generate one."}
+                {backlog.count > 0 && (
+                  <span className={canFit ? "now-planline-ok" : "now-planline-warn"}>
+                    {canFit ? " · catch-up fits today" : ` · ${backlog.minutes} min backlog`}
+                  </span>
+                )}
+              </div>
+            </>
+          ) : (
+            <>
+              <h1 className="dash-hero-title">
+                All caught up, {state.user.name.split(" ")[0]}! <span className="wave-emoji" aria-hidden="true">🎉</span>
+              </h1>
+              <p className="dash-hero-sub">
+                Nothing is waiting for you. Pick a weak topic, add a task, or take the rest of the day.
+              </p>
+              <div className="dash-hero-actions">
+                <button className="btn btn-primary btn-lg" onClick={onStartFocus}>
+                  <IconPlay size={15} /> Start Focus
+                </button>
+              </div>
+            </>
+          )}
         </div>
         <StudyScene variant="dashboard" className="dash-hero-scene" />
       </section>
 
-      {intel?.upNext && (() => {
-        const next = intel.upNext!;
-        // LIVE: the ML-predicted task is the one being timed right now.
-        // The same card that started the session stops it — no hunting.
-        const live = !!clockSessionActive && activeTaskId === next.id;
-        return (
-          <div
-            className={`glass-panel up-next${live ? " live" : ""}`}
-            onClick={() => !live && onFocusTask(next.id)}
-            role={live ? "status" : undefined}
-          >
-            <div className="up-next-glow" />
-            <div className="up-next-main">
-              <div className="intel-label intel-label--row">
-                {live ? "Now recording" : "Up next"}
-                {live
-                  ? <span className="up-next-live-chip">● {clockRunning ? "clock running" : clockOnBreak ? "on break" : "paused"}</span>
-                  : intel.focusSuggestion?.isNow && <span className="up-next-now">peak focus window</span>}
+      {/* ── RECOVERY — overdue work is a decision, never a failure. ── */}
+      {backlog.count > 0 && (
+        <div className="glass-panel recovery-panel accent-edge accent-edge--warning">
+          <div className="recovery-copy">
+            <h3 className="section-title recovery-title">
+              {backlog.count === 1 ? "1 unfinished task" : `${backlog.count} unfinished tasks`} from earlier days
+            </h3>
+            <p className="panel-lead">
+              Let&apos;s recover {backlog.count === 1 ? "it" : "them"} — no rush, no cramming.{" "}
+              {overload > 0 && recoveryPace
+                ? `Suggested recovery: +${recoveryPace.minutesPerDay} min/day for ${recoveryPace.days} day${recoveryPace.days === 1 ? "" : "s"} keeps today realistic.`
+                : "They still fit today's plan without overloading you."}
+            </p>
+          </div>
+          <div className="recovery-actions">
+            <button
+              className="btn btn-sm btn-secondary"
+              type="button"
+              disabled={!canFit}
+              title={canFit ? "Move the unfinished work into today's plan" : "More than your daily capacity — spread it instead"}
+              onClick={() => onMoveTasks(moveToday, `Moved ${moveToday.length} task${moveToday.length === 1 ? "" : "s"} to today.`)}
+            >
+              Do today
+            </button>
+            <button
+              className="btn btn-sm btn-secondary"
+              type="button"
+              onClick={() => onMoveTasks(moveTomorrow, `Moved ${moveTomorrow.length} task${moveTomorrow.length === 1 ? "" : "s"} to tomorrow.`)}
+            >
+              Move to tomorrow
+            </button>
+            <button
+              className="btn btn-sm btn-primary"
+              type="button"
+              onClick={() => onMoveTasks(spreadPlan, `Spread ${spreadPlan.length} task${spreadPlan.length === 1 ? "" : "s"} across the week.`)}
+            >
+              Spread across the week
+            </button>
+            <button className="btn btn-sm btn-primary" type="button" onClick={onReplan} disabled={replanning} aria-busy={replanning}>
+              {replanning && <span className="replanning-spark"><IconSpark size={12} /></span>}
+              {replanning ? "Re-planning…" : "Let AI re-plan"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── TODAY'S PLAN — the working list comes before every statistic. ── */}
+      <div className="dash-today-grid">
+        <div className="glass-panel tilt-card section-card dash-today-card">
+          <div className="day-head">
+            <h3 className="section-title">Today&apos;s Plan</h3>
+            <div className="day-head-side">
+              <span className="day-meta">{doneToday}/{todayTasks.length} done · {totalPlannedMin} min planned</span>
+              <QuickAdd state={state} onAdd={onAddTask} />
+            </div>
+          </div>
+          {!todayTasks.length && (
+            <div className="empty-state">
+              <div className="empty-state-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="4" width="18" height="18" rx="3" /><path d="M16 2v4M8 2v4M3 10h18" />
+                </svg>
               </div>
-              <div className="up-next-title">{next.title}</div>
-              <div className="up-next-sub">
-                {live
-                  ? `${mmss(activeClockSeconds ?? 0)} this session · your minutes are being saved`
-                  : `${next.minutes} min · one tap to clock in`}
+              <h4 className="empty-state-title">No sessions scheduled today</h4>
+              <p className="empty-state-sub">This may be a rest day, or your plan hasn&apos;t been generated yet.</p>
+              <div className="flex-row gap-sm">
+                <QuickAdd state={state} onAdd={onAddTask} />
+                <button className="btn btn-secondary btn-sm" onClick={onReplan} disabled={replanning}>
+                  {replanning ? "Re-planning…" : "Generate Plan"}
+                </button>
               </div>
             </div>
-            {live ? (
-              <div className="up-next-actions">
-                <div className="mono up-next-timer" aria-label="Session time">{mmss(activeClockSeconds ?? 0)}</div>
-                <div className="flex-row gap-sm up-next-actions-row">
-                  {!clockOnBreak && (
-                    <button className="btn btn-xs btn-secondary"
-                      onClick={(e) => { e.stopPropagation(); onPauseOrResume(); }}>
-                      {clockRunning ? "Pause" : "Resume"}
-                    </button>
-                  )}
-                  <button className="btn btn-sm btn-danger act-out"
-                    onClick={(e) => { e.stopPropagation(); onClockOut(); }}>
-                    Clock Out
-                  </button>
+          )}
+          {todayTasks.length > 0 && doneToday === todayTasks.length && (
+            <div className="day-complete">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 6 9 17l-5-5" />
+              </svg>
+              All done for today. Well earned — see you tomorrow.
+            </div>
+          )}
+          {todayTasks.map((task) => {
+            const meta = KIND_META[task.kind] || KIND_META.learn;
+            const subj = state.subjects.find((s) => s.id === task.subjectId);
+            const isCheckpoint = isCheckpointTask(task);
+            const kindLabel = isCheckpoint ? "Checkpoint" : meta.label;
+            const dotColor = subj?.color || (isCheckpoint ? "var(--color-primary)" : meta.color);
+            const formattedTitle = isCheckpoint ? normalizeCheckpointTitle(task.title) : task.title;
+            return (
+              <div key={task.id} className={`task-row clean-list${task.status === "done" ? " done" : ""}${activeTaskId === task.id ? " active-clock" : ""}`}>
+                <div className="task-dot" style={{ background: dotColor }} />
+                <div className="task-main">
+                  <div className="task-title">{formattedTitle}</div>
+                  <div className="task-sub">
+                    <span className="chip chip-kind chip-tight">{kindLabel}</span> · {task.plannedMinutes} min
+                    {isCheckpoint ? " · All Subjects · Comprehensive Review" : ""}
+                    {taskLogged(task.id) ? ` · ${fmtMin(taskLogged(task.id))} logged` : task.actualMinutes ? ` · ${task.actualMinutes}m logged` : ""}
+                    {activeTaskId === task.id && activeClockSeconds ? ` · live +${Math.floor(activeClockSeconds / 60)}m ${activeClockSeconds % 60}s` : ""}
+                  </div>
                 </div>
+                <TaskActions
+                  task={task}
+                  subject={subj}
+                  activeTaskId={activeTaskId}
+                  clockSessionActive={clockSessionActive}
+                  onTaskStatus={onTaskStatus}
+                  onFocusTask={onFocusTask}
+                  onClockOut={onClockOut}
+                  onEdit={setEditingTaskId}
+                  onSkipSubject={onSkipSubject}
+                />
               </div>
-            ) : clockSessionActive ? (
-              <button className="btn btn-primary" title="Save the current session and move to this lesson"
-                onClick={(e) => { e.stopPropagation(); onFocusTask(next.id); }}>
-                Switch
-              </button>
-            ) : (
-              <button className="btn btn-primary" aria-label="Start this task"
-                onClick={(e) => { e.stopPropagation(); onFocusTask(next.id); }}>
-                Start
-              </button>
-            )}
-          </div>
-        );
-      })()}
+            );
+          })}
+        </div>
 
+        <div className="dash-side-rail">
+          <div className="glass-panel tilt-card section-card dash-cal-card">
+            <h3 className="section-title">Calendar</h3>
+            <MiniCalendar state={state} />
+          </div>
+          <div className="glass-panel tilt-card section-card dash-quote-card">
+            <div className="quote-mark" aria-hidden="true">“</div>
+            <p className="quote-text">{quote.text}</p>
+            <div className="quote-tag">
+              <span className="quote-tag-icon">{quote.tag === "Stay present" ? <IconLeaf size={12} /> : <IconRocket size={12} />}</span>
+              {quote.tag}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── SUPPORTING NUMBERS — progress context, deliberately secondary ── */}
       <div className="momentum-strip">
         <span className="momentum-pill">This week <strong>{momentum.thisHrs}h</strong>
           {momentum.delta !== null && (
@@ -438,7 +628,7 @@ export default function Dashboard({
 
           {intelOpen && (
             <div className="intel-details slide-in">
-              {intel.pace.samples >= 3 ? (
+              {intel.pace && intel.pace.samples >= 3 ? (
                 <>
                   <div className="intel-label intel-subhead intel-subhead--first">Your pace vs plan (learned from {intel.pace.samples} sessions)</div>
                   {intel.pace.bySubject.slice(0, 6).map((p) => (
@@ -471,93 +661,6 @@ export default function Dashboard({
         </div>
       )}
 
-      {/* ── Today's Plan + calendar/quote rail ── */}
-      <div className="dash-today-grid">
-        <div className="glass-panel tilt-card section-card dash-today-card">
-          <div className="day-head">
-            <h3 className="section-title">Today&apos;s Plan</h3>
-            <span className="day-meta">{doneToday}/{todayTasks.length} done · {totalPlannedMin} min planned</span>
-          </div>
-          {!todayTasks.length && (
-            <div className="empty-state">
-              <div className="empty-state-icon">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="4" width="18" height="18" rx="3" /><path d="M16 2v4M8 2v4M3 10h18" />
-                </svg>
-              </div>
-              <h4 className="empty-state-title">No sessions scheduled today</h4>
-              <p className="empty-state-sub">This may be a rest day, or your plan hasn&apos;t been generated yet. Re-plan to fill your schedule.</p>
-              <button className="btn btn-secondary btn-sm" onClick={onReplan} disabled={replanning}>
-                {replanning ? "Re-planning…" : "Generate Plan"}
-              </button>
-            </div>
-          )}
-          {todayTasks.length > 0 && doneToday === todayTasks.length && (
-            <div className="day-complete">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M20 6 9 17l-5-5" />
-              </svg>
-              All done for today. Well earned — see you tomorrow.
-            </div>
-          )}
-          {todayTasks.map((task) => {
-            const meta = KIND_META[task.kind] || KIND_META.learn;
-            const subj = state.subjects.find((s) => s.id === task.subjectId);
-            const isCheckpoint = task.title.toLowerCase().includes("checkpoint") || (task.kind === "mock" && !task.subjectId);
-            const kindLabel = isCheckpoint ? "Checkpoint" : meta.label;
-            const dotColor = subj?.color || (isCheckpoint ? "var(--color-primary)" : meta.color);
-            const formattedTitle = isCheckpoint ? normalizeCheckpointTitle(task.title) : task.title;
-            return (
-              <div key={task.id} className={`task-row clean-list${task.status === "done" ? " done" : ""}${activeTaskId === task.id ? " active-clock" : ""}${moreActionsId === task.id ? " expanded-actions" : ""}`}>
-                <div className="task-dot" style={{ background: dotColor }} />
-                <div className="task-main">
-                  <div className="task-title">{formattedTitle}</div>
-                  <div className="task-sub">
-                    <span className="chip chip-kind chip-tight">{kindLabel}</span> · {task.plannedMinutes} min
-                    {isCheckpoint ? " · All Subjects · Comprehensive Review" : ""}
-                    {taskLogged(task.id) ? ` · ${fmtMin(taskLogged(task.id))} logged` : task.actualMinutes ? ` · ${task.actualMinutes}m logged` : ""}
-                    {activeTaskId === task.id && activeClockSeconds ? ` · live +${Math.floor(activeClockSeconds / 60)}m ${activeClockSeconds % 60}s` : ""}
-                  </div>
-                </div>
-                <div className="task-row-actions">
-                {subj && task.status !== "skipped" && (
-                  <button className="btn btn-xs btn-secondary task-skip-subj" title="Skip all tasks for this subject today"
-                    onClick={() => onSkipSubject(subj.id, task.date)}>Skip subject</button>
-                )}
-                <button className="btn btn-xs btn-secondary" onClick={() => setEditingTaskId(task.id)}>Edit</button>
-                {task.status !== "skipped" && task.status !== "done" && (
-                  <button className="btn btn-xs btn-secondary" title="Skip"
-                    onClick={() => onTaskStatus(task.id, "skipped")}>Skip</button>
-                )}
-                <TaskClockButton taskId={task.id} activeTaskId={activeTaskId} sessionActive={clockSessionActive}
-                  onFocusTask={onFocusTask} onClockOut={onClockOut} />
-                <button className="btn btn-xs btn-secondary task-more" aria-label="More actions"
-                  onClick={() => setMoreActionsId(moreActionsId === task.id ? null : task.id)}>⋯</button>
-                <button className={`btn btn-xs task-primary ${task.status === "done" ? "btn-secondary" : "btn-primary"}`}
-                  onClick={() => onTaskStatus(task.id, task.status === "done" ? "pending" : "done")}>
-                  {task.status === "done" ? "Undo" : "Done"}
-                </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        <div className="dash-side-rail">
-          <div className="glass-panel tilt-card section-card dash-cal-card">
-            <h3 className="section-title">Calendar</h3>
-            <MiniCalendar state={state} />
-          </div>
-          <div className="glass-panel tilt-card section-card dash-quote-card">
-            <div className="quote-mark" aria-hidden="true">“</div>
-            <p className="quote-text">{quote.text}</p>
-            <div className="quote-tag">
-              <span className="quote-tag-icon">{quote.tag === "Stay present" ? <IconLeaf size={12} /> : <IconRocket size={12} />}</span>
-              {quote.tag}
-            </div>
-          </div>
-        </div>
-      </div>
       <TaskEditor
         key={editingTaskId ?? "closed"}
         state={state}

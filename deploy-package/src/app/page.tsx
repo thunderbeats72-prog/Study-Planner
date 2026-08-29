@@ -1,9 +1,11 @@
 "use client";
 
-import React, { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { api, ApiError, prettyLong, today, type AppState, type MessageRow } from "@/lib/client";
-import { mmss, useFocusTimer, useStudyClock, type ClockApi, type TimerMode } from "@/lib/useTimer";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { api, ApiError, prettyDate, prettyLong, today, type AppState, type MessageRow } from "@/lib/client";
+import { mmss, useFocusTimer, useStudyClock, type ClockApi, type TimerApi, type TimerMode } from "@/lib/useTimer";
 import { nextPendingTask, type CompletedTaskInfo } from "@/lib/completion";
+import { nextAction } from "@/lib/prioritization";
+import type { QuickAddPayload } from "@/lib/quickAdd";
 import Onboarding from "@/components/Onboarding";
 import Dashboard from "@/components/Dashboard";
 import PlannerView from "@/components/PlannerView";
@@ -17,9 +19,12 @@ import { haptic } from "@/lib/haptics";
 import { useBackClose } from "@/lib/useBackClose";
 import type { TaskPatch } from "@/components/TaskEditor";
 import {
-  IconBolt, IconBook, IconCalendar, IconCheck, IconClock, IconFlame, IconGear, IconHome,
-  IconLogo, IconPanelLeft, IconSpark, IconWarn,
+  IconBolt, IconBell, IconBook, IconCalendar, IconCheck, IconClock, IconExpand2, IconFlame,
+  IconFocus2, IconGear, IconHome, IconLeaf, IconLogo, IconPalette, IconPanelLeft,
+  IconSpark, IconWarn,
 } from "@/components/icons";
+import ZenScene from "@/components/ZenScene";
+import { THEMES } from "@/lib/client";
 
 import {
   parseCommand, languageCapabilityReply, instantTutorReply, commandReply,
@@ -27,6 +32,21 @@ import {
 import { appendChatTurn, isFallbackUser } from "@/lib/chatTurn";
 
 type Page = "dashboard" | "planner" | "focus" | "subjects" | "settings";
+
+/** Zen header label for the current focus-timer mode. Display only. */
+const ZEN_MODE_LABEL: Record<TimerMode, string> = {
+  pomodoro: "Focus block",
+  short: "Short break",
+  long: "Long break",
+  stopwatch: "Open session",
+  custom: "Custom block",
+};
+
+/** One calm line for the bottom guidance panel, matched to the timer state. */
+function zenGuidance(timer: TimerApi): string {
+  if (timer.mode === "short" || timer.mode === "long") return "Rest your eyes — the break is part of the work";
+  return timer.running ? "Stay with this block — one lesson at a time" : "Begin when you are ready";
+}
 
 const NAV: { id: Page; label: string; icon: React.ReactNode }[] = [
   { id: "dashboard", label: "Overview", icon: <IconHome /> },
@@ -72,21 +92,6 @@ function savedSessionQueue(raw: string | null): PendingSessionLog[] {
   } catch { return []; }
 }
 
-/** The ⌘K hint's compact rail form has to name the modifier the learner
- *  actually presses: ⌘ on Apple keyboards, ⌃ (Ctrl) on everything else.
- *  `useSyncExternalStore` is React's own platform-detection pattern — the
- *  server snapshot and the first hydration paint both answer "Apple", the
- *  client corrects immediately afterwards, and no effect or state is
- *  involved, so the markup can never desynchronise from the DOM. */
-const noStoreSubscription = () => () => {};
-function isApplePlatform(): boolean {
-  if (typeof navigator === "undefined") return true;
-  return /Mac|iPhone|iPad|iPod/i.test(`${navigator.userAgent || ""} ${navigator.platform || ""}`);
-}
-function useAppleKeyboard(): boolean {
-  return useSyncExternalStore(noStoreSubscription, isApplePlatform, () => true);
-}
-
 export default function Home() {
   const [state, setState] = useState<AppState | null>(null);
   const [loading, setLoading] = useState(true);
@@ -104,6 +109,14 @@ export default function Home() {
   const [ambient, setAmbient] = useState("none");
   useEffect(() => onSoundChange(setAmbient), []);
   useBackClose(zen, () => setZen(false));
+  /* Zen is a full-screen room: lock the page scroll behind it so the browser
+     never paints a second scrollbar next to the composition. Restored on exit. */
+  useEffect(() => {
+    if (!zen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, [zen]);
   useBackClose(chatOpen, () => setChatOpen(false));
   const [toast, setToast] = useState<Toast | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -118,6 +131,23 @@ export default function Home() {
   const [forceWizard, setForceWizard] = useState(false);
   const [confirmWipe, setConfirmWipe] = useState(false);
   useBackClose(confirmWipe, () => setConfirmWipe(false));
+  /* Mobile navigation drawer (phones/tablets): the sidebar slides in
+     over a scrim instead of living in the bottom dock. */
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  useBackClose(drawerOpen, () => setDrawerOpen(false));
+  /* Quick controls: notifications + theme popovers in the tracker bar. */
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [themeOpen, setThemeOpen] = useState(false);
+  const [zenMinimal, setZenMinimal] = useState(false);
+  const zenRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!notifOpen && !themeOpen) return;
+    const close = () => { setNotifOpen(false); setThemeOpen(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") close(); };
+    window.addEventListener("click", close);
+    window.addEventListener("keydown", onKey);
+    return () => { window.removeEventListener("click", close); window.removeEventListener("keydown", onKey); };
+  }, [notifOpen, themeOpen]);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     // restore the user's sidebar preference (desktop only; harmless on mobile)
     try {
@@ -132,10 +162,6 @@ export default function Home() {
   const [railAnimating, setRailAnimating] = useState(false);
   const railTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => { if (railTimer.current) clearTimeout(railTimer.current); }, []);
-  /* The collapsed rail has no room for a sentence, so the ⌘K hint shows a key
-     glyph there — and it has to be the glyph this learner actually presses:
-     ⌘ on Apple keyboards, ⌃ (Ctrl) on everything else. */
-  const cmdGlyph = useAppleKeyboard() ? "⌘" : "⌃";
   const toggleSidebar = () => {
     setRailAnimating(true);
     if (railTimer.current) clearTimeout(railTimer.current);
@@ -252,51 +278,34 @@ export default function Home() {
     }
   }, [themeSetting, themeLevel]);
 
-  /* v12 — global click micro-interactions: every small click gets a soft
-     spring pulse (its icon pops with it) and CTAs grow a ripple at the
-     pointer. Delegated once; WAAPI so it never fights the CSS animations. */
+  /* Calm interaction layer. The old per-click pulse, icon pop, pointer-light
+     listener and ripple were removed; hover/focus states now carry the
+     micro-feedback. We keep only real completion celebration + touch haptics. */
+  const navRef = useRef<HTMLElement | null>(null);
   useEffect(() => {
-    const PRESSABLE =
-      "button, a, .vtab, .nav-item, .cal-cell, .cmdk-item, .task-row, .ob-range-chip, [role='button']";
-    const RIPPLE_HOST = ".btn, .ob-btn-primary, .ai-fab";
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
     const coarse = window.matchMedia("(pointer: coarse)");
-    const SPRING = "cubic-bezier(.22,1,.36,1)";
-    /* WAAPI pulses must COMPOSE with the element's own CSS transforms
-       (hover lift on CTAs, :active press scale, rotated/spinning icons) —
-       replace-mode used to hijack the transform for the pulse's duration
-       and then snap back, which read as a glitch on every CTA click.
-       `composite:"add"` layers the pulse on top instead; browsers that
-       reject the option fall back to the old replace behaviour. */
-    const pulse = (target: Element, frames: Keyframe[], opts: KeyframeAnimationOptions) => {
-      try {
-        target.animate(frames, { ...opts, composite: "add" });
-      } catch {
-        try { target.animate(frames, opts); } catch { /* no-op */ }
-      }
-    };
-    /* v13: a tiny confetti burst celebrates completions at the pointer */
-    const CONFETTI = ["--accent", "--success-accent", "--warning-accent", "--color-ai"];
+    const CONFETTI = ["--accent", "--success-accent"];
     const burst = (x: number, y: number) => {
       const cs = getComputedStyle(document.body);
-      for (let i = 0; i < 12; i++) {
+      for (let i = 0; i < 8; i++) {
         const p = document.createElement("span");
         p.className = "confetti";
         p.style.background = cs.getPropertyValue(CONFETTI[i % CONFETTI.length]);
         p.style.left = `${x}px`;
         p.style.top = `${y}px`;
         document.body.appendChild(p);
-        const angle = ((Math.PI * 2) / 12) * i + Math.random() * 0.6;
-        const dist = 34 + Math.random() * 46;
+        const angle = ((Math.PI * 2) / 8) * i + Math.random() * 0.5;
+        const dist = 24 + Math.random() * 22;
         const anim = p.animate(
           [
-            { transform: "translate(-50%,-50%) rotate(0deg)", opacity: 1 },
+            { transform: "translate(-50%,-50%) rotate(0deg)", opacity: 0.85 },
             {
-              transform: `translate(calc(-50% + ${(Math.cos(angle) * dist).toFixed(1)}px), calc(-50% + ${(Math.sin(angle) * dist - 14).toFixed(1)}px)) rotate(${(180 + Math.random() * 180).toFixed(0)}deg)`,
+              transform: `translate(calc(-50% + ${(Math.cos(angle) * dist).toFixed(1)}px), calc(-50% + ${(Math.sin(angle) * dist - 10).toFixed(1)}px)) rotate(${(180 + Math.random() * 180).toFixed(0)}deg)`,
               opacity: 0,
             },
           ],
-          { duration: 650 + Math.random() * 350, easing: "cubic-bezier(.16,1,.3,1)" },
+          { duration: 520 + Math.random() * 180, easing: "cubic-bezier(.22,1,.36,1)" },
         );
         anim.onfinish = () => p.remove();
         anim.oncancel = () => p.remove();
@@ -305,168 +314,22 @@ export default function Home() {
     const onClick = (e: MouseEvent) => {
       const t = e.target;
       if (!(t instanceof Element)) return;
-      if (coarse.matches) haptic(6); // light tick on real taps
-      if (reduce.matches) return;
-      const el = t.closest(PRESSABLE);
+      if (coarse.matches) haptic(6);
+      const el = t.closest("button, a, .rate-btn, [role='button']");
       if (!(el instanceof HTMLElement)) return;
-      const rect = el.getBoundingClientRect();
-      // Keyboard "clicks" report (0,0) — anchor effects to the element then.
-      const fromKeyboard = e.detail === 0 || (e.clientX === 0 && e.clientY === 0);
-      const px = fromKeyboard ? rect.left + rect.width / 2 : e.clientX;
-      const py = fromKeyboard ? rect.top + rect.height / 2 : e.clientY;
+      if (reduce.matches) return;
       const label = (el.textContent || "").trim();
-      if (label === "Done" || el.matches(".rate-btn")) burst(px, py);
-      const soft = el.matches(".task-row, .kpi-card");
-      pulse(
-        el,
-        [
-          { transform: "scale(1)" },
-          { transform: soft ? "scale(1.012)" : "scale(1.045)", offset: 0.35 },
-          { transform: "scale(1)" },
-        ],
-        { duration: soft ? 500 : 620, easing: SPRING },
-      );
-      const icon = el.querySelector("svg");
-      if (icon) {
-        pulse(
-          icon,
-          [
-            { transform: "scale(.82)" },
-            { transform: "scale(1.14)", offset: 0.55 },
-            { transform: "scale(1)" },
-          ],
-          { duration: 520, easing: SPRING },
-        );
-      }
-      const host = el.matches(RIPPLE_HOST) ? el : el.closest(RIPPLE_HOST);
-      if (host instanceof HTMLElement) {
-        const r = host.getBoundingClientRect();
-        const size = Math.max(r.width, r.height) * 2.2;
-        const span = document.createElement("span");
-        span.className = "fx-ripple";
-        span.style.width = span.style.height = `${size}px`;
-        span.style.left = `${px - r.left}px`;
-        span.style.top = `${py - r.top}px`;
-        host.appendChild(span);
-        const anim = span.animate(
-          [
-            { transform: "translate(-50%,-50%) scale(0)", opacity: 0.55 },
-            { transform: "translate(-50%,-50%) scale(1)", opacity: 0 },
-          ],
-          { duration: 750, easing: "cubic-bezier(.16,1,.3,1)" },
-        );
-        anim.onfinish = () => span.remove();
-        anim.oncancel = () => span.remove();
-      }
-    };
-    /* The CSS press-glow (.btn:active::after) blooms at var(--px)/var(--py);
-       nothing ever set those vars, so it always flashed at the CENTER while
-       the JS ripple bloomed at the pointer — two misaligned flashes on one
-       press. Wire the vars up on pointerdown so both effects share origin. */
-    const onDown = (e: PointerEvent) => {
-      const t = e.target;
-      if (!(t instanceof Element)) return;
-      const host = t.closest(".btn");
-      if (host instanceof HTMLElement) {
-        const r = host.getBoundingClientRect();
-        host.style.setProperty("--px", `${(e.clientX - r.left).toFixed(1)}px`);
-        host.style.setProperty("--py", `${(e.clientY - r.top).toFixed(1)}px`);
+      if (label === "Done" || el.matches(".rate-btn")) {
+        const rect = el.getBoundingClientRect();
+        const fromKeyboard = e.detail === 0 || (e.clientX === 0 && e.clientY === 0);
+        const px = fromKeyboard ? rect.left + rect.width / 2 : e.clientX;
+        const py = fromKeyboard ? rect.top + rect.height / 2 : e.clientY;
+        burst(px, py);
       }
     };
     document.addEventListener("click", onClick);
-    document.addEventListener("pointerdown", onDown, { passive: true });
-    return () => {
-      document.removeEventListener("click", onClick);
-      document.removeEventListener("pointerdown", onDown);
-    };
+    return () => document.removeEventListener("click", onClick);
   }, []);
-
-  /* v14 — pointer light. One delegated, rAF-throttled listener paints every
-     pointer-reactive effect in the app: the tilt origin (--mx/--my), the
-     liquid-glass specular pool (--spec-x/--spec-y, v14 CSS) and the CTA
-     gradient origin (--px/--py). Two elements maximum per frame, and mouse
-     pointers only — a finger never runs this. */
-  useEffect(() => {
-    let card: HTMLElement | null = null;
-    let btn: HTMLElement | null = null;
-    let raf = 0;
-    let x = 0;
-    let y = 0;
-    const paint = () => {
-      raf = 0;
-      if (card) {
-        const r = card.getBoundingClientRect();
-        const cx = (x - r.left).toFixed(1);
-        const cy = (y - r.top).toFixed(1);
-        card.style.setProperty("--mx", `${cx}px`);
-        card.style.setProperty("--my", `${cy}px`);
-        card.style.setProperty("--spec-x", `${cx}px`);
-        card.style.setProperty("--spec-y", `${cy}px`);
-      }
-      if (btn) {
-        const r = btn.getBoundingClientRect();
-        btn.style.setProperty("--px", `${(x - r.left).toFixed(1)}px`);
-        btn.style.setProperty("--py", `${(y - r.top).toFixed(1)}px`);
-      }
-    };
-    const onMove = (e: PointerEvent) => {
-      if (e.pointerType !== "mouse") return;
-      const t = e.target;
-      if (!(t instanceof Element)) return;
-      const c = t.closest(".tilt-card,.glass-panel,.ai-panel");
-      card = c instanceof HTMLElement ? c : null;
-      const b = t.closest(".btn");
-      btn = b instanceof HTMLElement ? b : null;
-      x = e.clientX;
-      y = e.clientY;
-      if ((card || btn) && !raf) raf = requestAnimationFrame(paint);
-    };
-    document.addEventListener("pointermove", onMove, { passive: true });
-    return () => {
-      document.removeEventListener("pointermove", onMove);
-      if (raf) cancelAnimationFrame(raf);
-    };
-  }, []);
-
-  /* v14 — liquid nav indicator. The active pill is measured, not guessed, so
-     it survives font scaling, the collapsed rail, the phone dock, landscape
-     rotation and label wrapping. `.lg-nav-ready` is only added once a real
-     box was measured: if this effect never runs, the CSS leaves v13 alone. */
-  const navRef = useRef<HTMLElement | null>(null);
-  useEffect(() => {
-    const list = navRef.current;
-    if (!list) return;
-    let raf = 0;
-    const measure = () => {
-      raf = 0;
-      const active = list.querySelector<HTMLElement>(".nav-item.active");
-      if (!active) { list.classList.remove("lg-nav-ready"); return; }
-      const lr = list.getBoundingClientRect();
-      const ar = active.getBoundingClientRect();
-      // Mid-collapse the rail can momentarily report a zero-width item;
-      // keeping the last good geometry beats jumping the pill to 0×0.
-      if (ar.width < 6 || ar.height < 6) return;
-      list.style.setProperty("--nav-x", `${(ar.left - lr.left).toFixed(1)}px`);
-      list.style.setProperty("--nav-y", `${(ar.top - lr.top).toFixed(1)}px`);
-      list.style.setProperty("--nav-w", `${ar.width.toFixed(1)}px`);
-      list.style.setProperty("--nav-h", `${ar.height.toFixed(1)}px`);
-      list.classList.add("lg-nav-ready");
-    };
-    const schedule = () => { if (!raf) raf = requestAnimationFrame(measure); };
-    schedule();
-    const settle = [80, 260, 520].map((ms) => window.setTimeout(schedule, ms));
-    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(schedule) : null;
-    ro?.observe(list);
-    window.addEventListener("resize", schedule);
-    window.addEventListener("orientationchange", schedule);
-    return () => {
-      if (raf) cancelAnimationFrame(raf);
-      settle.forEach((id) => window.clearTimeout(id));
-      ro?.disconnect();
-      window.removeEventListener("resize", schedule);
-      window.removeEventListener("orientationchange", schedule);
-    };
-  }, [page, sidebarCollapsed]);
 
   /* v14 — advancing through the rail slides the new view in from the right,
      stepping back from the left. Anything that is not a rail move (an AI
@@ -478,6 +341,16 @@ export default function Home() {
       const to = NAV.findIndex((n) => n.id === next);
       return { page: next, dir: from < 0 || to >= from ? "fwd" : "back" };
     });
+    setDrawerOpen(false);
+  }, []);
+
+  const toggleZenFullscreen = useCallback(() => {
+    const el = zenRef.current;
+    if (!el) return;
+    try {
+      if (document.fullscreenElement) void document.exitFullscreen();
+      else void el.requestFullscreen?.();
+    } catch { /* fullscreen may be blocked — Zen still works */ }
   }, []);
 
   const persistSessionQueue = useCallback(() => {
@@ -697,6 +570,30 @@ export default function Home() {
     } catch (error) { notify(apiFailureMessage(error, "Could not delete."), "error"); } finally { setBusy(false); }
   };
 
+  /** Quick Add: capture a task and drop it straight into the plan. */
+  const addTask = async (input: QuickAddPayload) => {
+    try {
+      const s = await api<AppState>("/api/tasks", { method: "POST", body: JSON.stringify(input) });
+      setState(s);
+      notify(
+        input.date === today()
+          ? `Added "${input.title.slice(0, 40)}" to today's plan.`
+          : `Added "${input.title.slice(0, 40)}" for ${prettyDate(input.date)}.`,
+        "success"
+      );
+    } catch (error) { notify(apiFailureMessage(error, "Could not add the task."), "error"); }
+  };
+
+  /** Backlog recovery: re-date overdue tasks in one bulk move. */
+  const moveTasks = async (moves: { id: number; date: string }[], message: string) => {
+    if (!moves.length) return;
+    try {
+      const s = await api<AppState>("/api/tasks", { method: "PATCH", body: JSON.stringify({ moves }) });
+      setState(s);
+      notify(message, "success");
+    } catch (error) { notify(apiFailureMessage(error, "Could not update the schedule — nothing was lost."), "error"); }
+  };
+
   const startSmartClock = useCallback(() => {
     const currentDay = today();
     const task = state?.tasks.find((item) => item.date === currentDay && item.status === "pending") ||
@@ -710,6 +607,14 @@ export default function Home() {
       notify(subject ? `Clocked in to ${subject.name}.` : "Clocked in — free session.");
     }
   }, [clock, notify, state]);
+
+  /** Dashboard hero: one tap starts a smart clock session AND jumps to
+   *  the Focus Studio, so "Start Focus" always does both. */
+  const startFocusSession = useCallback(() => {
+    if (!clock.sessionActive) startSmartClock();
+    else if (!clock.running && !clock.onBreak) clock.resume();
+    goPage("focus");
+  }, [clock, goPage, startSmartClock]);
 
   // Clock out from ANYWHERE — one handler for the tracker bar, the up-next
   // card, task rows and Zen mode. Confirms the saved minutes by name.
@@ -938,6 +843,12 @@ export default function Home() {
   const todayTotal = state.tasks.filter((x) => x.date === t).length;
   const allMsgs = [...state.messages, ...pendingMsgs];
 
+  // Zen ring progress: countdown modes deplete over the block (start full,
+  // drain to zero); stopwatch eases a full sweep once an hour. 0..1, NaN-safe.
+  const zenRingPct = timer.mode === "stopwatch"
+    ? (timer.seconds % 3600) / 3600
+    : timer.total ? Math.min(1, Math.max(0, timer.seconds / timer.total)) : 0;
+
   // The full task title, untruncated — CSS wraps it cleanly instead of
   // slicing it in JS (fixes "Principles of Marketing: Introduction…").
   const clockTaskTitle =
@@ -954,7 +865,7 @@ export default function Home() {
     { id: "clock-in", group: "Study Clock", label: clock.running ? "Pause Clock" : clock.sessionActive ? "Resume Clock" : "Clock In", hint: clock.running ? "Freeze, keep session" : "Start recording", keywords: "timer record attendance pause", run: () => (clock.running ? clock.pause() : clock.sessionActive ? clock.resume() : startSmartClock()) },
     { id: "clock-out", group: "Study Clock", label: "Clock Out", hint: clock.sessionActive ? "Stop & save minutes" : "no open session", keywords: "stop end finish timer", run: () => (clock.sessionActive ? clockOutNow() : notify("No open session to close.")) },
     { id: "clock-break", group: "Study Clock", label: clock.onBreak ? "Resume from break" : "Take a break", keywords: "pause rest", run: () => (clock.onBreak ? clock.endBreak() : clock.takeBreak()) },
-    { id: "next-lesson", group: "Study Clock", label: "Start next pending lesson", hint: "Clock in + switch", keywords: "begin study start task", run: () => { const t = today(); const next = state.tasks.find((x) => x.date === t && x.status === "pending" && x.id !== clock.taskId); if (next) focusTask(next.id); else notify("Nothing pending today — enjoy the rest day."); } },
+    { id: "next-lesson", group: "Study Clock", label: "Start next pending lesson", hint: "Clock in + switch", keywords: "begin study start task", run: () => { const t = today(); const next = nextAction(state.tasks.filter((x) => x.id !== clock.taskId), t).now; if (next) focusTask(next.id); else notify("Nothing pending — enjoy the rest day."); } },
     { id: "zen", group: "Focus", label: "Enter Zen mode", hint: "Distraction-free", keywords: "fullscreen minimal", run: () => setZen(true) },
     { id: "ai", group: "AI Tutor", label: "Ask AI Tutor", hint: "Open chat", keywords: "help question doubt", run: () => setChatOpen(true) },
     { id: "ai-today", group: "AI Tutor", label: "What should I study today?", keywords: "plan today", run: () => askTutor("What should I study today and in what order?") },
@@ -965,7 +876,10 @@ export default function Home() {
   return (
     <>
       {/* One flex row: [ mark + titles ]  ←→  [ status chip ]. The group keeps
-          its own gap, and both ends are bounded so neither stretches. */}
+          its own gap, and both ends are bounded so neither stretches.
+          There is deliberately no hamburger button: the fixed bottom
+          navigation is the primary mobile navigation, so the app bar starts
+          at the logo and no slot is reserved for a menu trigger. */}
       <header className="mobile-header">
         <div className="mh-brand">
           <div className="brand-logo-icon brand-logo-sm" aria-hidden="true"><IconLogo size={14} /></div>
@@ -976,6 +890,55 @@ export default function Home() {
         </div>
         <span className="streak-badge mh-streak"><IconFlame /> {state.user.streak}d</span>
       </header>
+
+      {/* Mobile/tablet navigation drawer + scrim */}
+      {drawerOpen && <div className="drawer-scrim" onClick={() => setDrawerOpen(false)} aria-hidden="true" />}
+      <aside className={`mobile-drawer${drawerOpen ? " open" : ""}`} aria-hidden={!drawerOpen}>
+        <div className="drawer-head">
+          <div className="brand-header">
+            <div className="brand-logo-icon" aria-hidden="true"><IconLogo /></div>
+            <div className="brand-text">
+              <div className="brand-title">Study Planner Pro</div>
+              <div className="brand-course">{state.user.courseName}</div>
+            </div>
+          </div>
+          <button className="drawer-close" aria-label="Close navigation menu" onClick={() => setDrawerOpen(false)}>×</button>
+        </div>
+        <div className="drawer-tools">
+          <button className="drawer-tool" type="button"
+            onClick={() => { setDrawerOpen(false); void replan(); }}
+            disabled={busy} title="Re-plan schedule with AI">
+            <span className={busy ? "replanning-spark" : ""}><IconSpark size={15} /></span>
+            <span>Re-plan{busy ? "ning…" : ""}</span>
+          </button>
+        </div>
+        <nav className="drawer-nav">
+          {NAV.map((n) => (
+            <button
+              key={n.id}
+              type="button"
+              className={`drawer-item${page === n.id ? " active" : ""}`}
+              onClick={() => goPage(n.id)}
+            >
+              {n.icon}<span>{n.label}</span>
+            </button>
+          ))}
+        </nav>
+        {/* Mobile drawer footer deliberately stays plain: navigation, streak
+            and setup only. Theme switching lives in Settings (and the
+            desktop tracker-bar palette), so it is not repeated here. */}
+        <div className="drawer-foot">
+          <div className="streak-badge foot-badge">
+            <IconFlame /> {state.user.streak} Day Streak
+          </div>
+          <p className="foot-sub">
+            {ctx.daysLeft} days left · {ctx.progressPct}% syllabus completed.
+          </p>
+          <button className="btn btn-secondary btn-sm w-full" onClick={() => { setDrawerOpen(false); requestWizardRestart(); }}>
+            Re-run Setup
+          </button>
+        </div>
+      </aside>
 
       <div className={`app-wrapper${sidebarCollapsed ? " sb-collapsed" : ""}${railAnimating ? " sb-anim" : ""}`}>
         <aside className="sidebar">
@@ -1026,16 +989,6 @@ export default function Home() {
               </button>
             </div>
           </div>
-          {/* ⌘K hint. It lives *inside* the sidebar rather than pinned to the
-              viewport corner, so the rail's own width is the hint's width: it
-              shrinks, re-centres and stays clipped by the sidebar instead of
-              hanging out of it with a word cut in half. The sentence keeps its
-              place in the DOM (screen readers still get it) while the rail
-              swaps it for the compact key chip. */}
-          <div className="cmdk-tip">
-            <kbd className="cmdk-tip-key" aria-hidden="true">{cmdGlyph}K</kbd>
-            <span className="cmdk-tip-text">Press ⌘K / Ctrl-K for commands</span>
-          </div>
         </aside>
 
         <main className="main-workspace" data-nav-dir={navDir}>
@@ -1082,6 +1035,88 @@ export default function Home() {
                 </button>
               )}
               <button className="btn btn-xs btn-secondary tracker-zen" aria-label="Enter Zen focus mode" onClick={() => setZen(true)}><IconBolt size={12} /> Zen</button>
+              <span className="tracker-quick-controls">
+                <button
+                  className="icon-quick-btn"
+                  aria-label={`Re-plan schedule${busy ? " (in progress)" : ""}`}
+                  title="AI re-plan"
+                  disabled={busy}
+                  onClick={(e) => { e.stopPropagation(); void replan(); }}
+                >
+                  <span className={busy ? "replanning-spark" : ""}><IconSpark size={15} /></span>
+                </button>
+                <div className="quick-popover-wrap" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    className="icon-quick-btn"
+                    aria-label="Notifications"
+                    aria-expanded={notifOpen}
+                    onClick={(e) => { e.stopPropagation(); setThemeOpen(false); setNotifOpen((v) => !v); }}
+                  >
+                    <IconBell size={15} />
+                    <span className="icon-quick-dot" aria-hidden="true" />
+                  </button>
+                  {notifOpen && (
+                    <div className="quick-popover notif-popover" role="menu">
+                      <div className="quick-popover-title">Notifications</div>
+                      <div className="notif-row">
+                        <span className="notif-dot notif-dot--orange" />
+                        <div>
+                          <strong>{ctx.overdue > 0 ? `${ctx.overdue} unfinished task${ctx.overdue > 1 ? "s" : ""}` : "Nothing unfinished"}</strong>
+                          <span>{ctx.overdue > 0 ? "Let's recover them — spread them out or re-plan." : "You're up to date."}</span>
+                        </div>
+                      </div>
+                      <div className="notif-row">
+                        <span className="notif-dot notif-dot--green" />
+                        <div>
+                          <strong>{todayDone}/{todayTotal} lessons done today</strong>
+                          <span>{todayTotal ? `${Math.round((todayDone / Math.max(1, todayTotal)) * 100)}% of today's plan` : "Rest day or no plan yet"}</span>
+                        </div>
+                      </div>
+                      <div className="notif-row">
+                        <span className="notif-dot notif-dot--violet" />
+                        <div>
+                          <strong>{state.user.streak} day streak</strong>
+                          <span>{state.user.streak > 0 ? "Your progress is still here, even on days you miss." : "Start today and it will build itself."}</span>
+                        </div>
+                      </div>
+                      <div className="notif-row">
+                        <span className="notif-dot notif-dot--blue" />
+                        <div>
+                          <strong>{ctx.daysLeft} days to {prettyLong(state.settings.examDate)}</strong>
+                          <span>{ctx.progressPct}% of the syllabus complete.</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div className="quick-popover-wrap" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    className="icon-quick-btn"
+                    aria-label="Change theme"
+                    aria-expanded={themeOpen}
+                    onClick={(e) => { e.stopPropagation(); setNotifOpen(false); setThemeOpen((v) => !v); }}
+                  >
+                    <IconPalette size={15} />
+                  </button>
+                  {themeOpen && (
+                    <div className="quick-popover theme-popover" role="menu">
+                      <div className="quick-popover-title">Theme</div>
+                      {THEMES.map((th) => (
+                        <button
+                          key={th.id}
+                          type="button"
+                          className={`theme-pop-item${state.settings.theme === th.id ? " active" : ""}`}
+                          onClick={(e) => { e.stopPropagation(); void patchSettings({ theme: th.id }); setThemeOpen(false); }}
+                        >
+                          <span className={`theme-pop-swatch theme-swatch--${th.id}`} aria-hidden="true" />
+                          <span>{th.label}</span>
+                          {state.settings.theme === th.id && <IconCheck size={13} />}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </span>
             </div>
           </div>
 
@@ -1091,7 +1126,8 @@ export default function Home() {
               activeTaskId={clock.taskId} activeClockSeconds={clock.elapsed}
               clockRunning={clock.running} clockSessionActive={clock.sessionActive} clockOnBreak={clock.onBreak}
               onClockOut={clockOutNow} onPauseOrResume={pauseOrResume}
-              replanning={busy} onReplan={replan} />
+              replanning={busy} onReplan={replan} onStartFocus={startFocusSession}
+              onAddTask={addTask} onMoveTasks={moveTasks} />
           )}
           {page === "planner" && (
             <PlannerView state={state} onTaskStatus={setTaskStatus} onTaskUpdate={updateTask}
@@ -1099,7 +1135,8 @@ export default function Home() {
               activeTaskId={clock.taskId} activeClockSeconds={clock.elapsed}
               clockSessionActive={clock.sessionActive}
               onClockOut={clockOutNow}
-              onAskTutor={askTutor} replanning={busy} onReplan={replan} />
+              onAskTutor={askTutor} replanning={busy} onReplan={replan}
+              onAddTask={addTask} />
           )}
           {page === "focus" && (
             <FocusView state={state} timer={timer} clock={clock} onCompleteTask={(id) => setTaskStatus(id, "done")}
@@ -1115,6 +1152,25 @@ export default function Home() {
         </main>
       </div>
 
+      {/* Mobile bottom navigation — the primary page switcher on phones and
+          tablets. Fixed, safe-area aware, shown only ≤ 860px via CSS. It is
+          the only navigation entry point on mobile now that the app bar has
+          no menu trigger. */}
+      <nav className="mobile-bottom-nav" aria-label="Primary">
+        {NAV.map((n) => (
+          <button
+            key={n.id}
+            type="button"
+            className={`mbn-item${page === n.id ? " active" : ""}`}
+            aria-current={page === n.id ? "page" : undefined}
+            onClick={() => goPage(n.id)}
+          >
+            <span className="mbn-icon" aria-hidden="true">{n.icon}</span>
+            <span className="mbn-label">{n.label}</span>
+          </button>
+        ))}
+      </nav>
+
       <ChatPanel open={chatOpen} setOpen={setChatOpen} messages={allMsgs} onSend={askTutor}
         thinking={thinking} provider={state.aiProvider}
         learner={{ name: state.user.name, daysLeft: ctx.daysLeft, progressPct: ctx.progressPct, streak: state.user.streak, todayDone, todayTotal }} />
@@ -1122,32 +1178,94 @@ export default function Home() {
       <CommandPalette commands={commands} />
 
       {zen && (
-        <div className="zen">
-          <div className="zen-kicker">
-            {state.subjects.find((x) => x.id === clock.subjectId)?.name || "Deep Focus Session"}
-          </div>
-          <div className="zen-digits mono">{mmss(timer.seconds)}</div>
-          <div className="zen-status">
-            Study clock: {clock.running ? "recording" : clock.onBreak ? "on break" : clock.sessionActive ? "paused" : "not clocked in"} · {mmss(clock.elapsed)}
-          </div>
-          <div className="flex-row gap-md zen-actions">
-            <button className="btn btn-primary" onClick={() => (timer.running ? timer.pause() : startFocusWithClock())}>
-              {timer.running ? "Pause Focus" : "Start Focus + Clock"}
+        <div className={`zen${zenMinimal ? " zen-minimal" : ""}`} ref={zenRef}>
+          <ZenScene className="zen-environment" />
+          <div className="zen-glow" aria-hidden="true" />
+
+          {/* TOP — one quiet control row, in normal flow (nothing to collide with). */}
+          <div className="zen-topbar">
+            <button className="zen-ghost" onClick={() => setZenMinimal((v) => !v)} aria-pressed={zenMinimal}>
+              <IconFocus2 size={14} /> <span>Focus Mode</span>
             </button>
-            {clock.sessionActive && (
-              <>
-                <button className="btn btn-secondary" onClick={pauseOrResume}>
-                  {clock.running ? "Pause Clock" : "Resume Clock"}
-                </button>
-                <button className="btn btn-danger" onClick={clockOutNow}>Clock Out</button>
-              </>
-            )}
-            <button className="btn btn-secondary" onClick={() => setZen(false)}>Exit Zen</button>
+            <div className="zen-topbar-right">
+              <button className="zen-ghost" onClick={toggleZenFullscreen}>
+                <IconExpand2 size={14} /> <span>Full Screen</span>
+              </button>
+              <button className="zen-ghost zen-exit" onClick={() => setZen(false)}>Exit Zen</button>
+            </div>
           </div>
-          {!timer.running && !clock.sessionActive && (
-            <p className="zen-hint">
-              “Start Focus + Clock” begins your focus timer and study clock together — one tap, no juggling.
-            </p>
+
+          {/* CENTER — emblem · title · timer ring · actions · hint, one column
+              with generous gaps; the timer is always the visual priority. */}
+          <div className="zen-stage">
+            <div className="zen-headline">
+              <span className="zen-emblem" aria-hidden="true"><IconFocus2 size={15} /></span>
+              <div className="zen-eyebrow">Deep Focus Session</div>
+              {!zenMinimal && (
+                <div className="zen-kicker">
+                  {state.subjects.find((x) => x.id === clock.subjectId)?.name || "Protect this time for what matters"}
+                </div>
+              )}
+            </div>
+
+            <div className="zen-ring-wrap">
+              <svg className="zen-ring" viewBox="0 0 320 320" aria-hidden="true">
+                <defs>
+                  {/* The component owns its gradient: the ring is the one
+                      element in Zen allowed a little colour. */}
+                  <linearGradient id="zenRingGradient" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0" stopColor="#b6aaff" />
+                    <stop offset="0.55" stopColor="#9b8bf7" />
+                    <stop offset="1" stopColor="#7d6cf0" />
+                  </linearGradient>
+                </defs>
+                <circle cx="160" cy="160" r="140" className="zen-ring-track" />
+                <circle
+                  cx="160" cy="160" r="140" className="zen-ring-progress"
+                  style={{
+                    strokeDashoffset: 2 * Math.PI * 140 * (1 - zenRingPct),
+                  }}
+                />
+              </svg>
+              <div className="zen-center">
+                <div className="zen-mode">{ZEN_MODE_LABEL[timer.mode]}</div>
+                <div className="zen-digits mono">{mmss(timer.seconds)}</div>
+                <div className="zen-status">
+                  Study clock: {clock.running ? "recording" : clock.onBreak ? "on break" : clock.sessionActive ? "paused" : "not clocked in"} · {mmss(clock.elapsed)}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex-row gap-md zen-actions">
+              <button className="btn btn-primary zen-primary" onClick={() => (timer.running ? timer.pause() : startFocusWithClock())}>
+                {timer.running ? "Pause Focus" : "Start Focus + Clock"}
+              </button>
+              {clock.sessionActive && (
+                <>
+                  <button className="btn btn-secondary zen-secondary" onClick={pauseOrResume}>
+                    {clock.running ? "Pause Clock" : "Resume Clock"}
+                  </button>
+                  <button className="btn btn-danger" onClick={clockOutNow}>Clock Out</button>
+                </>
+              )}
+              <button className="btn btn-secondary zen-secondary zen-exit-btn" onClick={() => setZen(false)}>Exit Zen</button>
+            </div>
+            {!timer.running && !clock.sessionActive && (
+              <p className="zen-hint">
+                “Start Focus + Clock” begins your focus timer and study clock together — one tap, no juggling.
+              </p>
+            )}
+          </div>
+
+          {/* BOTTOM — the 3-part focus guidance bar, the last flow row. */}
+          {!zenMinimal && (
+            <div className="zen-guidance">
+              <div className="zen-guidance-item"><IconLeaf size={15} /><span>{zenGuidance(timer)}</span></div>
+              <div className="zen-guidance-sep" aria-hidden="true" />
+              <div className="zen-guidance-item"><IconFocus2 size={15} /><span>Protect your focus</span></div>
+              <div className="zen-guidance-sep" aria-hidden="true" />
+              <div className="zen-guidance-item"><IconSpark size={15} /><span>You&apos;ve got this</span></div>
+            </div>
           )}
         </div>
       )}

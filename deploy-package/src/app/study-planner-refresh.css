@@ -1,0 +1,252 @@
+/* Study Planner Pro — reference-driven UI refresh.
+   Loaded after globals.css so it can refine the existing product without
+   changing business logic or the timer/planner data model. */
+
+:root{
+  --refresh-lavender:#6f63e8;
+  --refresh-lavender-soft:#eeebff;
+  --refresh-ink:#20213d;
+  --refresh-muted:#74758f;
+  --refresh-paper:#ffffff;
+  --refresh-canvas:#f7f7fb;
+  --refresh-border:#e7e6f0;
+  --refresh-shadow:0 1px 2px rgba(35,34,64,.04),0 12px 30px rgba(35,34,64,.07);
+  --refresh-shadow-hover:0 8px 24px rgba(35,34,64,.08),0 22px 54px rgba(35,34,64,.08);
+  --scene-accent:var(--accent);
+  --scene-accent-soft:var(--accent-light);
+  --scene-glow:var(--accent-glow);
+  --scene-ink:color-mix(in srgb,var(--text-main) 78%,var(--accent) 22%);
+  --scene-surface-1:color-mix(in srgb,var(--surface) 92%,var(--accent) 8%);
+  --scene-surface-2:color-mix(in srgb,var(--text-main) 18%,var(--surface) 82%);
+  --scene-shadow:color-mix(in srgb,var(--text-main) 18%,transparent);
+  --scene-book-1:color-mix(in srgb,var(--accent) 64%,#e9b5b9);
+  --scene-book-2:color-mix(in srgb,var(--accent) 48%,#d5c8ff);
+  --scene-book-3:color-mix(in srgb,var(--color-ai) 38%,#f4c6a7);
+  --scene-lamp-core:#fff4c2;
+  --scene-plant-1:color-mix(in srgb,var(--success-accent) 72%,#a7d9c9);
+  --scene-plant-2:color-mix(in srgb,var(--success-accent) 50%,#8fc6b4);
+  --scene-plant-stem:color-mix(in srgb,var(--success-accent) 72%,var(--text-main));
+  --scene-pot:color-mix(in srgb,var(--accent) 18%,var(--surface));
+  --scene-pot-rim:color-mix(in srgb,var(--accent) 30%,var(--surface));
+  --scene-soil:color-mix(in srgb,var(--text-main) 28%,var(--surface));
+}
+
+/* ---------------- Reference canvas ---------------- */
+body{
+  background-color:var(--refresh-canvas);
+  background-image:
+    radial-gradient(900px 420px at 10% -5%,color-mix(in srgb,var(--accent) 10%,transparent),transparent 68%),
+    radial-gradient(780px 360px at 92% 3%,color-mix(in srgb,var(--color-ai) 7%,transparent),transparent 68%);
+}
+body.theme-dark,body.theme-obsidian,body.theme-nebula{
+  --refresh-canvas:var(--app-bg);
+}
+
+/* ---------------- App shell / sidebar ---------------- */
+.app-wrapper{gap:18px;padding:16px 18px 28px;max-width:1660px;margin-inline:auto}
+.sidebar{
+  width:252px;
+  padding:18px 13px;
+  border-radius:24px;
+  background:color-mix(in srgb,var(--surface-elevated) 96%,transparent);
+  box-shadow:var(--refresh-shadow);
+}
+.brand-header{padding:4px 44px 16px 8px;margin-bottom:4px}
+.brand-logo-icon{width:40px;height:40px;border-radius:13px}
+.brand-title{font-size:1rem}
+.nav-list{gap:4px;margin-top:12px}
+.nav-item{min-height:44px;padding:10px 12px;border-radius:14px;font-size:.86rem}
+.nav-item.active{background:var(--nav-active-bg);color:var(--nav-active-text);border-color:var(--nav-active-border);box-shadow:none}
+.nav-item.active::before{left:-4px}
+.sidebar-foot{padding-top:18px}
+.sidebar-foot>.glass-panel{border-radius:20px;padding:18px 14px}
+.foot-title{font-size:.95rem}
+
+/* ---------------- Top session bar ---------------- */
+.tracker-bar{
+  margin:0 0 22px;
+  min-height:64px;
+  padding:10px 18px;
+  border-radius:18px;
+  background:color-mix(in srgb,var(--surface-elevated) 97%,transparent);
+  box-shadow:var(--refresh-shadow);
+  border-color:var(--refresh-border);
+}
+.tracker-status{gap:10px}
+.tracker-labels{gap:1px}
+.tracker-state{font-size:.78rem}
+.tracker-task{font-size:.68rem}
+.tracker-time{font-size:1.2rem!important;font-weight:850}
+.tracker-actions{gap:7px}
+.tracker-actions .chip{padding:7px 10px;border-radius:10px;background:var(--row-bg);border-color:var(--glass-border);font-size:.64rem}
+.tracker-actions .btn-xs{min-height:36px;padding:7px 12px;border-radius:10px}
+
+/* ---------------- Page headers / illustration anchor ---------------- */
+.page-header{margin-bottom:18px;min-height:82px;position:relative}
+.page-title{font-size:clamp(1.55rem,1.2rem + 1.25vw,2.15rem);letter-spacing:-.045em}
+.page-subtitle{font-size:.84rem;line-height:1.55}
+
+/* Dynamic lamp/books/plant illustration without an external network asset.
+   The inline SVG component can use this same token set when mounted; the
+   fallback scene below keeps the header visual even before component wiring. */
+.page-header::after{
+  content:"";
+  position:absolute;
+  right:18px;bottom:-4px;
+  width:220px;height:108px;
+  pointer-events:none;
+  opacity:.92;
+  background:
+    radial-gradient(ellipse at 74% 58%,var(--accent-glow) 0 18%,transparent 52%),
+    linear-gradient(155deg,transparent 0 63%,color-mix(in srgb,var(--accent) 22%,transparent) 64% 68%,transparent 69%),
+    linear-gradient(10deg,color-mix(in srgb,var(--color-ai) 38%,transparent) 0 8%,transparent 9% 100%);
+  border-radius:50%;
+  filter:blur(.1px);
+}
+.page-header::before{
+  content:"";
+  position:absolute;
+  right:42px;bottom:5px;
+  width:88px;height:74px;
+  border-radius:48% 52% 38% 38%;
+  background:
+    radial-gradient(circle at 45% 30%,color-mix(in srgb,var(--success-accent) 58%,transparent) 0 10%,transparent 11%),
+    radial-gradient(ellipse at 35% 48%,color-mix(in srgb,var(--success-accent) 55%,transparent) 0 18%,transparent 19%),
+    radial-gradient(ellipse at 66% 48%,color-mix(in srgb,var(--success-accent) 44%,transparent) 0 18%,transparent 19%),
+    linear-gradient(180deg,transparent 0 65%,color-mix(in srgb,var(--accent) 15%,var(--surface)) 66% 100%);
+  opacity:.7;
+}
+
+/* Hide decorative header scene when the real header contains no room. */
+@media(max-width:860px){.page-header::before,.page-header::after{display:none}}
+
+/* ---------------- Dashboard hierarchy ---------------- */
+.kpi-grid{gap:12px;margin-bottom:16px}
+.kpi-card{min-height:132px;padding:18px 20px;border-radius:18px}
+.kpi-label{font-size:.65rem}
+.kpi-value{font-size:clamp(1.65rem,2.1vw,2.25rem);margin-top:5px}
+.kpi-sub{font-size:.7rem;margin-top:7px}
+.dash-grid-2{gap:14px;margin-bottom:16px}
+.dash-card{padding:20px;border-radius:20px}
+.section-title{font-size:.95rem;font-weight:780}
+.momentum-strip{margin-bottom:12px}
+.momentum-pill{padding:6px 10px;font-size:.69rem}
+.up-next{padding:18px 20px;margin-bottom:12px;border-radius:20px;min-height:78px}
+.up-next-title{font-size:1rem}
+
+/* Today's load reads like a clean list, matching the reference planner. */
+.dashboard-tasks .task-row{padding:12px 14px;border-bottom:1px solid var(--glass-border);background:transparent}
+.dashboard-tasks .task-row:last-child{border-bottom:0}
+
+/* ---------------- Planner ---------------- */
+.planner-tools{gap:8px}
+.planner-days{gap:12px}
+.planner-days .day-block{border-radius:20px}
+.planner-days .day-head{padding:15px 18px 13px}
+.planner-days .task-row{padding:12px 18px}
+.planner-days .task-row .task-title{font-size:.84rem}
+.planner-days .task-row .task-sub{font-size:.68rem}
+.planner-days .task-row .task-row-actions{min-width:330px}
+
+/* ---------------- Focus / Zen ---------------- */
+.focus-page-header{min-height:92px}
+.study-clock-panel,.timer-panel,.ambient-panel,.rules-panel{border-radius:22px}
+.study-clock-panel{padding:22px 24px}
+.study-clock-display{min-width:176px}
+.timer-stage{min-height:330px;border-radius:22px}
+.focus-panel-icon{width:36px;height:36px;border-radius:12px}
+
+/* ---------------- Settings ---------------- */
+.grid-fit-300{gap:14px}
+.section-card{border-radius:20px}
+.section-card .section-title{font-size:1rem}
+.theme-grid .btn{min-height:46px;border-radius:12px}
+
+/* ---------------- Theme-aware decorative accents ---------------- */
+body.theme-mint{
+  --scene-book-1:#9ed8c3;--scene-book-2:#bfe9d9;--scene-book-3:#f3c7a8;--scene-lamp-core:#fff9d9;
+}
+body.theme-sunset{
+  --scene-book-1:#e9a16d;--scene-book-2:#f1c28e;--scene-book-3:#dba9cf;--scene-lamp-core:#fff1c5;
+}
+body.theme-silver-lavender{
+  --scene-book-1:#b3b0df;--scene-book-2:#d0cee9;--scene-book-3:#c6b8e8;
+}
+body.theme-dark,body.theme-obsidian,body.theme-nebula{
+  --scene-shadow:rgba(0,0,0,.55);
+  --scene-surface-1:color-mix(in srgb,var(--surface) 86%,#fff 14%);
+  --scene-surface-2:color-mix(in srgb,var(--text-main) 32%,var(--surface) 68%);
+}
+
+/* ---------------- Phone: reference-quality mobile app ---------------- */
+@media(max-width:860px){
+  .app-wrapper{padding:0 10px calc(var(--dock-h) + 30px);gap:0}
+  .main-workspace{padding-top:calc(var(--header-h) + 4px);padding-bottom:calc(var(--dock-h) + 28px)}
+  .mobile-header{box-shadow:0 2px 18px rgba(26,25,48,.07)}
+  .tracker-bar{top:calc(var(--header-h) + 4px);margin-bottom:12px}
+  .page-header{min-height:0;margin-bottom:14px}
+  .page-title{font-size:clamp(1.35rem,6vw,1.7rem)}
+  .page-subtitle{font-size:.76rem}
+  .kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+  .kpi-card{min-height:100px;padding:14px;border-radius:16px}
+  .kpi-value{font-size:1.5rem}
+  .kpi-sub{font-size:.64rem}
+  .dash-grid-2,.focus-grid-2{grid-template-columns:minmax(0,1fr);gap:10px}
+  .dash-card{padding:15px;border-radius:17px}
+  .up-next{padding:14px;border-radius:17px}
+  .momentum-strip{padding-bottom:2px}
+  .momentum-pill{font-size:.66rem;padding:6px 9px}
+  .planner-days .day-block{border-radius:17px}
+  .planner-days .day-head{padding:12px 13px}
+  .planner-days .task-row{padding:11px 13px}
+  .planner-days .task-row .task-row-actions{min-width:0}
+  .study-clock-panel{padding:17px 14px}
+  .timer-panel{padding:17px 14px!important}
+  .timer-stage{min-height:245px}
+  .timer-ring-wrap{width:min(72vw,235px)!important;height:min(72vw,235px)!important}
+  .section-card{border-radius:17px}
+}
+
+@media(max-width:479px){
+  .kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .kpi-card{padding:12px;min-height:92px}
+  .kpi-label{font-size:.56rem;letter-spacing:.05em}
+  .kpi-value{font-size:1.34rem}
+  .kpi-sub{font-size:.6rem;line-height:1.35}
+  .wk-chart{height:120px}
+  .page-title{font-size:1.38rem}
+}
+
+@media(max-width:360px){
+  .kpi-grid{grid-template-columns:1fr 1fr;gap:7px}
+  .kpi-card{padding:10px}
+  .kpi-value{font-size:1.22rem}
+  .nav-item{font-size:.6rem}
+}
+
+/* ---------------- Phone landscape ---------------- */
+@media(max-width:900px) and (max-height:500px) and (orientation:landscape){
+  .app-wrapper{padding-bottom:calc(var(--dock-h) + 18px)}
+  .main-workspace{padding-top:10px;padding-bottom:calc(var(--dock-h) + 18px)}
+  .tracker-bar{top:8px}
+  .page-header{margin-bottom:10px}
+}
+
+/* ---------------- Accessibility / performance ---------------- */
+@media(prefers-reduced-motion:reduce){
+  .page-header::before,.page-header::after{animation:none}
+}
+@media(prefers-reduced-transparency:reduce){
+  .sidebar,.tracker-bar{background:var(--surface-elevated)}
+}
+
+/* Real component illustration — if/when mounted, it gets the same tokens. */
+.study-scene{width:clamp(190px,23vw,300px);height:auto;pointer-events:none;opacity:.98}
+.study-scene svg{display:block;width:100%;height:auto;overflow:visible}
+.study-scene__lamp{transform-origin:220px 50px;animation:sceneLamp 7s ease-in-out infinite alternate}
+.study-scene__plant{transform-origin:188px 140px;animation:scenePlant 6s ease-in-out infinite alternate}
+@keyframes sceneLamp{from{transform:rotate(-1deg)}to{transform:rotate(1deg)}}
+@keyframes scenePlant{from{transform:rotate(-.7deg)}to{transform:rotate(.7deg)}}
+.study-scene--compact{width:210px}
+@media(max-width:860px){.study-scene{display:none}}
+@media(prefers-reduced-motion:reduce){.study-scene__lamp,.study-scene__plant{animation:none}}
