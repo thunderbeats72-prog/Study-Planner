@@ -67,15 +67,12 @@
   min-width: 94px !important;
 }
 
-/* Keep the status chip aligned with the action rail rather than allowing it
-   to become a competing flex item on narrow rows. */
 .task-row > .chip[class*="chip-"] {
   flex: 0 0 auto !important;
   align-self: center !important;
   white-space: nowrap !important;
 }
 
-/* Active state is intentionally calm: only the small recording dot moves. */
 .task-row.active-clock {
   animation: none !important;
   transform: none !important;
@@ -112,9 +109,7 @@
 }
 
 @media (min-width: 641px) {
-  .task-row-actions {
-    margin-right: 0 !important;
-  }
+  .task-row-actions { margin-right: 0 !important; }
 }
 
 @media (max-width: 640px) {
@@ -168,37 +163,29 @@
     justify-content: center !important;
   }
 
-  .task-more-wrap {
-    top: 9px !important;
-    right: 9px !important;
-  }
-
-  .task-more {
-    width: 34px !important;
-    height: 34px !important;
-  }
+  .task-more-wrap { top: 9px !important; right: 9px !important; }
+  .task-more { width: 34px !important; height: 34px !important; }
 
   .task-menu {
     max-width: calc(100vw - 24px) !important;
     min-width: 180px !important;
   }
 
-  .task-row.active-clock {
-    padding-left: 11px !important;
-  }
+  .task-row.active-clock { padding-left: 11px !important; }
 }
 
 @media (max-width: 360px) {
   .task-row > .task-row-actions { gap: 6px !important; }
-  .task-row > .task-row-actions .btn {
-    font-size: .72rem !important;
-    padding-inline: 7px !important;
-  }
+  .task-row > .task-row-actions .btn { font-size: .72rem !important; padding-inline: 7px !important; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .task-live-dot,
-  .task-clock.clock-live .clock-live-dot {
-    animation: none !important;
-  }
+  .task-clock.clock-live .clock-live-dot { animation: none !important; }
+}
+
+/* The Step 4 programme summary is intentionally removed from the onboarding
+   presentation. Keep the underlying programme/state data untouched. */
+.ob-program-card {
+  display: none !important;
 }
