@@ -1,0 +1,271 @@
+/*
+  Study Planner Pro — targeted UI/UX polish pass
+  Preserves the existing lavender/pastel system and only tightens hierarchy,
+  alignment, mobile task actions, onboarding density, and motion.
+*/
+
+/* =========================
+   OVERVIEW / DASHBOARD
+   ========================= */
+.dash-today-grid {
+  grid-template-columns: minmax(0, 1fr) 280px !important;
+  gap: 18px !important;
+  align-items: start;
+}
+
+/* Overview intentionally does not duplicate the full calendar experience. */
+.dash-cal-card { display: none !important; }
+
+.dash-side-rail {
+  min-width: 0;
+  gap: 14px !important;
+}
+
+.dash-quote-card {
+  min-height: 148px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.dash-today-card {
+  min-height: 0;
+}
+
+.dash-today-card .day-head {
+  padding-bottom: 13px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.dash-today-card .task-row {
+  transition: transform .18s cubic-bezier(.22,1,.36,1),
+              border-color .18s ease,
+              background .18s ease,
+              box-shadow .18s ease;
+}
+
+@media (hover:hover) and (pointer:fine) {
+  .dash-today-card .task-row:hover {
+    transform: translateY(-1px);
+    border-color: color-mix(in srgb, var(--accent) 30%, var(--glass-border));
+    box-shadow: 0 6px 18px rgba(30,27,60,.06);
+  }
+}
+
+/* Give the overview a tighter, more deliberate vertical rhythm. */
+.dash-hero { margin-bottom: 16px !important; }
+.recovery-panel { margin-bottom: 16px !important; }
+.momentum-strip { margin-top: 16px !important; }
+
+@media (max-width:1080px) {
+  .dash-today-grid { grid-template-columns: 1fr !important; }
+  .dash-side-rail { display: grid; grid-template-columns: 1fr; }
+}
+
+/* =========================
+   MOBILE TASK ACTIONS
+   ========================= */
+@media (max-width:640px) {
+  .task-row {
+    position: relative;
+    padding: 13px 12px 14px !important;
+    padding-right: 14px !important;
+  }
+
+  .task-row-actions {
+    position: relative;
+    width: 100%;
+    display: flex !important;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 7px;
+    padding-top: 32px;
+    margin-top: 2px;
+  }
+
+  /* The overflow action becomes a compact vertical anchor in the card's
+     top-right corner instead of a fourth inline button. */
+  .task-more-wrap {
+    position: absolute !important;
+    top: 0;
+    right: 0;
+    z-index: 8;
+  }
+
+  .task-more {
+    width: 34px !important;
+    height: 30px !important;
+    min-width: 34px !important;
+    padding: 0 !important;
+    border-radius: 9px !important;
+    font-size: 16px !important;
+    line-height: 1 !important;
+    letter-spacing: 0 !important;
+    box-shadow: 0 2px 7px rgba(30,27,60,.05);
+  }
+
+  .task-menu {
+    position: absolute !important;
+    top: calc(100% + 7px) !important;
+    right: 0 !important;
+    left: auto !important;
+    width: min(220px, calc(100vw - 42px)) !important;
+    min-width: 190px;
+    max-width: calc(100vw - 42px);
+    z-index: 80 !important;
+    padding: 5px !important;
+    border-radius: 14px !important;
+    box-shadow: 0 14px 34px rgba(30,27,60,.15), 0 4px 12px rgba(30,27,60,.08) !important;
+    animation: taskMenuPop .18s cubic-bezier(.22,1,.36,1) both;
+    transform-origin: top right;
+  }
+
+  .task-menu button {
+    min-height: 42px;
+    padding: 10px 12px !important;
+    border-radius: 10px !important;
+    font-size: .78rem !important;
+    text-align: left;
+  }
+
+  .task-row-actions > .btn.task-clock,
+  .task-row-actions > .btn.task-primary,
+  .task-row-actions > .task-clock-button {
+    min-height: 40px;
+  }
+
+  .task-row-actions > .btn.task-clock,
+  .task-row-actions > .task-clock-button {
+    flex: 1 1 0;
+  }
+
+  .task-row-actions > .btn.task-primary {
+    flex: 1 1 0;
+  }
+}
+
+@keyframes taskMenuPop {
+  from { opacity:0; transform: translateY(-4px) scale(.97); }
+  to { opacity:1; transform:none; }
+}
+
+/* =========================
+   ONBOARDING
+   ========================= */
+.ob-level-btn:first-child {
+  display: none !important;
+}
+
+.ob-card:has(.ob-level-grid) > p {
+  font-size: 0 !important;
+}
+.ob-card:has(.ob-level-grid) > p::after {
+  content: "From school and higher education through doctoral research, this tells the planner how deep the syllabus should go and how the language should be tuned.";
+  font-size: .88rem;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+
+/* MBA / NMIMS and other degree flows: use the available card width instead
+   of leaving a tall, narrow single-column form on desktop. */
+.ob-card {
+  width: min(920px, calc(100vw - 32px)) !important;
+}
+
+.ob-card .ob-schedule-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  column-gap: 16px;
+  row-gap: 14px;
+}
+
+.ob-card .ob-schedule-grid > .ob-field:last-child {
+  grid-column: 1 / -1;
+}
+
+.ob-field,
+.ob-range-card,
+.ob-choice-card,
+.ob-sub-row {
+  min-width: 0;
+}
+
+.ob-card .ob-level-grid {
+  grid-template-columns: repeat(2, minmax(0,1fr));
+  gap: 12px;
+}
+
+.ob-level-btn {
+  min-height: 92px;
+  transition: transform .18s cubic-bezier(.22,1,.36,1),
+              border-color .18s ease,
+              box-shadow .18s ease,
+              background .18s ease;
+}
+
+@media (hover:hover) and (pointer:fine) {
+  .ob-level-btn:hover {
+    transform: translateY(-2px);
+  }
+}
+
+@media (max-width:700px) {
+  .ob-card {
+    width: min(100%, calc(100vw - 20px)) !important;
+  }
+  .ob-card .ob-schedule-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .ob-card .ob-schedule-grid > .ob-field:last-child {
+    grid-column: auto;
+  }
+  .ob-card .ob-level-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* =========================
+   SMALL PREMIUM DETAILS
+   ========================= */
+.btn:focus-visible,
+.ob-level-btn:focus-visible,
+.task-more:focus-visible,
+.task-menu button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (hover:hover) and (pointer:fine) {
+  .dash-today-card .task-row::after,
+  .ob-level-btn::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 38%;
+    left: -55%;
+    pointer-events: none;
+    transform: skewX(-16deg);
+    background: linear-gradient(105deg, transparent, rgba(255,255,255,.16), transparent);
+  }
+  .dash-today-card .task-row:hover::after,
+  .ob-level-btn:hover::after {
+    animation: uiSheen .55s ease both;
+  }
+}
+
+@keyframes uiSheen {
+  from { left:-55%; }
+  to { left:125%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .task-menu,
+  .dash-today-card .task-row,
+  .ob-level-btn,
+  .dash-today-card .task-row::after,
+  .ob-level-btn::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
