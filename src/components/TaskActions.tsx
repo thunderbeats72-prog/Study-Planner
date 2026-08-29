@@ -69,18 +69,19 @@ export default function TaskActions({ task, subject, activeTaskId, clockSessionA
   };
 
   return <>
+    <div className="task-more-wrap" ref={wrapRef}>
+      <button ref={triggerRef} type="button" className="task-more" aria-label="More task actions" aria-haspopup="menu" aria-expanded={menuOpen} aria-controls={menuOpen ? `${menuId}-menu` : undefined} onClick={toggleMenu}>
+        <span className="task-more-dots" aria-hidden="true"><i /><i /><i /></span>
+      </button>
+      {menuOpen && <div id={`${menuId}-menu`} className="task-menu glass-panel" role="menu" aria-label="More task actions" onKeyDown={onMenuKeyDown}>
+        <button type="button" role="menuitem" onClick={() => { closeMenu(); onEdit(task.id); }}>Edit task</button>
+        {skipped && <button type="button" role="menuitem" onClick={() => { closeMenu(); onTaskStatus(task.id, "pending"); }}>Reopen</button>}
+        {!done && !skipped && <button type="button" role="menuitem" onClick={() => { closeMenu(); onTaskStatus(task.id, "skipped"); }}>Skip task</button>}
+        {subject && !skipped && onSkipSubject && <button type="button" role="menuitem" onClick={() => { closeMenu(); onSkipSubject(subject.id, task.date); }}>Skip {subject.name} today</button>}
+      </div>}
+    </div>
+
     <div className="task-row-actions">
-      <div className="task-more-wrap" ref={wrapRef} onClick={(event) => event.stopPropagation()}>
-        <button ref={triggerRef} type="button" className="task-more" aria-label="More task actions" aria-haspopup="menu" aria-expanded={menuOpen} aria-controls={menuOpen ? `${menuId}-menu` : undefined} onClick={toggleMenu}>
-          <span className="task-more-dots" aria-hidden="true"><i /><i /><i /></span>
-        </button>
-        {menuOpen && <div id={`${menuId}-menu`} className="task-menu glass-panel" role="menu" aria-label="More task actions" onKeyDown={onMenuKeyDown}>
-          <button type="button" role="menuitem" onClick={() => { closeMenu(); onEdit(task.id); }}>Edit task</button>
-          {skipped && <button type="button" role="menuitem" onClick={() => { closeMenu(); onTaskStatus(task.id, "pending"); }}>Reopen</button>}
-          {!done && !skipped && <button type="button" role="menuitem" onClick={() => { closeMenu(); onTaskStatus(task.id, "skipped"); }}>Skip task</button>}
-          {subject && !skipped && onSkipSubject && <button type="button" role="menuitem" onClick={() => { closeMenu(); onSkipSubject(subject.id, task.date); }}>Skip {subject.name} today</button>}
-        </div>}
-      </div>
       <TaskClockButton taskId={task.id} activeTaskId={activeTaskId} sessionActive={clockSessionActive} onFocusTask={onFocusTask} onClockOut={onClockOut} />
       <button type="button" className={`btn btn-xs task-primary ${done ? "btn-secondary" : "btn-primary"}`} aria-expanded={ratingOpen || undefined} onClick={handleDone}>{done ? "Undo" : "Done"}</button>
     </div>
