@@ -33,10 +33,25 @@
   max-width: min(260px, calc(100vw - 24px)) !important;
 }
 
+/* Keep status + primary actions visually aligned as one compact action rail. */
 .task-row-actions {
   position: relative !important;
   z-index: 4 !important;
   min-width: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 8px !important;
+  flex-wrap: nowrap !important;
+  flex-shrink: 0 !important;
+  min-height: 34px !important;
+}
+
+.task-row-actions > .btn,
+.task-row-actions > .task-clock {
+  flex: 0 0 auto !important;
+  white-space: nowrap !important;
+  vertical-align: middle !important;
 }
 
 @media (min-width: 641px) {
@@ -47,7 +62,8 @@
 
 @media (max-width: 640px) {
   .task-row-actions {
-    margin-right: 0 !important;
+    margin-right: 48px !important;
+    gap: 7px !important;
   }
 
   .task-more-wrap {
@@ -57,6 +73,32 @@
 
   .task-row .task-main {
     padding-right: 48px !important;
+  }
+
+  /* On narrow phones, move the action rail below the task metadata rather
+     than squeezing title, status and controls into one row. */
+  .task-row {
+    flex-wrap: wrap !important;
+    align-items: flex-start !important;
+  }
+
+  .task-row > .task-main {
+    flex: 1 1 calc(100% - 48px) !important;
+    min-width: 0 !important;
+  }
+
+  .task-row > .chip[class*="chip-"] {
+    margin-left: auto !important;
+    margin-right: 48px !important;
+    flex: 0 0 auto !important;
+    align-self: flex-start !important;
+  }
+
+  .task-row > .task-row-actions {
+    flex: 0 0 auto !important;
+    margin-left: auto !important;
+    margin-top: 4px !important;
+    padding-right: 0 !important;
   }
 }
 
