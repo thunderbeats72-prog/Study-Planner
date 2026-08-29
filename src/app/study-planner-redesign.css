@@ -435,9 +435,11 @@ body {
   display: grid;
   grid-template-columns: minmax(0, 1.65fr) minmax(280px, 1fr);
   gap: 20px;
-  align-items: start;
+  align-items: stretch;
 }
-.dash-today-card { margin-bottom: 0; }
+/* The left card stretches to the side rail's height so the two columns end on
+ * the same baseline — no dead gap under Today's Plan. */
+.dash-today-card { margin-bottom: 0; height: 100%; display: flex; flex-direction: column; }
 .dash-side-rail { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
 @media (max-width: 1080px) {
   .dash-today-grid { grid-template-columns: 1fr; }
