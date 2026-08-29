@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { api, ApiError, prettyDate, prettyLong, today, type AppState, type MessageRow } from "@/lib/client";
+import { api, ApiError, prettyDate, prettyLong, today, type AppState, type MessageRow, type SessionRow } from "@/lib/client";
 import { mmss, useFocusTimer, useStudyClock, type ClockApi, type TimerApi, type TimerMode } from "@/lib/useTimer";
+import { useStudySession, type StudySessionApi } from "@/lib/studySession";
 import { nextPendingTask, type CompletedTaskInfo } from "@/lib/completion";
 import { nextAction } from "@/lib/prioritization";
 import type { QuickAddPayload } from "@/lib/quickAdd";
@@ -90,6 +91,29 @@ function savedSessionQueue(raw: string | null): PendingSessionLog[] {
         && typeof value.mode === "string" && typeof value.date === "string";
     }).slice(-200);
   } catch { return []; }
+}
+
+/** Fold not-yet-synced Clock Out rows into displayed sessions so “Xm studied”
+ *  never waits on the network — and survives a refresh until the queue drains. */
+function overlayPendingSessions(fresh: AppState, queue: PendingSessionLog[] | null): AppState {
+  if (!queue?.length) return fresh;
+  const have = new Set(fresh.sessions.map((session) => session.eventId).filter(Boolean));
+  const extras: SessionRow[] = [];
+  for (const entry of queue) {
+    if (have.has(entry.eventId)) continue;
+    extras.push({
+      id: -1 - extras.length,
+      userId: fresh.user.id,
+      subjectId: entry.subjectId,
+      taskId: entry.taskId,
+      date: entry.date,
+      minutes: entry.minutes,
+      mode: entry.mode,
+      eventId: entry.eventId,
+      createdAt: new Date().toISOString(),
+    });
+  }
+  return extras.length ? { ...fresh, sessions: [...fresh.sessions, ...extras] } : fresh;
 }
 
 export default function Home() {
@@ -214,7 +238,13 @@ export default function Home() {
   const loadInitialState = useCallback(() => {
     setLoading(true);
     api<AppState>("/api/state", { timeoutMs: 20_000 })
-      .then(setState)
+      .then((fresh) => {
+        if (sessionQueueRef.current == null) {
+          try { sessionQueueRef.current = savedSessionQueue(localStorage.getItem(SESSION_QUEUE_KEY)); }
+          catch { sessionQueueRef.current = []; }
+        }
+        setState(overlayPendingSessions(fresh, sessionQueueRef.current));
+      })
       .catch((error) => notify(error instanceof ApiError ? error.message : "Could not reach the server.", "error"))
       .finally(() => setLoading(false));
   }, [notify]);
@@ -378,7 +408,7 @@ export default function Home() {
           });
           sessionQueueRef.current.shift();
           persistSessionQueue();
-          setState(fresh);
+          setState(overlayPendingSessions(fresh, sessionQueueRef.current));
           if (fresh.completedTask) {
             autoCompleteRef.current(fresh, fresh.completedTask, entry.date);
           }
@@ -406,19 +436,38 @@ export default function Home() {
       const random = typeof crypto.randomUUID === "function"
         ? crypto.randomUUID()
         : `${Date.now()}_${Math.random().toString(36).slice(2)}`;
+      const eventId = `session_${random}`;
+      const date = today();
       sessionQueueRef.current.push({
-        eventId: `session_${random}`,
+        eventId,
         minutes,
         subjectId,
         taskId,
         mode,
         // Send the CLIENT's local date: server timezone must not move a
         // session into a different day than the learner sees.
-        date: today(),
+        date,
       });
       // Keep a hard bound if a device stays offline for a very long time.
       if (sessionQueueRef.current.length > 200) sessionQueueRef.current.splice(0, sessionQueueRef.current.length - 200);
       persistSessionQueue();
+      // Show “Xm studied” immediately — Clock Out must not wait on POST.
+      setState((prev) => {
+        if (!prev) return prev;
+        if (prev.sessions.some((session) => session.eventId === eventId)) return prev;
+        const optimistic: SessionRow = {
+          id: -Date.now(),
+          userId: prev.user.id,
+          subjectId,
+          taskId,
+          date,
+          minutes,
+          mode,
+          eventId,
+          createdAt: new Date().toISOString(),
+        };
+        return { ...prev, sessions: [...prev.sessions, optimistic] };
+      });
       void drainSessionQueue();
     },
     [drainSessionQueue, persistSessionQueue]
@@ -470,6 +519,27 @@ export default function Home() {
     },
     onBlockComplete
   );
+
+  /* 3) ONE study session. The focus timer and the study clock are bound
+     together here so that the Focus Studio, Zen, the tracker bar and the
+     command palette all drive exactly the same state — one Pause, one
+     Clock Out, and breaks never billed as study time. */
+  const pickSessionTask = useCallback(() => {
+    const currentDay = today();
+    const task = state?.tasks.find((item) => item.date === currentDay && item.status === "pending")
+      || state?.tasks.find((item) => item.date === currentDay)
+      || null;
+    return {
+      taskId: task?.id ?? null,
+      subjectId: task?.subjectId ?? state?.subjects[0]?.id ?? null,
+    };
+  }, [state]);
+  const session: StudySessionApi = useStudySession({
+    timer,
+    clock,
+    pickTask: pickSessionTask,
+    onEvent: notify,
+  });
 
   const setTaskStatus = async (id: number, status: string, rating?: number) => {
     try {
@@ -608,20 +678,20 @@ export default function Home() {
     }
   }, [clock, notify, state]);
 
-  /** Dashboard hero: one tap starts a smart clock session AND jumps to
-   *  the Focus Studio, so "Start Focus" always does both. */
+  /** Dashboard hero: "Start Focus" starts the focus timer AND the study
+   *  clock as one session, then opens the Focus Studio. */
   const startFocusSession = useCallback(() => {
-    if (!clock.sessionActive) startSmartClock();
-    else if (!clock.running && !clock.onBreak) clock.resume();
+    session.start();
     goPage("focus");
-  }, [clock, goPage, startSmartClock]);
+  }, [goPage, session]);
 
   // Clock out from ANYWHERE — one handler for the tracker bar, the up-next
-  // card, task rows and Zen mode. Confirms the saved minutes by name.
+  // card, task rows and Zen mode. It ends the WHOLE session (focus timer
+  // included), so nobody ever has to pause two timers before closing it.
   const clockOutNow = useCallback(() => {
     const task = state?.tasks.find((item) => item.id === clock.taskId);
     const minutes = Math.floor(clock.elapsed / 60);
-    clock.clockOut();
+    session.endSession();
     haptic([12, 30]);
     notify(
       task
@@ -629,32 +699,20 @@ export default function Home() {
         : `Clocked out — ${minutes > 0 ? `${minutes} min saved.` : "minutes saved."}`,
       "success"
     );
-  }, [clock, notify, state]);
+  }, [clock.elapsed, clock.taskId, notify, session, state]);
 
-  // Pause when recording; resume when paused/on break.
+  // One control for both timers: pause the session while it moves, start
+  // (or resume) it when it does not.
   const pauseOrResume = () => {
-    if (clock.running) { clock.pause(); notify("Paused — the clock waits with you."); }
-    else if (clock.onBreak || clock.elapsed > 0) { clock.resume(); notify("Resumed — back on the clock."); }
-    else startSmartClock();
-  };
-
-  // Linked focus start (used by Zen): one tap starts the focus timer AND the
-  // study clock, so entering Zen no longer means juggling two separate
-  // controls. Breaks keep the clock untouched (they are rest, not study).
-  const startFocusWithClock = useCallback(() => {
-    if (!timer.running) timer.start();
-    if (clock.onBreak) {
-      clock.endBreak();
-      notify("Break ended — study clock resumed with your focus timer.", "success");
-      return;
-    }
-    if (!clock.sessionActive) {
+    if (session.active) {
+      session.pause();
+    } else if (clock.sessionActive) {
+      session.start();
+      notify("Resumed — focus timer and study clock are running together.");
+    } else {
       startSmartClock();
-    } else if (!clock.running) {
-      clock.resume();
-      notify("Study clock resumed with your focus timer.", "success");
     }
-  }, [clock, notify, startSmartClock, timer]);
+  };
 
   const focusTask = (taskId: number) => {
     const task = state?.tasks.find((x) => x.id === taskId);
@@ -683,10 +741,43 @@ export default function Home() {
   };
   const startWizard = () => {
     setConfirmWipe(false);
-    // bank any live study time before entering the wizard
-    if (clock.running) clock.pause();
+    // bank any live study time before entering the wizard — pausing the
+    // session stops the focus timer and the clock together.
+    session.pause();
     setForceWizard(true);
   };
+
+  /** AI-tutor clock intents, routed through the ONE study session so a chat
+   *  command can never leave the focus timer and the study clock out of step. */
+  const applyClockIntent = useCallback((type: string) => {
+    switch (type) {
+      case "startTimer":
+        if (session.active) return;
+        if (clock.sessionActive) session.start();
+        else startSmartClock();
+        break;
+      case "stopTimer":
+        if (clock.sessionActive) clockOutNow();
+        break;
+      case "pause":
+        if (session.active) session.pause();
+        else notify("No session running to pause.");
+        break;
+      case "resume":
+        if (clock.sessionActive || clock.elapsed > 0) session.start();
+        else startSmartClock();
+        break;
+      case "break":
+        if (clock.sessionActive && !clock.onBreak) session.takeBreak();
+        else notify("Start a session first, then take a break.");
+        break;
+      case "zen":
+        setZen(true);
+        break;
+      default:
+        break;
+    }
+  }, [clock.elapsed, clock.onBreak, clock.sessionActive, clockOutNow, notify, session, startSmartClock]);
 
   const askTutor = useCallback(
     async (q: string) => {
@@ -738,12 +829,7 @@ export default function Home() {
         const a = r.action;
         if (a) {
           if (a.type === "navigate") goPage(String(a.payload) as Page);
-          if (a.type === "startTimer") { if (!clock.running) { if (clock.sessionActive) clock.resume(); else startSmartClock(); } }
-          if (a.type === "stopTimer") { if (clock.sessionActive) clockOutNow(); }
-          if (a.type === "pause") { if (clock.running) clock.pause(); else notify("No session running to pause."); }
-          if (a.type === "resume") { if (clock.onBreak || clock.elapsed > 0) clock.resume(); else if (!clock.running) startSmartClock(); }
-          if (a.type === "break") { if (clock.running) clock.takeBreak(); else notify("Start a session first, then take a break."); }
-          if (a.type === "zen") setZen(true);
+          applyClockIntent(a.type);
           // The chat API already performs and returns a fresh replan. Calling
           // /api/replan again here caused a second rebuild and race.
           if (a.type === "theme") { void patchSettings({ theme: String(a.payload) }); }
@@ -761,12 +847,7 @@ export default function Home() {
         } else if (action) {
           fallbackText = commandReply(action, message, currentCtx?.daysLeft ?? 90);
           if (action.type === "navigate") goPage(String(action.payload) as Page);
-          if (action.type === "startTimer") { if (!clock.running) { if (clock.sessionActive) clock.resume(); else startSmartClock(); } }
-          if (action.type === "stopTimer") { if (clock.sessionActive) clockOutNow(); }
-          if (action.type === "pause") { if (clock.running) clock.pause(); else notify("No session running to pause."); }
-          if (action.type === "resume") { if (clock.onBreak || clock.elapsed > 0) clock.resume(); else if (!clock.running) startSmartClock(); }
-          if (action.type === "break") { if (clock.running) clock.takeBreak(); else notify("Start a session first, then take a break."); }
-          if (action.type === "zen") setZen(true);
+          applyClockIntent(action.type);
           if (action.type === "theme") { void patchSettings({ theme: String(action.payload) }); }
         } else if (instant) {
           fallbackText = instant.text;
@@ -797,7 +878,7 @@ export default function Home() {
         setThinking(false);
       }
     },
-    [clock, clockOutNow, goPage, notify, patchSettings, startSmartClock, state]
+    [applyClockIntent, goPage, notify, patchSettings, state]
   );
 
   if (loading) {
@@ -862,9 +943,9 @@ export default function Home() {
     { id: "nav-focus", group: "Navigate", label: "Go to Focus", hint: "Pomodoro", keywords: "timer deep work", run: () => goPage("focus") },
     { id: "nav-subj", group: "Navigate", label: "Go to Subjects", hint: "Syllabus", keywords: "units topics", run: () => goPage("subjects") },
     { id: "nav-set", group: "Navigate", label: "Go to Settings", keywords: "theme preferences", run: () => goPage("settings") },
-    { id: "clock-in", group: "Study Clock", label: clock.running ? "Pause Clock" : clock.sessionActive ? "Resume Clock" : "Clock In", hint: clock.running ? "Freeze, keep session" : "Start recording", keywords: "timer record attendance pause", run: () => (clock.running ? clock.pause() : clock.sessionActive ? clock.resume() : startSmartClock()) },
+    { id: "clock-in", group: "Study Clock", label: session.active ? "Pause Session" : clock.sessionActive ? "Resume Session" : "Clock In", hint: session.active ? "Freeze both timers" : "Start recording", keywords: "timer record attendance pause", run: () => (session.active ? session.pause() : clock.sessionActive ? session.start() : startSmartClock()) },
     { id: "clock-out", group: "Study Clock", label: "Clock Out", hint: clock.sessionActive ? "Stop & save minutes" : "no open session", keywords: "stop end finish timer", run: () => (clock.sessionActive ? clockOutNow() : notify("No open session to close.")) },
-    { id: "clock-break", group: "Study Clock", label: clock.onBreak ? "Resume from break" : "Take a break", keywords: "pause rest", run: () => (clock.onBreak ? clock.endBreak() : clock.takeBreak()) },
+    { id: "clock-break", group: "Study Clock", label: clock.onBreak ? "Resume from break" : "Take a break", keywords: "pause rest", run: () => (clock.onBreak ? session.start() : session.takeBreak()) },
     { id: "next-lesson", group: "Study Clock", label: "Start next pending lesson", hint: "Clock in + switch", keywords: "begin study start task", run: () => { const t = today(); const next = nextAction(state.tasks.filter((x) => x.id !== clock.taskId), t).now; if (next) focusTask(next.id); else notify("Nothing pending — enjoy the rest day."); } },
     { id: "zen", group: "Focus", label: "Enter Zen mode", hint: "Distraction-free", keywords: "fullscreen minimal", run: () => setZen(true) },
     { id: "ai", group: "AI Tutor", label: "Ask AI Tutor", hint: "Open chat", keywords: "help question doubt", run: () => setChatOpen(true) },
@@ -1012,22 +1093,29 @@ export default function Home() {
                 <span className="exam-chip-short">{ctx.daysLeft}d to exam</span>
               </span>
               {!clock.sessionActive && (
-                <button className="btn btn-xs btn-primary" onClick={startSmartClock}>Clock In</button>
-              )}
-              {clock.running && (
-                <>
-                  <button className="btn btn-xs btn-secondary act-pause" onClick={clock.pause}>Pause</button>
-                  <button className="btn btn-xs btn-secondary act-break" onClick={clock.takeBreak}>Break</button>
-                </>
-              )}
-              {clock.sessionActive && !clock.running && !clock.onBreak && (
-                <button className="btn btn-xs btn-primary act-pause" onClick={clock.resume}>Resume</button>
+                <button className="btn btn-xs btn-primary act-in" onClick={startSmartClock}>Clock In</button>
               )}
               {clock.sessionActive && (
-                <button className="btn btn-xs btn-danger act-out" onClick={clockOutNow}>Clock Out</button>
-              )}
-              {clock.onBreak && (
-                <button className="btn btn-xs btn-primary" onClick={clock.endBreak}>Resume</button>
+                <>
+                  {/* One slot for the session's primary verb, so the row keeps
+                      the same geometry while clocked in, paused and on break. */}
+                  <button
+                    className={`btn btn-xs ${session.active ? "btn-secondary" : "btn-primary"} act-toggle`}
+                    onClick={pauseOrResume}
+                  >
+                    {session.active ? "Pause" : "Resume"}
+                  </button>
+                  {/* Always rendered while a session is open, so the row keeps
+                      exactly the same geometry while clocked in and paused. */}
+                  <button
+                    className="btn btn-xs btn-secondary act-break"
+                    onClick={session.takeBreak}
+                    disabled={!clock.running}
+                  >
+                    Break
+                  </button>
+                  <button className="btn btn-xs btn-danger act-out" onClick={clockOutNow}>Clock Out</button>
+                </>
               )}
               {ambient !== "none" && (
                 <button className="btn btn-xs btn-secondary ambient-pill" onClick={() => stopSound()} title="Stop ambient sound">
@@ -1133,15 +1221,14 @@ export default function Home() {
             <PlannerView state={state} onTaskStatus={setTaskStatus} onTaskUpdate={updateTask}
               onSkipSubject={skipSubjectForDay} onFocusTask={focusTask}
               activeTaskId={clock.taskId} activeClockSeconds={clock.elapsed}
-              clockSessionActive={clock.sessionActive}
+              clockRunning={clock.running} clockSessionActive={clock.sessionActive}
               onClockOut={clockOutNow}
               onAskTutor={askTutor} replanning={busy} onReplan={replan}
               onAddTask={addTask} />
           )}
           {page === "focus" && (
-            <FocusView state={state} timer={timer} clock={clock} onCompleteTask={(id) => setTaskStatus(id, "done")}
-              onZen={() => setZen(true)}
-              onClockLink={(msg) => notify(msg, "success")} />
+            <FocusView state={state} session={session} onCompleteTask={(id) => setTaskStatus(id, "done")}
+              onZen={() => setZen(true)} />
           )}
           {page === "subjects" && (
             <SubjectsView state={state} onAdd={addSubject} onEdit={editSubject} onDelete={deleteSubject} busy={busy} onAskTutor={askTutor} />
@@ -1203,7 +1290,7 @@ export default function Home() {
               <div className="zen-eyebrow">Deep Focus Session</div>
               {!zenMinimal && (
                 <div className="zen-kicker">
-                  {state.subjects.find((x) => x.id === clock.subjectId)?.name || "Protect this time for what matters"}
+                  {clock.sessionActive ? clockTaskTitle : "Protect this time for what matters"}
                 </div>
               )}
             </div>
@@ -1231,30 +1318,36 @@ export default function Home() {
                 <div className="zen-mode">{ZEN_MODE_LABEL[timer.mode]}</div>
                 <div className="zen-digits mono">{mmss(timer.seconds)}</div>
                 <div className="zen-status">
-                  Study clock: {clock.running ? "recording" : clock.onBreak ? "on break" : clock.sessionActive ? "paused" : "not clocked in"} · {mmss(clock.elapsed)}
+                  <span
+                    className="zen-status-dot"
+                    data-live={session.active ? "true" : "false"}
+                    aria-hidden="true"
+                  />
+                  {session.active ? "Recording" : clock.onBreak ? "On break" : clock.sessionActive ? "Paused" : "Ready"}
+                  {" · "}{mmss(clock.elapsed)}
                 </div>
               </div>
             </div>
 
+            {/* ONE control for the whole session. There is deliberately no
+                separate "Pause Clock": focus and the study clock are the same
+                session, so they pause, resume and end together. */}
             <div className="flex-row gap-md zen-actions">
-              <button className="btn btn-primary zen-primary" onClick={() => (timer.running ? timer.pause() : startFocusWithClock())}>
-                {timer.running ? "Pause Focus" : "Start Focus + Clock"}
+              <button className="btn btn-primary zen-primary" onClick={session.toggle}>
+                {session.active ? "Pause" : clock.sessionActive ? "Resume" : "Start Focus"}
               </button>
               {clock.sessionActive && (
-                <>
-                  <button className="btn btn-secondary zen-secondary" onClick={pauseOrResume}>
-                    {clock.running ? "Pause Clock" : "Resume Clock"}
-                  </button>
-                  <button className="btn btn-danger" onClick={clockOutNow}>Clock Out</button>
-                </>
+                <button className="btn zen-secondary zen-clock-out" onClick={clockOutNow}>Clock Out</button>
               )}
-              <button className="btn btn-secondary zen-secondary zen-exit-btn" onClick={() => setZen(false)}>Exit Zen</button>
+              <button className="btn zen-secondary zen-exit-btn" onClick={() => setZen(false)}>Exit Zen</button>
             </div>
-            {!timer.running && !clock.sessionActive && (
-              <p className="zen-hint">
-                “Start Focus + Clock” begins your focus timer and study clock together — one tap, no juggling.
-              </p>
-            )}
+            <p className="zen-hint">
+              {session.active
+                ? "One session — the timer and the study clock run together."
+                : clock.sessionActive
+                  ? "Paused — no study time is being recorded."
+                  : "Start Focus begins the timer and the study clock in one tap."}
+            </p>
           </div>
 
           {/* BOTTOM — the 3-part focus guidance bar, the last flow row. */}

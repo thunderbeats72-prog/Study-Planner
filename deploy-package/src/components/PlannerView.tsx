@@ -8,8 +8,10 @@ import {
 import { IconSpark, IconClose, IconChevron } from "./icons";
 import TaskEditor, { type TaskPatch } from "./TaskEditor";
 import TaskActions from "./TaskActions";
+import { TaskLiveBadge } from "./TaskClockButton";
 import QuickAdd from "./QuickAdd";
 import { useBackClose } from "@/lib/useBackClose";
+import { taskStudiedSuffix } from "@/lib/studyTime";
 import type { QuickAddPayload } from "@/lib/quickAdd";
 
 type View = "list" | "calendar";
@@ -17,7 +19,7 @@ type RenderTaskOptions = { showLessonBrief?: boolean; lastRow?: boolean };
 
 export default function PlannerView({
   state, onTaskStatus, onTaskUpdate, onSkipSubject, onFocusTask, activeTaskId, activeClockSeconds,
-  clockSessionActive, onClockOut, onAskTutor, replanning, onReplan, onAddTask,
+  clockRunning, clockSessionActive, onClockOut, onAskTutor, replanning, onReplan, onAddTask,
 }: {
   state: AppState;
   onTaskStatus: (id: number, status: string, rating?: number) => void;
@@ -26,6 +28,7 @@ export default function PlannerView({
   onFocusTask: (taskId: number) => void;
   activeTaskId?: number | null;
   activeClockSeconds?: number;
+  clockRunning?: boolean;
   clockSessionActive?: boolean;
   onClockOut: () => void;
   onAskTutor: (q: string) => void;
@@ -41,6 +44,7 @@ export default function PlannerView({
   const [month, setMonth] = useState(() => {
     const d = new Date(); return { y: d.getFullYear(), m: d.getMonth() };
   });
+  const [calDir, setCalDir] = useState<1 | -1 | 0>(0);
   const t = today();
   useBackClose(!!openDay, () => setOpenDay(null));
 
@@ -91,11 +95,9 @@ export default function PlannerView({
 
   const topicFor = (task: TaskRow) => state.topics.find((x) => x.id === task.topicId);
   const subjFor = (task: TaskRow) => state.subjects.find((s) => s.id === task.subjectId);
-  const taskLogged = (taskId: number) => {
-    const sum = state.sessions.filter((x) => x.taskId === taskId).reduce((a, x) => a + x.minutes, 0);
-    return Math.round(sum * 100) / 100;
-  };
-  // 13.5 minutes displays as "13.5m" — never rounded to a different number
+  // The minute figures in the workload glance strip stay local to this view;
+  // the per-task studied total is shared through lib/studyTime so Planner and
+  // Dashboard word it identically.
   const fmtMin = (m: number) => {
     const r = Math.round(m * 10) / 10;
     return `${Number.isInteger(r) ? r : r.toFixed(1)}m`;
@@ -115,9 +117,13 @@ export default function PlannerView({
     const showLessonBrief = options.showLessonBrief !== false;
     const canExpandLessonBrief = showLessonBrief && (!!topic || (isCheckpoint && !!task.detail));
     const open = canExpandLessonBrief && expanded === task.id;
+    // Live state only while a session is actually open — Clock Out clears it
+    // immediately and the row returns to rest with its studied minutes visible.
+    const rowLive = !!clockSessionActive && activeTaskId === task.id;
+    const studiedLabel = taskStudiedSuffix(state.sessions, task);
     return (
       <div key={task.id}>
-        <div className={`task-row${task.status === "done" ? " done" : ""}${activeTaskId === task.id ? " active-clock" : ""}${options.lastRow ? " last-row" : ""}`}>
+        <div className={`task-row${task.status === "done" ? " done" : ""}${rowLive ? " active-clock" : ""}${options.lastRow ? " last-row" : ""}`}>
           <div className="task-dot" style={{ background: dotColor }} />
           <div className={`task-main${canExpandLessonBrief ? " is-expandable" : ""}`}
             role={canExpandLessonBrief ? "button" : undefined}
@@ -142,7 +148,7 @@ export default function PlannerView({
             </div>
             <div className="task-sub">
               <span className="chip chip-kind chip-tight">{kindLabel}</span>
-              {task.plannedMinutes} min
+              {` ${task.plannedMinutes} min`}
               {topic
                 ? ` · ${topic.unit} · ${topic.difficulty}`
                 : isCheckpoint
@@ -150,8 +156,8 @@ export default function PlannerView({
                 : task.detail
                 ? ` · ${task.detail}`
                 : ""}
-              {taskLogged(task.id) ? ` · ${fmtMin(taskLogged(task.id))} logged` : task.actualMinutes ? ` · ${task.actualMinutes}m logged` : ""}
-              {activeTaskId === task.id && activeClockSeconds ? ` · live +${Math.floor(activeClockSeconds / 60)}m ${activeClockSeconds % 60}s` : ""}
+              {studiedLabel ? ` · ${studiedLabel}` : ""}
+              {rowLive && <TaskLiveBadge seconds={activeClockSeconds} running={clockRunning} />}
             </div>
           </div>
           <span className={`chip chip-${task.status}`}>{task.status}</span>
@@ -243,7 +249,9 @@ export default function PlannerView({
     );
   };
 
-  // calendar grid
+  // calendar grid — six rows always, so switching between 5-row and 6-row
+  // months never nudges the page height. `calDir` carries the direction of the
+  // last month change so the CSS transition slides the grid the honest way.
   const first = new Date(month.y, month.m, 1);
   const startPad = first.getDay();
   const daysInMonth = new Date(month.y, month.m + 1, 0).getDate();
@@ -251,6 +259,18 @@ export default function PlannerView({
     ...Array(startPad).fill(null),
     ...Array.from({ length: daysInMonth }, (_, i) => fmtDate(new Date(month.y, month.m, i + 1))),
   ];
+  while (cells.length < 42) cells.push(null);
+
+  const isCurrentMonth = month.y === new Date(t).getFullYear() && month.m === new Date(t).getMonth();
+  const goMonth = (delta: number) => {
+    setCalDir(delta > 0 ? 1 : -1);
+    setMonth((mm) => (mm.m === 0 && delta < 0 ? { y: mm.y - 1, m: 11 } : mm.m === 11 && delta > 0 ? { y: mm.y + 1, m: 0 } : { ...mm, m: mm.m + delta }));
+  };
+  const backToThisMonth = () => {
+    const d = new Date();
+    setCalDir(d.getFullYear() * 12 + d.getMonth() > month.y * 12 + month.m ? -1 : 1);
+    setMonth({ y: d.getFullYear(), m: d.getMonth() });
+  };
 
   const dayTasks = (d: string) => filtered.filter((x) => x.date === d);
 
@@ -356,19 +376,27 @@ export default function PlannerView({
 
       {view === "calendar" && (
         <div className="glass-panel section-card cal-panel">
-          <div className="day-head">
+          <div className="day-head cal-nav-row">
             <div className="day-date">{first.toLocaleDateString(undefined, { month: "long", year: "numeric" })}</div>
-            <div className="flex-row gap-sm">
-              <button className="btn btn-xs btn-secondary" onClick={() => setMonth((mm) => (mm.m === 0 ? { y: mm.y - 1, m: 11 } : { ...mm, m: mm.m - 1 }))}>‹ Prev</button>
-              <button className="btn btn-xs btn-secondary" onClick={() => setMonth((mm) => (mm.m === 11 ? { y: mm.y + 1, m: 0 } : { ...mm, m: mm.m + 1 }))}>Next ›</button>
+            <div className="cal-nav-group">
+              {!isCurrentMonth && (
+                <button type="button" className="btn btn-xs btn-secondary cal-today-btn" onClick={backToThisMonth}>Today</button>
+              )}
+              <button type="button" className="cal-nav-btn" aria-label="Previous month" onClick={() => goMonth(-1)}>
+                <span className="cal-nav-ico cal-nav-ico--prev" aria-hidden="true"><IconChevron size={13} /></span>
+              </button>
+              <button type="button" className="cal-nav-btn" aria-label="Next month" onClick={() => goMonth(1)}>
+                <span className="cal-nav-ico cal-nav-ico--next" aria-hidden="true"><IconChevron size={13} /></span>
+              </button>
             </div>
           </div>
-          <div className="cal-grid cal-dow-row">
+          <div
+            key={`${month.y}-${month.m}`}
+            className={`cal-grid${calDir > 0 ? " cal-slide-next" : calDir < 0 ? " cal-slide-prev" : ""}`}
+          >
             {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => <div className="cal-dow" key={d}>{d}</div>)}
-          </div>
-          <div className="cal-grid">
             {cells.map((d, i) => {
-              if (!d) return <div className="cal-cell empty" key={`e${i}`} />;
+              if (!d) return <div className="cal-cell empty" key={`e${i}`} aria-hidden="true" />;
               const list = dayTasks(d);
               // Soft per-day tint from the first task's subject colour, so a
               // glance at the month shows where the load is — on phones too.
@@ -376,13 +404,20 @@ export default function PlannerView({
                 ? subjFor(list[0])?.color || (KIND_META[list[0].kind] || KIND_META.learn).color
                 : null;
               return (
-                <div key={d} className={`cal-cell${d === t ? " today" : ""}${list.length ? " has-tasks" : ""}`}
+                <div key={d} className={`cal-cell${d === t ? " today" : ""}${list.length ? " has-tasks" : ""}${openDay === d ? " is-selected" : ""}`}
+                  role={list.length ? "button" : undefined}
+                  tabIndex={list.length ? 0 : undefined}
+                  aria-label={list.length ? `${prettyDate(d)} — ${list.length} task${list.length > 1 ? "s" : ""} planned` : undefined}
                   style={tint ? ({ "--cell-tint": tint } as React.CSSProperties) : undefined}
-                  onClick={() => list.length && setOpenDay(d)}>
+                  onClick={() => list.length && setOpenDay(d)}
+                  onKeyDown={(e) => { if (list.length && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); setOpenDay(d); } }}>
                   <div className="cal-num">{parseDate(d).getDate()}</div>
                   {list.slice(0, 3).map((task) => {
                     const c = subjFor(task)?.color || (KIND_META[task.kind] || KIND_META.learn).color;
-                    return <div key={task.id} className="cal-pill" style={{ background: c, opacity: task.status === "done" ? 0.45 : 1 }}>{task.title}</div>;
+                    // Pills carry white text: light subject colours (amber,
+                    // lime, cyan…) are mixed toward ink just enough to keep
+                    // the hue readable — never a pastel square with a glow.
+                    return <div key={task.id} className="cal-pill" style={{ background: `color-mix(in srgb, ${c} 62%, #191631)`, opacity: task.status === "done" ? 0.45 : 1 }}>{task.title}</div>;
                   })}
                   {list.length > 3 && <div className="cal-more">+{list.length - 3} more</div>}
                 </div>

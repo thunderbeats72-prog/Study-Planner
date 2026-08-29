@@ -10,9 +10,11 @@ import {
 } from "./icons";
 import TaskEditor, { type TaskPatch } from "./TaskEditor";
 import TaskActions from "./TaskActions";
+import { TaskLiveBadge } from "./TaskClockButton";
 import QuickAdd from "./QuickAdd";
 import Heatmap from "./Heatmap";
 import { prioritizeTasks, weakestSubjectIds, reasonLabel } from "@/lib/prioritization";
+import { taskStudiedSuffix } from "@/lib/studyTime";
 import {
   backlogFor, backlogToDate, canFitToday, dailyCapacityMinutes, pendingOnDate,
   spreadAcrossDays, suggestedRecovery, todayOverload,
@@ -222,10 +224,8 @@ export default function Dashboard({
     const compRate = recent.length ? Math.round((recent.filter((x) => x.status === "done").length / recent.length) * 100) : null;
     return { thisHrs: Math.round((thisMin / 60) * 10) / 10, delta, avgSession, compRate };
   }, [state.sessions, state.tasks, t]);
-  const taskLogged = (taskId: number) => {
-    const sum = state.sessions.filter((x) => x.taskId === taskId).reduce((a, x) => a + x.minutes, 0);
-    return Math.round(sum * 100) / 100;
-  };
+  // Per-task study totals come from the shared helper so the Overview and
+  // the Planner word and aggregate them exactly the same way.
   // 13.5 minutes displays as "13.5m" — never rounded to a different number
   const fmtMin = (m: number) => {
     const r = Math.round(m * 10) / 10;
@@ -260,13 +260,14 @@ export default function Dashboard({
                 {state.subjects.find((subject) => subject.id === top.subjectId)
                   ? ` · ${state.subjects.find((subject) => subject.id === top.subjectId)!.name}`
                   : ""}
-                {taskLogged(top.id) ? ` · ${fmtMin(taskLogged(top.id))} already logged` : ""}
+                {taskStudiedSuffix(state.sessions, top) ? ` · ${taskStudiedSuffix(state.sessions, top)}` : ""}
               </p>
 
               {heroLive ? (
                 <div className="now-live">
-                  <span className="up-next-live-chip">
-                    ● {clockRunning ? "clock running" : clockOnBreak ? "on break" : "paused"}
+                  <span className={`up-next-live-chip${clockRunning ? " is-recording" : clockOnBreak ? " is-break" : " is-idle"}`}>
+                    <span className="task-live-dot" aria-hidden="true" />
+                    {clockRunning ? "clock running" : clockOnBreak ? "on break" : "paused"}
                   </span>
                   <span className="mono now-live-timer" aria-label="Session time">{mmss(activeClockSeconds ?? 0)}</span>
                   <div className="flex-row gap-sm">
@@ -424,18 +425,23 @@ export default function Dashboard({
             const kindLabel = isCheckpoint ? "Checkpoint" : meta.label;
             const dotColor = subj?.color || (isCheckpoint ? "var(--color-primary)" : meta.color);
             const formattedTitle = isCheckpoint ? normalizeCheckpointTitle(task.title) : task.title;
+            // Live state only while a session is actually open: Clock Out
+            // clears the row instantly and leaves the studied minutes behind.
+            const rowLive = !!clockSessionActive && activeTaskId === task.id;
+            const studiedLabel = taskStudiedSuffix(state.sessions, task);
             return (
-              <div key={task.id} className={`task-row clean-list${task.status === "done" ? " done" : ""}${activeTaskId === task.id ? " active-clock" : ""}`}>
+              <div key={task.id} className={`task-row clean-list${task.status === "done" ? " done" : ""}${rowLive ? " active-clock" : ""}`}>
                 <div className="task-dot" style={{ background: dotColor }} />
                 <div className="task-main">
                   <div className="task-title">{formattedTitle}</div>
                   <div className="task-sub">
                     <span className="chip chip-kind chip-tight">{kindLabel}</span> · {task.plannedMinutes} min
                     {isCheckpoint ? " · All Subjects · Comprehensive Review" : ""}
-                    {taskLogged(task.id) ? ` · ${fmtMin(taskLogged(task.id))} logged` : task.actualMinutes ? ` · ${task.actualMinutes}m logged` : ""}
-                    {activeTaskId === task.id && activeClockSeconds ? ` · live +${Math.floor(activeClockSeconds / 60)}m ${activeClockSeconds % 60}s` : ""}
+                    {studiedLabel ? ` · ${studiedLabel}` : ""}
+                    {rowLive && <TaskLiveBadge seconds={activeClockSeconds} running={clockRunning} />}
                   </div>
                 </div>
+                <span className={`chip chip-${task.status}`}>{task.status}</span>
                 <TaskActions
                   task={task}
                   subject={subj}

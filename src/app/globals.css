@@ -5109,7 +5109,87 @@ body.mode-young .section-title::after{width:46px;height:3px;bottom:-8px}
 .sound-option:not(.is-selected) .sound-option-indicator{opacity:0}
 .ambient-panel .vol-label{margin:0 0 7px;font-size:var(--fs-xs)}
 .ambient-panel .vol-label strong{color:var(--text-main);font-weight:800}
-.ambient-panel .vol-range{display:block;width:100%;height:24px;margin:0;accent-color:var(--accent);cursor:pointer}
+/* Volume speaks the same slider language as the onboarding controls: a
+   8px rail inside a 26px grab strip, filled to --vol-fill (set inline by
+   FocusView from its own state), one gradient thumb that presses gently.
+   The old control was a raw accent-color range — the app's one remaining
+   OS-native input. */
+.ambient-panel .vol-range{
+  --vol-track-h:8px;
+  display:block;width:100%;height:26px;margin:0;padding:0;
+  border:none;outline:none;background:transparent;cursor:pointer;
+  appearance:none;-webkit-appearance:none;
+  touch-action:pan-y;
+}
+.ambient-panel .vol-range::-webkit-slider-runnable-track{
+  height:var(--vol-track-h);border-radius:999px;
+  background:linear-gradient(90deg,
+    var(--accent) 0%,
+    var(--accent-light) var(--vol-fill,30%),
+    color-mix(in srgb,var(--text-main) 12%,transparent) var(--vol-fill,30%),
+    color-mix(in srgb,var(--text-main) 12%,transparent) 100%);
+  box-shadow:inset 0 1px 2px color-mix(in srgb,var(--text-main) 10%,transparent);
+}
+.ambient-panel .vol-range::-moz-range-track{
+  height:var(--vol-track-h);border-radius:999px;
+  background:color-mix(in srgb,var(--text-main) 12%,transparent);
+  box-shadow:inset 0 1px 2px color-mix(in srgb,var(--text-main) 10%,transparent);
+}
+.ambient-panel .vol-range::-moz-range-progress{
+  height:var(--vol-track-h);border-radius:999px 0 0 999px;
+  background:linear-gradient(90deg,var(--accent),var(--accent-light));
+}
+.ambient-panel .vol-range::-webkit-slider-thumb{
+  -webkit-appearance:none;appearance:none;
+  width:20px;height:20px;margin-top:calc((var(--vol-track-h) - 20px)/2);
+  border-radius:50%;border:2px solid var(--surface-solid);background:var(--accent-gradient);
+  box-shadow:0 1px 2px color-mix(in srgb,var(--text-main) 26%,transparent),
+             0 2px 6px color-mix(in srgb,var(--accent) 24%,transparent);
+  transition:transform .16s ease,box-shadow .16s ease;
+}
+.ambient-panel .vol-range::-moz-range-thumb{
+  width:20px;height:20px;border-radius:50%;border:2px solid var(--surface-solid);
+  background:var(--accent-gradient);
+  box-shadow:0 1px 2px color-mix(in srgb,var(--text-main) 26%,transparent),
+             0 2px 6px color-mix(in srgb,var(--accent) 24%,transparent);
+  transition:transform .16s ease,box-shadow .16s ease;
+}
+.ambient-panel .vol-range:active{cursor:grabbing}
+.ambient-panel .vol-range:active::-webkit-slider-thumb{
+  transform:scale(1.1);
+  box-shadow:0 1px 3px color-mix(in srgb,var(--text-main) 28%,transparent),
+             0 3px 10px color-mix(in srgb,var(--accent) 30%,transparent);
+}
+.ambient-panel .vol-range:active::-moz-range-thumb{transform:scale(1.1)}
+.ambient-panel .vol-range:focus-visible{outline:none}
+.ambient-panel .vol-range:focus-visible::-webkit-slider-thumb{
+  box-shadow:0 0 0 3px var(--surface-solid),
+             0 0 0 5px color-mix(in srgb,var(--accent) 55%,transparent),
+             0 1px 2px color-mix(in srgb,var(--text-main) 26%,transparent);
+}
+.ambient-panel .vol-range:focus-visible::-moz-range-thumb{
+  box-shadow:0 0 0 3px var(--surface-solid),
+             0 0 0 5px color-mix(in srgb,var(--accent) 55%,transparent),
+             0 1px 2px color-mix(in srgb,var(--text-main) 26%,transparent);
+}
+/* Dark themes need a lighter unfilled half or it disappears. */
+body.theme-dark .ambient-panel .vol-range::-webkit-slider-runnable-track,
+body.theme-obsidian .ambient-panel .vol-range::-webkit-slider-runnable-track,
+body.theme-nebula .ambient-panel .vol-range::-webkit-slider-runnable-track{
+  background:linear-gradient(90deg,
+    var(--accent) 0%,
+    var(--accent-light) var(--vol-fill,30%),
+    rgba(255,255,255,.16) var(--vol-fill,30%),
+    rgba(255,255,255,.16) 100%);
+}
+body.theme-dark .ambient-panel .vol-range::-moz-range-track,
+body.theme-obsidian .ambient-panel .vol-range::-moz-range-track,
+body.theme-nebula .ambient-panel .vol-range::-moz-range-track{background:rgba(255,255,255,.16)}
+@media(pointer:coarse){
+  .ambient-panel .vol-range{height:34px}
+  .ambient-panel .vol-range::-webkit-slider-thumb{width:24px;height:24px;margin-top:calc((var(--vol-track-h) - 24px)/2)}
+  .ambient-panel .vol-range::-moz-range-thumb{width:24px;height:24px}
+}
 .ambient-current{display:flex;align-items:center;gap:7px;margin-top:8px;color:var(--text-dim);font-size:var(--fs-micro);font-weight:650}
 .ambient-current-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 3px var(--accent-glow)}
 .rules-list{

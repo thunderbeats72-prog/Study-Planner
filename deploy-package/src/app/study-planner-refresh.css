@@ -135,18 +135,12 @@ body.theme-dark,body.theme-obsidian,body.theme-nebula{
 .up-next-title{font-size:1rem}
 
 /* Today's load reads like a clean list, matching the reference planner. */
-.dashboard-tasks .task-row{padding:12px 14px;border-bottom:1px solid var(--glass-border);background:transparent}
-.dashboard-tasks .task-row:last-child{border-bottom:0}
-
 /* ---------------- Planner ---------------- */
 .planner-tools{gap:8px}
 .planner-days{gap:12px}
 .planner-days .day-block{border-radius:20px}
 .planner-days .day-head{padding:15px 18px 13px}
-.planner-days .task-row{padding:12px 18px}
-.planner-days .task-row .task-title{font-size:.84rem}
-.planner-days .task-row .task-sub{font-size:.68rem}
-.planner-days .task-row .task-row-actions{min-width:330px}
+/* Task-row geometry is owned by ui-polish.css (single source of truth). */
 
 /* ---------------- Focus / Zen ---------------- */
 .focus-page-header{min-height:92px}
@@ -198,8 +192,6 @@ body.theme-dark,body.theme-obsidian,body.theme-nebula{
   .momentum-pill{font-size:.66rem;padding:6px 9px}
   .planner-days .day-block{border-radius:17px}
   .planner-days .day-head{padding:12px 13px}
-  .planner-days .task-row{padding:11px 13px}
-  .planner-days .task-row .task-row-actions{min-width:0}
   .study-clock-panel{padding:17px 14px}
   .timer-panel{padding:17px 14px!important}
   .timer-stage{min-height:245px}

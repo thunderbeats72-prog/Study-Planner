@@ -71,53 +71,53 @@
   min-height:34px;padding:5px 12px;border-radius:999px;
   border:1px solid var(--glass-border);background:var(--row-bg);
   color:var(--text-main);font:inherit;font-size:.76rem;font-weight:700;cursor:pointer;
+  transition:background .16s ease,border-color .16s ease,color .16s ease,
+              transform .14s cubic-bezier(.25,1,.4,1),box-shadow .16s ease;
 }
-.qa-min-chip.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+/* Same tactile contract as every other chip control in the app: quiet
+   hover, spring press, and the shared gradient selected state. */
+@media (hover:hover) and (pointer:fine){
+  .qa-min-chip:not(.active):hover{
+    border-color:color-mix(in srgb,var(--accent) 45%,var(--glass-border));
+    background:var(--surface-hover);color:var(--accent);
+  }
+}
+.qa-min-chip:active{transform:scale(.96)}
+.qa-min-chip.active{
+  background:var(--accent-gradient);color:#fff;border-color:transparent;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.22),0 2px 8px var(--accent-glow);
+}
 .qa-min-chip:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .qa-min-input{width:76px;min-width:0}
 .qa-date-seg{display:flex;border:1px solid var(--glass-border);border-radius:10px;overflow:hidden}
 .qa-date-btn{
   flex:1;min-height:36px;border:0;background:var(--row-bg);
   color:var(--text-main);font:inherit;font-size:.78rem;font-weight:700;cursor:pointer;
+  transition:background .15s ease,color .15s ease,box-shadow .15s ease;
 }
-.qa-date-btn.active{background:var(--accent);color:#fff}
+.qa-date-btn:not(.active):hover{background:var(--row-hover);color:var(--accent)}
+.qa-date-btn:not(.active):active{background:var(--row-hover)}
+.qa-date-btn.active{
+  background:var(--accent-gradient);color:#fff;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.22);
+}
+.qa-date-btn:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .qa-error{font-size:.72rem;font-weight:600;color:var(--status-skipped-text)}
 .quick-add-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
 
 .day-head-side{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap}
+/* While the tray is open it is one predictable full-width sheet inside
+   whatever row opened it — the capture form never sizes itself to its
+   content and left-align raggedly beside the header text. */
+.day-head-side:has(.quick-add-panel),
+.planner-quickadd-row:has(.quick-add-panel){display:block}
+.quick-add-panel{width:100%}
 @media(max-width:640px){
   .quick-add-grid{grid-template-columns:1fr}
   .day-head-side{width:100%;justify-content:space-between}
 }
 
-/* ── 4. TASK ACTIONS — one [Done]/[Start] flow, extras behind ⋯ ────── */
-.task-row{position:relative}
-.task-more-wrap{position:relative;display:inline-flex}
-/* The old ⋯ toggle was mobile-only and dead on desktop; the new menu is a
-   real popover everywhere. This layer loads LAST, so it wins the cascade. */
-.task-more{display:inline-flex !important}
-@media(max-width:640px){
-  .task-row-actions .task-more{display:inline-flex !important}
-}
-.task-menu{
-  position:absolute;top:calc(100% + 6px);right:0;z-index:60;
-  min-width:200px;max-width:min(260px,calc(100vw - 32px));
-  display:flex;flex-direction:column;gap:2px;
-  padding:6px;border-radius:14px;
-  background:var(--surface-elevated);
-  border:1px solid var(--glass-border);
-  box-shadow:0 12px 32px rgba(10,12,26,.18);
-}
-.task-menu button{
-  width:100%;text-align:left;min-height:38px;padding:8px 12px;border-radius:9px;
-  border:0;background:transparent;color:var(--text-main);
-  font:inherit;font-size:.8rem;font-weight:600;cursor:pointer;
-}
-.task-menu button:hover{background:var(--row-hover)}
-.task-menu button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
-
-/* The recall rating strip sits inside the row now, spanning its width. */
-.task-row > .rating-strip{flex:1 1 100%;order:10;margin:2px 0 8px;min-width:0}
+/* ── 4. TASK ACTIONS — appearance consolidated into ui-polish.css ──── */
 
 /* ── 5. PLANNER — workload glance ───────────────────────────────────── */
 .workload-strip{
