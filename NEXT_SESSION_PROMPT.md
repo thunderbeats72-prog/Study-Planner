@@ -3,6 +3,56 @@
 
 ---
 
+## v25 — MOBILE PLANNER GAP + THEME-AWARE ILLUSTRATIONS (this session)
+
+Two user-reported issues, both traced to stale/leaked state, both fixed in the
+file that owns the selector. No behaviour, data or routing changes:
+
+1. **The "huge gap" in the mobile Planner header was the dead kanban slot.**
+   v20 removed the Planner's third view (kanban duplicated the list's
+   statuses — see deploy-package README), but globals.css's ≤640px block
+   still laid `.vtabs` out as `repeat(3,1fr)`. With only List and Calendar
+   tabs left, the third grid column rendered as a full-width dead band on
+   every phone (the control is `flex:1 1 100%` full-width there), and the two
+   real tabs were squeezed into a third of the row each. Fix (globals.css,
+   same ≤640px block): `repeat(2,minmax(0,1fr))` — one column per tab. The
+   base `.kanban`/`.kan-col` CSS classes are now provably dead (no component
+   references them); they were left in place, consistent with the repo's
+   "keep the layers, fix in place" convention.
+2. **The illustrations were frozen on the default theme under every other
+   theme.** All `--scene-*` tokens (the StudyScene family: dashboard hero,
+   planner/focus/subjects/settings headers) were declared on `:root` only,
+   but they are built from `var(--accent)`/`var(--color-ai)`/
+   `var(--success-accent)`/`var(--surface)`/`var(--text-main)` — and var()
+   resolves in the scope where the property is DEFINED. Theme overrides live
+   on `body.theme-*`, so a `:root`-defined token always computed against the
+   DEFAULT theme: mint/sunset/silver-lavender/obsidian/nebula all painted the
+   lamp, glow, ink, desk, books, pot and soil in the default purple (the old
+   per-theme book patches in study-planner-refresh.css were the visible
+   symptom of this). Fix: the same token block is now declared on
+   `:root, body` — body's copy re-computes every value in the active theme's
+   scope, so the whole scene family re-paints on theme switch (sunset →
+   warm orange, obsidian → blue, mint → teal…). The manual per-theme
+   `--scene-book-*` / dark `--scene-surface-*` tuning rules now layer on top
+   as intentional palettes. The Zen room was already theme-correct (`--zen-*`
+   live on `.zen`, inside body) and was left alone, as were the
+   currentColor icons, charts, heatmap and the header pseudo-elements.
+   Only remaining static "image" is the browser-tab favicon (icon.svg),
+   which page CSS cannot re-theme by definition.
+
+   NOTE FOR DEPLOYS: `deploy-package/src` had drifted behind src (the old
+   stacked-scene mobile rule and the 3-column vtabs were still in the mirror,
+   i.e. the Vercel drag-and-drop path would have shipped the exact gap this
+   session fixes). It was re-mirrored byte-exact — verify with
+   `diff -rq src deploy-package/src` after any future src edit.
+
+Verification: served-CSS cascade checks (dev + production bundle),
+`npm run typecheck`, `npm run lint` (0 warnings), `npm test` (250/250),
+`npm run build:app`. Theme switch exercised through
+PATCH /api/settings under SPP_DEMO_DATA=1.
+
+---
+
 ## v24 — RESIDUAL POLISH: SIX GENUINE LEFTOVERS (this session)
 
 Audited the whole cascade first (globals.css v1–v23 + the four theme sheets +

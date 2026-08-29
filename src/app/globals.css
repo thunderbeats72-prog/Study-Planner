@@ -474,7 +474,11 @@ body.theme-dark .tracker-bar,body.theme-obsidian .tracker-bar,body.theme-nebula 
   .ai-quick button{flex-shrink:0}
   .ai-input-row{padding:10px 12px calc(10px + env(safe-area-inset-bottom));gap:8px}
   .ai-msg{max-width:92%;font-size:.82rem}
-  .vtabs{width:100%;display:grid;grid-template-columns:repeat(3,1fr)}
+  /* One column PER TAB — the control carries exactly List and Calendar.
+     The old repeat(3,1fr) was the kanban slot that lost its tab: with only
+     two tabs it left a full dead band on the right (the "huge gap" on
+     phones) and squeezed List/Calendar into a third of the row each. */
+  .vtabs{width:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
   .vtab{text-align:center;padding:8px 6px}
   .page-header > .flex-row{width:100%}
   .page-header select.input-field{width:100%!important}
