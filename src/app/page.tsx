@@ -1275,7 +1275,7 @@ export default function Home() {
               <IconFocus2 size={14} /> <span>Focus Mode</span>
             </button>
             <div className="zen-topbar-right">
-              <button className="zen-ghost" onClick={toggleZenFullscreen}>
+              <button className="zen-ghost zen-fs" onClick={toggleZenFullscreen}>
                 <IconExpand2 size={14} /> <span>Full Screen</span>
               </button>
               <button className="zen-ghost zen-exit" onClick={() => setZen(false)}>Exit Zen</button>
@@ -1299,11 +1299,14 @@ export default function Home() {
               <svg className="zen-ring" viewBox="0 0 320 320" aria-hidden="true">
                 <defs>
                   {/* The component owns its gradient: the ring is the one
-                      element in Zen allowed a little colour. */}
+                      element in Zen allowed a little colour. The stops read
+                      the active theme's accent tokens (defined on .zen), so
+                      the ring is orange under the sunset theme, teal under
+                      mint, and so on — never a fixed purple. */}
                   <linearGradient id="zenRingGradient" x1="0" y1="0" x2="1" y2="1">
-                    <stop offset="0" stopColor="#b6aaff" />
-                    <stop offset="0.55" stopColor="#9b8bf7" />
-                    <stop offset="1" stopColor="#7d6cf0" />
+                    <stop offset="0" stopColor="var(--zen-ring-1)" />
+                    <stop offset="0.55" stopColor="var(--zen-ring-2)" />
+                    <stop offset="1" stopColor="var(--zen-ring-3)" />
                   </linearGradient>
                 </defs>
                 <circle cx="160" cy="160" r="140" className="zen-ring-track" />
@@ -1331,15 +1334,23 @@ export default function Home() {
 
             {/* ONE control for the whole session. There is deliberately no
                 separate "Pause Clock": focus and the study clock are the same
-                session, so they pause, resume and end together. */}
+                session, so they pause, resume and end together.
+
+                The secondary buttons share a wrapper: on desktop it renders
+                as `display: contents` (same row as before); on phones it
+                becomes one compact centred row, so Exit Zen / Clock Out stay
+                visible next to the primary CTA instead of stacking into
+                full-width slabs. */}
             <div className="flex-row gap-md zen-actions">
               <button className="btn btn-primary zen-primary" onClick={session.toggle}>
                 {session.active ? "Pause" : clock.sessionActive ? "Resume" : "Start Focus"}
               </button>
-              {clock.sessionActive && (
-                <button className="btn zen-secondary zen-clock-out" onClick={clockOutNow}>Clock Out</button>
-              )}
-              <button className="btn zen-secondary zen-exit-btn" onClick={() => setZen(false)}>Exit Zen</button>
+              <div className="zen-actions-secondary">
+                {clock.sessionActive && (
+                  <button className="btn zen-secondary zen-clock-out" onClick={clockOutNow}>Clock Out</button>
+                )}
+                <button className="btn zen-secondary zen-exit-btn" onClick={() => setZen(false)}>Exit Zen</button>
+              </div>
             </div>
             <p className="zen-hint">
               {session.active

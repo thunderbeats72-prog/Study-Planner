@@ -808,15 +808,57 @@ body {
    composition, the room itself scrolls — content is never clipped, and
    the page behind it never grows a scrollbar.
 ══════════════════════════════════════════════════════════════════════ */
+/* ── Theme tokens for the Zen room ──────────────────────────────────────
+   Zen is a DARK room in every theme — that darkness is the point — but its
+   HUE follows the active theme. Every `--zen-*` value is a mix of the
+   theme's `--accent` (and `--success-accent` for the plant) over a fixed
+   dark base, so the sunset theme gets a warm amber room, mint a dark teal
+   room, obsidian a deep blue one, and so on. The tokens live on `.zen`
+   because the scene SVG, the ring gradient and the buttons are all its
+   descendants and read them via `var()`. */
 .zen {
+  /* ring (read by the inline gradient in page.tsx) */
+  --zen-ring-1: color-mix(in srgb, var(--accent-light) 75%, #ffffff);
+  --zen-ring-2: var(--accent-light);
+  --zen-ring-3: var(--accent);
+  /* room atmosphere */
+  --zen-aura: var(--accent);
+  --zen-glow-soft: color-mix(in srgb, var(--accent) 15%, transparent);
+  --zen-room-top: color-mix(in srgb, var(--accent) 10%, #0b0a1c);
+  --zen-room-bottom: color-mix(in srgb, var(--accent) 8%, #0a091d);
+  --zen-lamp-fade: color-mix(in srgb, var(--accent) 12%, transparent);
+  /* the desk scene (read by ZenScene.tsx) */
+  --zen-desk-1: color-mix(in srgb, var(--accent) 18%, #14122a);
+  --zen-desk-2: color-mix(in srgb, var(--accent) 10%, #0d0c1f);
+  --zen-desk-edge: color-mix(in srgb, var(--accent) 36%, #262346);
+  --zen-shelf-1: color-mix(in srgb, var(--accent) 13%, #101026);
+  --zen-shelf-2: color-mix(in srgb, var(--accent) 24%, #1a1938);
+  --zen-book-1: color-mix(in srgb, var(--accent) 30%, #222042);
+  --zen-book-2: color-mix(in srgb, var(--accent) 44%, #222042);
+  --zen-book-3: color-mix(in srgb, var(--accent) 58%, #262348);
+  --zen-book-4: color-mix(in srgb, var(--accent) 72%, #2e2b54);
+  --zen-metal: color-mix(in srgb, var(--accent) 24%, #1d1b3a);
+  --zen-metal-hi: color-mix(in srgb, var(--accent) 48%, #232148);
+  --zen-mug: color-mix(in srgb, var(--accent) 15%, #14132c);
+  --zen-mug-rim: color-mix(in srgb, var(--accent) 28%, #1c1a3c);
+  --zen-note: color-mix(in srgb, var(--accent) 20%, #171630);
+  --zen-pot: color-mix(in srgb, var(--accent) 18%, #14132c);
+  --zen-pot-rim: color-mix(in srgb, var(--accent) 30%, #1c1a3c);
+  --zen-mote: color-mix(in srgb, var(--accent-light) 72%, #ffffff);
+  --zen-plant-1: color-mix(in srgb, var(--success-accent) 55%, #5cbf9a);
+  --zen-plant-2: color-mix(in srgb, var(--success-accent) 46%, #43a583);
+  --zen-plant-3: color-mix(in srgb, var(--success-accent) 50%, #4aa381);
+  --zen-plant-4: color-mix(in srgb, var(--success-accent) 43%, #388a6d);
+  --zen-plant-stem: color-mix(in srgb, var(--success-accent) 46%, #10251e);
+
   position: fixed; inset: 0; z-index: 999999;
   min-height: 100vh;
   min-height: 100dvh;   /* dynamic viewport: wins where supported */
   background:
-    radial-gradient(900px 460px at 50% -12%, rgba(124, 99, 246, .16), transparent 62%),
-    radial-gradient(620px 420px at 10% 106%, rgba(124, 99, 246, .08), transparent 60%),
-    radial-gradient(620px 420px at 92% 108%, rgba(90, 190, 170, .05), transparent 60%),
-    linear-gradient(180deg, #0b0a1c 0%, #080714 58%, #0a091d 100%) !important;
+    radial-gradient(900px 460px at 50% -12%, color-mix(in srgb, var(--accent) 17%, transparent), transparent 62%),
+    radial-gradient(620px 420px at 10% 106%, color-mix(in srgb, var(--accent) 9%, transparent), transparent 60%),
+    radial-gradient(620px 420px at 92% 108%, color-mix(in srgb, var(--success-accent) 6%, transparent), transparent 60%),
+    linear-gradient(180deg, var(--zen-room-top) 0%, #080714 58%, var(--zen-room-bottom) 100%) !important;
   color: #f4f3ff;
   display: flex; flex-direction: column;
   align-items: stretch; justify-content: flex-start;
@@ -844,7 +886,7 @@ body {
   width: min(760px, 92vmin); height: min(760px, 92vmin);
   transform: translate(-50%, -50%);
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(139, 124, 246, .13), transparent 62%);
+  background: radial-gradient(circle, var(--zen-glow-soft), transparent 62%);
   pointer-events: none;
   opacity: .55;
 }
@@ -946,13 +988,13 @@ body {
   width: 34px; height: 34px; border-radius: 50%;
   border: 1px solid rgba(255, 255, 255, .14);
   background: rgba(255, 255, 255, .05);
-  color: rgba(196, 188, 255, .9);
+  color: var(--accent-light);
   backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
 }
 .zen-eyebrow {
   font-size: .72rem; font-weight: 800; letter-spacing: .3em; text-indent: .3em;
   text-transform: uppercase;
-  color: rgba(196, 188, 255, .8);
+  color: color-mix(in srgb, var(--accent-light) 80%, #ffffff);
   text-align: center;
 }
 .zen-kicker {
@@ -992,14 +1034,15 @@ body {
 .zen-center::before {
   content: ""; position: absolute; inset: 14%;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(139, 124, 246, .12), transparent 70%);
+  background: radial-gradient(circle, var(--zen-glow-soft), transparent 70%);
   pointer-events: none;
 }
 .zen-mode {
   position: relative;
   font-size: .66rem; font-weight: 750; letter-spacing: .22em;
   text-transform: uppercase;
-  color: rgba(196, 188, 255, .72);
+  color: color-mix(in srgb, var(--accent-light) 75%, #ffffff);
+  opacity: .85;
 }
 .zen .zen-digits {
   position: relative;
@@ -1009,7 +1052,7 @@ body {
   letter-spacing: -.03em !important;
   font-variant-numeric: tabular-nums;
   line-height: 1;
-  text-shadow: 0 0 34px rgba(150, 132, 246, .22);
+  text-shadow: 0 0 34px color-mix(in srgb, var(--accent) 26%, transparent);
   animation: none !important;
 }
 .zen-status {
@@ -1022,13 +1065,24 @@ body {
 }
 
 .zen-actions { flex-wrap: wrap; justify-content: center; gap: 10px !important; }
-.zen-primary {
+/* The secondary buttons share a wrapper. On desktop it must vanish from the
+   layout entirely (display: contents) so the row reads exactly as before:
+   [primary] [clock out] [exit zen]. On phones the media block below turns it
+   into one compact centred row instead of stacked full-width slabs. */
+.zen-actions-secondary { display: contents; }
+/* Higher specificity on purpose: the later "calm refresh" rule paints every
+   .btn-primary flat; Zen keeps its gradient, re-derived from the theme. */
+.zen .zen-primary {
   min-height: 48px; padding: 12px 28px;
   font-size: .92rem; font-weight: 750;
   border-radius: 999px;
-  background: linear-gradient(150deg, #8f81f2, #6a5ae4);
+  background: var(--accent) !important;
+  background-image: linear-gradient(150deg,
+    color-mix(in srgb, var(--accent-light) 55%, var(--accent)),
+    var(--accent) 90%) !important;
   border: 1px solid rgba(255, 255, 255, .16);
-  box-shadow: 0 10px 30px -14px rgba(124, 110, 240, .7), inset 0 1px 0 rgba(255, 255, 255, .22);
+  box-shadow: 0 10px 30px -14px color-mix(in srgb, var(--accent) 70%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, .22);
 }
 .zen-primary:hover { filter: brightness(1.07); transform: translateY(-1px); }
 .zen-primary:active { transform: translateY(0) scale(.985); }
@@ -1071,7 +1125,7 @@ body {
   flex-wrap: wrap;
 }
 .zen-guidance-item { display: inline-flex; align-items: center; gap: 8px; }
-.zen-guidance-item svg { color: rgba(196, 188, 255, .85); flex: 0 0 auto; }
+.zen-guidance-item svg { color: color-mix(in srgb, var(--accent-light) 85%, #ffffff); flex: 0 0 auto; }
 .zen-guidance-sep { width: 4px; height: 4px; border-radius: 50%; background: rgba(255, 255, 255, .28); }
 
 /* Minimal mode keeps the room, drops the furniture. */
@@ -1096,19 +1150,31 @@ body {
   .zen-environment { opacity: .6; }
   .zen-environment svg { max-height: 20vh; }
 }
-/* Narrow phones: the action buttons become one stacked, full-width column
-   so they can never collide with each other or with the scene. */
+/* Narrow phones: ONE full-width primary CTA, then the secondary controls as
+   a compact centred row. Stacking every button full-width (the old rule)
+   made the controls read as giant slabs and pushed Exit Zen / Clock Out out
+   of sight — they now stay a normal-size pair under the CTA. */
 @media (max-width: 460px) {
   .zen-actions {
-    flex-direction: column; align-items: stretch;
-    width: 100%; max-width: 340px; gap: 8px !important;
+    flex-direction: column; align-items: center;
+    width: 100%; max-width: 320px; gap: 10px !important;
   }
-  .zen-actions .btn { width: 100%; }
+  .zen-actions .zen-primary { width: 100%; }
+  .zen-actions-secondary {
+    display: flex; align-items: center; justify-content: center;
+    width: 100%; gap: 10px;
+  }
+  .zen-actions-secondary .btn { flex: 1 1 0; min-width: 0; }
+  /* A lone secondary (no open session) keeps its natural width, centred. */
+  .zen-actions-secondary .btn:only-child { flex: 0 1 auto; margin-inline: auto; }
 }
+/* Small phones: the top-bar controls keep their LABELS (icon-only buttons
+   read as dead hardware) — they just shrink to fit the 320px class. */
 @media (max-width: 400px) {
-  .zen-topbar { padding: calc(8px + env(safe-area-inset-top)) 10px 0; }
-  .zen-ghost span { display: none; }
-  .zen-ghost { padding: 9px; }
+  .zen-topbar { padding: calc(8px + env(safe-area-inset-top)) 10px 0; gap: 6px; }
+  .zen-topbar-right { gap: 6px; }
+  .zen-ghost { padding: 7px 10px; font-size: .64rem; gap: 5px; }
+  .zen-ghost svg { width: 13px; height: 13px; }
   .zen-stage { gap: clamp(8px, 1.8vh, 14px); padding: 10px 14px; }
   .zen-headline { gap: 6px; }
   .zen-emblem { width: 30px; height: 30px; }
@@ -1124,6 +1190,12 @@ body {
   .zen-guidance-sep { display: none; }
   .zen-environment { opacity: .5; }
   .zen-environment svg { max-height: 15vh; }
+}
+/* Very narrow phones (320px class): the Full Screen toggle is the first
+   control to step out — on a phone the room is already full-screen, and
+   Focus Mode / Exit Zen keep their labels. */
+@media (max-width: 340px) {
+  .zen-topbar .zen-fs { display: none; }
 }
 /* Short desktop/laptop viewports (small laptops, split view): the ring and
    gaps step down so the whole composition still fits without scrolling. */

@@ -625,12 +625,14 @@
   border-color: color-mix(in srgb, var(--accent) 30%, transparent);
 }
 
-/* The input is the 32px strip; the visible rail is its 9px track. */
+/* The input is the 34px strip; the visible rail is its 10px track — a
+   recessed channel with a filled accent gradient, and a ringed thumb that
+   reads as a physical control instead of a bare range input. */
 .ob-range-card .ob-range-input {
-  --ob-track-h: 9px;
-  --ob-track-bg: color-mix(in srgb, var(--text-main) 12%, transparent);
+  --ob-track-h: 10px;
+  --ob-track-bg: color-mix(in srgb, var(--text-main) 13%, transparent);
   width: 100%;
-  height: 32px;
+  height: 34px;
   margin: 0;
   padding: 0;
   border: none;
@@ -651,6 +653,9 @@
   transition-duration: 0s;
 }
 
+/* Track: the filled lead is a bright accent → accent-light sweep, and the
+   unfilled tail sits in a recessed channel (inset shadow + faint top light)
+   so the rail reads as a machined groove, not a flat line. */
 .ob-range-card .ob-range-input::-webkit-slider-runnable-track {
   height: var(--ob-track-h);
   border-radius: 999px;
@@ -659,7 +664,9 @@
     var(--accent-light) var(--ob-range-fill, 0%),
     var(--ob-track-bg) var(--ob-range-fill, 0%),
     var(--ob-track-bg) 100%);
-  box-shadow: inset 0 1px 2px color-mix(in srgb, var(--text-main) 10%, transparent);
+  box-shadow:
+    inset 0 1px 2px color-mix(in srgb, var(--text-main) 16%, transparent),
+    inset 0 -1px 0 rgba(255, 255, 255, .05);
   transition: --ob-range-fill .18s cubic-bezier(.25, 1, .4, 1);
 }
 
@@ -667,67 +674,88 @@
   height: var(--ob-track-h);
   border-radius: 999px;
   background: var(--ob-track-bg);
-  box-shadow: inset 0 1px 2px color-mix(in srgb, var(--text-main) 10%, transparent);
+  box-shadow:
+    inset 0 1px 2px color-mix(in srgb, var(--text-main) 16%, transparent),
+    inset 0 -1px 0 rgba(255, 255, 255, .05);
 }
 
 .ob-range-card .ob-range-input::-moz-range-progress {
   height: var(--ob-track-h);
   border-radius: 999px 0 0 999px;
   background: linear-gradient(90deg, var(--accent), var(--accent-light));
+  box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 35%, transparent);
 }
 
+/* Thumb: a 24px knob with a surface ring, an accent-gradient face and a
+   soft inner top-light so it reads as a raised physical control. */
 .ob-range-card .ob-range-input::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 22px;
-  height: 22px;
-  margin-top: calc((var(--ob-track-h) - 22px) / 2);
+  width: 24px;
+  height: 24px;
+  margin-top: calc((var(--ob-track-h) - 24px) / 2);
   border-radius: 50%;
-  border: 2px solid var(--surface-solid);
+  border: 3px solid var(--surface-solid);
   background: var(--accent-gradient);
-  box-shadow: 0 1px 2px color-mix(in srgb, var(--text-main) 26%, transparent),
-              0 2px 6px color-mix(in srgb, var(--accent) 24%, transparent);
+  box-shadow:
+    0 1px 2px color-mix(in srgb, var(--text-main) 30%, transparent),
+    0 3px 8px color-mix(in srgb, var(--accent) 30%, transparent),
+    inset 0 1px 1px rgba(255, 255, 255, .35);
   transition: transform .16s ease, box-shadow .16s ease;
 }
 
 .ob-range-card .ob-range-input::-moz-range-thumb {
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
-  border: 2px solid var(--surface-solid);
+  border: 3px solid var(--surface-solid);
   background: var(--accent-gradient);
-  box-shadow: 0 1px 2px color-mix(in srgb, var(--text-main) 26%, transparent),
-              0 2px 6px color-mix(in srgb, var(--accent) 24%, transparent);
+  box-shadow:
+    0 1px 2px color-mix(in srgb, var(--text-main) 30%, transparent),
+    0 3px 8px color-mix(in srgb, var(--accent) 30%, transparent),
+    inset 0 1px 1px rgba(255, 255, 255, .35);
   transition: transform .16s ease, box-shadow .16s ease;
 }
 
 @media (hover: hover) and (pointer: fine) {
   .ob-range-card .ob-range-input:hover:not(:active)::-webkit-slider-thumb {
-    transform: scale(1.05);
-    box-shadow: 0 1px 2px color-mix(in srgb, var(--text-main) 26%, transparent),
-                0 3px 9px color-mix(in srgb, var(--accent) 30%, transparent);
+    transform: scale(1.08);
+    box-shadow:
+      0 1px 3px color-mix(in srgb, var(--text-main) 30%, transparent),
+      0 4px 12px color-mix(in srgb, var(--accent) 38%, transparent),
+      inset 0 1px 1px rgba(255, 255, 255, .35);
   }
   .ob-range-card .ob-range-input:hover:not(:active)::-moz-range-thumb {
-    transform: scale(1.05);
-    box-shadow: 0 1px 2px color-mix(in srgb, var(--text-main) 26%, transparent),
-                0 3px 9px color-mix(in srgb, var(--accent) 30%, transparent);
+    transform: scale(1.08);
+    box-shadow:
+      0 1px 3px color-mix(in srgb, var(--text-main) 30%, transparent),
+      0 4px 12px color-mix(in srgb, var(--accent) 38%, transparent),
+      inset 0 1px 1px rgba(255, 255, 255, .35);
   }
 }
 
-/* Pressed / dragging: a restrained scale-up and a firmer, tighter shadow. */
+/* Pressed / dragging: a gentle lift plus a soft accent halo so the thumb
+   clearly "grabs" the rail. Never a bounce, never a harsh glow. */
 .ob-range-card .ob-range-input:active { cursor: grabbing; }
 
 .ob-range-card .ob-range-input:active::-webkit-slider-thumb,
 .ob-range-card .ob-range-input.is-key-active::-webkit-slider-thumb {
-  transform: scale(1.1);
-  box-shadow: 0 1px 3px color-mix(in srgb, var(--text-main) 28%, transparent),
-              0 3px 10px color-mix(in srgb, var(--accent) 30%, transparent);
+  transform: scale(1.12);
+  box-shadow:
+    0 0 0 6px color-mix(in srgb, var(--accent) 14%, transparent),
+    0 1px 3px color-mix(in srgb, var(--text-main) 30%, transparent),
+    0 5px 14px color-mix(in srgb, var(--accent) 42%, transparent),
+    inset 0 1px 1px rgba(255, 255, 255, .35);
 }
 
-.ob-range-card .ob-range-input:active::-moz-range-thumb {
-  transform: scale(1.1);
-  box-shadow: 0 1px 3px color-mix(in srgb, var(--text-main) 28%, transparent),
-              0 3px 10px color-mix(in srgb, var(--accent) 30%, transparent);
+.ob-range-card .ob-range-input:active::-moz-range-thumb,
+.ob-range-card .ob-range-input.is-key-active::-moz-range-thumb {
+  transform: scale(1.12);
+  box-shadow:
+    0 0 0 6px color-mix(in srgb, var(--accent) 14%, transparent),
+    0 1px 3px color-mix(in srgb, var(--text-main) 30%, transparent),
+    0 5px 14px color-mix(in srgb, var(--accent) 42%, transparent),
+    inset 0 1px 1px rgba(255, 255, 255, .35);
 }
 
 /* Keyboard focus: one clean double ring on the thumb, no outline box on
@@ -735,22 +763,25 @@
 .ob-range-card .ob-range-input:focus-visible { outline: none; }
 
 .ob-range-card .ob-range-input:focus-visible::-webkit-slider-thumb {
-  box-shadow: 0 0 0 3px var(--surface-solid),
-              0 0 0 5px color-mix(in srgb, var(--accent) 55%, transparent),
-              0 1px 2px color-mix(in srgb, var(--text-main) 26%, transparent);
+  box-shadow:
+    0 0 0 3px var(--surface-solid),
+    0 0 0 6px color-mix(in srgb, var(--accent) 55%, transparent),
+    0 1px 2px color-mix(in srgb, var(--text-main) 26%, transparent);
 }
 
 .ob-range-card .ob-range-input:focus-visible::-moz-range-thumb {
-  box-shadow: 0 0 0 3px var(--surface-solid),
-              0 0 0 5px color-mix(in srgb, var(--accent) 55%, transparent),
-              0 1px 2px color-mix(in srgb, var(--text-main) 26%, transparent);
+  box-shadow:
+    0 0 0 3px var(--surface-solid),
+    0 0 0 6px color-mix(in srgb, var(--accent) 55%, transparent),
+    0 1px 2px color-mix(in srgb, var(--text-main) 26%, transparent);
 }
 
-/* Dark themes need a lighter rail or the unfilled half disappears. */
+/* Dark themes need a lighter rail or the unfilled half disappears in the
+   recessed channel. */
 body.theme-dark .ob-range-card .ob-range-input,
 body.theme-obsidian .ob-range-card .ob-range-input,
 body.theme-nebula .ob-range-card .ob-range-input {
-  --ob-track-bg: rgba(255, 255, 255, .16);
+  --ob-track-bg: rgba(255, 255, 255, .18);
 }
 
 body.theme-dark .ob-range-value,
@@ -821,14 +852,14 @@ body.theme-nebula .ob-range-value {
    44px chip floor from the tap-target layer still applies on coarse
    pointers. */
 @media (pointer: coarse) {
-  .ob-range-card .ob-range-input { height: 40px; }
+  .ob-range-card .ob-range-input { height: 44px; }
   .ob-range-card .ob-range-input::-webkit-slider-thumb {
-    width: 26px;
-    height: 26px;
-    margin-top: calc((var(--ob-track-h) - 26px) / 2);
+    width: 28px;
+    height: 28px;
+    margin-top: calc((var(--ob-track-h) - 28px) / 2);
   }
-  .ob-range-card .ob-range-input::-moz-range-thumb { width: 26px; height: 26px; }
-  .ob-range-chip { min-height: 40px; }
+  .ob-range-card .ob-range-input::-moz-range-thumb { width: 28px; height: 28px; }
+  .ob-range-chip { min-height: 44px; }
 }
 
 @media (max-width: 700px) {
@@ -1377,9 +1408,9 @@ body.theme-nebula .ob-range-value {
 .zen-actions .btn { min-width: 122px; justify-content: center; }
 
 .zen-actions .zen-secondary {
-  background: rgba(255, 255, 255, .06);
-  border-color: rgba(255, 255, 255, .13);
-  color: rgba(255, 255, 255, .74);
+  background: rgba(255, 255, 255, .08);
+  border-color: rgba(255, 255, 255, .2);
+  color: rgba(255, 255, 255, .85);
   box-shadow: none;
   font-weight: 650;
 }
@@ -1398,9 +1429,29 @@ body.theme-nebula .ob-range-value {
 
 .zen-hint { max-width: 40ch; font-size: .76rem; opacity: .78; }
 
+/* Mobile Zen actions (restates the redesign-layer contract — this file
+   loads last, so this is the final word): one full-width primary CTA, then
+   the secondary controls in one compact row. The old rule flexed EVERY
+   button to 100% width, stacking the controls into giant slabs and pushing
+   Exit Zen / Clock Out out of sight. */
 @media (max-width: 520px) {
-  .zen-actions { gap: 7px; }
-  .zen-actions .btn { flex: 1 1 100%; min-width: 0; min-height: 44px; }
+  .zen-actions {
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    max-width: 320px;
+    gap: 8px;
+  }
+  .zen-actions .zen-primary { flex: 0 0 auto; width: 100%; min-height: 46px; }
+  .zen-actions-secondary {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    gap: 8px;
+  }
+  .zen-actions-secondary .btn { flex: 1 1 0; min-width: 0; min-height: 44px; }
+  .zen-actions-secondary .btn:only-child { flex: 0 1 auto; margin-inline: auto; }
 }
 
 /* =========================

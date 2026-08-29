@@ -132,8 +132,12 @@ function DashboardScene() {
 
 /* ── Planner: desk calendar · stack of books · potted plant ───────────── */
 function PlannerScene() {
-  const cols = [162, 190, 218, 246];
-  const rows = [86, 106, 126];
+  // Grid is centred on the page both ways: 4×20px cells + 3×8px gaps = 104px
+  // wide (4px page margin either side), and the 53px-tall grid is vertically
+  // centred in the 96px body below the header band (21px above / 22px below)
+  // so the page reads balanced instead of top-heavy.
+  const cols = [154, 182, 210, 238];
+  const rows = [95, 115, 135];
   return (
     <svg viewBox="0 0 360 200" role="presentation">
       <SceneDefs id="plan" />
@@ -170,8 +174,6 @@ function PlannerScene() {
             />
           ))
         )}
-        <path d="M162 150h88" stroke="var(--scene-ink)" strokeOpacity=".2" strokeWidth="3" strokeLinecap="round" />
-        <path d="M162 160h56" stroke="var(--scene-ink)" strokeOpacity=".14" strokeWidth="3" strokeLinecap="round" />
       </g>
 
       {/* plant (right) */}
