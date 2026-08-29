@@ -8,6 +8,7 @@ import "./practical-enhancements.css";
 import "./ui-polish.css";
 import "./ui-polish-pass.css";
 import "./ui-polish-landing.css";
+import "./final-ui-fixes.css";
 
 const inter = localFont({
   src: "./fonts/inter-latin-variable.woff2",
