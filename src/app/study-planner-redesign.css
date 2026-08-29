@@ -437,10 +437,30 @@ body {
   gap: 20px;
   align-items: stretch;
 }
-/* The left card stretches to the side rail's height so the two columns end on
- * the same baseline — no dead gap under Today's Plan. */
-.dash-today-card { margin-bottom: 0; height: 100%; display: flex; flex-direction: column; }
-.dash-side-rail { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+/* Left column: Today's Plan on top, the quote pinned below it. When the
+ * calendar is the taller column these two spread apart instead of leaving a
+ * hollow band inside the Today's Plan card. */
+.dash-today-col { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.dash-today-card { margin-bottom: 0; display: flex; flex-direction: column; }
+.dash-today-col > .glass-panel,
+.dash-side-rail > .glass-panel { margin-bottom: 0; }
+.dash-side-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+@media (min-width: 1081px) {
+  .dash-today-col { height: 100%; justify-content: space-between; }
+  .dash-today-col > .dash-today-card,
+  .dash-today-col > .dash-quote-card { flex: 0 0 auto; }
+  /* If the Today list is the taller column, the rail itself is taller than
+     the calendar. Let the calendar absorb that height instead of leaving a
+     blank band in the middle of the page. */
+  .dash-side-rail { height: 100%; }
+  .dash-side-rail > .glass-panel { width: 100%; }
+  .dash-side-rail > .dash-cal-card { flex: 1 1 0; min-height: 0; }
+}
 @media (max-width: 1080px) {
   .dash-today-grid { grid-template-columns: 1fr; }
 }
@@ -459,6 +479,20 @@ body {
 }
 .mini-cal-btn:hover { color: var(--accent); border-color: var(--nav-active-border); background: var(--rd-lavender-soft); }
 .mini-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+/* When the dashboard calendar grows to fill the side rail, stretch the grid
+   rows too so the card never ends with a hollow band under the dates. This is
+   desktop-only: the single-column layout keeps the compact square calendar. */
+@media (min-width: 1081px) {
+  .dash-cal-card { display: flex; flex-direction: column; }
+  .dash-cal-card .mini-cal { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+  .dash-cal-card .mini-cal-head { flex: 0 0 auto; }
+  .dash-cal-card .mini-cal-grid {
+    flex: 1 1 auto;
+    min-height: 0;
+    grid-template-rows: repeat(7, minmax(0, 1fr));
+  }
+  .dash-cal-card .mini-cal-cell { aspect-ratio: auto; min-height: 32px; }
+}
 .mini-cal-dow {
   text-align: center; font-size: .62rem; font-weight: 800;
   color: var(--text-dim); padding: 3px 0;
@@ -1450,6 +1484,13 @@ body::after { content: none !important; display: none !important; }
 .glass-panel.dash-quote-card {
   background-color: var(--surface);
   background-image: linear-gradient(180deg, color-mix(in srgb, var(--accent) 4%, var(--surface)), var(--surface));
+}
+/* Overview cards: a hairline that reads as a card edge rather than a ghost
+   line, so the columns look deliberately fitted and never washed out. */
+.dash-today-card,
+.dash-cal-card,
+.dash-quote-card {
+  border-color: color-mix(in srgb, var(--glass-border-hover) 68%, var(--glass-border));
 }
 .glass-panel:not(.modal-box)::after,
 .liquid-card::after {
