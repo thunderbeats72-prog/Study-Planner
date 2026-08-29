@@ -17,5 +17,5 @@ const result = prioritizeTasks([
 assert.equal(result[0].id, 2);
 assert.equal(result[0].reason, "overdue");
 assert.equal(result[0].priorityLabel, "Start here");
-assert.equal(result.some((item) => item.id === 3 && item.reason === "due-soon" || item.reason === "revision"), true);
+assert.equal(result.some((item) => item.id === 3 && (item.reason === "due-soon" || item.reason === "revision")), true);
 assert.equal(result.length, 3);
