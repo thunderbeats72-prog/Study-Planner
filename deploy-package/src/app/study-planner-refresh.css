@@ -12,6 +12,20 @@
   --refresh-border:#e7e6f0;
   --refresh-shadow:0 1px 2px rgba(35,34,64,.04),0 12px 30px rgba(35,34,64,.07);
   --refresh-shadow-hover:0 8px 24px rgba(35,34,64,.08),0 22px 54px rgba(35,34,64,.08);
+}
+
+/* ── Scene illustration tokens — defined on :root AND on body ──────────
+   Every --scene-* value is a mix of the theme tokens (--accent,
+   --color-ai, --success-accent, --surface, --text-main). var() resolves
+   in the scope where the property is DEFINED, and the theme overrides
+   live on body.theme-*, so a :root-only copy of these tokens always
+   computes against the DEFAULT theme and the illustrations (dashboard
+   hero, page headers) stayed purple under mint/sunset/obsidian/nebula.
+   Declaring the same block on body re-computes every value in the
+   active theme's scope, so the whole illustration family — lamp, glow,
+   ink, desk, books, plant, pot, soil — re-paints on theme switch. The
+   :root copy remains as a safe default for anything outside body. */
+:root, body{
   --scene-accent:var(--accent);
   --scene-accent-soft:var(--accent-light);
   --scene-glow:var(--accent-glow);
@@ -80,10 +94,6 @@ body.theme-dark,body.theme-obsidian,body.theme-nebula{
 .tracker-actions{gap:7px}
 .tracker-actions .chip{padding:7px 10px;border-radius:10px;background:var(--row-bg);border-color:var(--glass-border);font-size:.64rem}
 .tracker-actions .btn-xs{min-height:36px;padding:7px 12px;border-radius:10px}
-
-/* Remove the faint hairline/outline visible along the tracker bar edges.
-   The reference bar should read as a single clean surface. */
-.tracker-bar{border:0;outline:0;box-shadow:var(--refresh-shadow)}
 
 /* ---------------- Page headers / illustration anchor ---------------- */
 .page-header{margin-bottom:18px;min-height:82px;position:relative}
