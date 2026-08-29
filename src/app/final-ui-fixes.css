@@ -118,13 +118,22 @@
   animation: calmRecordingDot 2s ease-in-out infinite;
 }
 
+/* The Clock Out button's own live dot uses the SAME quiet pulse. It used to
+   run the loud 1.6s red breathing-ring (`clockLivePulse`, globals.css), so
+   one active task pulsed two different ways at once. One calm signal. */
+.task-clock.clock-live .clock-live-dot {
+  animation: calmRecordingDot 2s ease-in-out infinite;
+  box-shadow: none !important;
+}
+
 @keyframes calmRecordingDot {
   0%,100% { opacity:.55; transform:scale(.95); }
   50% { opacity:1; transform:scale(1); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .task-live-badge.is-recording .task-live-dot { animation:none !important; }
+  .task-live-badge.is-recording .task-live-dot,
+  .task-clock.clock-live .clock-live-dot { animation:none !important; }
   .task-row.active-clock { transition:none !important; }
 }
 
