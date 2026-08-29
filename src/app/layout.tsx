@@ -24,7 +24,7 @@ const jetBrainsMono = localFont({
 export const metadata: Metadata = {
   title: "Study Planner Pro — AI Study Engine",
   description:
-    "An AI study architect that turns any syllabus — nursery to PhD to competitive exams — into a lesson-by-lesson daily plan, with focus timer, spaced recall and a built-in tutor.",
+    "An AI study architect that turns any syllabus — school to PhD and competitive exams — into a lesson-by-lesson daily plan, with focus timer, spaced recall and a built-in tutor.",
 };
 
 export const viewport: Viewport = {
