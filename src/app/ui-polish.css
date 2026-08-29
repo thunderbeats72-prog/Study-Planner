@@ -153,10 +153,7 @@
 /* =========================
    ONBOARDING
    ========================= */
-.ob-level-btn:first-child {
-  display: none !important;
-}
-
+/* The API now removes nursery/pre-school from the onboarding contract. */
 .ob-card:has(.ob-level-grid) > p {
   font-size: 0 !important;
 }
