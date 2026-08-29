@@ -440,6 +440,7 @@ export default function Dashboard({
                     {rowLive && <TaskLiveBadge seconds={activeClockSeconds} running={clockRunning} />}
                   </div>
                 </div>
+                <span className={`chip chip-${task.status}`}>{task.status}</span>
                 <TaskActions
                   task={task}
                   subject={subj}

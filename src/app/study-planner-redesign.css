@@ -1547,7 +1547,7 @@ body::after { content: none !important; display: none !important; }
 .tracker-bar, .mobile-header { animation: none !important; }
 .tracker-state { color: var(--text-muted); font-weight: 700; letter-spacing: .035em; }
 .tracker-time { color: var(--accent); font-weight: 760 !important; }
-.act-out, .up-next-live-chip, .clock-live-dot { animation: none !important; }
+.act-out, .up-next-live-chip { animation: none !important; }
 
 /* ── Dashboard hierarchy: neutral KPI icons, restrained chips ─────────── */
 .kpi-card {

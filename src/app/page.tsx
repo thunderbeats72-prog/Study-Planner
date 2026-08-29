@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { api, ApiError, prettyDate, prettyLong, today, type AppState, type MessageRow } from "@/lib/client";
+import { api, ApiError, prettyDate, prettyLong, today, type AppState, type MessageRow, type SessionRow } from "@/lib/client";
 import { mmss, useFocusTimer, useStudyClock, type ClockApi, type TimerApi, type TimerMode } from "@/lib/useTimer";
 import { useStudySession, type StudySessionApi } from "@/lib/studySession";
 import { nextPendingTask, type CompletedTaskInfo } from "@/lib/completion";
@@ -91,6 +91,29 @@ function savedSessionQueue(raw: string | null): PendingSessionLog[] {
         && typeof value.mode === "string" && typeof value.date === "string";
     }).slice(-200);
   } catch { return []; }
+}
+
+/** Fold not-yet-synced Clock Out rows into displayed sessions so “Xm studied”
+ *  never waits on the network — and survives a refresh until the queue drains. */
+function overlayPendingSessions(fresh: AppState, queue: PendingSessionLog[] | null): AppState {
+  if (!queue?.length) return fresh;
+  const have = new Set(fresh.sessions.map((session) => session.eventId).filter(Boolean));
+  const extras: SessionRow[] = [];
+  for (const entry of queue) {
+    if (have.has(entry.eventId)) continue;
+    extras.push({
+      id: -1 - extras.length,
+      userId: fresh.user.id,
+      subjectId: entry.subjectId,
+      taskId: entry.taskId,
+      date: entry.date,
+      minutes: entry.minutes,
+      mode: entry.mode,
+      eventId: entry.eventId,
+      createdAt: new Date().toISOString(),
+    });
+  }
+  return extras.length ? { ...fresh, sessions: [...fresh.sessions, ...extras] } : fresh;
 }
 
 export default function Home() {
@@ -215,7 +238,13 @@ export default function Home() {
   const loadInitialState = useCallback(() => {
     setLoading(true);
     api<AppState>("/api/state", { timeoutMs: 20_000 })
-      .then(setState)
+      .then((fresh) => {
+        if (sessionQueueRef.current == null) {
+          try { sessionQueueRef.current = savedSessionQueue(localStorage.getItem(SESSION_QUEUE_KEY)); }
+          catch { sessionQueueRef.current = []; }
+        }
+        setState(overlayPendingSessions(fresh, sessionQueueRef.current));
+      })
       .catch((error) => notify(error instanceof ApiError ? error.message : "Could not reach the server.", "error"))
       .finally(() => setLoading(false));
   }, [notify]);
@@ -379,7 +408,7 @@ export default function Home() {
           });
           sessionQueueRef.current.shift();
           persistSessionQueue();
-          setState(fresh);
+          setState(overlayPendingSessions(fresh, sessionQueueRef.current));
           if (fresh.completedTask) {
             autoCompleteRef.current(fresh, fresh.completedTask, entry.date);
           }
@@ -407,19 +436,38 @@ export default function Home() {
       const random = typeof crypto.randomUUID === "function"
         ? crypto.randomUUID()
         : `${Date.now()}_${Math.random().toString(36).slice(2)}`;
+      const eventId = `session_${random}`;
+      const date = today();
       sessionQueueRef.current.push({
-        eventId: `session_${random}`,
+        eventId,
         minutes,
         subjectId,
         taskId,
         mode,
         // Send the CLIENT's local date: server timezone must not move a
         // session into a different day than the learner sees.
-        date: today(),
+        date,
       });
       // Keep a hard bound if a device stays offline for a very long time.
       if (sessionQueueRef.current.length > 200) sessionQueueRef.current.splice(0, sessionQueueRef.current.length - 200);
       persistSessionQueue();
+      // Show “Xm studied” immediately — Clock Out must not wait on POST.
+      setState((prev) => {
+        if (!prev) return prev;
+        if (prev.sessions.some((session) => session.eventId === eventId)) return prev;
+        const optimistic: SessionRow = {
+          id: -Date.now(),
+          userId: prev.user.id,
+          subjectId,
+          taskId,
+          date,
+          minutes,
+          mode,
+          eventId,
+          createdAt: new Date().toISOString(),
+        };
+        return { ...prev, sessions: [...prev.sessions, optimistic] };
+      });
       void drainSessionQueue();
     },
     [drainSessionQueue, persistSessionQueue]
