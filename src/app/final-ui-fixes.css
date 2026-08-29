@@ -27,7 +27,13 @@
 }
 
 .task-row-actions {
-  position: relative;
+  /* NOT positioned here: the ⋮ more button below is absolutely positioned and
+     its containing block must be the task ROW, not this actions gutter. When
+     it anchored to this box, ui-polish-landing.css had also zeroed the box's
+     reserved right padding, so the corner button overlapped the right-aligned
+     Clock/Done targets and swallowed the taps aimed at them (a visible "Clock
+     out" that silently opened the ⋮ menu instead of clocking out). */
+  position: static !important;
   z-index: 4;
   display: grid !important;
   grid-template-columns: minmax(0,auto) minmax(0,auto) !important;
@@ -43,6 +49,18 @@
   z-index: 30;
   pointer-events: auto !important;
   touch-action: manipulation;
+}
+
+/* Reserve a dedicated corner lane so Clock/Done never sit under the ⋮ button.
+   The more button lives at the row's top-right (anchored to .task-row, above),
+   so the actions gutter must stop short of it on desktop. (Needs the same
+   specificity as the earlier `.task-row .task-row-actions` override and this
+   file loads last, so it wins.) On mobile the actions are already on their own
+   bottom row and the corner is free, so no extra inset is needed there. */
+@media (min-width: 641px) {
+  .task-row .task-row-actions {
+    padding-right: 44px !important;
+  }
 }
 
 .task-clock.clock-live {
@@ -122,13 +140,22 @@
   animation: calmRecordingDot 2s ease-in-out infinite;
 }
 
+/* The Clock Out button's own live dot uses the SAME quiet pulse. It was still
+   running the loud 1.6s red breathing-ring (`clockLivePulse`) from globals, so
+   one active task pulsed two different ways at once. One calm recording signal. */
+.task-clock.clock-live .clock-live-dot {
+  animation: calmRecordingDot 2s ease-in-out infinite;
+  box-shadow: none !important;
+}
+
 @keyframes calmRecordingDot {
   0%,100% { opacity:.55; transform:scale(.95); }
   50% { opacity:1; transform:scale(1); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .task-live-dot { animation:none !important; }
+  .task-live-dot,
+  .task-clock.clock-live .clock-live-dot { animation:none !important; }
 }
 
 /* --------------------------------------------------------------------------
