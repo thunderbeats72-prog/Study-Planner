@@ -7,15 +7,17 @@ import {
 } from "@/lib/client";
 import { IconSpark, IconClose, IconChevron } from "./icons";
 import TaskEditor, { type TaskPatch } from "./TaskEditor";
-import TaskClockButton from "./TaskClockButton";
+import TaskActions from "./TaskActions";
+import QuickAdd from "./QuickAdd";
 import { useBackClose } from "@/lib/useBackClose";
+import type { QuickAddPayload } from "@/lib/quickAdd";
 
-type View = "list" | "calendar" | "kanban";
+type View = "list" | "calendar";
 type RenderTaskOptions = { showLessonBrief?: boolean; lastRow?: boolean };
 
 export default function PlannerView({
   state, onTaskStatus, onTaskUpdate, onSkipSubject, onFocusTask, activeTaskId, activeClockSeconds,
-  clockSessionActive, onClockOut, onAskTutor, replanning, onReplan,
+  clockSessionActive, onClockOut, onAskTutor, replanning, onReplan, onAddTask,
 }: {
   state: AppState;
   onTaskStatus: (id: number, status: string, rating?: number) => void;
@@ -29,14 +31,13 @@ export default function PlannerView({
   onAskTutor: (q: string) => void;
   replanning: boolean;
   onReplan: () => void;
+  onAddTask: (input: QuickAddPayload) => void;
 }) {
   const [view, setView] = useState<View>("list");
   const [filter, setFilter] = useState("all");
   const [openDay, setOpenDay] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<number | null>(null);
   const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
-  const [ratingTaskId, setRatingTaskId] = useState<number | null>(null);
-  const [moreActionsId, setMoreActionsId] = useState<number | null>(null);
   const [month, setMonth] = useState(() => {
     const d = new Date(); return { y: d.getFullYear(), m: d.getMonth() };
   });
@@ -75,6 +76,19 @@ export default function PlannerView({
   const upcoming = grouped.filter(([d]) => dayDiff(d, t) <= 0);
   const overdue = grouped.filter(([d]) => dayDiff(d, t) > 0 && d !== t).flatMap(([, v]) => v).filter((x) => x.status === "pending");
 
+  // Workload glance — today's remaining work, tomorrow's plan, this week's total.
+  const weekEnd = addDays(t, 6);
+  const todayRemaining = state.tasks
+    .filter((x) => x.date === t && x.status === "pending")
+    .reduce((sum, x) => sum + x.plannedMinutes, 0);
+  const todayPendingCount = state.tasks.filter((x) => x.date === t && x.status === "pending").length;
+  const tomorrowPlanned = state.tasks
+    .filter((x) => x.date === addDays(t, 1))
+    .reduce((sum, x) => sum + x.plannedMinutes, 0);
+  const weekList = state.tasks.filter((x) => x.date >= t && x.date <= weekEnd && x.status !== "skipped");
+  const weekPlanned = weekList.reduce((sum, x) => sum + x.plannedMinutes, 0);
+  const weekTaskCount = weekList.length;
+
   const topicFor = (task: TaskRow) => state.topics.find((x) => x.id === task.topicId);
   const subjFor = (task: TaskRow) => state.subjects.find((s) => s.id === task.subjectId);
   const taskLogged = (taskId: number) => {
@@ -103,7 +117,7 @@ export default function PlannerView({
     const open = canExpandLessonBrief && expanded === task.id;
     return (
       <div key={task.id}>
-        <div className={`task-row${task.status === "done" ? " done" : ""}${activeTaskId === task.id ? " active-clock" : ""}${moreActionsId === task.id ? " expanded-actions" : ""}${options.lastRow ? " last-row" : ""}`}>
+        <div className={`task-row${task.status === "done" ? " done" : ""}${activeTaskId === task.id ? " active-clock" : ""}${options.lastRow ? " last-row" : ""}`}>
           <div className="task-dot" style={{ background: dotColor }} />
           <div className={`task-main${canExpandLessonBrief ? " is-expandable" : ""}`}
             role={canExpandLessonBrief ? "button" : undefined}
@@ -141,43 +155,18 @@ export default function PlannerView({
             </div>
           </div>
           <span className={`chip chip-${task.status}`}>{task.status}</span>
-          <div className="task-row-actions">
-            {subj && task.status !== "skipped" && (
-              <button className="btn btn-xs btn-secondary task-skip-subj" title="Skip all tasks for this subject today"
-                onClick={() => onSkipSubject(subj.id, task.date)}>Skip subject</button>
-            )}
-            <button className="btn btn-xs btn-secondary" onClick={() => setEditingTaskId(task.id)}>Edit</button>
-            {task.status !== "skipped" && task.status !== "done" && (
-              <button className="btn btn-xs btn-secondary" title="Skip"
-                onClick={() => onTaskStatus(task.id, "skipped")}>Skip</button>
-            )}
-            <TaskClockButton taskId={task.id} activeTaskId={activeTaskId} sessionActive={clockSessionActive}
-              onFocusTask={onFocusTask} onClockOut={onClockOut} />
-            <button className="btn btn-xs btn-secondary task-more" aria-label="More actions"
-              onClick={() => setMoreActionsId(moreActionsId === task.id ? null : task.id)}>⋯</button>
-            <button className={`btn btn-xs task-primary ${task.status === "done" ? "btn-secondary" : "btn-primary"}`}
-              onClick={() => {
-                if (task.status === "done") { onTaskStatus(task.id, "pending"); return; }
-                // Recall/revision tasks ask for a memory rating — that one tap
-                // trains the spaced-repetition model that schedules reviews.
-                if (task.kind === "revise" && task.topicId) { setRatingTaskId(ratingTaskId === task.id ? null : task.id); return; }
-                onTaskStatus(task.id, "done");
-              }}>
-              {task.status === "done" ? "Undo" : "Done"}
-            </button>
-          </div>
+          <TaskActions
+            task={task}
+            subject={subj}
+            activeTaskId={activeTaskId}
+            clockSessionActive={clockSessionActive}
+            onTaskStatus={onTaskStatus}
+            onFocusTask={onFocusTask}
+            onClockOut={onClockOut}
+            onEdit={setEditingTaskId}
+            onSkipSubject={onSkipSubject}
+          />
         </div>
-        {ratingTaskId === task.id && task.status !== "done" && (
-          <div className="rating-strip glass-panel slide-in">
-            <span className="rating-q">How well did you recall it?</span>
-            <div className="rating-btns">
-              <button className="rate-btn rate-again" onClick={() => { setRatingTaskId(null); onTaskStatus(task.id, "done", 1); }}>Again</button>
-              <button className="rate-btn rate-hard" onClick={() => { setRatingTaskId(null); onTaskStatus(task.id, "done", 2); }}>Hard</button>
-              <button className="rate-btn rate-good" onClick={() => { setRatingTaskId(null); onTaskStatus(task.id, "done", 3); }}>Good</button>
-              <button className="rate-btn rate-easy" onClick={() => { setRatingTaskId(null); onTaskStatus(task.id, "done", 4); }}>Easy</button>
-            </div>
-          </div>
-        )}
         {canExpandLessonBrief && open && topic && (
           <div ref={briefRef} className="glass-panel slide-in planner-lesson-brief accent-edge" style={{ "--edge": subj?.color || "var(--accent)" } as React.CSSProperties}>
             <div className="lesson-brief-heading">
@@ -277,7 +266,7 @@ export default function PlannerView({
         </div>
         <div className="flex-row gap-md planner-tools">
           <div className="vtabs">
-            {(["list", "calendar", "kanban"] as View[]).map((v) => (
+            {(["list", "calendar"] as View[]).map((v) => (
               <div key={v} className={`vtab${view === v ? " active" : ""}`} onClick={() => setView(v)}>
                 {v[0].toUpperCase() + v.slice(1)}
               </div>
@@ -292,6 +281,19 @@ export default function PlannerView({
             {replanning ? "Rebalancing schedule…" : "Rebalance schedule"}
           </button>
         </div>
+      </div>
+
+      {/* One-line workload glance: what remains today, tomorrow, this week. */}
+      <div className="workload-strip glass-panel">
+        <span className="workload-item">Today <strong>{fmtMin(todayRemaining)}</strong> to go · {todayPendingCount} left</span>
+        <span className="workload-sep" aria-hidden="true" />
+        <span className="workload-item">Tomorrow <strong>{fmtMin(tomorrowPlanned)}</strong> planned</span>
+        <span className="workload-sep" aria-hidden="true" />
+        <span className="workload-item">This week <strong>{fmtMin(weekPlanned)}</strong> planned · {weekTaskCount} tasks</span>
+      </div>
+
+      <div className="planner-quickadd-row">
+        <QuickAdd state={state} onAdd={onAddTask} />
       </div>
 
       {overdue.length > 0 && (
@@ -387,37 +389,6 @@ export default function PlannerView({
               );
             })}
           </div>
-        </div>
-      )}
-
-      {view === "kanban" && (
-        <div className="kanban">
-          {(["pending", "done", "skipped"] as const).map((col) => {
-            const list = filtered.filter((x) => x.status === col && dayDiff(x.date, t) >= -21).slice(0, 40);
-            return (
-              <div className="glass-panel kan-col" key={col}>
-                <div className="kan-title">{col} · {list.length}</div>
-                {list.map((task) => {
-                  const c = subjFor(task)?.color || (KIND_META[task.kind] || KIND_META.learn).color;
-                  return (
-                    <div className="task-row kanban-task" key={task.id}>
-                      <div className="task-dot" style={{ background: c }} />
-                      <div className="task-main">
-                        <div className="task-title">{task.title}</div>
-                        <div className="task-sub">{prettyDate(task.date)} · {task.plannedMinutes}m</div>
-                        <div className="flex-row gap-sm kanban-task-actions">
-                          <button className="btn btn-xs btn-secondary" onClick={() => setEditingTaskId(task.id)}>Edit</button>
-                          {col !== "done" && <button className="btn btn-xs btn-primary" onClick={() => onTaskStatus(task.id, "done")}>Done</button>}
-                          {col !== "pending" && <button className="btn btn-xs btn-secondary" onClick={() => onTaskStatus(task.id, "pending")}>Reopen</button>}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-                {!list.length && <div className="panel-lead">Nothing here.</div>}
-              </div>
-            );
-          })}
         </div>
       )}
 

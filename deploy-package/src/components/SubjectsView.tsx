@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import StudyScene from "./StudyScene";
 import { type AppState, type SubjectRow } from "@/lib/client";
 import { IconSpark, IconTrash, IconClose } from "./icons";
 
@@ -27,6 +28,7 @@ export default function SubjectsView({
   return (
     <div className="fade-in">
       <div className="page-header">
+        <StudyScene variant="subjects" className="page-header-scene" />
         <div>
           <h1 className="page-title">Subjects &amp; Lessons</h1>
           <p className="page-subtitle">

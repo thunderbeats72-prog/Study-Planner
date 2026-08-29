@@ -1,0 +1,150 @@
+/* ════════════════════════════════════════════════════════════════════
+   STUDY PLANNER PRO — practical-enhancements.css (v20)
+   Additive styles for the real-world enhancement pass. Everything here
+   builds ON the existing visual language (glass panels, theme tokens,
+   pastel surfaces) — no redesign, no new identity.
+
+   Surfaces styled here:
+   1. Dashboard "What now?" hero        (NOW / NEXT / TODAY / RECOVERY)
+   2. Backlog recovery panel
+   3. Quick Add tray
+   4. Task action menu (⋯ popover) + rating strip inside rows
+   5. Planner workload glance strip
+   6. Responsive / touch / accessibility guards
+   ════════════════════════════════════════════════════════════════════ */
+
+/* ── 1. HERO: the actionable answer, not a stats wall ──────────────── */
+.now-label{
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  font-size:.74rem;font-weight:800;letter-spacing:.7px;text-transform:uppercase;
+  color:var(--accent);margin-bottom:8px;
+}
+.now-label-sep{opacity:.45;font-weight:600}
+.now-title{overflow-wrap:anywhere;margin-bottom:6px}
+.now-live{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.now-live-timer{font-size:1.05rem;font-weight:700;font-variant-numeric:tabular-nums}
+
+/* NEXT: one quiet line — what comes after the current task */
+.now-next{
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  margin-top:14px;padding:10px clamp(10px,1.4vw,14px);border-radius:12px;
+  background:var(--row-bg);border:1px solid var(--glass-border);
+  max-width:min(100%,560px);
+}
+.now-next-label{font-size:.66rem;font-weight:800;text-transform:uppercase;letter-spacing:.7px;color:var(--text-muted)}
+.now-next-title{flex:1 1 160px;min-width:0;font-size:.86rem;font-weight:650;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.now-next-meta{font-size:.76rem;color:var(--text-muted);font-weight:650}
+.now-next-start{flex:0 0 auto}
+
+/* TODAY: how much of the plan remains */
+.now-planline{margin-top:12px;font-size:.8rem;font-weight:600;color:var(--text-muted);line-height:1.5}
+.now-planline-ok{color:var(--status-done-text)}
+.now-planline-warn{color:var(--status-pending-text)}
+
+@media(max-width:640px){
+  .now-actions .btn{flex:1 1 auto}
+  .now-next{max-width:100%}
+}
+
+/* ── 2. BACKLOG RECOVERY — unfinished work is a decision, not a failure */
+.recovery-panel{
+  display:flex;flex-wrap:wrap;align-items:center;gap:12px 18px;
+  padding:16px 18px;margin-bottom:20px;
+}
+.recovery-copy{flex:1 1 280px;min-width:0}
+.recovery-title{margin:0 0 4px;font-size:1rem}
+.recovery-copy .panel-lead{margin:0}
+.recovery-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+
+/* ── 3. QUICK ADD — capture a task in one breath ───────────────────── */
+.quick-add{position:relative}
+.quick-add-panel{margin-top:10px;padding:clamp(10px,1.6vw,14px);display:flex;flex-direction:column;gap:12px}
+.quick-add-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.quick-add-title{font-size:.9rem;font-weight:800}
+.quick-add-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr));gap:10px 12px}
+.qa-field{display:flex;flex-direction:column;gap:6px;min-width:0}
+.qa-field-title{grid-column:1/-1}
+.lbl-opt{font-weight:500;opacity:.7}
+.qa-minutes{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.qa-min-chip{
+  min-height:34px;padding:5px 12px;border-radius:999px;
+  border:1px solid var(--glass-border);background:var(--row-bg);
+  color:var(--text-main);font:inherit;font-size:.76rem;font-weight:700;cursor:pointer;
+}
+.qa-min-chip.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.qa-min-chip:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.qa-min-input{width:76px;min-width:0}
+.qa-date-seg{display:flex;border:1px solid var(--glass-border);border-radius:10px;overflow:hidden}
+.qa-date-btn{
+  flex:1;min-height:36px;border:0;background:var(--row-bg);
+  color:var(--text-main);font:inherit;font-size:.78rem;font-weight:700;cursor:pointer;
+}
+.qa-date-btn.active{background:var(--accent);color:#fff}
+.qa-error{font-size:.72rem;font-weight:600;color:var(--status-skipped-text)}
+.quick-add-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+
+.day-head-side{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap}
+@media(max-width:640px){
+  .quick-add-grid{grid-template-columns:1fr}
+  .day-head-side{width:100%;justify-content:space-between}
+}
+
+/* ── 4. TASK ACTIONS — one [Done]/[Start] flow, extras behind ⋯ ────── */
+.task-row{position:relative}
+.task-more-wrap{position:relative;display:inline-flex}
+/* The old ⋯ toggle was mobile-only and dead on desktop; the new menu is a
+   real popover everywhere. This layer loads LAST, so it wins the cascade. */
+.task-more{display:inline-flex !important}
+@media(max-width:640px){
+  .task-row-actions .task-more{display:inline-flex !important}
+}
+.task-menu{
+  position:absolute;top:calc(100% + 6px);right:0;z-index:60;
+  min-width:200px;max-width:min(260px,calc(100vw - 32px));
+  display:flex;flex-direction:column;gap:2px;
+  padding:6px;border-radius:14px;
+  background:var(--surface-elevated);
+  border:1px solid var(--glass-border);
+  box-shadow:0 12px 32px rgba(10,12,26,.18);
+}
+.task-menu button{
+  width:100%;text-align:left;min-height:38px;padding:8px 12px;border-radius:9px;
+  border:0;background:transparent;color:var(--text-main);
+  font:inherit;font-size:.8rem;font-weight:600;cursor:pointer;
+}
+.task-menu button:hover{background:var(--row-hover)}
+.task-menu button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+
+/* The recall rating strip sits inside the row now, spanning its width. */
+.task-row > .rating-strip{flex:1 1 100%;order:10;margin:2px 0 8px;min-width:0}
+
+/* ── 5. PLANNER — workload glance ───────────────────────────────────── */
+.workload-strip{
+  display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;
+  padding:10px 16px;margin-bottom:14px;
+  font-size:.8rem;font-weight:550;color:var(--text-muted);
+}
+.workload-item strong{color:var(--text-main);font-weight:750;font-variant-numeric:tabular-nums}
+.workload-sep{width:1px;height:14px;background:var(--glass-border)}
+.planner-quickadd-row{margin-bottom:14px;display:flex;justify-content:flex-start}
+
+/* ── 6. TOUCH + ACCESSIBILITY GUARDS ────────────────────────────────── */
+@media(pointer:coarse){
+  .qa-min-chip,.qa-date-btn,.quick-add-actions .btn,.recovery-actions .btn,
+  .task-menu button{min-height:var(--tap,44px)}
+  .recovery-actions .btn,.now-actions .btn{padding:10px 18px}
+}
+@media(max-width:640px){
+  .recovery-actions .btn{flex:1 1 calc(50% - 8px);min-width:0}
+  .workload-strip{padding:10px 12px}
+}
+@media(prefers-contrast:more){
+  .task-menu,.quick-add-panel{border-width:2px}
+  .qa-date-btn.active,.qa-min-chip.active{border:1px solid var(--text-main)}
+  .now-next{border-width:2px}
+}
+@media(prefers-reduced-motion:reduce){
+  /* This layer adds no animation; keep everything instant. */
+  .task-menu,.quick-add-panel{transition:none}
+}

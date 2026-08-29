@@ -1,9 +1,11 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { api, ApiError, prettyLong, today, type AppState, type MessageRow } from "@/lib/client";
+import { api, ApiError, prettyDate, prettyLong, today, type AppState, type MessageRow } from "@/lib/client";
 import { mmss, useFocusTimer, useStudyClock, type ClockApi, type TimerApi, type TimerMode } from "@/lib/useTimer";
 import { nextPendingTask, type CompletedTaskInfo } from "@/lib/completion";
+import { nextAction } from "@/lib/prioritization";
+import type { QuickAddPayload } from "@/lib/quickAdd";
 import Onboarding from "@/components/Onboarding";
 import Dashboard from "@/components/Dashboard";
 import PlannerView from "@/components/PlannerView";
@@ -568,6 +570,30 @@ export default function Home() {
     } catch (error) { notify(apiFailureMessage(error, "Could not delete."), "error"); } finally { setBusy(false); }
   };
 
+  /** Quick Add: capture a task and drop it straight into the plan. */
+  const addTask = async (input: QuickAddPayload) => {
+    try {
+      const s = await api<AppState>("/api/tasks", { method: "POST", body: JSON.stringify(input) });
+      setState(s);
+      notify(
+        input.date === today()
+          ? `Added "${input.title.slice(0, 40)}" to today's plan.`
+          : `Added "${input.title.slice(0, 40)}" for ${prettyDate(input.date)}.`,
+        "success"
+      );
+    } catch (error) { notify(apiFailureMessage(error, "Could not add the task."), "error"); }
+  };
+
+  /** Backlog recovery: re-date overdue tasks in one bulk move. */
+  const moveTasks = async (moves: { id: number; date: string }[], message: string) => {
+    if (!moves.length) return;
+    try {
+      const s = await api<AppState>("/api/tasks", { method: "PATCH", body: JSON.stringify({ moves }) });
+      setState(s);
+      notify(message, "success");
+    } catch (error) { notify(apiFailureMessage(error, "Could not update the schedule — nothing was lost."), "error"); }
+  };
+
   const startSmartClock = useCallback(() => {
     const currentDay = today();
     const task = state?.tasks.find((item) => item.date === currentDay && item.status === "pending") ||
@@ -839,7 +865,7 @@ export default function Home() {
     { id: "clock-in", group: "Study Clock", label: clock.running ? "Pause Clock" : clock.sessionActive ? "Resume Clock" : "Clock In", hint: clock.running ? "Freeze, keep session" : "Start recording", keywords: "timer record attendance pause", run: () => (clock.running ? clock.pause() : clock.sessionActive ? clock.resume() : startSmartClock()) },
     { id: "clock-out", group: "Study Clock", label: "Clock Out", hint: clock.sessionActive ? "Stop & save minutes" : "no open session", keywords: "stop end finish timer", run: () => (clock.sessionActive ? clockOutNow() : notify("No open session to close.")) },
     { id: "clock-break", group: "Study Clock", label: clock.onBreak ? "Resume from break" : "Take a break", keywords: "pause rest", run: () => (clock.onBreak ? clock.endBreak() : clock.takeBreak()) },
-    { id: "next-lesson", group: "Study Clock", label: "Start next pending lesson", hint: "Clock in + switch", keywords: "begin study start task", run: () => { const t = today(); const next = state.tasks.find((x) => x.date === t && x.status === "pending" && x.id !== clock.taskId); if (next) focusTask(next.id); else notify("Nothing pending today — enjoy the rest day."); } },
+    { id: "next-lesson", group: "Study Clock", label: "Start next pending lesson", hint: "Clock in + switch", keywords: "begin study start task", run: () => { const t = today(); const next = nextAction(state.tasks.filter((x) => x.id !== clock.taskId), t).now; if (next) focusTask(next.id); else notify("Nothing pending — enjoy the rest day."); } },
     { id: "zen", group: "Focus", label: "Enter Zen mode", hint: "Distraction-free", keywords: "fullscreen minimal", run: () => setZen(true) },
     { id: "ai", group: "AI Tutor", label: "Ask AI Tutor", hint: "Open chat", keywords: "help question doubt", run: () => setChatOpen(true) },
     { id: "ai-today", group: "AI Tutor", label: "What should I study today?", keywords: "plan today", run: () => askTutor("What should I study today and in what order?") },
@@ -1035,8 +1061,8 @@ export default function Home() {
                       <div className="notif-row">
                         <span className="notif-dot notif-dot--orange" />
                         <div>
-                          <strong>{ctx.overdue > 0 ? `${ctx.overdue} overdue task${ctx.overdue > 1 ? "s" : ""}` : "No overdue tasks"}</strong>
-                          <span>{ctx.overdue > 0 ? "Re-plan to redistribute them." : "You're up to date."}</span>
+                          <strong>{ctx.overdue > 0 ? `${ctx.overdue} unfinished task${ctx.overdue > 1 ? "s" : ""}` : "Nothing unfinished"}</strong>
+                          <span>{ctx.overdue > 0 ? "Let's recover them — spread them out or re-plan." : "You're up to date."}</span>
                         </div>
                       </div>
                       <div className="notif-row">
@@ -1050,7 +1076,7 @@ export default function Home() {
                         <span className="notif-dot notif-dot--violet" />
                         <div>
                           <strong>{state.user.streak} day streak</strong>
-                          <span>Study today to keep it alive.</span>
+                          <span>{state.user.streak > 0 ? "Your progress is still here, even on days you miss." : "Start today and it will build itself."}</span>
                         </div>
                       </div>
                       <div className="notif-row">
@@ -1100,7 +1126,8 @@ export default function Home() {
               activeTaskId={clock.taskId} activeClockSeconds={clock.elapsed}
               clockRunning={clock.running} clockSessionActive={clock.sessionActive} clockOnBreak={clock.onBreak}
               onClockOut={clockOutNow} onPauseOrResume={pauseOrResume}
-              replanning={busy} onReplan={replan} onStartFocus={startFocusSession} />
+              replanning={busy} onReplan={replan} onStartFocus={startFocusSession}
+              onAddTask={addTask} onMoveTasks={moveTasks} />
           )}
           {page === "planner" && (
             <PlannerView state={state} onTaskStatus={setTaskStatus} onTaskUpdate={updateTask}
@@ -1108,7 +1135,8 @@ export default function Home() {
               activeTaskId={clock.taskId} activeClockSeconds={clock.elapsed}
               clockSessionActive={clock.sessionActive}
               onClockOut={clockOutNow}
-              onAskTutor={askTutor} replanning={busy} onReplan={replan} />
+              onAskTutor={askTutor} replanning={busy} onReplan={replan}
+              onAddTask={addTask} />
           )}
           {page === "focus" && (
             <FocusView state={state} timer={timer} clock={clock} onCompleteTask={(id) => setTaskStatus(id, "done")}

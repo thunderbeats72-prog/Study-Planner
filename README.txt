@@ -106,6 +106,47 @@ instead of stopping on a “voice model unavailable” error; the chat shows a
 clear non-error notice. One failed long-answer part switches the remaining
 parts to that local voice, so every later part keeps flowing.
 
+v20 PRACTICAL REAL-WORLD ENHANCEMENT (this build)
+--------------------------------------------------
+ - "WHAT SHOULD I DO NOW?" IS THE HERO: the Overview opens with one clear
+   answer — the single best next task (overdue → revision → today → weak
+   subject → soon), its reason, a Start button, the NEXT task behind it,
+   and how much of today remains. Live session controls (pause / clock out)
+   sit on that same card while it records. Statistics (KPIs, charts, heatmap,
+   coaching, intelligence) moved BELOW the plan so they support instead of
+   dominate. One deterministic priority order (src/lib/prioritization.ts) is
+   shared by the hero, the AI tutor's live context, and the command palette —
+   the AI now recommends exactly what the hero shows.
+ - BACKLOG RECOVERY, NOT GUILT: overdue work is framed as "N unfinished
+   tasks — let's recover them". Four options: Do today (disabled when it
+   would exceed daily capacity), Move to tomorrow, Spread across the week
+   (per-day capacity-aware, oldest first, never crammed), or Let AI re-plan.
+   A gentle pace suggestion (+30 min/day for N days) comes from
+   src/lib/recovery.ts. Bulk re-dating happens in ONE API call
+   (PATCH /api/tasks `moves`) — valid in demo and real DB modes.
+ - QUICK ADD: capture a task in one breath — title, duration chips, optional
+   subject, Today/Tomorrow, type — from the Overview's Today card or the
+   Planner. Shared client-side validation (src/lib/quickAdd.ts) mirrors the
+   server limits; the task lands in the plan immediately.
+ - CLEANER TASK ROWS: every row is now [Done] / [Start] with everything else
+   (Edit, Skip, Skip subject, Reopen) inside a real "⋯" menu — the old
+   dead toggle on desktop is gone. Revision rating works identically on the
+   Overview and Planner (one shared TaskActions component). Planner's kanban
+   view was removed (duplicated the list's statuses; added visual noise).
+ - AI SAFETY: the tutor's system prompt now states plainly that QUESTIONS
+   about actions ("how do I re-plan?", "what is dark mode?") are answered,
+   never executed; action tags require a clear imperative request. The regex
+   command layer was already question-safe and is now pinned by tests.
+ - MOBILE + ACCESSIBILITY: new surfaces use fluid sizing (clamp/minmax/
+   auto-fit), the shared 44px --tap token on coarse pointers, safe-area-aware
+   existing chrome, prefers-reduced-motion and prefers-contrast guards.
+ - TESTS: suite grew 131 → 180. New sections: prioritization (overdue first,
+   today > future, revision, weak subject, exclusions, determinism), quick
+   add validation, backlog recovery maths (capacity-aware spread, gentle
+   pace), timer lesson-switch banking, AI question-safety cases, and static
+   responsive/accessibility CSS checks. `npm run check` and `npm run build`
+   are green.
+
 v19 COLLAPSED-RAIL + MOBILE BAR FIXES (this build)
 --------------------------------------------------
  - ONE HIGHLIGHT IN THE COLLAPSED SIDEBAR: the brand tile used to be painted

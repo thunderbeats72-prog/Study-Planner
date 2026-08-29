@@ -9,7 +9,7 @@ import {
 } from "@/lib/demoState";
 import {
   enumValue, finiteNumber, isoDate, positiveId, readJsonObject,
-  textValue, validationPayload,
+  textValue, ValidationError, validationPayload,
 } from "@/lib/validation";
 import { withDbGuard } from "@/lib/routeGuard";
 
@@ -36,16 +36,61 @@ async function patchTasks(req: Request) {
   const key = keyFrom(req);
   const user = await getOrCreateUser(key);
 
+  // Shared demo response builder — the in-memory preview round-trips the
+  // same { ...state, context } shape every mutation path returns.
+  const demoResponse = async () => {
+    const fresh = await fullState(key);
+    return NextResponse.json({ ...fresh, context: buildContext(fresh, dateFrom(req)) });
+  };
+
+  // ── Bulk date moves (backlog recovery) ──────────────────────────────────
+  // `moves: [{id, date}]` re-dates many pending tasks in ONE call, so
+  // "move to tomorrow" / "spread across the week" don't hammer the API.
+  // Tasks that no longer exist are skipped; nothing is silently created.
+  if (body.moves != null) {
+    let moves: { id: number; date: string }[];
+    try {
+      const raw = body.moves;
+      if (!Array.isArray(raw) || raw.length === 0 || raw.length > 60) {
+        throw new ValidationError("moves must be an array of 1–60 {id, date} entries.", "INVALID_MOVES");
+      }
+      moves = raw.map((entry, index) => {
+        if (!entry || typeof entry !== "object") {
+          throw new ValidationError(`moves[${index}] must be an object.`, "INVALID_MOVES");
+        }
+        const record = entry as Record<string, unknown>;
+        return {
+          id: positiveId(record.id, `moves[${index}].id`) as number,
+          date: isoDate(record.date, `moves[${index}].date`),
+        };
+      });
+    } catch (error) {
+      const payload = validationPayload(error);
+      return NextResponse.json({ error: payload.error, code: payload.code }, { status: payload.status });
+    }
+
+    if (demoDataEnabled()) {
+      for (const move of moves) demoPatchTask(move.id, { date: move.date });
+      return demoResponse();
+    }
+
+    await db.transaction(async (tx) => {
+      for (const move of moves) {
+        await tx
+          .update(tasks)
+          .set({ date: move.date })
+          .where(and(eq(tasks.id, move.id), eq(tasks.userId, user.id)));
+      }
+    });
+    return responseState(key, dateFrom(req));
+  }
+
   // ── Preview without a database ───────────────────────────────────────────
   // The in-memory demo layer applies the same patches so Done / Undo / Skip /
   // Edit / Skip-subject all behave in the preview exactly as they look in a
   // real deployment (state round-trips through the same response shape).
   if (demoDataEnabled()) {
     const demo = await fullState(key);
-    const demoResponse = async () => {
-      const fresh = await fullState(key);
-      return NextResponse.json({ ...fresh, context: buildContext(fresh, dateFrom(req)) });
-    };
 
     // Bulk skip: skip all pending tasks from one owned subject on one day.
     if (body.skipSubjectId != null) {

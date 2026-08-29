@@ -1,6 +1,10 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
+import "./study-planner-refresh.css";
+import "./pastel-ui-system.css";
+import "./study-planner-redesign.css";
+import "./practical-enhancements.css";
 
 const inter = localFont({
   src: "./fonts/inter-latin-variable.woff2",
@@ -26,8 +30,6 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  // Android soft keyboard resizes the layout instead of covering the chat
-  // input; iOS sheets keep their safe-area padding.
   interactiveWidget: "resizes-content",
   themeColor: "#5B5CE2",
 };
