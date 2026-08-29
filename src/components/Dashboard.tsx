@@ -10,6 +10,7 @@ import {
 } from "./icons";
 import TaskEditor, { type TaskPatch } from "./TaskEditor";
 import TaskActions from "./TaskActions";
+import { TaskLiveBadge } from "./TaskClockButton";
 import QuickAdd from "./QuickAdd";
 import Heatmap from "./Heatmap";
 import { prioritizeTasks, weakestSubjectIds, reasonLabel } from "@/lib/prioritization";
@@ -433,7 +434,7 @@ export default function Dashboard({
                     <span className="chip chip-kind chip-tight">{kindLabel}</span> · {task.plannedMinutes} min
                     {isCheckpoint ? " · All Subjects · Comprehensive Review" : ""}
                     {taskLogged(task.id) ? ` · ${fmtMin(taskLogged(task.id))} logged` : task.actualMinutes ? ` · ${task.actualMinutes}m logged` : ""}
-                    {activeTaskId === task.id && activeClockSeconds ? ` · live +${Math.floor(activeClockSeconds / 60)}m ${activeClockSeconds % 60}s` : ""}
+                    {activeTaskId === task.id && <TaskLiveBadge seconds={activeClockSeconds} running={clockRunning} />}
                   </div>
                 </div>
                 <TaskActions

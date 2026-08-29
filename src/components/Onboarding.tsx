@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useId, useMemo, useRef, useState } from "react";
 import { api, addDays, today, dayDiff, prettyLong, type AppState } from "@/lib/client";
 import { countStudyDays, projectCompletionDate } from "@/lib/planner";
 import { IconCalendar, IconCheck, IconLock, IconLogo, IconTarget } from "./icons";
@@ -66,6 +66,13 @@ const BUFFER_PRESETS: SliderPreset[] = [
   { value: 7, label: "7" },
   { value: 10, label: "10" },
 ];
+const YEAR_LABELS: Record<string, string> = {
+  "0": "Full course (all terms)",
+  "1": "Year 1 / Semester 1-2",
+  "2": "Year 2 / Semester 3-4",
+  "3": "Year 3 / Semester 5-6",
+  "4": "Year 4 / Semester 7-8",
+};
 const STEP_META: StepMeta[] = [
   { key: "you", label: "You" },
   { key: "level", label: "Level" },
@@ -212,6 +219,7 @@ function OnboardingSlider({
   presets = [],
   fullWidth = false,
 }: OnboardingSliderProps) {
+  const inputId = useId();
   const fillPct = max === min ? 0 : ((value - min) / (max - min)) * 100;
   const sliderStyle = { "--ob-range-fill": `${fillPct}%` } as React.CSSProperties;
 
@@ -219,28 +227,30 @@ function OnboardingSlider({
     <div className={`ob-field${fullWidth ? " ob-field-span-full" : ""}`}>
       <div className="ob-range-card">
         <div className="ob-range-head">
-          <div>
-            <label>{label}</label>
+          <div className="ob-range-copy">
+            <label htmlFor={inputId}>{label}</label>
             {hint && <div className="ob-range-hint">{hint}</div>}
           </div>
-          <div className="ob-range-value">{valueLabel}</div>
+          <output className="ob-range-value" htmlFor={inputId}>{valueLabel}</output>
         </div>
         <input
+          id={inputId}
           className="ob-range-input"
           type="range"
           min={min}
           max={max}
           step={step}
           value={value}
+          aria-valuetext={valueLabel}
           onChange={(e) => onChange(Number(e.target.value))}
           style={sliderStyle}
         />
-        <div className="ob-range-meta">
+        <div className="ob-range-meta" aria-hidden="true">
           <span>{minLabel}</span>
           <span>{maxLabel}</span>
         </div>
         {!!presets.length && (
-          <div className="ob-range-presets">
+          <div className="ob-range-presets" role="group" aria-label={`${label} presets`}>
             {presets.map((preset) => {
               const active = Math.abs(value - preset.value) < Math.max(step / 2, 0.01);
               return (
@@ -577,7 +587,10 @@ export default function Onboarding({
         {step === 2 && (
           <>
             <h1>Choose your study level</h1>
-            <p>From nursery to doctoral research, this tells the planner how deep the syllabus should go and how the language should be tuned.</p>
+            <p className="ob-lead">
+              From school and higher education through doctoral research, this tells the planner how deep the
+              syllabus should go and how the language should be tuned.
+            </p>
             <div className="ob-level-grid">
               {levels.map((l) => (
                 <button key={l.id} className={`ob-level-btn${level === l.id ? " selected" : ""}`}
@@ -646,8 +659,40 @@ export default function Onboarding({
         {step === 4 && (
           <>
             <h1>Add the details that make it accurate</h1>
-            <p>These answers help the planner assess the <em>exact</em> syllabus — the right papers, board pattern, stream, and attempt context — instead of a generic version.</p>
-            <div className="ob-schedule-grid" style={{ gridTemplateColumns: "1fr" }}>
+            <p className="ob-lead">
+              These answers help the planner assess the <em>exact</em> syllabus — the right papers, board pattern,
+              stream, and attempt context — instead of a generic version.
+            </p>
+            <div className="ob-program-card">
+              <div className="ob-program-main">
+                <span className="ob-field-label">Programme</span>
+                <strong className="ob-program-name">{resolvedCourseName || "Not selected yet"}</strong>
+              </div>
+              <div className="ob-program-meta">
+                <div className="ob-program-item">
+                  <span className="ob-field-label">{isSchool ? "Board" : "Specialisation"}</span>
+                  <strong>{(isSchool ? board : specialisation.trim()) || "—"}</strong>
+                </div>
+                <div className="ob-program-item">
+                  <span className="ob-field-label">
+                    {isDegree ? "Institution" : isCompetitive ? "Exam body" : "Level"}
+                  </span>
+                  <strong>
+                    {institution.trim()
+                      || (isDegree || isCompetitive
+                        ? "—"
+                        : levels.find((l) => l.id === level)?.label || "School")}
+                  </strong>
+                </div>
+                {isDegree && (
+                  <div className="ob-program-item">
+                    <span className="ob-field-label">Term</span>
+                    <strong>{YEAR_LABELS[year] || "Full course"}</strong>
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="ob-schedule-grid ob-details-grid">
               {isDegree && (
                 <>
                   <div className="ob-field">
@@ -663,11 +708,9 @@ export default function Onboarding({
                   <div className="ob-field">
                     <label>Year / Semester (narrows to that term)</label>
                     <select value={year} onChange={(e) => setYear(e.target.value)}>
-                      <option value="0">Full course (all terms)</option>
-                      <option value="1">Year 1 / Semester 1-2</option>
-                      <option value="2">Year 2 / Semester 3-4</option>
-                      <option value="3">Year 3 / Semester 5-6</option>
-                      <option value="4">Year 4 / Semester 7-8</option>
+                      {Object.entries(YEAR_LABELS).map(([value, text]) => (
+                        <option key={value} value={value}>{text}</option>
+                      ))}
                     </select>
                   </div>
                 </>
@@ -886,6 +929,7 @@ export default function Onboarding({
                 maxLabel="6 subjects"
                 presets={SUBJECTS_PRESETS}
                 onChange={setSpd}
+                fullWidth
               />
 
               <OnboardingChoiceGroup
