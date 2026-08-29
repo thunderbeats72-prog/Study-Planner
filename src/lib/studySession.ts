@@ -104,8 +104,12 @@ export function planSession(snapshot: SessionSnapshot, command: SessionCommand):
     }
 
     case "endSession": {
-      if (snapshot.timerRunning) fx.push({ kind: "timer.pause" });
-      if (snapshot.focusOwnsClock && snapshot.clockSessionActive) fx.push({ kind: "clock.out" });
+      /* End Session is the universal Clock Out action. A manual Study Clock
+         session must close just as reliably as a Focus-owned one. Focus timer
+         is stopped only when Focus owns the clock, preserving the separation
+         between an independently-started clock and Focus mode. */
+      if (snapshot.focusOwnsClock && snapshot.timerRunning) fx.push({ kind: "timer.pause" });
+      if (snapshot.clockSessionActive) fx.push({ kind: "clock.out" });
       fx.push({ kind: "own.clear" });
       return fx;
     }
