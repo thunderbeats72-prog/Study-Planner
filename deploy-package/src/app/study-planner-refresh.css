@@ -81,6 +81,10 @@ body.theme-dark,body.theme-obsidian,body.theme-nebula{
 .tracker-actions .chip{padding:7px 10px;border-radius:10px;background:var(--row-bg);border-color:var(--glass-border);font-size:.64rem}
 .tracker-actions .btn-xs{min-height:36px;padding:7px 12px;border-radius:10px}
 
+/* Remove the faint hairline/outline visible along the tracker bar edges.
+   The reference bar should read as a single clean surface. */
+.tracker-bar{border:0;outline:0;box-shadow:var(--refresh-shadow)}
+
 /* ---------------- Page headers / illustration anchor ---------------- */
 .page-header{margin-bottom:18px;min-height:82px;position:relative}
 .page-title{font-size:clamp(1.55rem,1.2rem + 1.25vw,2.15rem);letter-spacing:-.045em}
