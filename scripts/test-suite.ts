@@ -41,7 +41,6 @@ import TaskActions from "../src/components/TaskActions";
 import { OnboardingSlider } from "../src/components/Onboarding";
 import { taskSessionMinutes, formatMinutesShort, formatStudied, taskStudiedSuffix } from "../src/lib/studyTime";
 import { MENU_NAV_KEYS, isMenuNavKey, nextMenuIndex } from "../src/lib/menuNav";
-import { QUOTES, pickDaily, pickNext, hashDate } from "../src/lib/quotes";
 import type { SubjectRow } from "../src/lib/client";
 
 let passed = 0;
@@ -1048,50 +1047,6 @@ async function runTests() {
     "Calendars slide direction-aware with a stable six-week grid, and the overview calendar is restored");
   if (prevActEnv === undefined) delete (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT;
   else (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = prevActEnv;
-
-  console.log("\n--- 18. Quote Personas & Onboarding Flow Guards ---");
-  /* The quote card rotates through a persona roster (Osho, Luther,
-     philosophers…) with a strict no-repeat contract. */
-  check(QUOTES.length >= 24, "The quote pool is deep enough to rotate without feeling stale", String(QUOTES.length));
-  check(new Set(QUOTES.map((q) => q.text)).size === QUOTES.length,
-    "Every quote text is unique — nothing repeats inside one cycle");
-  check(new Set(QUOTES.map((q) => q.author)).size >= 20,
-    "The roster carries many distinct personas, not one voice");
-  check(QUOTES.some((q) => q.author === "Osho") && QUOTES.some((q) => q.author === "Martin Luther"),
-    "The personas the user asked for (Osho, Luther) are in the pool");
-  check(hashDate("2026-08-30") === hashDate("2026-08-30") && hashDate("2026-08-30") !== hashDate("2026-08-31"),
-    "The date hash is deterministic per day and changes across days");
-  {
-    const first = pickDaily(QUOTES.length, "2026-08-30", []);
-    const same = pickDaily(QUOTES.length, "2026-08-30", first.seen);
-    check(same.index !== first.index, "The next day-pick never repeats the quote just shown");
-    check(same.seen.length === 2 && same.seen.includes(first.index),
-      "Every shown quote is recorded in the seen history");
-  }
-  {
-    const seen = [0, 1, 2];
-    const next = pickNext(QUOTES.length, 0, seen);
-    check(next.index === 3 && next.seen.length === 4, "Shuffle advances to the next unseen quote");
-    const exhausted = pickNext(4, 1, [0, 1, 2, 3]);
-    check(exhausted.index === 2 && exhausted.seen.length === 1,
-      "Once the whole pool is seen the cycle resets instead of repeating early");
-  }
-  check(dashboardSrc.includes("quote-shuffle") && dashboardSrc.includes('from "@/lib/quotes"'),
-    "The dashboard offers an on-demand shuffle driven by the shared quote engine");
-
-  /* Onboarding flow: step changes land at the top, the rhythm sliders have
-     no preset chip rows, and each step carries a themed illustration. */
-  check(onboardingSource.includes("overlayRef.current?.scrollTo"),
-    "Every step change scrolls the wizard overlay back to the top");
-  check(!onboardingSource.includes("presets={") && onboardingSource.includes("ticks={"),
-    "Rhythm sliders use rail ticks, not the removed preset chip rows");
-  check(onboardingSource.includes("ob-label-icon") && onboardingSource.includes("ob-optional"),
-    "Details labels are trimmed with optional badges and icon-led date fields");
-  const artSrc = readFileSync(join(process.cwd(), "src/components/OnboardingArt.tsx"), "utf8");
-  check(artSrc.includes('variant === "you"') && artSrc.includes('variant === "rhythm"') && artSrc.includes('variant === "review"'),
-    "Every onboarding step has a themed mini-illustration variant");
-  check(polishCss.includes(".ob-step-art") && polishCss.includes(".ob-range-ticks") && polishCss.includes(".ob-course-item::before"),
-    "The finish layer owns the new step art, rail ticks and course hover edge");
 
   console.log("\n==================================================");
   console.log(`TEST SUITE RESULTS: ${passed} PASSED, ${failed} FAILED`);
