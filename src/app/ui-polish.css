@@ -3433,3 +3433,162 @@ body.theme-nebula .ob-choice-btn .ob-choice-copy strong { color: var(--text-main
   .ob-level-btn,
   .ob-choice-btn { animation: none; transition: none; }
 }
+
+/* ========================================================================
+   THEME-RESPONSIVE ONBOARDING ART
+   The decorative study scenes and edge artwork inherit the active palette.
+   Static PNG decor uses a carefully scoped color treatment while every SVG
+   scene uses the platform's live CSS tokens directly. No user action or
+   onboarding state changes when a theme changes. */
+.ob-overlay {
+  --ob-canvas: color-mix(in srgb, var(--app-bg) 92%, #fff);
+  --ob-surface: color-mix(in srgb, var(--surface-solid) 96%, #fff);
+  --ob-border: color-mix(in srgb, var(--accent) 16%, var(--glass-border));
+  --ob-card-tint: color-mix(in srgb, var(--accent) 5%, var(--surface-solid));
+  --ob-art-paper: color-mix(in srgb, var(--surface-solid) 88%, #fff);
+  --ob-art-soft: color-mix(in srgb, var(--accent-light) 58%, var(--surface-solid));
+  --ob-art-highlight: color-mix(in srgb, var(--accent) 32%, var(--surface-solid));
+  --ob-art-warm: color-mix(in srgb, var(--warning-accent) 62%, var(--accent-light));
+  --ob-art-leaf-stem: color-mix(in srgb, var(--success-accent) 48%, var(--accent));
+  --ob-art-leaf: color-mix(in srgb, var(--success-accent) 58%, var(--accent-light));
+  --ob-art-leaf-deep: color-mix(in srgb, var(--success-accent) 72%, var(--accent));
+  --ob-art-leaf-light: color-mix(in srgb, var(--success-accent) 36%, var(--accent-light));
+  background-color: var(--ob-canvas);
+  background-image:
+    radial-gradient(54rem 34rem at -12% -13%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 68%),
+    radial-gradient(48rem 32rem at 106% 8%, color-mix(in srgb, var(--accent-light) 11%, transparent), transparent 70%),
+    linear-gradient(145deg, color-mix(in srgb, var(--surface-solid) 82%, #fff) 0%, var(--ob-canvas) 56%, color-mix(in srgb, var(--accent) 2%, var(--ob-canvas)) 100%);
+}
+
+.ob-card {
+  border-color: var(--ob-border);
+  background: var(--ob-surface);
+  box-shadow: 0 20px 48px -34px color-mix(in srgb, var(--text-main) 30%, transparent), 0 2px 8px color-mix(in srgb, var(--text-main) 4%, transparent);
+}
+
+.ob-card h1 { color: var(--text-main); }
+.ob-card > p,
+.ob-card > .ob-lead { color: var(--text-muted); }
+.ob-step-kicker { border-color: color-mix(in srgb, var(--accent) 15%, transparent); background: color-mix(in srgb, var(--accent) 8%, var(--surface-solid)); color: var(--accent); }
+
+.ob-feature,
+.ob-course-item,
+.ob-level-btn,
+.ob-choice-btn,
+.ob-range-card,
+.ob-review-card,
+.ob-mini-stat,
+.ob-sub-row {
+  border-color: var(--ob-border);
+  background: var(--surface-solid);
+}
+
+.ob-feature-icon,
+.ob-level-icon,
+.ob-choice-icon,
+.ob-range-icon,
+.ob-review-check-icon {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface-solid));
+}
+
+.ob-card .lbl { color: var(--accent); }
+.ob-name-input,
+.ob-course-search,
+.ob-add-sub-input,
+.ob-field input,
+.ob-field select,
+.ob-field textarea,
+.ob-choice-card select {
+  color: var(--text-main);
+  border-color: var(--ob-border);
+  background: var(--input-bg);
+}
+
+.ob-name-input:focus,
+.ob-course-search:focus,
+.ob-add-sub-input:focus,
+.ob-field input:focus,
+.ob-field select:focus,
+.ob-field textarea:focus,
+.ob-choice-card select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.ob-note-panel,
+.ob-projection-card,
+.ob-review-pulse { background: var(--ob-card-tint); border-color: var(--ob-border); color: var(--text-muted); }
+.ob-projection-date,
+.ob-mini-stat strong,
+.ob-choice-btn .ob-choice-copy strong { color: var(--text-main); }
+.ob-choice-btn .ob-choice-copy > span,
+.ob-level-btn small { color: var(--text-muted); }
+
+.ob-course-item:hover,
+.ob-level-btn:hover,
+.ob-choice-btn:hover { border-color: color-mix(in srgb, var(--accent) 46%, var(--glass-border)); background: color-mix(in srgb, var(--accent) 4%, var(--surface-solid)); }
+.ob-course-item.selected,
+.ob-level-btn.selected,
+.ob-choice-btn.selected { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 6%, var(--surface-solid)); box-shadow: 0 0 0 1px var(--accent) inset; }
+.ob-course-item.selected .ob-course-check,
+.ob-choice-btn.selected .ob-choice-check { background: var(--accent); border-color: var(--accent); }
+.ob-choice-btn.selected .ob-choice-copy strong { color: var(--accent); }
+.ob-btn-primary { background: var(--accent-gradient); box-shadow: 0 9px 17px -12px color-mix(in srgb, var(--accent) 82%, transparent); }
+.ob-cancel-link { color: var(--accent); }
+
+/* Default art stays close to the lavender composition. Other palettes tint
+   the original desk imagery toward their accent rather than leaving purple
+   books/lamp behind. */
+body.theme-mint .ob-overlay::before,
+body.theme-mint .ob-overlay::after { display: block; filter: hue-rotate(-112deg) saturate(1.02) brightness(1.015); }
+body.theme-sunset .ob-overlay::before,
+body.theme-sunset .ob-overlay::after { display: block; filter: hue-rotate(118deg) saturate(1.08) brightness(1.015); }
+/* In dark themes the source artwork is inverted before it is screened over
+   the canvas: its light studio backdrop disappears, while the objects remain
+   as a low-contrast, accent-tinted silhouette rather than a pale rectangle. */
+body.theme-obsidian .ob-overlay::before,
+body.theme-obsidian .ob-overlay::after { display: block; filter: invert(.88) hue-rotate(130deg) saturate(1.1) brightness(.78); mix-blend-mode: screen; opacity: .47; }
+body.theme-nebula .ob-overlay::before,
+body.theme-nebula .ob-overlay::after { display: block; filter: invert(.88) hue-rotate(186deg) saturate(1.2) brightness(.76); mix-blend-mode: screen; opacity: .44; }
+body.theme-dark .ob-overlay::before,
+body.theme-dark .ob-overlay::after { display: block; filter: invert(.9) hue-rotate(170deg) saturate(.8) brightness(.68); mix-blend-mode: screen; opacity: .34; }
+
+body.theme-dark .ob-overlay,
+body.theme-obsidian .ob-overlay,
+body.theme-nebula .ob-overlay { --ob-canvas: var(--app-bg); --ob-surface: var(--surface-solid); }
+
+/* The full horizontal rail and the content canvas remain bounded at each
+   responsive breakpoint; décor is removed before it can compete with fields. */
+@media (max-width: 1100px) {
+  .ob-overlay::before,
+  .ob-overlay::after,
+  body.theme-mint .ob-overlay::before,
+  body.theme-mint .ob-overlay::after,
+  body.theme-sunset .ob-overlay::before,
+  body.theme-sunset .ob-overlay::after,
+  body.theme-obsidian .ob-overlay::before,
+  body.theme-obsidian .ob-overlay::after,
+  body.theme-nebula .ob-overlay::before,
+  body.theme-nebula .ob-overlay::after,
+  body.theme-dark .ob-overlay::before,
+  body.theme-dark .ob-overlay::after { display: none; }
+
+  .ob-shell,
+  .ob-card { max-width: 820px; }
+}
+
+@media (max-width: 700px) {
+  .ob-card { border-radius: 18px; }
+  .ob-card .ob-level-grid { grid-template-columns: 1fr; }
+  .ob-choice-grid { grid-template-columns: 1fr; }
+  .ob-review-grid { grid-template-columns: 1fr; }
+  .ob-footer-strip { align-items: stretch; }
+}
+
+@media (max-width: 390px) {
+  .ob-progress { gap: 0; }
+  .ob-step-node { width: 23px; height: 23px; font-size: .55rem; }
+  .ob-step + .ob-step::before { top: 11px; margin-inline: 10px; }
+  .ob-card { padding-inline: 14px; }
+}
