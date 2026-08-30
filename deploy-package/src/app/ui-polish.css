@@ -492,3 +492,2203 @@
   .task-more,
   .task-menu button { transition: none; }
 }
+
+/* ========================================================================
+   REFERENCE-LED VISUAL REFINEMENT — ONBOARDING + SHARED WORKSPACE
+   ------------------------------------------------------------------------
+   This final pass is intentionally visual only. It keeps the existing
+   eight-step onboarding flow, the same controls, same endpoints, same task
+   hierarchy and the same responsive behaviour; it simply gives them one
+   calmer editorial system: a warm layered canvas, a clear journey rail,
+   confident typography, tactile selection states and restrained elevation.
+   ======================================================================== */
+
+/* ── A. Onboarding: an intentional journey, not a floating form ─────── */
+.ob-overlay {
+  --ob-ink: var(--text-main);
+  --ob-muted: var(--text-muted);
+  --ob-line: color-mix(in srgb, var(--glass-border) 82%, transparent);
+  --ob-panel: color-mix(in srgb, var(--surface-solid) 94%, transparent);
+  --ob-soft-accent: color-mix(in srgb, var(--accent) 10%, var(--surface-solid));
+  --ob-shadow: 0 24px 70px -38px color-mix(in srgb, var(--text-main) 36%, transparent),
+    0 2px 5px color-mix(in srgb, var(--text-main) 8%, transparent);
+  position: fixed;
+  isolation: isolate;
+  padding: clamp(24px, 4.8vh, 56px) clamp(20px, 4vw, 56px);
+  background-color: var(--app-bg);
+  background-image:
+    radial-gradient(62rem 34rem at -12% -12%, color-mix(in srgb, var(--accent) 13%, transparent), transparent 66%),
+    radial-gradient(50rem 34rem at 108% 4%, color-mix(in srgb, var(--color-ai, var(--accent)) 9%, transparent), transparent 68%),
+    linear-gradient(145deg, color-mix(in srgb, var(--surface) 24%, var(--app-bg)), var(--app-bg) 60%);
+}
+
+/* The two ambient pools give the canvas depth without introducing an image,
+   animation or any competing content. The wizard remains fully legible in
+   all of the existing theme palettes. */
+.ob-overlay::before,
+.ob-overlay::after {
+  content: "";
+  position: fixed;
+  z-index: -1;
+  width: min(42vw, 560px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  pointer-events: none;
+  filter: blur(2px);
+}
+
+.ob-overlay::before {
+  left: max(-210px, -11vw);
+  bottom: max(-240px, -18vh);
+  background: radial-gradient(circle, color-mix(in srgb, var(--accent-light) 18%, transparent), transparent 67%);
+}
+
+.ob-overlay::after {
+  top: max(-250px, -16vh);
+  right: max(-210px, -12vw);
+  background: radial-gradient(circle, color-mix(in srgb, var(--success-accent) 10%, transparent), transparent 68%);
+}
+
+.ob-shell {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 780px);
+  max-width: none;
+  gap: 14px;
+}
+
+.ob-brand-bar {
+  min-height: 50px;
+  padding: 3px 4px;
+  gap: 12px;
+}
+
+.ob-brand-mark {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  background: linear-gradient(145deg, var(--accent-light), var(--accent));
+  box-shadow: 0 10px 22px -12px color-mix(in srgb, var(--accent) 80%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, .34);
+}
+
+.ob-brand-name {
+  font-size: .98rem;
+  font-weight: 800;
+  letter-spacing: -.035em;
+  line-height: 1.1;
+}
+
+.ob-brand-tag {
+  margin-top: 3px;
+  font-size: .72rem;
+  font-weight: 650;
+  letter-spacing: .015em;
+  color: var(--text-dim);
+}
+
+/* On medium screens the rail stays as an elegant compact timeline above the
+   card. Desktop converts the exact same markup into a true side journey. */
+.ob-progress {
+  position: relative;
+  width: 100%;
+  margin: 0;
+  padding: 3px 4px 0;
+}
+
+.ob-step {
+  gap: 6px;
+}
+
+.ob-step-node {
+  width: 30px;
+  height: 30px;
+  border: 1px solid color-mix(in srgb, var(--glass-border-hover) 82%, transparent);
+  background: color-mix(in srgb, var(--surface-solid) 90%, transparent);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--text-main) 8%, transparent);
+  font-size: .66rem;
+}
+
+.ob-step.current .ob-step-node {
+  background: linear-gradient(145deg, var(--accent-light), var(--accent));
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 10%, transparent),
+    0 5px 12px -8px color-mix(in srgb, var(--accent) 82%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, .32);
+}
+
+.ob-step.done .ob-step-node {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 11%, var(--surface-solid));
+  border-color: color-mix(in srgb, var(--accent) 28%, var(--glass-border));
+  box-shadow: none;
+}
+
+.ob-step-label {
+  font-size: .62rem;
+  font-weight: 720;
+  letter-spacing: .01em;
+}
+
+.ob-step.current .ob-step-label { color: var(--accent); }
+.ob-step.done .ob-step-label { color: var(--text-muted); }
+
+.ob-step + .ob-step::before {
+  height: 1px;
+  top: 14px;
+  margin-inline: 18px;
+  background: color-mix(in srgb, var(--glass-border-hover) 72%, transparent);
+}
+
+.ob-step.done + .ob-step::before {
+  background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 38%, var(--glass-border)));
+}
+
+/* The card uses a calm opaque reading surface: enough depth to feel premium,
+   but no translucency behind form labels or user-entered text. */
+.ob-card {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: clamp(28px, 3.5vw, 44px);
+  border: 1px solid color-mix(in srgb, var(--glass-border-hover) 72%, var(--glass-border));
+  border-radius: 28px;
+  background-color: var(--surface-solid);
+  background-image:
+    radial-gradient(42rem 17rem at 105% -20%, color-mix(in srgb, var(--accent) 9%, transparent), transparent 67%),
+    linear-gradient(180deg, color-mix(in srgb, var(--surface-solid) 97%, var(--accent)) 0%, var(--surface-solid) 46%);
+  box-shadow: var(--ob-shadow);
+  animation: obCardEnter .42s cubic-bezier(.22, 1, .36, 1) both;
+}
+
+.ob-card::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, #fff 76%, transparent) 20%, color-mix(in srgb, #fff 72%, transparent) 80%, transparent);
+  opacity: .9;
+}
+
+.ob-card > * { position: relative; z-index: 1; }
+
+@keyframes obCardEnter {
+  from { opacity: 0; transform: translateY(8px) scale(.995); }
+  to { opacity: 1; transform: none; }
+}
+
+.ob-card-head {
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.ob-step-art {
+  position: relative;
+  width: 72px;
+  height: 62px;
+  flex-basis: 72px;
+  overflow: hidden;
+  border-radius: 19px;
+  background:
+    radial-gradient(100% 110% at 14% 5%, color-mix(in srgb, var(--accent-light) 31%, transparent), transparent 63%),
+    linear-gradient(145deg, color-mix(in srgb, var(--accent) 16%, var(--surface-solid)), color-mix(in srgb, var(--accent) 5%, var(--surface-solid)));
+  border-color: color-mix(in srgb, var(--accent) 24%, var(--glass-border));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .38),
+    0 12px 24px -18px color-mix(in srgb, var(--accent) 78%, transparent);
+}
+
+.ob-step-art::before {
+  content: "";
+  position: absolute;
+  right: -12px;
+  bottom: -16px;
+  width: 43px;
+  height: 43px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+}
+
+.ob-step-art svg {
+  position: relative;
+  z-index: 1;
+  width: 58px;
+  height: 46px;
+  stroke-width: 2.15;
+}
+
+.ob-step-kicker {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  margin: 0;
+  padding: 5px 9px;
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 7%, var(--surface-solid));
+  color: var(--accent);
+  font-size: .64rem;
+  font-weight: 800;
+  letter-spacing: .08em;
+  line-height: 1;
+}
+
+.ob-card h1 {
+  max-width: 18ch;
+  margin: 0 0 12px;
+  font-size: clamp(1.7rem, 1.2rem + 1.3vw, 2.28rem);
+  font-weight: 790;
+  letter-spacing: -.052em;
+  line-height: 1.08;
+  text-wrap: balance;
+  color: var(--ob-ink);
+}
+
+.ob-card > p,
+.ob-card > .ob-lead {
+  max-width: 65ch;
+  margin-bottom: 24px;
+  color: var(--ob-muted);
+  font-size: .9rem;
+  font-weight: 540;
+  line-height: 1.65;
+}
+
+/* Step one becomes a concise feature trio on roomy cards. The content and
+   order do not change; this simply improves scanning before the first input. */
+.ob-feature-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0 0 24px;
+}
+
+.ob-feature {
+  min-height: 100%;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--glass-border) 88%, transparent);
+  border-radius: 17px;
+  background: linear-gradient(155deg, color-mix(in srgb, var(--surface-solid) 94%, var(--accent)), color-mix(in srgb, var(--row-bg) 78%, var(--surface-solid)));
+  box-shadow: 0 5px 14px -14px color-mix(in srgb, var(--text-main) 48%, transparent);
+}
+
+.ob-feature-icon {
+  width: 30px;
+  height: 30px;
+  margin-top: 0;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface-solid));
+  color: var(--accent);
+}
+
+.ob-feature strong {
+  margin-top: 1px;
+  font-size: .78rem;
+  letter-spacing: -.012em;
+}
+
+.ob-feature div span {
+  margin-top: 3px;
+  font-size: .7rem;
+  line-height: 1.48;
+  color: var(--text-muted);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .ob-feature {
+    transition: transform .18s cubic-bezier(.22, 1, .36, 1), border-color .18s ease, box-shadow .18s ease;
+  }
+  .ob-feature:hover {
+    transform: translateY(-2px);
+    border-color: color-mix(in srgb, var(--accent) 30%, var(--glass-border));
+    box-shadow: 0 10px 22px -18px color-mix(in srgb, var(--text-main) 62%, transparent);
+  }
+}
+
+/* Forms: a consistent soft inset, clear focus ring and a 48px baseline
+   makes the wizard feel coherent even as the fields change from step to step. */
+.ob-name-input,
+.ob-course-search,
+.ob-add-sub-input,
+.ob-field input,
+.ob-field select,
+.ob-field textarea,
+.ob-choice-card select {
+  min-height: 48px;
+  border: 1px solid color-mix(in srgb, var(--glass-border-hover) 72%, var(--glass-border));
+  border-radius: 13px;
+  background-color: var(--input-bg);
+  box-shadow: inset 0 1px 1px color-mix(in srgb, var(--text-main) 4%, transparent);
+  color: var(--text-main);
+  font-weight: 620;
+  transition: border-color .16s ease, box-shadow .16s ease, background .16s ease;
+}
+
+.ob-field textarea { min-height: 78px; line-height: 1.5; }
+
+.ob-name-input::placeholder,
+.ob-course-search::placeholder,
+.ob-add-sub-input::placeholder,
+.ob-field input::placeholder,
+.ob-field textarea::placeholder { color: var(--text-dim); font-weight: 500; }
+
+.ob-name-input:focus,
+.ob-course-search:focus,
+.ob-add-sub-input:focus,
+.ob-field input:focus,
+.ob-field select:focus,
+.ob-field textarea:focus,
+.ob-choice-card select:focus {
+  border-color: color-mix(in srgb, var(--accent) 70%, var(--glass-border));
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 13%, transparent), inset 0 1px 1px color-mix(in srgb, var(--text-main) 3%, transparent);
+  outline: none;
+}
+
+.ob-card .lbl,
+.ob-field label,
+.ob-choice-card > label {
+  color: var(--text-muted);
+  font-size: .68rem;
+  font-weight: 780;
+  letter-spacing: .075em;
+}
+
+.ob-note-panel {
+  padding: 13px 15px;
+  border: 1px solid color-mix(in srgb, var(--accent) 13%, var(--glass-border));
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--accent) 4.5%, var(--surface-solid));
+  color: var(--text-muted);
+  line-height: 1.52;
+}
+
+/* Study level cards retain their existing selection behaviour, but now read
+   as a coherent collection with a precise selected border and quiet surface. */
+.ob-card .ob-level-grid { gap: 12px; margin-bottom: 22px; }
+
+.ob-level-btn {
+  min-height: 106px;
+  padding: 16px;
+  border: 1px solid var(--glass-border);
+  border-radius: 18px;
+  background: linear-gradient(155deg, color-mix(in srgb, var(--surface-solid) 96%, var(--accent)), color-mix(in srgb, var(--row-bg) 76%, var(--surface-solid)));
+  box-shadow: none;
+}
+
+.ob-level-btn:hover {
+  border-color: color-mix(in srgb, var(--accent) 33%, var(--glass-border));
+  background: color-mix(in srgb, var(--accent) 4%, var(--surface-solid));
+}
+
+.ob-level-btn.selected {
+  border-color: color-mix(in srgb, var(--accent) 74%, var(--glass-border));
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface-solid));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 10%, transparent), inset 0 1px 0 rgba(255, 255, 255, .22);
+}
+
+.ob-level-icon {
+  width: 32px;
+  height: 32px;
+  flex-basis: 32px;
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface-solid));
+}
+
+.ob-level-btn.selected .ob-level-icon {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 18%, var(--surface-solid));
+}
+
+.ob-level-title { font-size: .92rem; font-weight: 780; }
+.ob-level-btn small { font-size: .72rem; line-height: 1.44; }
+
+/* Course search and curriculum rows share the same calm nested-surface
+   language, making lengthy catalog steps feel much less dense. */
+.ob-course-list,
+.ob-subs-grid {
+  padding: 5px;
+  border-color: color-mix(in srgb, var(--glass-border-hover) 68%, var(--glass-border));
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--row-bg) 74%, var(--surface-solid));
+}
+
+.ob-course-item {
+  min-height: 50px;
+  padding: 12px 14px;
+  border-radius: 13px;
+  border-color: transparent;
+  background: var(--surface-solid);
+  box-shadow: 0 1px 1px color-mix(in srgb, var(--text-main) 5%, transparent);
+  font-size: .82rem;
+  font-weight: 670;
+}
+
+.ob-course-item:hover {
+  background: color-mix(in srgb, var(--accent) 4.5%, var(--surface-solid));
+  border-color: color-mix(in srgb, var(--accent) 24%, var(--glass-border));
+}
+
+.ob-course-item.selected {
+  background: color-mix(in srgb, var(--accent) 7.5%, var(--surface-solid));
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--glass-border));
+  color: var(--text-main);
+  box-shadow: inset 3px 0 0 var(--accent), 0 1px 2px color-mix(in srgb, var(--text-main) 4%, transparent);
+}
+
+.ob-course-item-accent {
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface-solid));
+  border-color: color-mix(in srgb, var(--accent) 36%, var(--glass-border));
+}
+
+.ob-course-item-accent strong { color: var(--accent); }
+
+.ob-course-check {
+  width: 21px;
+  height: 21px;
+  border-radius: 8px;
+}
+
+.ob-sub-row {
+  min-height: 50px;
+  padding: 9px 11px;
+  border-radius: 13px;
+  border-color: var(--glass-border);
+  box-shadow: none;
+}
+
+.ob-sub-row input[type="text"] { font-size: .82rem; }
+.ob-sub-row input[type="number"],
+.ob-sub-row select { min-height: 33px; }
+
+.ob-mini-stat {
+  padding: 13px 11px;
+  border-radius: 15px;
+  border-color: var(--glass-border);
+  background: linear-gradient(155deg, color-mix(in srgb, var(--accent) 5%, var(--surface-solid)), var(--surface-solid));
+}
+
+.ob-mini-stat strong { font-size: 1.12rem; font-variant-numeric: tabular-nums; }
+.ob-mini-stat span { font-size: .68rem; }
+
+/* Every configuration card follows the same high-clarity selection language. */
+.ob-range-card,
+.ob-choice-card,
+.ob-review-card,
+.ob-projection-card {
+  border-color: color-mix(in srgb, var(--glass-border-hover) 68%, var(--glass-border));
+  background-color: var(--surface-solid);
+  background-image: linear-gradient(155deg, color-mix(in srgb, var(--surface-solid) 96%, var(--accent)), color-mix(in srgb, var(--row-bg) 78%, var(--surface-solid)));
+  box-shadow: 0 6px 18px -18px color-mix(in srgb, var(--text-main) 56%, transparent);
+}
+
+.ob-choice-card { padding: 17px; }
+.ob-choice-grid { gap: 9px; }
+
+.ob-choice-btn {
+  min-height: 68px;
+  padding: 13px 14px;
+  border-radius: 14px;
+  border-color: var(--glass-border);
+  background: var(--surface-solid);
+  transition: background .16s ease, border-color .16s ease, box-shadow .16s ease, transform .13s cubic-bezier(.22, 1, .36, 1);
+}
+
+.ob-choice-btn strong { font-size: .8rem; letter-spacing: -.012em; }
+.ob-choice-btn span { font-size: .71rem; line-height: 1.45; }
+
+.ob-choice-btn:hover {
+  border-color: color-mix(in srgb, var(--accent) 34%, var(--glass-border));
+  background: color-mix(in srgb, var(--accent) 4%, var(--surface-solid));
+}
+
+.ob-choice-btn.selected {
+  border-color: color-mix(in srgb, var(--accent) 65%, var(--glass-border));
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface-solid));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 44%, transparent), 0 5px 13px -12px color-mix(in srgb, var(--accent) 62%, transparent);
+}
+
+.ob-choice-btn.selected strong { color: var(--accent); }
+
+.ob-range-card { padding: 17px; }
+.ob-range-icon { border-radius: 10px; }
+.ob-range-value { font-variant-numeric: tabular-nums; }
+
+.ob-projection-card {
+  position: relative;
+  overflow: hidden;
+  padding: 20px;
+  border-radius: 20px;
+  text-align: left;
+}
+
+.ob-projection-card::after {
+  content: "";
+  position: absolute;
+  top: -34px;
+  right: -22px;
+  width: 112px;
+  height: 112px;
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, transparent);
+  border-radius: 50%;
+  box-shadow: 0 0 0 18px color-mix(in srgb, var(--accent) 4%, transparent),
+    0 0 0 37px color-mix(in srgb, var(--accent) 2.5%, transparent);
+  pointer-events: none;
+}
+
+.ob-projection-date { font-size: clamp(1.55rem, 3vw, 2rem); }
+
+.ob-review-grid { gap: 14px; margin-bottom: 14px; }
+.ob-review-card { padding: 20px; border-radius: 19px; }
+.ob-review-title { color: var(--text-muted); }
+.ob-review-check-icon { background: color-mix(in srgb, var(--success-accent) 13%, var(--surface-solid)); color: var(--success-accent); }
+.ob-review-pulse { background: color-mix(in srgb, var(--accent) 7%, var(--surface-solid)); }
+
+.ob-summary-row {
+  padding-block: 10px;
+  border-bottom-color: color-mix(in srgb, var(--glass-border) 82%, transparent);
+}
+
+.ob-summary-row span:last-child { font-weight: 750; color: var(--text-main); }
+
+.ob-error-banner {
+  border: 1px solid color-mix(in srgb, var(--danger-accent) 32%, var(--glass-border));
+  background: color-mix(in srgb, var(--danger-accent) 9%, var(--surface-solid));
+  color: color-mix(in srgb, var(--danger-accent) 88%, var(--text-main));
+}
+
+/* The footer is a precise, stable close to every step. It remains in normal
+   document flow (rather than sticky) so small screens and long steps never
+   hide a control behind browser chrome. */
+.ob-footer-strip {
+  gap: 20px;
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top-color: color-mix(in srgb, var(--glass-border) 82%, transparent);
+}
+
+.ob-privacy {
+  max-width: 36ch;
+  color: var(--text-dim);
+  font-size: .72rem;
+  line-height: 1.45;
+}
+
+.ob-privacy svg { color: var(--accent); }
+
+.ob-btn-row { gap: 10px; }
+
+.ob-btn {
+  min-width: 138px;
+  min-height: 48px;
+  border-radius: 13px;
+  font-size: .84rem;
+  font-weight: 760;
+  letter-spacing: -.012em;
+}
+
+.ob-btn-primary {
+  background: linear-gradient(135deg, var(--accent-light), var(--accent) 56%, var(--accent-hover));
+  box-shadow: 0 10px 22px -13px color-mix(in srgb, var(--accent) 82%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, .3);
+}
+
+.ob-btn-primary:hover {
+  filter: brightness(1.025);
+  box-shadow: 0 13px 26px -14px color-mix(in srgb, var(--accent) 88%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, .3);
+}
+
+.ob-btn-secondary {
+  border-color: color-mix(in srgb, var(--glass-border-hover) 86%, var(--glass-border));
+  background: var(--surface-solid);
+}
+
+.ob-cancel-link {
+  color: var(--text-muted);
+  font-weight: 650;
+}
+
+.ob-cancel-link:hover { color: var(--accent); }
+
+/* ── B. Desktop journey rail ─────────────────────────────────────────── */
+@media (min-width: 961px) {
+  .ob-overlay {
+    align-items: center;
+    padding-inline: clamp(32px, 5vw, 80px);
+  }
+
+  .ob-shell {
+    display: grid;
+    grid-template-columns: minmax(178px, 208px) minmax(0, 790px);
+    grid-template-rows: auto 1fr;
+    column-gap: clamp(26px, 3vw, 46px);
+    row-gap: 14px;
+    width: min(100%, 1044px);
+    align-items: start;
+  }
+
+  .ob-brand-bar {
+    grid-column: 1;
+    grid-row: 1;
+    align-self: center;
+    padding: 6px 4px;
+  }
+
+  .ob-progress {
+    grid-column: 1;
+    grid-row: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 3px;
+    width: auto;
+    margin: 0;
+    padding: 10px 0 0;
+  }
+
+  .ob-progress::before {
+    content: "";
+    position: absolute;
+    top: 29px;
+    bottom: 30px;
+    left: 15px;
+    width: 1px;
+    background: color-mix(in srgb, var(--glass-border-hover) 72%, transparent);
+  }
+
+  .ob-step {
+    z-index: 1;
+    flex: 0 0 auto;
+    display: grid;
+    grid-template-columns: 32px minmax(0, 1fr);
+    align-items: center;
+    min-height: 43px;
+    padding: 5px 8px 5px 0;
+    gap: 10px;
+    border-radius: 12px;
+    text-align: left;
+  }
+
+  .ob-step + .ob-step::before { content: none; display: none; }
+
+  .ob-step-label {
+    display: block;
+    overflow: visible;
+    color: var(--text-dim);
+    font-size: .73rem;
+    text-align: left;
+    white-space: nowrap;
+  }
+
+  .ob-step.current {
+    background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 9%, transparent), transparent 95%);
+  }
+
+  .ob-step-node {
+    width: 31px;
+    height: 31px;
+    justify-self: center;
+  }
+
+  .ob-card {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    align-self: start;
+  }
+}
+
+/* ── C. Tablet and phone: preserve the identical workflow with a carefully
+      compressed hierarchy rather than a scaled-down desktop composition. ── */
+@media (max-width: 960px) {
+  .ob-shell {
+    width: min(100%, 780px);
+    margin-top: auto;
+    margin-bottom: auto;
+  }
+
+  .ob-progress::before { content: none; }
+}
+
+@media (max-width: 700px) {
+  .ob-overlay {
+    padding: max(16px, env(safe-area-inset-top)) 12px max(22px, env(safe-area-inset-bottom));
+    background-image:
+      radial-gradient(34rem 22rem at -20% -8%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 66%),
+      radial-gradient(30rem 20rem at 116% 4%, color-mix(in srgb, var(--color-ai, var(--accent)) 7%, transparent), transparent 69%),
+      linear-gradient(145deg, color-mix(in srgb, var(--surface) 18%, var(--app-bg)), var(--app-bg) 62%);
+  }
+
+  .ob-overlay::before,
+  .ob-overlay::after { display: none; }
+
+  .ob-shell { gap: 11px; width: 100%; }
+
+  .ob-brand-bar { min-height: 42px; padding: 0 3px; gap: 10px; }
+  .ob-brand-mark { width: 38px; height: 38px; border-radius: 12px; }
+  .ob-brand-name { font-size: .9rem; }
+  .ob-brand-tag { margin-top: 2px; font-size: .66rem; }
+
+  .ob-progress { padding: 1px 2px 2px; }
+  .ob-step { gap: 4px; }
+  .ob-step-node { width: 25px; height: 25px; font-size: .58rem; }
+  .ob-step + .ob-step::before { top: 12px; margin-inline: 13px; }
+  .ob-step-label { display: none; }
+
+  .ob-card {
+    width: 100%;
+    padding: 23px 18px 20px;
+    border-radius: 22px;
+    background-image:
+      radial-gradient(28rem 14rem at 110% -20%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 67%),
+      linear-gradient(180deg, color-mix(in srgb, var(--surface-solid) 97%, var(--accent)) 0%, var(--surface-solid) 48%);
+    box-shadow: 0 17px 42px -30px color-mix(in srgb, var(--text-main) 45%, transparent),
+      0 1px 3px color-mix(in srgb, var(--text-main) 7%, transparent);
+  }
+
+  .ob-card-head { gap: 11px; margin-bottom: 17px; }
+  .ob-step-art { width: 57px; height: 50px; flex-basis: 57px; border-radius: 16px; }
+  .ob-step-art svg { width: 47px; height: 38px; }
+  .ob-step-kicker { padding: 4px 8px; font-size: .59rem; }
+
+  .ob-card h1 {
+    max-width: 22ch;
+    margin-bottom: 10px;
+    font-size: clamp(1.48rem, 7vw, 1.8rem);
+    letter-spacing: -.045em;
+    line-height: 1.12;
+  }
+
+  .ob-card > p,
+  .ob-card > .ob-lead { margin-bottom: 19px; font-size: .84rem; line-height: 1.58; }
+
+  .ob-feature-list { grid-template-columns: 1fr; gap: 8px; margin-bottom: 20px; }
+  .ob-feature { min-height: 0; padding: 11px 12px; border-radius: 14px; }
+  .ob-feature-icon { width: 28px; height: 28px; border-radius: 9px; }
+  .ob-feature strong { font-size: .77rem; }
+  .ob-feature div span { font-size: .69rem; }
+
+  .ob-name-input,
+  .ob-course-search,
+  .ob-add-sub-input,
+  .ob-field input,
+  .ob-field select,
+  .ob-field textarea,
+  .ob-choice-card select { min-height: 48px; font-size: 16px; }
+
+  .ob-card .ob-level-grid { gap: 9px; margin-bottom: 19px; }
+  .ob-level-btn { min-height: 83px; padding: 13px; border-radius: 15px; }
+  .ob-level-icon { width: 30px; height: 30px; flex-basis: 30px; border-radius: 10px; }
+  .ob-level-title { font-size: .86rem; }
+  .ob-level-btn small { font-size: .68rem; }
+
+  .ob-course-list,
+  .ob-subs-grid { max-height: min(42dvh, 310px); border-radius: 15px; }
+  .ob-course-item { min-height: 48px; padding: 10px 11px; border-radius: 11px; font-size: .78rem; }
+  .ob-course-check { width: 20px; height: 20px; }
+  .ob-list-meta { margin: -2px 0 9px; }
+
+  .ob-mini-stats { gap: 7px; margin-bottom: 12px; }
+  .ob-mini-stat { padding: 10px 6px; border-radius: 12px; }
+  .ob-mini-stat strong { font-size: 1rem; }
+  .ob-mini-stat span { font-size: .61rem; }
+
+  .ob-choice-card,
+  .ob-range-card { padding: 14px; border-radius: 16px; }
+  .ob-choice-btn { min-height: 60px; padding: 12px; border-radius: 12px; }
+  .ob-choice-btn strong { font-size: .78rem; }
+  .ob-choice-btn span { font-size: .69rem; }
+  .ob-range-value { min-width: 76px; padding: 6px 11px; font-size: .78rem; }
+  .ob-projection-card { padding: 17px; border-radius: 17px; }
+  .ob-projection-date { font-size: 1.5rem; }
+  .ob-review-card { padding: 16px; border-radius: 16px; }
+
+  .ob-footer-strip {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 13px;
+    margin-top: 20px;
+    padding-top: 17px;
+  }
+
+  .ob-privacy { max-width: none; justify-content: center; text-align: center; font-size: .68rem; }
+  .ob-btn-row { width: 100%; gap: 8px; }
+  .ob-btn { min-height: 48px; min-width: 0; }
+  .ob-cancel-link { margin-top: 8px; font-size: .75rem; }
+}
+
+@media (max-width: 380px) {
+  .ob-overlay { padding-inline: 9px; }
+  .ob-card { padding-inline: 15px; border-radius: 20px; }
+  .ob-brand-tag { display: none; }
+  .ob-step-art { width: 52px; height: 47px; flex-basis: 52px; }
+  .ob-card h1 { font-size: 1.42rem; }
+  .ob-sub-row { gap: 7px; }
+  .ob-footer-strip { gap: 11px; }
+}
+
+/* Dark palettes receive the same hierarchy without a white halo around the
+   card, selectors or form inputs. */
+body.theme-dark .ob-overlay,
+body.theme-obsidian .ob-overlay,
+body.theme-nebula .ob-overlay {
+  --ob-panel: color-mix(in srgb, var(--surface-solid) 96%, transparent);
+  --ob-shadow: 0 26px 72px -36px rgba(0, 0, 0, .86), 0 2px 5px rgba(0, 0, 0, .36);
+}
+
+body.theme-dark .ob-card,
+body.theme-obsidian .ob-card,
+body.theme-nebula .ob-card {
+  background-image:
+    radial-gradient(42rem 17rem at 105% -20%, color-mix(in srgb, var(--accent) 13%, transparent), transparent 67%),
+    linear-gradient(180deg, color-mix(in srgb, var(--surface-solid) 98%, #fff) 0%, var(--surface-solid) 58%);
+  border-color: color-mix(in srgb, var(--glass-border-hover) 74%, transparent);
+}
+
+body.theme-dark .ob-feature,
+body.theme-obsidian .ob-feature,
+body.theme-nebula .ob-feature,
+body.theme-dark .ob-range-card,
+body.theme-obsidian .ob-range-card,
+body.theme-nebula .ob-range-card,
+body.theme-dark .ob-choice-card,
+body.theme-obsidian .ob-choice-card,
+body.theme-nebula .ob-choice-card,
+body.theme-dark .ob-review-card,
+body.theme-obsidian .ob-review-card,
+body.theme-nebula .ob-review-card {
+  background-image: linear-gradient(155deg, color-mix(in srgb, var(--surface-solid) 94%, var(--accent)), color-mix(in srgb, var(--row-bg) 86%, var(--surface-solid)));
+}
+
+/* ── D. Shared view polish: planner, focus, subjects and settings ───────
+   These rules do not change grids, controls or interaction state. They make
+   the existing app screens feel related to the new onboarding with matching
+   surface depth, editorial headings and compact grouped controls. */
+.page-header .page-title {
+  font-weight: 790;
+  letter-spacing: -.045em;
+  line-height: 1.08;
+}
+
+.page-header .page-subtitle { font-weight: 560; color: var(--text-muted); }
+
+.workload-strip {
+  border: 1px solid color-mix(in srgb, var(--glass-border-hover) 62%, var(--glass-border));
+  border-radius: 16px;
+  background: linear-gradient(110deg, color-mix(in srgb, var(--accent) 4.5%, var(--surface-solid)), var(--surface-solid) 62%);
+  box-shadow: 0 7px 20px -20px color-mix(in srgb, var(--text-main) 62%, transparent);
+}
+
+.workload-sep { background: color-mix(in srgb, var(--glass-border-hover) 72%, transparent); }
+
+.planner-days .day-block {
+  border-color: color-mix(in srgb, var(--glass-border-hover) 62%, var(--glass-border));
+  box-shadow: 0 9px 26px -24px color-mix(in srgb, var(--text-main) 65%, transparent);
+}
+
+.planner-days .day-block > .day-head {
+  background: linear-gradient(110deg, color-mix(in srgb, var(--accent) 5.5%, var(--surface-solid)), var(--surface-solid) 70%);
+}
+
+.focus-view .study-clock-panel,
+.focus-view .timer-panel,
+.focus-view .ambient-panel,
+.focus-view .rules-panel,
+.settings-view .section-card,
+.subs-wrap .section-card,
+.side-form {
+  border-color: color-mix(in srgb, var(--glass-border-hover) 64%, var(--glass-border));
+  box-shadow: 0 10px 28px -25px color-mix(in srgb, var(--text-main) 68%, transparent);
+}
+
+.focus-view .study-clock-panel {
+  background-image: linear-gradient(135deg, color-mix(in srgb, var(--success-accent) 4.5%, var(--surface-solid)), var(--surface-solid) 58%);
+}
+
+.focus-view .timer-panel {
+  background-image: radial-gradient(34rem 20rem at 50% 0%, color-mix(in srgb, var(--accent) 6%, transparent), transparent 62%), linear-gradient(180deg, var(--surface-solid), color-mix(in srgb, var(--row-bg) 48%, var(--surface-solid)));
+}
+
+.focus-view .ambient-panel,
+.focus-view .rules-panel,
+.settings-view .section-card,
+.subs-wrap .section-card,
+.side-form {
+  background-image: linear-gradient(155deg, color-mix(in srgb, var(--surface-solid) 97%, var(--accent)), var(--surface-solid) 66%);
+}
+
+.theme-card {
+  border-color: color-mix(in srgb, var(--glass-border-hover) 65%, var(--glass-border));
+  background: var(--surface-solid);
+}
+
+.theme-card.active {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 11%, transparent), 0 7px 16px -15px color-mix(in srgb, var(--accent) 70%, transparent);
+}
+
+.focus-view .mode-row {
+  border-color: color-mix(in srgb, var(--glass-border-hover) 62%, var(--glass-border));
+  background: color-mix(in srgb, var(--row-bg) 70%, var(--surface-solid));
+}
+
+.focus-view .sound-option {
+  border-color: color-mix(in srgb, var(--glass-border-hover) 58%, var(--glass-border));
+}
+
+@media (max-width: 700px) {
+  .workload-strip { border-radius: 14px; }
+  .planner-days .day-block { box-shadow: 0 7px 19px -20px color-mix(in srgb, var(--text-main) 66%, transparent); }
+  .focus-view .study-clock-panel,
+  .focus-view .timer-panel,
+  .focus-view .ambient-panel,
+  .focus-view .rules-panel,
+  .settings-view .section-card,
+  .subs-wrap .section-card,
+  .side-form { box-shadow: 0 7px 20px -22px color-mix(in srgb, var(--text-main) 72%, transparent); }
+}
+
+/* Reduced-motion and reduced-transparency users keep every information cue
+   while avoiding ornamental travel and translucent decorative light pools. */
+@media (prefers-reduced-motion: reduce) {
+  .ob-card,
+  .ob-feature,
+  .ob-level-btn,
+  .ob-choice-btn,
+  .ob-btn,
+  .ob-step-node,
+  .ob-course-item {
+    animation: none;
+    transition: none;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .ob-overlay { background-image: none; }
+  .ob-overlay::before,
+  .ob-overlay::after,
+  .ob-step-art::before,
+  .ob-projection-card::after { display: none; }
+  .ob-card,
+  .ob-feature,
+  .ob-range-card,
+  .ob-choice-card,
+  .ob-review-card,
+  .ob-projection-card { background-image: none; background-color: var(--surface-solid); }
+}
+
+/* ========================================================================
+   ONBOARDING COMPOSITION CORRECTION
+   ------------------------------------------------------------------------
+   The onboarding now follows the supplied visual direction more closely:
+   a centered horizontal journey, one generous white content canvas, large
+   purpose-made study scenes, soft edge decor and light icon-led choices.
+   This supersedes the experimental side-rail composition above while keeping
+   every existing onboarding state, action and responsive workflow intact.
+   ======================================================================== */
+
+/* The generated study objects are purely decorative and deliberately sit
+   outside the interaction layer. They are hidden before they can crowd a
+   tablet or phone. */
+.ob-overlay {
+  background-color: #f8f7fc;
+  background-image:
+    radial-gradient(54rem 34rem at -12% -13%, rgba(116, 96, 235, .105), transparent 68%),
+    radial-gradient(48rem 32rem at 106% 8%, rgba(177, 151, 247, .10), transparent 70%),
+    linear-gradient(145deg, #fbfaff 0%, #f7f6fc 56%, #fbfafe 100%);
+}
+
+.ob-overlay::before,
+.ob-overlay::after {
+  display: block;
+  position: fixed;
+  z-index: 0;
+  aspect-ratio: auto;
+  border-radius: 0;
+  filter: none;
+  opacity: .92;
+  pointer-events: none;
+}
+
+.ob-overlay::before {
+  left: 0;
+  bottom: 0;
+  width: min(27vw, 370px);
+  height: min(88vh, 880px);
+  background: url("./onboarding-left-decor.png") left bottom / auto 100% no-repeat;
+}
+
+.ob-overlay::after {
+  top: auto;
+  right: 0;
+  bottom: 0;
+  width: min(34vw, 520px);
+  height: min(85vh, 900px);
+  background: url("./onboarding-right-decor.png") right bottom / auto 70% no-repeat;
+}
+
+.ob-shell {
+  z-index: 1;
+  width: min(100%, 960px);
+  max-width: 960px;
+  gap: 13px;
+}
+
+/* Reset the desktop side rail back to a simple, readable horizontal journey.
+   The rail and the main card intentionally share the same left/right edge. */
+@media (min-width: 961px) {
+  .ob-overlay {
+    align-items: center;
+    padding: clamp(28px, 4vh, 48px) clamp(28px, 5vw, 72px);
+  }
+
+  .ob-shell {
+    display: flex;
+    flex-direction: column;
+    grid-template-columns: none;
+    grid-template-rows: none;
+    width: min(100%, 960px);
+    max-width: 960px;
+    gap: 13px;
+  }
+
+  .ob-brand-bar {
+    grid-column: auto;
+    grid-row: auto;
+    align-self: stretch;
+    padding: 2px 4px;
+  }
+
+  .ob-progress {
+    grid-column: auto;
+    grid-row: auto;
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    width: 100%;
+    margin: 0;
+    padding: 3px 5px 4px;
+    gap: 0;
+  }
+
+  .ob-progress::before { content: none; }
+
+  .ob-step {
+    display: flex;
+    flex: 1 1 0;
+    flex-direction: column;
+    align-items: center;
+    min-height: 0;
+    padding: 0;
+    gap: 6px;
+    border-radius: 0;
+    background: transparent;
+    text-align: center;
+  }
+
+  .ob-step + .ob-step::before {
+    display: block;
+    content: "";
+    top: 15px;
+    left: -50%;
+    right: 50%;
+    width: auto;
+    height: 1px;
+    margin-inline: 18px;
+  }
+
+  .ob-step-label {
+    display: block;
+    overflow: hidden;
+    color: var(--text-muted);
+    font-size: .67rem;
+    font-weight: 700;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  .ob-step-node {
+    width: 31px;
+    height: 31px;
+  }
+
+  .ob-card {
+    grid-column: auto;
+    grid-row: auto;
+    align-self: stretch;
+  }
+}
+
+/* White canvas, deliberately lighter and calmer than the application panels.
+   It makes the onboarding feel like one focused studio, while its familiar
+   accent, type and controls still belong to Study Planner Pro. */
+.ob-card {
+  width: 100%;
+  max-width: 960px;
+  margin: 0;
+  padding: 28px clamp(30px, 5vw, 70px) 26px;
+  border: 1px solid rgba(108, 92, 231, .12);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, .92);
+  background-image: none;
+  box-shadow: 0 20px 48px -34px rgba(42, 37, 83, .31), 0 2px 8px rgba(42, 37, 83, .035);
+}
+
+.ob-card::before { display: none; }
+
+/* The tiny icon tile has been replaced by a full-width SVG study scene. */
+.ob-card-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  margin: 0 0 10px;
+  text-align: center;
+}
+
+.ob-step-art,
+.ob-step-art.ob-step-art--you {
+  width: min(100%, 330px);
+  height: 144px;
+  flex: 0 0 144px;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.ob-step-art::before { display: none; }
+
+.ob-step-art svg {
+  width: 100%;
+  height: 100%;
+  stroke-width: initial;
+}
+
+.ob-step-kicker {
+  margin-top: -7px;
+  padding: 5px 11px;
+  border-color: rgba(108, 92, 231, .08);
+  background: rgba(108, 92, 231, .075);
+  color: #5b49cc;
+  font-size: .61rem;
+  letter-spacing: .09em;
+}
+
+.ob-card h1 {
+  max-width: 26ch;
+  margin: 0 auto 9px;
+  text-align: center;
+  color: #17162e;
+  font-size: clamp(1.72rem, 1.18rem + 1.15vw, 2.2rem);
+  font-weight: 800;
+  letter-spacing: -.055em;
+  line-height: 1.12;
+}
+
+.ob-card > p,
+.ob-card > .ob-lead {
+  max-width: 66ch;
+  margin: 0 auto 22px;
+  text-align: center;
+  color: #696880;
+  font-size: .87rem;
+  line-height: 1.56;
+}
+
+/* Content groups stay comfortably narrow within the large canvas, following
+   the reference's generous side gutters and making long form text scan well. */
+.ob-feature-list,
+.ob-card > .lbl,
+.ob-card > .ob-name-input,
+.ob-card > .ob-note-panel,
+.ob-card > .ob-course-search,
+.ob-card > .ob-list-meta,
+.ob-card > .ob-course-list,
+.ob-card > .ob-mini-stats,
+.ob-card > .ob-subs-grid,
+.ob-card > .ob-add-sub-row,
+.ob-card > .curriculum-sources,
+.ob-card > .ob-hint,
+.ob-card > .ob-schedule-grid,
+.ob-card > .ob-projection-card,
+.ob-card > .ob-review-grid,
+.ob-card > .ob-error-banner {
+  width: min(100%, 700px);
+  margin-inline: auto;
+}
+
+.ob-feature-list {
+  grid-template-columns: 1fr;
+  gap: 8px;
+  margin-bottom: 22px;
+}
+
+.ob-feature {
+  align-items: center;
+  padding: 12px 15px;
+  border-color: rgba(108, 92, 231, .12);
+  border-radius: 13px;
+  background: #fff;
+  box-shadow: 0 4px 12px -13px rgba(42, 37, 83, .35);
+}
+
+.ob-feature-icon,
+.ob-level-icon,
+.ob-choice-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #6554d9;
+  background: #f1efff;
+}
+
+.ob-feature-icon {
+  width: 35px;
+  height: 35px;
+  border-radius: 12px;
+}
+
+.ob-feature strong { font-size: .81rem; }
+.ob-feature div span { font-size: .72rem; }
+
+.ob-card .lbl {
+  display: block;
+  margin-bottom: 7px;
+  color: #6057bd;
+  font-size: .64rem;
+}
+
+.ob-name-input,
+.ob-course-search,
+.ob-add-sub-input,
+.ob-field input,
+.ob-field select,
+.ob-field textarea,
+.ob-choice-card select {
+  border-color: rgba(55, 48, 93, .14);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: inset 0 1px 2px rgba(42, 37, 83, .025);
+}
+
+.ob-name-input:focus,
+.ob-course-search:focus,
+.ob-add-sub-input:focus,
+.ob-field input:focus,
+.ob-field select:focus,
+.ob-field textarea:focus,
+.ob-choice-card select:focus {
+  border-color: #7160e7;
+  box-shadow: 0 0 0 3px rgba(113, 96, 231, .12);
+}
+
+.ob-note-panel {
+  border-color: rgba(108, 92, 231, .1);
+  border-radius: 12px;
+  background: #f7f5ff;
+  color: #716f8a;
+}
+
+/* Course and syllabus lists retain their capability but shed the heavy
+   container treatment; the rows now feel like the clear reference cards. */
+.ob-course-list,
+.ob-subs-grid {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.ob-course-list { gap: 7px; max-height: 332px; }
+
+.ob-course-item {
+  min-height: 54px;
+  padding: 12px 14px;
+  border: 1px solid rgba(55, 48, 93, .11);
+  border-radius: 13px;
+  background: #fff;
+  box-shadow: 0 2px 7px -8px rgba(42, 37, 83, .25);
+}
+
+.ob-course-item::before { display: none; }
+.ob-course-item:hover { transform: none; background: #fbfaff; border-color: rgba(108, 92, 231, .3); }
+.ob-course-item.selected {
+  background: #fbfaff;
+  border-color: #7564e4;
+  box-shadow: 0 0 0 1px #7564e4 inset;
+}
+
+.ob-course-check {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  border-color: rgba(55, 48, 93, .18);
+  box-shadow: none;
+}
+
+.ob-course-item.selected .ob-course-check {
+  background: #6856dc;
+  border-color: #6856dc;
+  box-shadow: 0 2px 6px rgba(104, 86, 220, .2);
+}
+
+.ob-course-item-accent { background: #f8f6ff; }
+
+.ob-card .ob-level-grid { width: min(100%, 700px); margin: 0 auto 20px; gap: 9px; }
+.ob-level-btn {
+  min-height: 80px;
+  padding: 13px 14px;
+  border-color: rgba(55, 48, 93, .11);
+  border-radius: 13px;
+  background: #fff;
+  box-shadow: 0 3px 10px -12px rgba(42, 37, 83, .35);
+}
+
+.ob-level-btn:hover { transform: none; border-color: rgba(108, 92, 231, .36); background: #fbfaff; }
+.ob-level-btn.selected { background: #fbfaff; border-color: #7564e4; box-shadow: 0 0 0 1px #7564e4 inset; }
+
+.ob-level-icon {
+  width: 34px;
+  height: 34px;
+  flex-basis: 34px;
+  border-radius: 12px;
+}
+
+.ob-level-title { font-size: .86rem; }
+.ob-level-btn small { font-size: .68rem; color: #717087; }
+
+/* Choice groups become labels plus lightweight icon cards, with a clear radio
+   affordance that mirrors the reference without adding any new interaction. */
+.ob-choice-card {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.ob-choice-card > label,
+.ob-choice-card > .ob-range-hint { display: block; text-align: left; }
+.ob-choice-card > .ob-range-hint { margin-top: 3px; }
+.ob-choice-grid { gap: 9px; margin-top: 10px; }
+
+.ob-choice-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: 78px;
+  gap: 11px;
+  padding: 12px 40px 12px 12px;
+  border-color: rgba(55, 48, 93, .11);
+  border-radius: 13px;
+  background: #fff;
+  text-align: left;
+  box-shadow: 0 3px 10px -13px rgba(42, 37, 83, .35);
+}
+
+.ob-choice-btn .ob-choice-icon {
+  width: 39px;
+  height: 39px;
+  flex: 0 0 39px;
+  border-radius: 50%;
+}
+
+.ob-choice-btn .ob-choice-copy {
+  display: block;
+  min-width: 0;
+  color: inherit;
+}
+
+.ob-choice-btn .ob-choice-copy strong {
+  display: block;
+  margin: 0 0 3px;
+  color: #201f36;
+  font-size: .76rem;
+  font-weight: 780;
+}
+
+.ob-choice-btn .ob-choice-copy > span {
+  display: block;
+  color: #727188;
+  font-size: .67rem;
+  font-weight: 580;
+  line-height: 1.42;
+}
+
+.ob-choice-btn .ob-choice-check {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 19px;
+  height: 19px;
+  padding: 0;
+  border: 1.5px solid rgba(55, 48, 93, .18);
+  border-radius: 50%;
+  color: #fff;
+  background: #fff;
+}
+
+.ob-choice-btn:hover { transform: none; border-color: rgba(108, 92, 231, .34); background: #fbfaff; }
+.ob-choice-btn.selected { background: #fdfcff; border-color: #7564e4; box-shadow: 0 0 0 1px #7564e4 inset; }
+.ob-choice-btn.selected .ob-choice-check { border-color: #6856dc; background: #6856dc; }
+.ob-choice-btn.selected .ob-choice-copy strong { color: #4e3fc9; }
+
+/* Keep range cards as the only softly tinted panels in the rhythm step.
+   Their sliders remain unchanged functionally, but their scale now belongs to
+   the lighter composition. */
+.ob-range-card,
+.ob-review-card,
+.ob-projection-card {
+  border-color: rgba(55, 48, 93, .11);
+  background-color: #fff;
+  background-image: none;
+  box-shadow: 0 3px 11px -13px rgba(42, 37, 83, .38);
+}
+
+.ob-range-card { padding: 15px 16px; border-radius: 14px; }
+.ob-range-icon { background: #f1efff; border-color: transparent; color: #6554d9; }
+.ob-range-value { background: linear-gradient(135deg, #917cf0, #6753dd); color: #fff; }
+
+.ob-subs-grid { gap: 0; margin-bottom: 11px; border: 1px solid rgba(55, 48, 93, .11); border-radius: 13px; overflow: hidden; }
+.ob-sub-row { min-height: 51px; margin: 0; border: 0; border-bottom: 1px solid rgba(55, 48, 93, .09); border-radius: 0; background: #fff; }
+.ob-sub-row:last-child { border-bottom: 0; }
+
+.ob-mini-stat { border-color: rgba(55, 48, 93, .11); border-radius: 13px; background: #fff; }
+.ob-mini-stat strong { color: #26243f; }
+
+.ob-review-grid { gap: 12px; }
+.ob-review-card { padding: 18px; border-radius: 15px; }
+.ob-review-title { color: #393750; }
+.ob-review-check-icon { background: #f1efff; color: #6554d9; }
+.ob-review-pulse { border-radius: 13px; background: #f4f1ff; }
+
+.ob-projection-card { background: #f6f3ff; border-color: rgba(108, 92, 231, .08); }
+.ob-projection-date { color: #2c2949; }
+
+.ob-footer-strip {
+  width: min(100%, 700px);
+  margin: 21px auto 0;
+  padding-top: 17px;
+  border-top-color: rgba(55, 48, 93, .1);
+}
+
+.ob-privacy { color: #74728a; }
+.ob-privacy svg { color: #6554d9; }
+.ob-btn { min-width: 122px; min-height: 45px; border-radius: 12px; }
+.ob-btn-primary { background: linear-gradient(135deg, #8e78ed, #5e49df); box-shadow: 0 9px 17px -12px rgba(91, 70, 219, .75); }
+.ob-btn-secondary { border-color: rgba(55, 48, 93, .14); background: #fff; }
+.ob-cancel-link { display: block; width: fit-content; margin: 11px auto 0; color: #6250cc; }
+
+/* Keep the image-led bright treatment intentional in the default/pastel
+   themes; darker palettes preserve their established dark surface instead. */
+body.theme-dark .ob-overlay,
+body.theme-obsidian .ob-overlay,
+body.theme-nebula .ob-overlay { background: var(--app-bg); }
+
+body.theme-dark .ob-card,
+body.theme-obsidian .ob-card,
+body.theme-nebula .ob-card {
+  background: var(--surface-solid);
+  border-color: var(--glass-border);
+  box-shadow: var(--ob-shadow);
+}
+
+body.theme-dark .ob-card h1,
+body.theme-obsidian .ob-card h1,
+body.theme-nebula .ob-card h1 { color: var(--text-main); }
+
+body.theme-dark .ob-feature,
+body.theme-dark .ob-course-item,
+body.theme-dark .ob-level-btn,
+body.theme-dark .ob-choice-btn,
+body.theme-dark .ob-range-card,
+body.theme-dark .ob-review-card,
+body.theme-obsidian .ob-feature,
+body.theme-obsidian .ob-course-item,
+body.theme-obsidian .ob-level-btn,
+body.theme-obsidian .ob-choice-btn,
+body.theme-obsidian .ob-range-card,
+body.theme-obsidian .ob-review-card,
+body.theme-nebula .ob-feature,
+body.theme-nebula .ob-course-item,
+body.theme-nebula .ob-level-btn,
+body.theme-nebula .ob-choice-btn,
+body.theme-nebula .ob-range-card,
+body.theme-nebula .ob-review-card { background: var(--surface-solid); border-color: var(--glass-border); }
+
+body.theme-dark .ob-choice-btn .ob-choice-copy strong,
+body.theme-obsidian .ob-choice-btn .ob-choice-copy strong,
+body.theme-nebula .ob-choice-btn .ob-choice-copy strong { color: var(--text-main); }
+
+/* Mobile retains the horizontal stepper and card hierarchy but intentionally
+   omits edge décor and shrinks the decorative art before it can push form
+   fields below the fold. */
+@media (max-width: 1100px) {
+  .ob-overlay::before,
+  .ob-overlay::after { display: none; }
+}
+
+@media (max-width: 700px) {
+  .ob-overlay { background: linear-gradient(145deg, #fbfaff, #f5f3fb); }
+  .ob-shell { width: 100%; max-width: none; gap: 10px; }
+  .ob-card { padding: 20px 16px 19px; border-radius: 18px; }
+  .ob-progress { padding-inline: 0; }
+  .ob-step-node { width: 25px; height: 25px; }
+  .ob-step + .ob-step::before { margin-inline: 12px; }
+
+  .ob-card-head { margin-bottom: 8px; }
+  .ob-step-art,
+  .ob-step-art.ob-step-art--you { width: min(100%, 245px); height: 106px; flex-basis: 106px; }
+  .ob-step-kicker { margin-top: -4px; font-size: .56rem; }
+  .ob-card h1 { max-width: 23ch; font-size: clamp(1.45rem, 6.8vw, 1.72rem); }
+  .ob-card > p,
+  .ob-card > .ob-lead { margin-bottom: 17px; font-size: .8rem; }
+
+  .ob-feature-list { gap: 7px; }
+  .ob-feature { padding: 10px 11px; border-radius: 12px; }
+  .ob-feature-icon { width: 31px; height: 31px; border-radius: 10px; }
+
+  .ob-card .ob-level-grid { gap: 8px; }
+  .ob-level-btn { min-height: 75px; padding: 11px; }
+  .ob-course-item { min-height: 50px; }
+
+  .ob-choice-btn { min-height: 70px; padding: 10px 36px 10px 10px; }
+  .ob-choice-btn .ob-choice-icon { width: 35px; height: 35px; flex-basis: 35px; }
+  .ob-choice-btn .ob-choice-copy strong { font-size: .74rem; }
+  .ob-choice-btn .ob-choice-copy > span { font-size: .65rem; }
+
+  .ob-footer-strip { width: 100%; margin-top: 17px; padding-top: 14px; }
+  .ob-btn { min-height: 46px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ob-card,
+  .ob-step,
+  .ob-step-node,
+  .ob-feature,
+  .ob-course-item,
+  .ob-level-btn,
+  .ob-choice-btn { animation: none; transition: none; }
+}
+
+/* ========================================================================
+   THEME-RESPONSIVE ONBOARDING ART
+   The decorative study scenes and edge artwork inherit the active palette.
+   Static PNG decor uses a carefully scoped color treatment while every SVG
+   scene uses the platform's live CSS tokens directly. No user action or
+   onboarding state changes when a theme changes. */
+.ob-overlay {
+  --ob-canvas: color-mix(in srgb, var(--app-bg) 92%, #fff);
+  --ob-surface: color-mix(in srgb, var(--surface-solid) 96%, #fff);
+  --ob-border: color-mix(in srgb, var(--accent) 16%, var(--glass-border));
+  --ob-card-tint: color-mix(in srgb, var(--accent) 5%, var(--surface-solid));
+  --ob-art-paper: color-mix(in srgb, var(--surface-solid) 88%, #fff);
+  --ob-art-soft: color-mix(in srgb, var(--accent-light) 58%, var(--surface-solid));
+  --ob-art-highlight: color-mix(in srgb, var(--accent) 32%, var(--surface-solid));
+  --ob-art-warm: color-mix(in srgb, var(--warning-accent) 62%, var(--accent-light));
+  --ob-art-leaf-stem: color-mix(in srgb, var(--success-accent) 48%, var(--accent));
+  --ob-art-leaf: color-mix(in srgb, var(--success-accent) 58%, var(--accent-light));
+  --ob-art-leaf-deep: color-mix(in srgb, var(--success-accent) 72%, var(--accent));
+  --ob-art-leaf-light: color-mix(in srgb, var(--success-accent) 36%, var(--accent-light));
+  background-color: var(--ob-canvas);
+  background-image:
+    radial-gradient(54rem 34rem at -12% -13%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 68%),
+    radial-gradient(48rem 32rem at 106% 8%, color-mix(in srgb, var(--accent-light) 11%, transparent), transparent 70%),
+    linear-gradient(145deg, color-mix(in srgb, var(--surface-solid) 82%, #fff) 0%, var(--ob-canvas) 56%, color-mix(in srgb, var(--accent) 2%, var(--ob-canvas)) 100%);
+}
+
+.ob-card {
+  border-color: var(--ob-border);
+  background: var(--ob-surface);
+  box-shadow: 0 20px 48px -34px color-mix(in srgb, var(--text-main) 30%, transparent), 0 2px 8px color-mix(in srgb, var(--text-main) 4%, transparent);
+}
+
+.ob-card h1 { color: var(--text-main); }
+.ob-card > p,
+.ob-card > .ob-lead { color: var(--text-muted); }
+.ob-step-kicker { border-color: color-mix(in srgb, var(--accent) 15%, transparent); background: color-mix(in srgb, var(--accent) 8%, var(--surface-solid)); color: var(--accent); }
+
+.ob-feature,
+.ob-course-item,
+.ob-level-btn,
+.ob-choice-btn,
+.ob-range-card,
+.ob-review-card,
+.ob-mini-stat,
+.ob-sub-row {
+  border-color: var(--ob-border);
+  background: var(--surface-solid);
+}
+
+.ob-feature-icon,
+.ob-level-icon,
+.ob-choice-icon,
+.ob-range-icon,
+.ob-review-check-icon {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface-solid));
+}
+
+.ob-card .lbl { color: var(--accent); }
+.ob-name-input,
+.ob-course-search,
+.ob-add-sub-input,
+.ob-field input,
+.ob-field select,
+.ob-field textarea,
+.ob-choice-card select {
+  color: var(--text-main);
+  border-color: var(--ob-border);
+  background: var(--input-bg);
+}
+
+.ob-name-input:focus,
+.ob-course-search:focus,
+.ob-add-sub-input:focus,
+.ob-field input:focus,
+.ob-field select:focus,
+.ob-field textarea:focus,
+.ob-choice-card select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.ob-note-panel,
+.ob-projection-card,
+.ob-review-pulse { background: var(--ob-card-tint); border-color: var(--ob-border); color: var(--text-muted); }
+.ob-projection-date,
+.ob-mini-stat strong,
+.ob-choice-btn .ob-choice-copy strong { color: var(--text-main); }
+.ob-choice-btn .ob-choice-copy > span,
+.ob-level-btn small { color: var(--text-muted); }
+
+.ob-course-item:hover,
+.ob-level-btn:hover,
+.ob-choice-btn:hover { border-color: color-mix(in srgb, var(--accent) 46%, var(--glass-border)); background: color-mix(in srgb, var(--accent) 4%, var(--surface-solid)); }
+.ob-course-item.selected,
+.ob-level-btn.selected,
+.ob-choice-btn.selected { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 6%, var(--surface-solid)); box-shadow: 0 0 0 1px var(--accent) inset; }
+.ob-course-item.selected .ob-course-check,
+.ob-choice-btn.selected .ob-choice-check { background: var(--accent); border-color: var(--accent); }
+.ob-choice-btn.selected .ob-choice-copy strong { color: var(--accent); }
+.ob-btn-primary { background: var(--accent-gradient); box-shadow: 0 9px 17px -12px color-mix(in srgb, var(--accent) 82%, transparent); }
+.ob-cancel-link { color: var(--accent); }
+
+body.theme-dark .ob-overlay,
+body.theme-obsidian .ob-overlay,
+body.theme-nebula .ob-overlay { --ob-canvas: var(--app-bg); --ob-surface: var(--surface-solid); }
+
+/* The full horizontal rail and the content canvas remain bounded at each
+   responsive breakpoint; décor is removed before it can compete with fields. */
+@media (max-width: 1100px) {
+  .ob-overlay::before,
+  .ob-overlay::after { display: none; }
+
+  .ob-shell,
+  .ob-card { max-width: 820px; }
+}
+
+@media (max-width: 700px) {
+  .ob-card { border-radius: 18px; }
+  .ob-card .ob-level-grid { grid-template-columns: 1fr; }
+  .ob-choice-grid { grid-template-columns: 1fr; }
+  .ob-review-grid { grid-template-columns: 1fr; }
+  .ob-footer-strip { align-items: stretch; }
+}
+
+@media (max-width: 390px) {
+  .ob-progress { gap: 0; }
+  .ob-step-node { width: 23px; height: 23px; font-size: .55rem; }
+  .ob-step + .ob-step::before { top: 11px; margin-inline: 10px; }
+  .ob-card { padding-inline: 14px; }
+}
+
+/* ========================================================================
+   THEME-RESPONSIVE WORKSPACE ART
+   ------------------------------------------------------------------------
+   Planner, Focus Studio and the dashboard now use the same larger editorial
+   desk still-life language as onboarding: calendar + books, desk clock +
+   plant, and lamp + books. The scenes remain decorative (the existing inline
+   SVGs stay in the DOM as the lightweight/tablet fallback), and their palette
+   follows the active app theme. The rendered studio art is deliberately kept
+   to roomy desktop widths; the compact token-driven SVG scenes continue to
+   protect every tablet and phone layout.
+   ======================================================================== */
+.study-scene--dashboard,
+.study-scene--planner,
+.study-scene--focus {
+  --studio-scene-blend: multiply;
+  --studio-scene-filter: none;
+  --studio-scene-opacity: .94;
+}
+
+.study-scene--dashboard { --studio-scene-art: url("./dashboard-lamp-studio-scene.webp"); }
+.study-scene--planner { --studio-scene-art: url("./planner-studio-scene.webp"); }
+.study-scene--focus { --studio-scene-art: url("./focus-clock-studio-scene.webp"); }
+
+/* The studio source artwork starts lavender. Theme-specific filters shift
+   every object — including books, calendar rim, clock and desk lamp — at the
+   exact same instant as the app's live CSS theme tokens change. */
+body.theme-silver-lavender .study-scene--dashboard,
+body.theme-silver-lavender .study-scene--planner,
+body.theme-silver-lavender .study-scene--focus {
+  --studio-scene-filter: saturate(.56) brightness(1.01);
+}
+
+body.theme-mint .study-scene--dashboard,
+body.theme-mint .study-scene--planner,
+body.theme-mint .study-scene--focus {
+  --studio-scene-filter: hue-rotate(-112deg) saturate(1.02) brightness(1.015);
+}
+
+body.theme-sunset .study-scene--dashboard,
+body.theme-sunset .study-scene--planner,
+body.theme-sunset .study-scene--focus {
+  --studio-scene-filter: hue-rotate(118deg) saturate(1.08) brightness(1.015);
+}
+
+/* The source backdrop becomes black after inversion, so screen blending
+   removes its rectangle on dark themes while retaining an accent-tinted desk
+   silhouette. This mirrors the dark onboarding decor treatment. */
+body.theme-dark .study-scene--dashboard,
+body.theme-dark .study-scene--planner,
+body.theme-dark .study-scene--focus {
+  --studio-scene-filter: invert(.9) hue-rotate(170deg) saturate(.8) brightness(.68);
+  --studio-scene-blend: screen;
+  --studio-scene-opacity: .42;
+}
+
+body.theme-obsidian .study-scene--dashboard,
+body.theme-obsidian .study-scene--planner,
+body.theme-obsidian .study-scene--focus {
+  --studio-scene-filter: invert(.88) hue-rotate(130deg) saturate(1.1) brightness(.78);
+  --studio-scene-blend: screen;
+  --studio-scene-opacity: .53;
+}
+
+body.theme-nebula .study-scene--dashboard,
+body.theme-nebula .study-scene--planner,
+body.theme-nebula .study-scene--focus {
+  --studio-scene-filter: invert(.88) hue-rotate(186deg) saturate(1.2) brightness(.76);
+  --studio-scene-blend: screen;
+  --studio-scene-opacity: .5;
+}
+
+@media (min-width: 1101px) {
+  .dash-hero-scene.study-scene--dashboard,
+  .page-header-scene.study-scene--planner,
+  .page-header-scene.study-scene--focus {
+    isolation: isolate;
+    overflow: visible;
+  }
+
+  .dash-hero-scene.study-scene--dashboard::after,
+  .page-header-scene.study-scene--planner::after,
+  .page-header-scene.study-scene--focus::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    background-image: var(--studio-scene-art);
+    background-position: center;
+    background-size: cover;
+    background-repeat: no-repeat;
+    filter: var(--studio-scene-filter);
+    mix-blend-mode: var(--studio-scene-blend);
+    opacity: var(--studio-scene-opacity);
+  }
+
+  /* Preserve the SVG's intrinsic ratio to anchor the art, then visually
+     hand the stage to the detailed studio image. */
+  .dash-hero-scene.study-scene--dashboard > svg,
+  .page-header-scene.study-scene--planner > svg,
+  .page-header-scene.study-scene--focus > svg { opacity: 0; }
+}
+
+/* Users who explicitly reduce transparency receive the original crisp SVG
+   study scenes instead of blended raster decoration. */
+@media (prefers-reduced-transparency: reduce) {
+  .dash-hero-scene.study-scene--dashboard::after,
+  .page-header-scene.study-scene--planner::after,
+  .page-header-scene.study-scene--focus::after { display: none; }
+
+  .dash-hero-scene.study-scene--dashboard > svg,
+  .page-header-scene.study-scene--planner > svg,
+  .page-header-scene.study-scene--focus > svg { opacity: 1; }
+}
+
+/* ========================================================================
+   ONBOARDING FOLLOW-UP — ICON GEOMETRY + THEMED EDGE ART
+   ------------------------------------------------------------------------
+   Configuration-choice icons were inheriting a broad button-span rule and
+   losing their flex centring. Lock each icon chip to an optical centre. The
+   edge scenes also select a dark-native studio source for dark palettes, so
+   every theme keeps visible themed artwork instead of fading the pale source
+   art into the dark canvas.
+   ======================================================================== */
+
+/* All onboarding icon holders use one centred square geometry. The direct
+   child selector deliberately outranks `.ob-choice-btn span`, which used to
+   turn the choice glyph holder back into a normal block. */
+.ob-step-node,
+.ob-course-check,
+.ob-feature-icon,
+.ob-level-icon,
+.ob-choice-btn > .ob-choice-icon,
+.ob-choice-btn > .ob-choice-check,
+.ob-range-icon,
+.ob-review-check-icon,
+.ob-brand-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.ob-choice-btn > .ob-choice-icon {
+  align-self: center;
+  color: var(--accent);
+}
+
+.ob-step-node > svg,
+.ob-course-check > svg,
+.ob-feature-icon > svg,
+.ob-level-icon > svg,
+.ob-choice-btn > .ob-choice-icon > svg,
+.ob-choice-btn > .ob-choice-check > svg,
+.ob-range-icon > svg,
+.ob-review-check-icon > svg,
+.ob-brand-mark > svg {
+  display: block;
+  flex: 0 0 auto;
+  margin: 0;
+}
+
+/* Each palette receives its own art file rather than a subtle hue rotation.
+   This keeps the plant, books, lamp, and their surrounding canvas genuinely
+   different in every theme — most noticeably in Sunset, Mint, and Obsidian. */
+.ob-overlay {
+  --ob-edge-left-art: url("./onboarding-left-decor.png");
+  --ob-edge-right-art: url("./onboarding-right-decor.png");
+  --ob-edge-art-filter: none;
+  --ob-edge-art-blend: normal;
+  --ob-edge-art-opacity: .96;
+}
+
+/* Default / lavender */
+body.theme-default .ob-overlay {
+  --accent: #6c5ce7;
+  --accent-light: #8b7cf2;
+  --accent-gradient: linear-gradient(160deg, #7d6df0, #5d4de0);
+  --accent-glow: rgba(108, 92, 231, .14);
+  --color-ai: #6d5ef5;
+  --success-accent: #16a37a;
+  --warning-accent: #e59a24;
+  --ob-canvas: #f8f7fc;
+  --ob-surface: #fff;
+  --ob-border: #e9e7f1;
+  --ob-card-tint: #f4f1ff;
+  --ob-art-paper: #fff;
+  --ob-art-soft: #dcd6ff;
+  --ob-art-highlight: #aaa0f5;
+  --ob-art-warm: #e59a24;
+  --ob-art-leaf-stem: #4f9d7d;
+  --ob-art-leaf: #94d5ba;
+  --ob-art-leaf-deep: #54ac86;
+  --ob-art-leaf-light: #c8eddd;
+}
+
+/* Silver Lavender */
+body.theme-silver-lavender .ob-overlay {
+  --ob-edge-left-art: url("./onboarding-left-decor-silver.webp");
+  --ob-edge-right-art: url("./onboarding-right-decor-silver.webp");
+  --accent: #7a70e0;
+  --accent-light: #9a92ec;
+  --accent-gradient: linear-gradient(160deg, #968ee9, #6f63d8);
+  --accent-glow: rgba(122, 112, 224, .14);
+  --color-ai: #8a80e8;
+  --success-accent: #6b9b87;
+  --warning-accent: #b99752;
+  --ob-canvas: #f5f5fa;
+  --ob-surface: #fdfdff;
+  --ob-border: #e1e0eb;
+  --ob-card-tint: #f0eff8;
+  --ob-art-paper: #fff;
+  --ob-art-soft: #d9d8e8;
+  --ob-art-highlight: #aaa7c4;
+  --ob-art-warm: #b8a9a3;
+  --ob-art-leaf-stem: #7f9692;
+  --ob-art-leaf: #b4c7c3;
+  --ob-art-leaf-deep: #839c97;
+  --ob-art-leaf-light: #d9e3e1;
+}
+
+/* Mint Fresh */
+body.theme-mint .ob-overlay {
+  --ob-edge-left-art: url("./onboarding-left-decor-mint.webp");
+  --ob-edge-right-art: url("./onboarding-right-decor-mint.webp");
+  --accent: #0fa37f;
+  --accent-light: #34d399;
+  --accent-gradient: linear-gradient(180deg, #16b08a, #0fa37f);
+  --accent-glow: rgba(15, 163, 127, .13);
+  --color-ai: #10b389;
+  --success-accent: #16a37a;
+  --warning-accent: #e3a43c;
+  --ob-canvas: #f2fbf7;
+  --ob-surface: #fcfffd;
+  --ob-border: #d2ebdf;
+  --ob-card-tint: #e4f6ee;
+  --ob-art-paper: #fafffc;
+  --ob-art-soft: #a9edd0;
+  --ob-art-highlight: #58cda1;
+  --ob-art-warm: #efb35b;
+  --ob-art-leaf-stem: #248c6b;
+  --ob-art-leaf: #75dcb3;
+  --ob-art-leaf-deep: #249a72;
+  --ob-art-leaf-light: #c5f4df;
+}
+
+/* Sunset — warm canvas, orange art, and an orange mini-illustration rather
+   than the former lavender scene. */
+body.theme-sunset .ob-overlay {
+  --ob-edge-left-art: url("./onboarding-left-decor-sunset.webp");
+  --ob-edge-right-art: url("./onboarding-right-decor-sunset.webp");
+  --accent: #e1620f;
+  --accent-light: #fb923c;
+  --accent-gradient: linear-gradient(180deg, #ee6f1b, #dc5e0c);
+  --accent-glow: rgba(225, 98, 15, .13);
+  --color-ai: #ee7118;
+  --success-accent: #1a9471;
+  --warning-accent: #e1620f;
+  --ob-canvas: #fff6ef;
+  --ob-surface: #fffdfa;
+  --ob-border: #f2d7c2;
+  --ob-card-tint: #fff0e4;
+  --ob-art-paper: #fffaf5;
+  --ob-art-soft: #ffc69d;
+  --ob-art-highlight: #f28f4c;
+  --ob-art-warm: #e1620f;
+  --ob-art-leaf-stem: #6b9879;
+  --ob-art-leaf: #a6d8ad;
+  --ob-art-leaf-deep: #5da57a;
+  --ob-art-leaf-light: #d8efd0;
+}
+
+/* Midnight */
+body.theme-dark .ob-overlay {
+  --ob-edge-left-art: url("./onboarding-left-decor-dark.webp");
+  --ob-edge-right-art: url("./onboarding-right-decor-dark.webp");
+  --accent: #8a8af4;
+  --accent-light: #aeaef8;
+  --accent-gradient: linear-gradient(135deg, #9494f5, #6e6ef0);
+  --accent-glow: rgba(138, 138, 244, .2);
+  --color-ai: #9c9cf6;
+  --success-accent: #5ee0a8;
+  --warning-accent: #efbe6e;
+  --ob-canvas: #050506;
+  --ob-surface: #0e0e10;
+  --ob-border: #232326;
+  --ob-card-tint: #16151e;
+  --ob-art-paper: #292931;
+  --ob-art-soft: #5f5fa8;
+  --ob-art-highlight: #9c9cf6;
+  --ob-art-warm: #efbe6e;
+  --ob-art-leaf-stem: #50b889;
+  --ob-art-leaf: #88dbb5;
+  --ob-art-leaf-deep: #45a57e;
+  --ob-art-leaf-light: #c2f0d8;
+  --ob-edge-art-opacity: .9;
+}
+
+/* Obsidian — cool cyan, not a recoloured midnight scene. */
+body.theme-obsidian .ob-overlay {
+  --ob-edge-left-art: url("./onboarding-left-decor-obsidian.webp");
+  --ob-edge-right-art: url("./onboarding-right-decor-obsidian.webp");
+  --accent: #38bdf8;
+  --accent-light: #7dd3fc;
+  --accent-gradient: linear-gradient(180deg, #4cc5f9, #22a8e6);
+  --accent-glow: rgba(56, 189, 248, .14);
+  --color-ai: #4cc5f9;
+  --success-accent: #4bc59e;
+  --warning-accent: #e0b35c;
+  --ob-canvas: #070a12;
+  --ob-surface: #131a2a;
+  --ob-border: #263349;
+  --ob-card-tint: #10243c;
+  --ob-art-paper: #273c50;
+  --ob-art-soft: #397893;
+  --ob-art-highlight: #6acffa;
+  --ob-art-warm: #e0b35c;
+  --ob-art-leaf-stem: #2fa48c;
+  --ob-art-leaf: #58c8c2;
+  --ob-art-leaf-deep: #1a97a3;
+  --ob-art-leaf-light: #9ae5dd;
+  --ob-edge-art-opacity: .92;
+}
+
+/* Nebula */
+body.theme-nebula .ob-overlay {
+  --ob-edge-left-art: url("./onboarding-left-decor-nebula.webp");
+  --ob-edge-right-art: url("./onboarding-right-decor-nebula.webp");
+  --accent: #a855f7;
+  --accent-light: #c495fa;
+  --accent-gradient: linear-gradient(180deg, #b168f8, #9333ea);
+  --accent-glow: rgba(168, 85, 247, .15);
+  --color-ai: #bf7dfa;
+  --success-accent: #58c9aa;
+  --warning-accent: #dfa960;
+  --ob-canvas: #0a0616;
+  --ob-surface: #191230;
+  --ob-border: #32264f;
+  --ob-card-tint: #251844;
+  --ob-art-paper: #352354;
+  --ob-art-soft: #7950b8;
+  --ob-art-highlight: #ca9afd;
+  --ob-art-warm: #dfa960;
+  --ob-art-leaf-stem: #638fb5;
+  --ob-art-leaf: #a080df;
+  --ob-art-leaf-deep: #7559be;
+  --ob-art-leaf-light: #d7c0ff;
+  --ob-edge-art-opacity: .9;
+}
+
+/* Desktop-only on purpose: the real input areas retain their full width on
+   tablet and phone, while the theme-aware inline artwork remains available
+   in every viewport. */
+@media (min-width: 1101px) {
+  .ob-overlay::before,
+  .ob-overlay::after {
+    display: block;
+    filter: var(--ob-edge-art-filter);
+    mix-blend-mode: var(--ob-edge-art-blend);
+    opacity: var(--ob-edge-art-opacity);
+  }
+
+  .ob-overlay::before {
+    background-image: var(--ob-edge-left-art);
+    background-position: left bottom;
+    background-size: auto 100%;
+    background-repeat: no-repeat;
+  }
+
+  .ob-overlay::after {
+    background-image: var(--ob-edge-right-art);
+    background-position: right bottom;
+    background-size: auto 70%;
+    background-repeat: no-repeat;
+  }
+}
+
+/* Keep the themed still-lifes visible at compact desktop, tablet, and
+   landscape-phone widths (including the supplied captures) without taking
+   form space: they shrink into the outer gutters and stay behind the card. */
+@media (min-width: 481px) and (max-width: 1100px) {
+  .ob-overlay::before,
+  .ob-overlay::after {
+    display: block;
+    bottom: 0;
+    top: auto;
+    height: min(48vh, 300px);
+    opacity: .86;
+  }
+
+  .ob-overlay::before {
+    left: 0;
+    width: min(22vw, 220px);
+    background-image: var(--ob-edge-left-art);
+    background-position: left bottom;
+    background-size: auto 100%;
+    background-repeat: no-repeat;
+  }
+
+  .ob-overlay::after {
+    right: 0;
+    width: min(27vw, 270px);
+    background-image: var(--ob-edge-right-art);
+    background-position: right bottom;
+    background-size: auto 72%;
+    background-repeat: no-repeat;
+  }
+}
+
+@media (max-width: 480px) {
+  .ob-overlay::before,
+  .ob-overlay::after { display: none; }
+}
+
+/* Preserve the existing accessibility preference after the desktop art rule. */
+@media (prefers-reduced-transparency: reduce) {
+  .ob-overlay::before,
+  .ob-overlay::after { display: none; }
+}
+
+/* Final geometry lock: the label, name input, and support note are one
+   aligned field column on every breakpoint instead of three independently
+   sized card children. */
+.ob-name-field {
+  width: min(100%, 700px);
+  margin-inline: auto;
+}
+
+.ob-name-field > .lbl {
+  display: block;
+  margin-bottom: 7px;
+}
+
+.ob-name-field > .ob-name-input,
+.ob-name-field > .ob-note-panel {
+  display: block;
+  width: 100%;
+  max-width: none;
+  margin-inline: 0;
+}
+
+.ob-name-field > .ob-name-input { margin-bottom: 8px; }
+.ob-name-field > .ob-note-panel { margin-bottom: 0; }
+
+/* Keep the option glyphs optically centred and visible. These direct-child
+   rules beat the broad legacy `.ob-choice-btn span` selector without changing
+   the button's selectable behaviour or its responsive dimensions. */
+.ob-choice-btn > .ob-choice-icon,
+.ob-choice-btn > .ob-choice-check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+}
+
+.ob-choice-btn > .ob-choice-icon {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 13%, var(--surface-solid));
+  border: 1px solid color-mix(in srgb, var(--accent) 17%, var(--glass-border));
+}
+
+.ob-choice-btn > .ob-choice-icon > svg {
+  display: block;
+  width: 17px;
+  height: 17px;
+  flex: 0 0 17px;
+  margin: 0;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.15;
+}
+
+.ob-choice-btn > .ob-choice-check > svg {
+  display: block;
+  width: 11px;
+  height: 11px;
+  flex: 0 0 11px;
+  margin: 0;
+  fill: none;
+  stroke: currentColor;
+}

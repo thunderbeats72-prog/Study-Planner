@@ -914,6 +914,12 @@ body {
   --zen-note: color-mix(in srgb, var(--accent) 20%, #171630);
   --zen-pot: color-mix(in srgb, var(--accent) 18%, #14132c);
   --zen-pot-rim: color-mix(in srgb, var(--accent) 30%, #1c1a3c);
+  /* Desk clock: the Focus Studio object follows the active theme here too. */
+  --zen-clock-rim: color-mix(in srgb, var(--accent) 48%, #272448);
+  --zen-clock-face: color-mix(in srgb, var(--accent) 10%, #171530);
+  --zen-clock-mark: color-mix(in srgb, var(--accent-light) 76%, #ffffff);
+  --zen-clock-hand: color-mix(in srgb, var(--accent-light) 58%, #ffffff);
+  --zen-clock-shadow: color-mix(in srgb, #000000 56%, var(--accent));
   --zen-mote: color-mix(in srgb, var(--accent-light) 72%, #ffffff);
   --zen-plant-1: color-mix(in srgb, var(--success-accent) 55%, #5cbf9a);
   --zen-plant-2: color-mix(in srgb, var(--success-accent) 46%, #43a583);
