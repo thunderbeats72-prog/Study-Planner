@@ -533,13 +533,13 @@
 /* =========================
    ONBOARDING SLIDERS
    =========================
-   The slider is a real 9px rail inside a 32px grab strip (so the hit area
-   is touch-friendly without the control looking heavy). The fill is a
-   registered @property on the track, which lets preset jumps and keyboard
-   steps glide while the thumb is being dragged 1:1 (dragging removes the
-   transition for that frame-perfect tracking). The thumb presses gently —
-   never a bounce, never a glow show. All slider cards share one width and
-   one vertical rhythm inside the schedule grid. */
+   The slider's visuals are plain divs (rail · fill · thumb) — no native
+   range pseudo-elements and no appearance rendering, so there is no track or
+   thumb edge a browser can draw (the source of the "hairline" a native
+   <input type=range> leaves behind). The real range input is kept as an
+   invisible interaction surface on top, so keyboard, pointer and screen-reader
+   behaviour are untouched, and the thumb/fill track the finger 1:1 while
+   dragging (the transition is removed mid-drag). */
 
 @property --ob-range-fill {
   syntax: "<percentage>";
@@ -550,18 +550,26 @@
 .ob-range-card {
   padding: 15px 16px 14px;
   border-radius: 18px;
-  border: 1px solid var(--glass-border);
+  border: 0;
   background: linear-gradient(180deg, var(--surface) 0%, var(--row-bg) 100%);
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 10px 24px -16px color-mix(in srgb, var(--text-main) 42%, transparent);
   min-width: 0;
-  transition: border-color .18s ease, box-shadow .18s ease, background .18s ease;
+  transition: box-shadow .18s ease, background .18s ease;
+}
+
+/* Other layers (globals.css and its dark-theme blocks) still declare a 1px
+   hairline border on .ob-range-card. This two-class rule out-specifies every
+   one of them AND loads last, so the slider card can never regain a hairline
+   no matter what an earlier layer says. */
+.ob-card .ob-range-card,
+.ob-range-card {
+  border: 0;
 }
 
 .ob-range-card.is-dragging {
-  border-color: color-mix(in srgb, var(--accent) 34%, var(--glass-border));
   background: linear-gradient(180deg, var(--surface) 0%, color-mix(in srgb, var(--accent) 2.5%, var(--row-bg)) 100%);
-  box-shadow: 0 1px 3px color-mix(in srgb, var(--text-main) 5%, transparent),
-              0 8px 22px -14px color-mix(in srgb, var(--text-main) 30%, transparent);
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--text-main) 5%, transparent),
+              0 14px 30px -16px color-mix(in srgb, var(--accent) 34%, transparent);
 }
 
 .ob-range-head {
@@ -593,10 +601,11 @@
   overflow-wrap: break-word;
 }
 
-/* Value badge: fixed-measure, tabular, and it fades its digits in whenever
-   a committed value change re-mounts it (see the key on <output> in
-   Onboarding.tsx). While dragging, the key is stable so the badge reads as
-   one continuous, quiet surface instead of flickering at 60fps. */
+/* Value badge: fixed-measure, tabular, and it swaps its digits instantly on
+   a committed value change (the key on <output> in Onboarding.tsx re-mounts
+   it so the number repaints cleanly — no translate/bounce, which read as
+   jitter). While dragging, the key is stable so the badge reads as one
+   continuous, quiet surface instead of flickering at 60fps. */
 .ob-range-value {
   flex: 0 0 auto;
   align-self: flex-start;
@@ -610,82 +619,123 @@
   font-variant-numeric: tabular-nums;
   color: var(--accent);
   background: color-mix(in srgb, var(--accent) 10%, var(--surface-solid));
-  border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
+  border: 0;
   box-shadow: none;
-  transition: background .18s ease, border-color .18s ease, color .18s ease;
-  animation: obValueSwap .16s ease both;
-}
-
-@keyframes obValueSwap {
-  from { opacity: .4; transform: translateY(1.5px); }
-  to   { opacity: 1;  transform: none; }
+  transition: background .18s ease, color .18s ease;
 }
 
 .ob-range-card.is-dragging .ob-range-value {
   animation: none;
   background: color-mix(in srgb, var(--accent) 15%, var(--surface-solid));
-  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
 }
 
-/* The input is the 34px strip; the visible rail is its 10px track — a
-   recessed channel with a filled accent gradient, and a ringed thumb that
-   reads as a physical control instead of a bare range input. */
-.ob-range-card .ob-range-input {
-  --ob-track-h: 10px;
+/* Rail, fill and thumb are drawn as divs. The 12px pill rail is inset by
+   half the thumb so the knob's centre travels exactly edge-to-edge of the
+   card. No borders, no inset shadows, no native track: nothing can render a
+   hairline. */
+.ob-range-card {
+  --ob-track-h: 12px;
   --ob-track-bg: color-mix(in srgb, var(--text-main) 13%, transparent);
-  width: 100%;
+}
+
+.ob-range-track-wrap {
+  position: relative;
   height: 34px;
+  min-width: 0;
+}
+
+.ob-range-rail {
+  position: absolute;
+  left: calc(var(--ob-thumb, 26px) / 2);
+  right: calc(var(--ob-thumb, 26px) / 2);
+  top: 50%;
+  height: var(--ob-track-h);
+  transform: translateY(-50%);
+  border-radius: 999px;
+  background: var(--ob-track-bg);
+  overflow: visible;
+  pointer-events: none;
+}
+
+.ob-range-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  border-radius: 999px;
+  background: var(--accent-gradient);
+  transition: width .18s cubic-bezier(.25, 1, .4, 1);
+}
+
+.ob-range-thumb {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: var(--ob-thumb, 26px);
+  height: var(--ob-thumb, 26px);
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: var(--accent-gradient);
+  box-shadow:
+    0 2px 6px -1px color-mix(in srgb, var(--text-main) 26%, transparent),
+    0 4px 12px -2px color-mix(in srgb, var(--accent) 34%, transparent);
+  transition: left .18s cubic-bezier(.25, 1, .4, 1),
+              box-shadow .16s ease, transform .16s ease;
+}
+
+/* The native input is an invisible interaction surface laid over the drawn
+   rail — it keeps every keyboard / pointer / AT behaviour, but renders
+   nothing of its own. */
+.ob-range-card .ob-range-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   margin: 0;
   padding: 0;
   border: none;
   outline: none;
   background: transparent;
+  opacity: 0;
+  z-index: 2;
   cursor: pointer;
   appearance: none;
   -webkit-appearance: none;
-  /* pan-y keeps vertical page scrolling alive when a finger lands on the
-     slider; the horizontal drag belongs to the control. */
+  -moz-appearance: none;
   touch-action: pan-y;
-  transition: --ob-range-fill .18s cubic-bezier(.25, 1, .4, 1);
 }
 
-/* While dragging, the rail tracks the thumb with zero animation delay… */
-.ob-range-card.is-dragging .ob-range-input,
-.ob-range-card.is-dragging .ob-range-input::-webkit-slider-runnable-track {
+/* While dragging, the fill and thumb track the finger with zero lag. */
+.ob-range-card.is-dragging .ob-range-fill,
+.ob-range-card.is-dragging .ob-range-thumb {
   transition-duration: 0s;
 }
 
-/* Track: the filled lead is a bright accent → accent-light sweep, and the
-   unfilled tail sits in a recessed channel (inset shadow + faint top light)
-   so the rail reads as a machined groove, not a flat line. */
-.ob-range-card .ob-range-input::-webkit-slider-runnable-track {
-  height: var(--ob-track-h);
-  border-radius: 999px;
-  background: linear-gradient(90deg,
-    var(--accent) 0%,
-    var(--accent-light) var(--ob-range-fill, 0%),
-    var(--ob-track-bg) var(--ob-range-fill, 0%),
-    var(--ob-track-bg) 100%);
-  box-shadow:
-    inset 0 1px 2px color-mix(in srgb, var(--text-main) 16%, transparent),
-    inset 0 -1px 0 rgba(255, 255, 255, .05);
-  transition: --ob-range-fill .18s cubic-bezier(.25, 1, .4, 1);
+@media (hover: hover) and (pointer: fine) {
+  .ob-range-card:hover .ob-range-thumb {
+    box-shadow:
+      0 2px 8px -1px color-mix(in srgb, var(--text-main) 26%, transparent),
+      0 6px 16px -2px color-mix(in srgb, var(--accent) 42%, transparent);
+  }
 }
 
-.ob-range-card .ob-range-input::-moz-range-track {
-  height: var(--ob-track-h);
-  border-radius: 999px;
-  background: var(--ob-track-bg);
+.ob-range-card.is-dragging .ob-range-thumb {
   box-shadow:
-    inset 0 1px 2px color-mix(in srgb, var(--text-main) 16%, transparent),
-    inset 0 -1px 0 rgba(255, 255, 255, .05);
+    0 0 0 6px color-mix(in srgb, var(--accent) 14%, transparent),
+    0 2px 6px -1px color-mix(in srgb, var(--text-main) 30%, transparent),
+    0 6px 16px -2px color-mix(in srgb, var(--accent) 42%, transparent);
 }
 
-.ob-range-card .ob-range-input::-moz-range-progress {
-  height: var(--ob-track-h);
-  border-radius: 999px 0 0 999px;
-  background: linear-gradient(90deg, var(--accent), var(--accent-light));
-  box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 35%, transparent);
+.ob-range-track-wrap:has(.ob-range-input:focus-visible) .ob-range-thumb {
+  box-shadow:
+    0 0 0 3px var(--surface-solid),
+    0 0 0 6px color-mix(in srgb, var(--accent) 55%, transparent),
+    0 2px 6px -1px color-mix(in srgb, var(--text-main) 26%, transparent);
+}
+
+@media (pointer: coarse) {
+  .ob-range-track-wrap { height: 44px; }
 }
 
 /* Thumb: a 24px knob with a surface ring, an accent-gradient face and a
@@ -700,9 +750,8 @@
   border: 3px solid var(--surface-solid);
   background: var(--accent-gradient);
   box-shadow:
-    0 1px 2px color-mix(in srgb, var(--text-main) 30%, transparent),
-    0 3px 8px color-mix(in srgb, var(--accent) 30%, transparent),
-    inset 0 1px 1px rgba(255, 255, 255, .35);
+    0 2px 6px -1px color-mix(in srgb, var(--text-main) 22%, transparent),
+    0 4px 12px -2px color-mix(in srgb, var(--accent) 30%, transparent);
   transition: transform .16s ease, box-shadow .16s ease;
 }
 
@@ -713,9 +762,8 @@
   border: 3px solid var(--surface-solid);
   background: var(--accent-gradient);
   box-shadow:
-    0 1px 2px color-mix(in srgb, var(--text-main) 30%, transparent),
-    0 3px 8px color-mix(in srgb, var(--accent) 30%, transparent),
-    inset 0 1px 1px rgba(255, 255, 255, .35);
+    0 2px 6px -1px color-mix(in srgb, var(--text-main) 22%, transparent),
+    0 4px 12px -2px color-mix(in srgb, var(--accent) 30%, transparent);
   transition: transform .16s ease, box-shadow .16s ease;
 }
 
@@ -723,16 +771,14 @@
   .ob-range-card .ob-range-input:hover:not(:active)::-webkit-slider-thumb {
     transform: scale(1.08);
     box-shadow:
-      0 1px 3px color-mix(in srgb, var(--text-main) 30%, transparent),
-      0 4px 12px color-mix(in srgb, var(--accent) 38%, transparent),
-      inset 0 1px 1px rgba(255, 255, 255, .35);
+      0 2px 6px -1px color-mix(in srgb, var(--text-main) 24%, transparent),
+      0 5px 14px -2px color-mix(in srgb, var(--accent) 38%, transparent);
   }
   .ob-range-card .ob-range-input:hover:not(:active)::-moz-range-thumb {
     transform: scale(1.08);
     box-shadow:
-      0 1px 3px color-mix(in srgb, var(--text-main) 30%, transparent),
-      0 4px 12px color-mix(in srgb, var(--accent) 38%, transparent),
-      inset 0 1px 1px rgba(255, 255, 255, .35);
+      0 2px 6px -1px color-mix(in srgb, var(--text-main) 24%, transparent),
+      0 5px 14px -2px color-mix(in srgb, var(--accent) 38%, transparent);
   }
 }
 
@@ -746,8 +792,7 @@
   box-shadow:
     0 0 0 6px color-mix(in srgb, var(--accent) 14%, transparent),
     0 1px 3px color-mix(in srgb, var(--text-main) 30%, transparent),
-    0 5px 14px color-mix(in srgb, var(--accent) 42%, transparent),
-    inset 0 1px 1px rgba(255, 255, 255, .35);
+    0 5px 14px color-mix(in srgb, var(--accent) 42%, transparent);
 }
 
 .ob-range-card .ob-range-input:active::-moz-range-thumb,
@@ -756,8 +801,7 @@
   box-shadow:
     0 0 0 6px color-mix(in srgb, var(--accent) 14%, transparent),
     0 1px 3px color-mix(in srgb, var(--text-main) 30%, transparent),
-    0 5px 14px color-mix(in srgb, var(--accent) 42%, transparent),
-    inset 0 1px 1px rgba(255, 255, 255, .35);
+    0 5px 14px color-mix(in srgb, var(--accent) 42%, transparent);
 }
 
 /* Keyboard focus: one clean double ring on the thumb, no outline box on
@@ -778,11 +822,10 @@
     0 1px 2px color-mix(in srgb, var(--text-main) 26%, transparent);
 }
 
-/* Dark themes need a lighter rail or the unfilled half disappears in the
-   recessed channel. */
-body.theme-dark .ob-range-card .ob-range-input,
-body.theme-obsidian .ob-range-card .ob-range-input,
-body.theme-nebula .ob-range-card .ob-range-input {
+/* Dark themes need a lighter rail or the unfilled half disappears. */
+body.theme-dark .ob-range-card,
+body.theme-obsidian .ob-range-card,
+body.theme-nebula .ob-range-card {
   --ob-track-bg: rgba(255, 255, 255, .18);
 }
 
@@ -1530,6 +1573,8 @@ body.theme-nebula .ob-range-value {
   .zen-status-dot[data-live="true"],
   .cal-grid[class*="cal-slide"],
   .mini-cal-grid[class*="cal-slide"],
+  .ob-range-fill,
+  .ob-range-thumb,
   .ob-range-card .ob-range-input::-webkit-slider-thumb,
   .ob-range-card .ob-range-input::-moz-range-thumb,
   .ob-range-card .ob-range-input::-webkit-slider-runnable-track,
@@ -1582,35 +1627,40 @@ body.theme-nebula .ob-range-value {
    choice instead of a faint line appearing under the cursor. */
 
 .ob-card-head {
-  flex-direction: row;
+  flex-direction: column;
   align-items: center;
-  gap: 14px;
-  margin-bottom: 18px;
+  gap: 8px;
+  margin-bottom: 12px;
 }
 
+/* The step illustration sits directly on the card — no tile box, no border,
+   no inset hairline, and no motion — pixel-identical to how the platform's
+   StudyScene page headers render the same 360×200 canvas. The former
+   "floating" treatment (a translateY float + a blurred radial glow) is gone:
+   the float's fractional-pixel transform anti-aliased the scene's crisp desk
+   edge into a faint horizontal seam that read as a hairline, and the
+   filter:blur() glow on a clipped ellipse could paint its own edge ring.
+   A static scene with only its built-in soft contact shadows is seamless —
+   nothing here can render a hairline. */
 .ob-step-art {
-  width: 64px;
-  height: 56px;
-  flex: 0 0 64px;
-  border-radius: 16px;
+  position: relative;
+  width: clamp(176px, 34vw, 264px);
+  aspect-ratio: 9 / 5;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--accent);
-  background:
-    radial-gradient(130% 120% at 30% 0%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 62%),
-    linear-gradient(160deg, color-mix(in srgb, var(--accent) 13%, var(--surface-solid)), color-mix(in srgb, var(--accent) 4%, var(--surface-solid)));
-  border: 1px solid color-mix(in srgb, var(--accent) 26%, var(--glass-border));
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, .16),
-    0 8px 18px -12px color-mix(in srgb, var(--accent) 50%, transparent);
 }
 
-.ob-step-art svg { display: block; }
+.ob-step-art svg {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
 
 @media (max-width: 640px) {
-  .ob-step-art { width: 54px; height: 48px; flex-basis: 54px; border-radius: 14px; }
-  .ob-card-head { gap: 11px; }
+  .ob-step-art { width: min(76vw, 224px); }
+  .ob-card-head { gap: 6px; }
 }
 
 /* Level cards: a glyph tile above the title so the step reads as a menu
@@ -1719,9 +1769,9 @@ body.theme-nebula .ob-range-value {
   align-items: center;
   justify-content: center;
   background: color-mix(in srgb, var(--accent) 12%, var(--surface-solid));
-  border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--glass-border));
+  border: 0;
   color: var(--accent);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .14);
+  box-shadow: 0 3px 8px -4px color-mix(in srgb, var(--accent) 40%, transparent);
 }
 
 .ob-range-icon svg { display: block; }
@@ -1734,17 +1784,14 @@ body.theme-nebula .ob-range-value {
   font-size: .85rem;
   color: #fff;
   background: var(--accent-gradient);
-  border-color: transparent;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, .28),
-    0 4px 14px -6px color-mix(in srgb, var(--accent) 60%, transparent);
+  border: 0;
+  box-shadow: 0 4px 14px -6px color-mix(in srgb, var(--accent) 60%, transparent);
 }
 
 .ob-range-card.is-dragging .ob-range-value {
   background: var(--accent-gradient);
-  border-color: transparent;
+  border: 0;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, .28),
     0 0 0 4px color-mix(in srgb, var(--accent) 16%, transparent),
     0 4px 14px -6px color-mix(in srgb, var(--accent) 60%, transparent);
 }
@@ -1754,7 +1801,7 @@ body.theme-dark .ob-range-value,
 body.theme-obsidian .ob-range-value,
 body.theme-nebula .ob-range-value {
   background: var(--accent-gradient);
-  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  border: 0;
   color: #fff;
 }
 
@@ -1799,10 +1846,8 @@ body.theme-nebula .ob-range-tick {
   margin-top: calc((var(--ob-track-h) - var(--ob-thumb)) / 2);
   border-width: 4px;
   box-shadow:
-    0 1px 2px color-mix(in srgb, var(--text-main) 30%, transparent),
-    0 3px 10px color-mix(in srgb, var(--accent) 38%, transparent),
-    0 0 0 1px color-mix(in srgb, var(--accent) 20%, transparent),
-    inset 0 1px 1px rgba(255, 255, 255, .4);
+    0 2px 6px -1px color-mix(in srgb, var(--text-main) 22%, transparent),
+    0 4px 14px -2px color-mix(in srgb, var(--accent) 38%, transparent);
 }
 
 .ob-range-card .ob-range-input::-moz-range-thumb {
@@ -1810,10 +1855,8 @@ body.theme-nebula .ob-range-tick {
   height: var(--ob-thumb);
   border-width: 4px;
   box-shadow:
-    0 1px 2px color-mix(in srgb, var(--text-main) 30%, transparent),
-    0 3px 10px color-mix(in srgb, var(--accent) 38%, transparent),
-    0 0 0 1px color-mix(in srgb, var(--accent) 20%, transparent),
-    inset 0 1px 1px rgba(255, 255, 255, .4);
+    0 2px 6px -1px color-mix(in srgb, var(--text-main) 22%, transparent),
+    0 4px 14px -2px color-mix(in srgb, var(--accent) 38%, transparent);
 }
 
 /* Coarse pointers keep the bigger grab thumb; the tick inset follows it
@@ -1831,6 +1874,7 @@ body.theme-nebula .ob-range-tick {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .ob-step-art svg,
   .ob-course-item,
   .ob-course-item::before,
   .ob-range-tick,

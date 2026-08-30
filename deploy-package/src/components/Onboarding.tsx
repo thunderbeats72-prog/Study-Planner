@@ -83,7 +83,13 @@ export function OnboardingSlider({ label, value, valueLabel, hint, min, max, ste
           {/* key={value} re-mounts the badge so its swap transition replays on each committed change; while dragging the key is stable so digits never flicker mid-glide */}
           <output className="ob-range-value" key={dragging ? "ob-value-static" : `ob-value-${value}`} htmlFor={inputId} aria-live="off">{valueLabel}</output>
         </div>
-        <input id={inputId} className="ob-range-input" type="range" min={min} max={max} step={step} value={value} aria-valuetext={valueLabel} onChange={(e) => onChange(Number(e.target.value))} onPointerDown={() => setDragging(true)} onPointerUp={stopDrag} onPointerCancel={stopDrag} onLostPointerCapture={stopDrag} onBlur={stopDrag} style={sliderStyle} />
+        <div className="ob-range-track-wrap">
+          <div className="ob-range-rail" aria-hidden="true">
+            <div className="ob-range-fill" style={{ width: `${fillPct}%` }} />
+            <div className="ob-range-thumb" style={{ left: `${fillPct}%` }} />
+          </div>
+          <input id={inputId} className="ob-range-input" type="range" min={min} max={max} step={step} value={value} aria-valuetext={valueLabel} onChange={(e) => onChange(Number(e.target.value))} onPointerDown={() => setDragging(true)} onPointerUp={stopDrag} onPointerCancel={stopDrag} onLostPointerCapture={stopDrag} onBlur={stopDrag} style={sliderStyle} />
+        </div>
         {!!ticks.length && <div className="ob-range-ticks" aria-hidden="true">{ticks.map((tick) => { const pct = max === min ? 0 : ((tick - min) / (max - min)) * 100; return <span key={`${label}-tick-${tick}`} className={`ob-range-tick${value >= tick ? " on" : ""}`} style={{ left: `${pct}%` }} />; })}</div>}
         <div className="ob-range-meta" aria-hidden="true"><span>{minLabel}</span><span>{maxLabel}</span></div>
         {!!presets.length && <div className="ob-range-presets" role="group" aria-label={`${label} presets`}>{presets.map((preset) => { const active = Math.abs(value - preset.value) < Math.max(step / 2, 0.01); return <button key={`${label}-${preset.value}`} type="button" className={`ob-range-chip${active ? " active" : ""}`} aria-pressed={active} onClick={() => onChange(preset.value)}>{preset.label}</button>; })}</div>}

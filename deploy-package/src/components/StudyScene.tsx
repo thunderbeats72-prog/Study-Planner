@@ -24,7 +24,18 @@ import React from "react";
  * decoration.
  */
 
-export type SceneVariant = "dashboard" | "planner" | "focus" | "subjects" | "settings";
+export type SceneVariant =
+  | "dashboard"
+  | "planner"
+  | "focus"
+  | "subjects"
+  | "settings"
+  | "graduation"
+  | "course"
+  | "details"
+  | "syllabus"
+  | "style"
+  | "review";
 
 /* Shared gradients + soft shadow blur. `id` prefixes every gradient so two
    scenes on the same page can never collide. */
@@ -72,7 +83,7 @@ function SceneDesk({ id, y = 168 }: { id: string; y?: number }) {
 }
 
 /* ── Dashboard: desk lamp · stack of books · potted plant ─────────────── */
-function DashboardScene() {
+export function DashboardScene() {
   return (
     <svg viewBox="0 0 360 200" role="presentation">
       <SceneDefs id="dash" />
@@ -131,7 +142,7 @@ function DashboardScene() {
 }
 
 /* ── Planner: desk calendar · stack of books · potted plant ───────────── */
-function PlannerScene() {
+export function PlannerScene() {
   // Grid is centred on the page both ways: 4×20px cells + 3×8px gaps = 104px
   // wide (4px page margin either side), and the 53px-tall grid is vertically
   // centred in the 96px body below the header band (21px above / 22px below)
@@ -197,7 +208,7 @@ function PlannerScene() {
 }
 
 /* ── Focus: desk clock · mug · potted plant ───────────────────────────── */
-function FocusScene() {
+export function FocusScene() {
   return (
     <svg viewBox="0 0 360 200" role="presentation">
       <SceneDefs id="foc" />
@@ -255,7 +266,7 @@ function FocusScene() {
 }
 
 /* ── Subjects: open notebook · book stack · pencil ────────────────────── */
-function SubjectsScene() {
+export function SubjectsScene() {
   return (
     <svg viewBox="0 0 360 200" role="presentation">
       <SceneDefs id="sub" />
@@ -304,7 +315,7 @@ function SubjectsScene() {
 }
 
 /* ── Settings: subtle stationery on the desk ──────────────────────────── */
-function SettingsScene() {
+export function SettingsScene() {
   return (
     <svg viewBox="0 0 360 200" role="presentation">
       <SceneDefs id="set" />
@@ -355,12 +366,273 @@ function SettingsScene() {
   );
 }
 
+/* ── Graduation (onboarding · level): cap · books · plant ─────────────── */
+export function GraduationScene() {
+  return (
+    <svg viewBox="0 0 360 200" role="presentation">
+      <SceneDefs id="grad" />
+      <SceneDesk id="grad" />
+      <ellipse cx="178" cy="72" rx="96" ry="50" fill="var(--scene-glow)" opacity=".22" filter="url(#grad-blur)" />
+
+      {/* books (left) */}
+      <g>
+        <rect x="34" y="157" width="98" height="12" rx="5" fill="var(--scene-book-2)" opacity=".9" />
+        <rect x="42" y="144" width="90" height="13" rx="5" fill="url(#grad-book)" />
+        <rect x="50" y="131" width="74" height="13" rx="5" fill="var(--scene-book-3)" />
+        <path d="M56 135h60" stroke="rgba(255,255,255,.3)" strokeWidth="2" strokeLinecap="round" />
+      </g>
+
+      {/* graduation cap (centre, floating on a soft shadow) */}
+      <g>
+        <ellipse cx="178" cy="104" rx="52" ry="8" fill="var(--scene-shadow)" opacity=".16" filter="url(#grad-blur)" />
+        <path d="M178 40 132 66 178 92 224 66Z" fill="url(#grad-lamp)" />
+        <path d="M178 42 135 66 178 90 221 66Z" fill="none" stroke="rgba(255,255,255,.4)" strokeWidth="2.5" strokeLinejoin="round" />
+        <path d="M138 74h80v13c0 9-18 15-40 15s-40-6-40-15Z" fill="var(--scene-surface-2)" />
+        <circle cx="178" cy="66" r="5" fill="var(--scene-lamp-core)" />
+        <path d="M224 66v25" stroke="var(--scene-ink)" strokeWidth="4.5" strokeLinecap="round" />
+        <path d="M217 91h14l-7 13Z" fill="var(--scene-accent)" />
+      </g>
+
+      {/* plant (right) */}
+      <g className="study-scene__plant">
+        <path d="M315 147c0-20 2-30 8-40" stroke="var(--scene-plant-stem)" strokeWidth="3.6" strokeLinecap="round" />
+        <path d="M323 117c-9-5-16-15-12-23 10 1 17 10 12 23Z" fill="var(--scene-plant-1)" />
+        <path d="M323 111c8-12 19-13 23-5-5 11-13 14-23 5Z" fill="var(--scene-plant-2)" />
+        <path d="M318 130c-12-1-19-7-19-15 10-3 18 3 19 15Z" fill="var(--scene-plant-2)" opacity=".9" />
+        <path d="M322 125c10-10 21-8 23 1-7 9-15 10-23-1Z" fill="var(--scene-plant-1)" opacity=".9" />
+        <path d="M290 149h50l-6 21h-38Z" fill="var(--scene-pot)" />
+        <path d="M287 144h56l-3 8H290Z" fill="var(--scene-pot-rim)" />
+        <ellipse cx="315" cy="146" rx="25" ry="6" fill="var(--scene-soil)" />
+      </g>
+
+      <g fill="var(--scene-accent)" opacity=".5">
+        <path d="m96 52 3 7 7 3-7 3-3 7-3-7-7-3 7-3Z" />
+        <circle cx="266" cy="42" r="3" />
+      </g>
+    </svg>
+  );
+}
+
+/* ── Course (onboarding · course): open book · magnifier · pencil ─────── */
+export function CourseScene() {
+  return (
+    <svg viewBox="0 0 360 200" role="presentation">
+      <SceneDefs id="crs" />
+      <SceneDesk id="crs" />
+      <ellipse cx="170" cy="106" rx="104" ry="50" fill="var(--scene-glow)" opacity=".2" filter="url(#crs-blur)" />
+
+      {/* open book (centre-left) */}
+      <g>
+        <ellipse cx="180" cy="160" rx="112" ry="9" fill="var(--scene-shadow)" opacity=".16" filter="url(#crs-blur)" />
+        <path d="M84 100 184 88v64l-100 8Z" fill="url(#crs-paper)" />
+        <path d="M184 88 300 98l4 62-104-8Z" fill="url(#crs-paper)" />
+        <path d="M176 90h16v60h-16Z" fill="var(--scene-surface-2)" opacity=".6" />
+        <g stroke="var(--scene-ink)" strokeOpacity=".16" strokeWidth="3" strokeLinecap="round">
+          <path d="M104 116h56M104 130h56M104 144h38" />
+          <path d="M210 118h70M210 132h70M210 146h52" />
+        </g>
+        <rect x="210" y="108" width="52" height="4" rx="2" fill="var(--scene-accent)" opacity=".8" />
+      </g>
+
+      {/* magnifier (top-right) */}
+      <g>
+        <circle cx="286" cy="52" r="24" fill="var(--scene-accent-soft)" opacity=".24" />
+        <circle cx="286" cy="52" r="24" fill="none" stroke="var(--scene-ink)" strokeOpacity=".5" strokeWidth="4.5" />
+        <path d="M302 68l20 20" stroke="var(--scene-ink)" strokeOpacity=".5" strokeWidth="6" strokeLinecap="round" />
+        <path d="M274 42a18 18 0 0 1 11-5" stroke="rgba(255,255,255,.55)" strokeWidth="3" strokeLinecap="round" fill="none" />
+      </g>
+
+      {/* pencil (bottom-left) */}
+      <g transform="rotate(24 58 96)">
+        <rect x="38" y="50" width="13" height="86" rx="4" fill="var(--scene-book-3)" />
+        <rect x="38" y="50" width="13" height="15" rx="4" fill="var(--scene-accent)" />
+        <path d="M38 136h13l-6.5 12Z" fill="var(--scene-surface-2)" />
+        <path d="M42 58h6" stroke="rgba(255,255,255,.4)" strokeWidth="2" strokeLinecap="round" />
+      </g>
+
+      <g fill="var(--scene-accent)" opacity=".5">
+        <path d="m124 60 3 7 7 3-7 3-3 7-3-7-7-3 7-3Z" />
+        <circle cx="52" cy="32" r="2.8" />
+      </g>
+    </svg>
+  );
+}
+
+/* ── Details (onboarding · details): clipboard · pencil · plant ───────── */
+export function DetailsScene() {
+  return (
+    <svg viewBox="0 0 360 200" role="presentation">
+      <SceneDefs id="dtl" />
+      <SceneDesk id="dtl" />
+      <ellipse cx="180" cy="96" rx="92" ry="48" fill="var(--scene-glow)" opacity=".2" filter="url(#dtl-blur)" />
+
+      {/* clipboard (centre) */}
+      <g>
+        <ellipse cx="180" cy="160" rx="70" ry="8" fill="var(--scene-shadow)" opacity=".16" filter="url(#dtl-blur)" />
+        <rect x="108" y="48" width="120" height="116" rx="14" fill="url(#dtl-paper)" />
+        <rect x="132" y="36" width="72" height="20" rx="7" fill="var(--scene-surface-2)" />
+        <rect x="108" y="76" width="120" height="22" fill="var(--scene-accent-soft)" opacity=".5" />
+        <g stroke="var(--scene-ink)" strokeOpacity=".16" strokeWidth="3.5" strokeLinecap="round">
+          <path d="M130 118h76M130 132h76M130 146h48" />
+        </g>
+      </g>
+
+      {/* pencil (right) */}
+      <g transform="rotate(28 266 120)">
+        <rect x="252" y="64" width="15" height="100" rx="5" fill="var(--scene-book-3)" />
+        <rect x="252" y="64" width="15" height="18" rx="5" fill="var(--scene-book-1)" />
+        <path d="M252 164h15l-7.5 14Z" fill="var(--scene-surface-2)" />
+      </g>
+
+      {/* plant (left) */}
+      <g className="study-scene__plant">
+        <path d="M52 148c0-18 2-28 7-37" stroke="var(--scene-plant-stem)" strokeWidth="3.2" strokeLinecap="round" />
+        <path d="M59 120c-8-5-14-14-11-21 9 1 15 9 11 21Z" fill="var(--scene-plant-1)" />
+        <path d="M59 114c7-11 17-12 20-4-4 10-11 13-20 4Z" fill="var(--scene-plant-2)" />
+        <path d="M33 149h44l-6 19h-32Z" fill="var(--scene-pot)" />
+        <path d="M30 145h50l-3 7h-44Z" fill="var(--scene-pot-rim)" />
+        <ellipse cx="55" cy="147" rx="22" ry="5" fill="var(--scene-soil)" />
+      </g>
+
+      <g fill="var(--scene-accent)" opacity=".5">
+        <path d="m70 96 3 7 7 3-7 3-3 7-3-7-7-3 7-3Z" />
+      </g>
+    </svg>
+  );
+}
+
+/* ── Syllabus (onboarding · syllabus): book stack · bookmark · plant ──── */
+export function SyllabusScene() {
+  return (
+    <svg viewBox="0 0 360 200" role="presentation">
+      <SceneDefs id="syl" />
+      <SceneDesk id="syl" />
+      <ellipse cx="150" cy="120" rx="96" ry="46" fill="var(--scene-glow)" opacity=".2" filter="url(#syl-blur)" />
+
+      {/* book stack (left) */}
+      <g>
+        <rect x="36" y="156" width="120" height="12" rx="5" fill="var(--scene-book-2)" opacity=".9" />
+        <rect x="44" y="142" width="108" height="14" rx="5" fill="url(#syl-book)" />
+        <rect x="52" y="128" width="94" height="14" rx="5" fill="var(--scene-book-3)" />
+        <rect x="60" y="114" width="80" height="14" rx="5" fill="var(--scene-book-1)" />
+        <path d="M66 118h68" stroke="rgba(255,255,255,.32)" strokeWidth="2.5" strokeLinecap="round" />
+        <path d="M50 132h86" stroke="rgba(255,255,255,.2)" strokeWidth="2.5" strokeLinecap="round" />
+        <path d="M74 114v36l-8-7-8 7V114Z" fill="var(--scene-accent)" />
+      </g>
+
+      {/* plant (right) */}
+      <g className="study-scene__plant">
+        <path d="M315 147c0-20 2-30 8-40" stroke="var(--scene-plant-stem)" strokeWidth="3.6" strokeLinecap="round" />
+        <path d="M323 117c-9-5-16-15-12-23 10 1 17 10 12 23Z" fill="var(--scene-plant-1)" />
+        <path d="M323 111c8-12 19-13 23-5-5 11-13 14-23 5Z" fill="var(--scene-plant-2)" />
+        <path d="M318 130c-12-1-19-7-19-15 10-3 18 3 19 15Z" fill="var(--scene-plant-2)" opacity=".9" />
+        <path d="M322 125c10-10 21-8 23 1-7 9-15 10-23-1Z" fill="var(--scene-plant-1)" opacity=".9" />
+        <path d="M290 149h50l-6 21h-38Z" fill="var(--scene-pot)" />
+        <path d="M287 144h56l-3 8H290Z" fill="var(--scene-pot-rim)" />
+        <ellipse cx="315" cy="146" rx="25" ry="6" fill="var(--scene-soil)" />
+      </g>
+
+      <g fill="var(--scene-accent)" opacity=".5">
+        <path d="m300 74 3 7 7 3-7 3-3 7-3-7-7-3 7-3Z" />
+        <circle cx="252" cy="96" r="2.8" />
+      </g>
+    </svg>
+  );
+}
+
+/* ── Style (onboarding · style): glowing bulb · books · rays ──────────── */
+export function StyleScene() {
+  return (
+    <svg viewBox="0 0 360 200" role="presentation">
+      <SceneDefs id="sty" />
+      <SceneDesk id="sty" />
+      <ellipse cx="210" cy="60" rx="88" ry="52" fill="var(--scene-glow)" opacity=".3" filter="url(#sty-blur)" />
+
+      {/* light rays */}
+      <g stroke="var(--scene-accent)" strokeOpacity=".4" strokeWidth="4" strokeLinecap="round">
+        <path d="M120 40h-24M300 40h24M210 6V2" />
+        <path d="M156 18l-12-12M264 18l12-12" />
+      </g>
+
+      {/* bulb (centre-right) */}
+      <g>
+        <ellipse cx="210" cy="112" rx="40" ry="7" fill="var(--scene-shadow)" opacity=".16" filter="url(#sty-blur)" />
+        <circle cx="210" cy="52" r="30" fill="url(#sty-lamp)" />
+        <path d="M196 44a22 22 0 0 1 8-14" stroke="rgba(255,255,255,.45)" strokeWidth="4" strokeLinecap="round" fill="none" />
+        <circle cx="202" cy="58" r="7" fill="var(--scene-lamp-core)" />
+        <rect x="196" y="80" width="28" height="16" rx="6" fill="url(#sty-lamp)" />
+        <rect x="188" y="96" width="44" height="9" rx="4.5" fill="var(--scene-surface-2)" />
+        <rect x="193" y="105" width="34" height="7" rx="3.5" fill="var(--scene-surface-1)" />
+      </g>
+
+      {/* books (left) */}
+      <g>
+        <rect x="30" y="156" width="104" height="12" rx="5" fill="var(--scene-book-2)" opacity=".9" />
+        <rect x="38" y="143" width="96" height="13" rx="5" fill="url(#sty-book)" />
+        <rect x="46" y="130" width="82" height="13" rx="5" fill="var(--scene-book-3)" />
+        <path d="M52 134h68" stroke="rgba(255,255,255,.3)" strokeWidth="2" strokeLinecap="round" />
+      </g>
+
+      <g fill="var(--scene-accent)" opacity=".5">
+        <path d="m150 108 3 7 7 3-7 3-3 7-3-7-7-3 7-3Z" />
+        <circle cx="310" cy="130" r="3" />
+      </g>
+    </svg>
+  );
+}
+
+/* ── Review (onboarding · review): checklist board · flag · books ─────── */
+export function ReviewScene() {
+  return (
+    <svg viewBox="0 0 360 200" role="presentation">
+      <SceneDefs id="rev" />
+      <SceneDesk id="rev" />
+      <ellipse cx="190" cy="92" rx="96" ry="48" fill="var(--scene-glow)" opacity=".2" filter="url(#rev-blur)" />
+
+      {/* books (left) */}
+      <g>
+        <rect x="34" y="157" width="90" height="12" rx="5" fill="var(--scene-book-2)" opacity=".9" />
+        <rect x="42" y="144" width="82" height="13" rx="5" fill="url(#rev-book)" />
+        <rect x="50" y="131" width="68" height="13" rx="5" fill="var(--scene-book-3)" />
+        <path d="M56 135h56" stroke="rgba(255,255,255,.3)" strokeWidth="2" strokeLinecap="round" />
+      </g>
+
+      {/* checklist board (centre) */}
+      <g>
+        <ellipse cx="200" cy="160" rx="66" ry="8" fill="var(--scene-shadow)" opacity=".16" filter="url(#rev-blur)" />
+        <rect x="140" y="44" width="120" height="116" rx="16" fill="url(#rev-paper)" />
+        <rect x="156" y="58" width="52" height="7" rx="3.5" fill="var(--scene-accent)" opacity=".8" />
+        <g stroke="var(--scene-accent)" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" fill="none">
+          <path d="M168 96l12 12 20-24" />
+          <path d="M168 128l12 12 20-24" />
+        </g>
+      </g>
+
+      {/* flag (right) */}
+      <g>
+        <path d="M292 160V60" stroke="var(--scene-ink)" strokeWidth="5" strokeLinecap="round" />
+        <path d="M292 60c11 8 22 8 32 0-8 14-21 14-32 0Z" fill="url(#rev-lamp)" />
+      </g>
+
+      <g fill="var(--scene-accent)" opacity=".5">
+        <path d="m76 96 3 7 7 3-7 3-3 7-3-7-7-3 7-3Z" />
+      </g>
+    </svg>
+  );
+}
+
 const SCENES: Record<SceneVariant, () => React.JSX.Element> = {
   dashboard: DashboardScene,
   planner: PlannerScene,
   focus: FocusScene,
   subjects: SubjectsScene,
   settings: SettingsScene,
+  graduation: GraduationScene,
+  course: CourseScene,
+  details: DetailsScene,
+  syllabus: SyllabusScene,
+  style: StyleScene,
+  review: ReviewScene,
 };
 
 export default function StudyScene({

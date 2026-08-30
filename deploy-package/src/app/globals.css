@@ -2872,7 +2872,7 @@ body.theme-dark .ob-step-label,body.theme-obsidian .ob-step-label,body.theme-neb
 .ob-projection-note{margin-top:6px;font-size:.82rem;font-weight:700;line-height:1.55}
 .ob-projection-note.ok{color:var(--success-accent)}
 .ob-projection-note.warn{color:var(--danger-accent)}
-.ob-footer-strip{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:18px;padding-top:18px;border-top:1px solid var(--glass-border)}
+.ob-footer-strip{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:18px;padding-top:18px;border-top:none}
 .ob-btn-row{margin-top:0;padding-top:0;border-top:none;flex-shrink:0}
 .ob-btn{min-width:132px;font-weight:800}
 .ob-privacy{margin-top:0;max-width:34rem;font-size:.76rem;justify-content:flex-start}
@@ -3616,17 +3616,12 @@ body.theme-dark,body.theme-obsidian,body.theme-nebula{
   --grid-line:color-mix(in srgb,var(--accent) 11%,transparent);
 }
 
-/* The mesh itself: a fixed layer painted above the body wash and
-   below all content, fading out toward the fold like the reference.
-   Lives on ::after — ::before already carries the slow aurora drift. */
-body::after{
-  content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:1;animation:none;
-  background:
-    linear-gradient(var(--grid-line) 1px,transparent 1px) 0 0/var(--grid-s) var(--grid-s),
-    linear-gradient(90deg,var(--grid-line) 1px,transparent 1px) 0 0/var(--grid-s) var(--grid-s);
-  -webkit-mask-image:linear-gradient(to bottom,rgba(0,0,0,.95),rgba(0,0,0,.45) 46%,transparent 92%);
-  mask-image:linear-gradient(to bottom,rgba(0,0,0,.95),rgba(0,0,0,.45) 46%,transparent 92%);
-}
+/* Ambient canvas: only the soft aurora glow (body::before) remains.
+   The former body::after "grid mesh" — a full-screen pattern of 1px
+   horizontal + vertical lines every 44px — was removed: its 1px lines
+   rendered as an unintended subtle hairline around cards, most visibly
+   in the dark theme (where --grid-line was strongest). Cards keep their
+   own intentional 1px borders; the canvas keeps its soft gradients. */
 
 /* Onboarding + loader share the app canvas instead of repainting a
    flat one on top of it — one continuous surface, end to end. */
@@ -4118,7 +4113,6 @@ body.theme-mint,body.theme-sunset,body.theme-silver-lavender,body.theme-default{
    E · SCROLL-AWARE CHROME
 ──────────────────────────────────────────────────────────────────────── */
 @keyframes lgFrost{from{--frost:0}to{--frost:1}}
-@keyframes lgMesh{to{background-position:0 -46px,-46px 0}}
 @keyframes lgReveal{from{opacity:0;transform:translateY(11px) scale(.994)}to{opacity:1;transform:none}}
 
 @supports (animation-timeline:scroll()){
@@ -4162,9 +4156,6 @@ body.theme-mint,body.theme-sunset,body.theme-silver-lavender,body.theme-default{
                    0 -2px 12px rgba(10,12,26,calc(.06 + var(--frost) * .05)),
                    0 20px 44px -20px rgba(10,12,26,calc(.34 + var(--frost) * .12));}
     }
-    /* Canvas parallax: the mesh lags one cell behind the scroll — depth,
-       not motion. Skipped while focus-live owns body::after. */
-    body:not(.focus-live)::after{animation:lgMesh auto linear both;animation-timeline:scroll(root block)}
   }
 }
 
@@ -5132,12 +5123,12 @@ body.mode-young .section-title::after{width:46px;height:3px;bottom:-8px}
     var(--accent-light) var(--vol-fill,30%),
     color-mix(in srgb,var(--text-main) 12%,transparent) var(--vol-fill,30%),
     color-mix(in srgb,var(--text-main) 12%,transparent) 100%);
-  box-shadow:inset 0 1px 2px color-mix(in srgb,var(--text-main) 10%,transparent);
+  box-shadow:none;
 }
 .ambient-panel .vol-range::-moz-range-track{
   height:var(--vol-track-h);border-radius:999px;
   background:color-mix(in srgb,var(--text-main) 12%,transparent);
-  box-shadow:inset 0 1px 2px color-mix(in srgb,var(--text-main) 10%,transparent);
+  box-shadow:none;
 }
 .ambient-panel .vol-range::-moz-range-progress{
   height:var(--vol-track-h);border-radius:999px 0 0 999px;
