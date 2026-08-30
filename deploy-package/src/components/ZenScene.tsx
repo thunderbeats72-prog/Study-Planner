@@ -79,9 +79,8 @@ export default function ZenScene({ className = "" }: { className?: string }) {
           </g>
         </g>
 
-        {/* leaning books (far right): moved outward to make room for the
-            little desk clock that completes the shared workspace language. */}
-        <g opacity=".85" transform="translate(80 0)">
+        {/* leaning books (right) */}
+        <g opacity=".85">
           <rect x="960" y="260" width="120" height="13" rx="4" fill="var(--zen-book-1)" transform="rotate(-3 1020 266)" />
           <rect x="976" y="245" width="108" height="14" rx="4" fill="var(--zen-book-2)" transform="rotate(-6 1030 252)" />
           <rect x="990" y="231" width="94" height="13" rx="4" fill="var(--zen-book-3)" transform="rotate(-9 1037 237)" />
@@ -123,26 +122,6 @@ export default function ZenScene({ className = "" }: { className?: string }) {
           <path d="M879 243c21-19 42-15 46 2-13 18-30 20-46-2z" fill="var(--zen-plant-4)" />
           <path d="M812 284h82l-9 16h-64z" fill="var(--zen-pot)" />
           <rect x="808" y="280" width="90" height="10" rx="4" fill="var(--zen-pot-rim)" />
-        </g>
-
-        {/* Table clock: the focus-room object is now part of Zen too. Its
-            rim, face and hands all use live theme tokens instead of a fixed
-            colour, so a theme change reaches the room as well as the pages. */}
-        <g className="zen-scene__clock" opacity=".93">
-          <ellipse cx="966" cy="300" rx="50" ry="7" fill="var(--zen-clock-shadow)" opacity=".42" />
-          <path d="M942 282l-10 18M990 282l10 18" stroke="var(--zen-clock-rim)" strokeWidth="7" strokeLinecap="round" />
-          <circle cx="966" cy="252" r="35" fill="var(--zen-clock-rim)" />
-          <circle cx="966" cy="252" r="28" fill="var(--zen-clock-face)" stroke="var(--zen-clock-mark)" strokeOpacity=".24" strokeWidth="2" />
-          <g stroke="var(--zen-clock-mark)" strokeWidth="3" strokeLinecap="round" opacity=".78">
-            <path d="M966 230v5M966 269v5M944 252h5M983 252h5" />
-            <path d="m950 236 3 3M979 265l3 3M982 236l-3 3M953 265l-3 3" />
-          </g>
-          <g stroke="var(--zen-clock-hand)" strokeWidth="4" strokeLinecap="round">
-            <path d="M966 252v-15" />
-            <path d="m966 252 14 9" />
-          </g>
-          <circle cx="966" cy="252" r="4" fill="var(--zen-clock-mark)" />
-          <path d="M936 296h60" stroke="var(--zen-clock-rim)" strokeWidth="7" strokeLinecap="round" />
         </g>
 
         {/* drifting motes — the only movement that crosses the whole scene */}

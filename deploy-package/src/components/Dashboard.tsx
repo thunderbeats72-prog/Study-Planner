@@ -6,9 +6,8 @@ import MiniCalendar from "./MiniCalendar";
 import { api, addDays, dayDiff, mdToHtml, prettyLong, today, KIND_META, normalizeCheckpointTitle, type AppState, type TaskRow } from "@/lib/client";
 import { mmss } from "@/lib/useTimer";
 import {
-  IconSpark, IconCalendar, IconTarget, IconClock, IconFlame, IconPlay, IconLeaf, IconRocket, IconBolt,
+  IconSpark, IconCalendar, IconTarget, IconClock, IconFlame, IconPlay, IconLeaf, IconRocket,
 } from "./icons";
-import { QUOTES, TONE_TAG, pickDaily, pickNext, readSeen, writeSeen, type QuoteTone } from "@/lib/quotes";
 import TaskEditor, { type TaskPatch } from "./TaskEditor";
 import TaskActions from "./TaskActions";
 import { TaskLiveBadge } from "./TaskClockButton";
@@ -50,15 +49,21 @@ function useCountUp(target: number): string {
   return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
 }
 
-const QUOTE_ICONS: Record<QuoteTone, React.ReactNode> = {
-  presence: <IconLeaf size={12} />,
-  focus: <IconTarget size={12} />,
-  begin: <IconRocket size={12} />,
-  discipline: <IconFlame size={12} />,
-  courage: <IconBolt size={12} />,
-  patience: <IconClock size={12} />,
-  mastery: <IconSpark size={12} />,
-};
+const QUOTES = [
+  { text: "Small steps every day add up to big results.", tag: "Stay present" },
+  { text: "Focus is saying no to a hundred good ideas.", tag: "Protect your focus" },
+  { text: "You don't have to be great to start, but you have to start to be great.", tag: "You've got this" },
+  { text: "The expert in anything was once a beginner.", tag: "Keep going" },
+  { text: "Discipline is choosing between what you want now and what you want most.", tag: "Stay present" },
+  { text: "One focused hour beats a distracted day.", tag: "Protect your focus" },
+  { text: "Progress, not perfection.", tag: "You've got this" },
+];
+
+function dailyQuote(dateKey: string) {
+  let hash = 0;
+  for (let i = 0; i < dateKey.length; i++) hash = (hash * 31 + dateKey.charCodeAt(i)) >>> 0;
+  return QUOTES[hash % QUOTES.length];
+}
 
 /** Checkpoints are cross-subject mock tasks rendered without a subject. */
 function isCheckpointTask(task: TaskRow): boolean {
@@ -105,37 +110,7 @@ export default function Dashboard({
   const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
   const t = today();
   const ctx = state.context;
-
-  /* Quote engine: the card shows the day's pick, advanced past anything
-     already seen; "New thought" advances on demand. The seen-history lives
-     in localStorage so a quote never repeats until the whole pool has been
-     shown once — then the cycle resets and starts over. */
-  const [quoteState, setQuoteState] = useState(() => {
-    const seen = readSeen() ?? [];
-    const { index, seen: updated } = pickDaily(QUOTES.length, t, seen);
-    return { index, seen: updated };
-  });
-  const quoteDayRef = useRef(t);
-  const quote = QUOTES[quoteState.index];
-  useEffect(() => {
-    writeSeen(quoteState.seen);
-  }, [quoteState.seen]);
-  useEffect(() => {
-    // The dashboard can stay mounted across midnight — roll the quote over
-    // to the new day's pick without waiting for a remount.
-    if (quoteDayRef.current === t) return;
-    quoteDayRef.current = t;
-    setQuoteState((prev) => {
-      const { index, seen } = pickDaily(QUOTES.length, t, prev.seen);
-      return { index, seen };
-    });
-  }, [t]);
-  const nextQuote = () => {
-    setQuoteState((prev) => {
-      const { index, seen } = pickNext(QUOTES.length, prev.index, prev.seen);
-      return { index, seen };
-    });
-  };
+  const quote = dailyQuote(t);
 
   const taskProgressVersion = `${state.tasks.length}:${state.tasks.filter((task) => task.status === "done").length}:${state.tasks.filter((task) => task.status === "skipped").length}`;
   const loggedQuarterHour = Math.floor(
@@ -487,20 +462,11 @@ export default function Dashboard({
           {/* The quote sits under the plan so the right rail keeps the shorter,
               fixed-height calendar; the two columns stay fitted end to end. */}
           <div className="glass-panel tilt-card section-card dash-quote-card">
-            <div className="quote-top">
-              <div className="quote-mark" aria-hidden="true">“</div>
-              <button type="button" className="quote-shuffle" onClick={nextQuote} aria-label="Show a different thought" title="Show a different thought">
-                <IconSpark size={12} /> New thought
-              </button>
-            </div>
+            <div className="quote-mark" aria-hidden="true">“</div>
             <p className="quote-text">{quote.text}</p>
             <div className="quote-tag">
-              <span className="quote-tag-icon">{QUOTE_ICONS[quote.tone]}</span>
-              {TONE_TAG[quote.tone]}
-            </div>
-            <div className="quote-author">
-              <span className="quote-author-name">— {quote.author}</span>
-              <span className="quote-author-role">{quote.role}</span>
+              <span className="quote-tag-icon">{quote.tag === "Stay present" ? <IconLeaf size={12} /> : <IconRocket size={12} />}</span>
+              {quote.tag}
             </div>
           </div>
         </div>
