@@ -103,3 +103,7 @@ export const IconRocket = ({ size = 16 }: P) => (
 export const IconPlus = ({ size = 14 }: P) => (
   <svg {...base(size)}><path d="M12 5v14M5 12h14" /></svg>
 );
+
+export const IconRefresh = ({ size = 15 }: P) => (
+  <svg {...base(size)}><path d="M21 12a9 9 0 1 1-2.64-6.36" /><polyline points="21 3 21 9 15 9" /></svg>
+);

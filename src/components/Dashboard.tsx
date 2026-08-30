@@ -6,7 +6,7 @@ import MiniCalendar from "./MiniCalendar";
 import { api, addDays, dayDiff, mdToHtml, prettyLong, today, KIND_META, normalizeCheckpointTitle, type AppState, type TaskRow } from "@/lib/client";
 import { mmss } from "@/lib/useTimer";
 import {
-  IconSpark, IconCalendar, IconTarget, IconClock, IconFlame, IconPlay, IconLeaf, IconRocket,
+  IconSpark, IconCalendar, IconTarget, IconClock, IconFlame, IconPlay, IconLeaf, IconRocket, IconRefresh,
 } from "./icons";
 import TaskEditor, { type TaskPatch } from "./TaskEditor";
 import TaskActions from "./TaskActions";
@@ -20,6 +20,7 @@ import {
   spreadAcrossDays, suggestedRecovery, todayOverload,
 } from "@/lib/recovery";
 import type { QuickAddPayload } from "@/lib/quickAdd";
+import { QUOTES, TONE_TAG, pickDaily, pickNext, readSeen, writeSeen } from "@/lib/quotes";
 
 /** v13 — KPI digits count up to their new value instead of snapping.
  *  Returns a formatted string (integers stay clean, tenths when needed). */
@@ -49,20 +50,72 @@ function useCountUp(target: number): string {
   return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
 }
 
-const QUOTES = [
-  { text: "Small steps every day add up to big results.", tag: "Stay present" },
-  { text: "Focus is saying no to a hundred good ideas.", tag: "Protect your focus" },
-  { text: "You don't have to be great to start, but you have to start to be great.", tag: "You've got this" },
-  { text: "The expert in anything was once a beginner.", tag: "Keep going" },
-  { text: "Discipline is choosing between what you want now and what you want most.", tag: "Stay present" },
-  { text: "One focused hour beats a distracted day.", tag: "Protect your focus" },
-  { text: "Progress, not perfection.", tag: "You've got this" },
-];
+/* ── Daily thought — persona quotes with a no-repeat rotation ─────────
+   The card shows one quote per calendar day, drawn from a roster of real
+   voices (Osho, Martin Luther, Marcus Aurelius, Rumi, …). "Another thought"
+   advances to the next unseen quote immediately; the seen history lives in
+   localStorage (see lib/quotes.ts) so nothing repeats until the whole pool
+   has been shown. Today's pick is remembered separately so a refresh keeps
+   the same card and a new day always brings a new voice. */
+const QUOTE_TODAY_KEY = "spp-quote-today";
 
-function dailyQuote(dateKey: string) {
-  let hash = 0;
-  for (let i = 0; i < dateKey.length; i++) hash = (hash * 31 + dateKey.charCodeAt(i)) >>> 0;
-  return QUOTES[hash % QUOTES.length];
+function readTodayQuote(): { d: string; i: number } | null {
+  try {
+    const raw = window.localStorage.getItem(QUOTE_TODAY_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { d?: unknown; i?: unknown };
+    if (typeof parsed.d !== "string" || typeof parsed.i !== "number") return null;
+    return { d: parsed.d, i: parsed.i };
+  } catch {
+    return null;
+  }
+}
+
+function writeTodayQuote(dateKey: string, index: number) {
+  try {
+    window.localStorage.setItem(QUOTE_TODAY_KEY, JSON.stringify({ d: dateKey, i: index }));
+  } catch {
+    /* storage unavailable — rotation still works for the session */
+  }
+}
+
+function useDailyQuote(dateKey: string): [number, () => void] {
+  const [index, setIndex] = useState(() => resolveDailyQuote(dateKey));
+  /* If the calendar day rolls over while the tab stays open, the next
+     quote arrives on its own — checked on a quiet timer and whenever the
+     tab becomes visible again (both are callbacks, never render paths). */
+  useEffect(() => {
+    const check = () => {
+      if (readTodayQuote()?.d !== dateKey) setIndex(resolveDailyQuote(dateKey));
+    };
+    const timer = window.setInterval(check, 60_000);
+    document.addEventListener("visibilitychange", check);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", check);
+    };
+  }, [dateKey]);
+  const advance = () => {
+    setIndex((current) => {
+      const pick = pickNext(QUOTES.length, current, readSeen() ?? []);
+      writeSeen(pick.seen);
+      writeTodayQuote(dateKey, pick.index);
+      return pick.index;
+    });
+  };
+  return [index, advance];
+}
+
+/** The day's pick: yesterday's card survives a refresh; a new day draws the
+ *  next unseen quote from the pool and records it in the history. */
+function resolveDailyQuote(dateKey: string): number {
+  if (typeof window === "undefined") return pickDaily(QUOTES.length, dateKey, []).index;
+  const stored = readTodayQuote();
+  if (stored && stored.d === dateKey) return stored.i;
+  const pick = pickDaily(QUOTES.length, dateKey, readSeen() ?? []);
+  writeSeen(pick.seen);
+  writeTodayQuote(dateKey, pick.index);
+  return pick.index;
 }
 
 /** Checkpoints are cross-subject mock tasks rendered without a subject. */
@@ -110,7 +163,8 @@ export default function Dashboard({
   const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
   const t = today();
   const ctx = state.context;
-  const quote = dailyQuote(t);
+  const [quoteIndex, nextQuote] = useDailyQuote(t);
+  const quote = QUOTES[quoteIndex] ?? QUOTES[0];
 
   const taskProgressVersion = `${state.tasks.length}:${state.tasks.filter((task) => task.status === "done").length}:${state.tasks.filter((task) => task.status === "skipped").length}`;
   const loggedQuarterHour = Math.floor(
@@ -462,11 +516,30 @@ export default function Dashboard({
           {/* The quote sits under the plan so the right rail keeps the shorter,
               fixed-height calendar; the two columns stay fitted end to end. */}
           <div className="glass-panel tilt-card section-card dash-quote-card">
+            <button
+              type="button"
+              className="quote-refresh"
+              onClick={nextQuote}
+              title="Another thought"
+              aria-label="Show another thought"
+            >
+              <IconRefresh size={15} />
+            </button>
             <div className="quote-mark" aria-hidden="true">“</div>
-            <p className="quote-text">{quote.text}</p>
-            <div className="quote-tag">
-              <span className="quote-tag-icon">{quote.tag === "Stay present" ? <IconLeaf size={12} /> : <IconRocket size={12} />}</span>
-              {quote.tag}
+            <div className="quote-body" key={quoteIndex}>
+              <p className="quote-text">{quote.text}</p>
+              <div className="quote-source">
+                <div className="quote-author">
+                  <strong>{quote.author}</strong>
+                  <span>{quote.role}</span>
+                </div>
+                <span className="quote-tag">
+                  <span className="quote-tag-icon">
+                    {quote.tone === "presence" || quote.tone === "patience" ? <IconLeaf size={12} /> : <IconRocket size={12} />}
+                  </span>
+                  {TONE_TAG[quote.tone]}
+                </span>
+              </div>
             </div>
           </div>
         </div>
