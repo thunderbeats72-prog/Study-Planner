@@ -917,7 +917,7 @@ async function runTests() {
   const onboardingSource = readFileSync(join(process.cwd(), "src/components/Onboarding.tsx"), "utf8");
   check(!/from nursery/i.test(onboardingSource),
     "The Level step copy no longer advertises nursery / pre-school");
-  check(onboardingSource.includes("From school and higher education through doctoral research"),
+  check(onboardingSource.includes("This sets how deep the syllabus goes"),
     "The Level step explains itself in real markup");
   const polishCss = readFileSync(join(process.cwd(), "src/app/ui-polish.css"), "utf8");
   check(!/font-size:\s*0\s*!important/.test(polishCss),
@@ -965,9 +965,7 @@ async function runTests() {
   await act(async () => {
     sliderTree = TestRenderer.create(React.createElement(OnboardingSlider, {
       label: "Daily hours", value: 2.5, valueLabel: "2.5 hours", min: 0.5, max: 8, step: 0.25,
-      minLabel: "30 min", maxLabel: "8 hours", presets: [
-        { label: "1 hour", value: 1 }, { label: "2 hours", value: 2 }, { label: "4 hours", value: 4 },
-      ],
+      minLabel: "30 min", maxLabel: "8 hours",
       onChange: (v: number) => { sliderValue = v; },
     }));
   });
@@ -981,10 +979,8 @@ async function runTests() {
     check(fill.startsWith("26.6"), "The filled rail is driven by --ob-range-fill from the actual value", fill);
     check(!!root.findByProps({ className: "ob-range-value" }) && String(root.findByProps({ className: "ob-range-value" }).children.join("")) === "2.5 hours",
       "The value badge shows the readable label");
-    const chips = root.findAll((n) => String(n.props.className || "").startsWith("ob-range-chip"));
-    check(chips.length === 3, "Preset chips render beside the slider");
-    act(() => { chips[2].props.onClick(); });
-    check(sliderValue === 4, "A preset chip commits its own value through onChange");
+    check(root.findAll((n) => String(n.props.className || "").includes("ob-range-chip")).length === 0,
+      "No preset chips crowd the slider — the rail and its labels are the whole control");
     act(() => { input.props.onChange({ target: { value: "3.25" } }); });
     check(sliderValue === 3.25, "Dragging the thumb reports numbers, not strings");
     act(() => { input.props.onPointerDown({}); });
@@ -996,19 +992,6 @@ async function runTests() {
       "Screen readers get the label and the pointer state stays recoverable on blur");
   }
   await act(async () => { sliderTree.unmount(); });
-  {
-    let presetTree!: TestRenderer.ReactTestRenderer;
-    await act(async () => {
-      presetTree = TestRenderer.create(React.createElement(OnboardingSlider, {
-        label: "Daily hours", value: 4, valueLabel: "4 hours", min: 0.5, max: 8, step: 0.25,
-        minLabel: "30 min", maxLabel: "8 hours", presets: [{ label: "4 hours", value: 4 }], onChange: () => {},
-      }));
-    });
-    const chip = presetTree.root.findAll((n) => String(n.props.className || "").startsWith("ob-range-chip"))[0];
-    check(chip.props["aria-pressed"] === true && String(chip.props.className).includes("active"),
-      "The matching preset chip is visibly AND semantically pressed");
-    await act(async () => { presetTree.unmount(); });
-  }
 
   /* CSS consolidation audit: one authoritative finish layer */
   const retired = ["ui-polish-pass.css", "ui-polish-landing.css", "final-ui-fixes.css", "task-actions-final.css"];

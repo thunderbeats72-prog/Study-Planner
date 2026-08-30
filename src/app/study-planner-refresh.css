@@ -45,6 +45,67 @@
   --scene-soil:color-mix(in srgb,var(--text-main) 28%,var(--surface));
 }
 
+/* ── Onboarding illustration tokens — same pattern as the scene tokens.
+   OnboardingArt paints itself from these vars, so every step illustration
+   follows the active theme (light, dark, obsidian, nebula, mint, sunset):
+   paper cards, warm highlights and leaf greens are re-mixed per palette. */
+:root, body{
+  --ob-art-paper:color-mix(in srgb,var(--surface) 94%,#fff 6%);
+  --ob-art-soft:color-mix(in srgb,var(--accent) 10%,var(--surface));
+  --ob-art-warm:#f2a86b;
+  --ob-art-highlight:#ffd98e;
+  --ob-art-leaf:color-mix(in srgb,var(--success-accent) 66%,#a7d9c9);
+  --ob-art-leaf-deep:color-mix(in srgb,var(--success-accent) 48%,#8fc6b4);
+  --ob-art-leaf-light:color-mix(in srgb,var(--success-accent) 40%,#e6f7f0);
+  --ob-art-leaf-stem:color-mix(in srgb,var(--success-accent) 62%,var(--text-main));
+}
+body.theme-dark,body.theme-obsidian,body.theme-nebula{
+  --ob-art-paper:color-mix(in srgb,var(--surface) 78%,#fff 22%);
+  --ob-art-soft:color-mix(in srgb,var(--accent) 16%,var(--surface));
+  --ob-art-warm:#e0a06a;
+  --ob-art-highlight:#f4cf85;
+  --ob-art-leaf:color-mix(in srgb,var(--success-accent) 55%,#3d6b5c);
+  --ob-art-leaf-deep:color-mix(in srgb,var(--success-accent) 42%,#2f574b);
+  --ob-art-leaf-light:color-mix(in srgb,var(--success-accent) 30%,#20302b);
+}
+body.theme-mint{
+  --ob-art-warm:#e8b184;
+  --ob-art-highlight:#ffe3a3;
+}
+body.theme-sunset{
+  --ob-art-warm:#ec9a5f;
+  --ob-art-highlight:#ffce8f;
+}
+
+/* Onboarding step header: headline + lead on the left, the editorial
+   illustration on the right. Below 700px the art settles under the copy,
+   centred and smaller, so phones keep the same flow without crowding. */
+.ob-step-intro{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) clamp(150px,26%,215px);
+  gap:2px 24px;
+  align-items:center;
+  margin-bottom:6px;
+}
+.ob-step-intro .ob-step-copy{min-width:0;grid-row:1}
+.ob-step-intro h1{margin-bottom:8px}
+.ob-step-intro p{margin-bottom:18px;max-width:52ch}
+.ob-step-art{width:100%;display:block;pointer-events:none;grid-row:1;align-self:center}
+.ob-step-art svg{width:100%;height:auto;display:block;overflow:visible}
+@media (prefers-reduced-motion: no-preference){
+  .ob-step-art{animation:obArtFloat 7.5s ease-in-out infinite alternate}
+  @keyframes obArtFloat{from{transform:translateY(-3px)}to{transform:translateY(3px)}}
+}
+@media(max-width:700px){
+  .ob-step-intro{grid-template-columns:1fr;gap:0}
+  .ob-step-intro .ob-step-copy{grid-row:1}
+  .ob-step-intro p{margin-bottom:14px}
+  .ob-step-art{grid-row:2;max-width:200px;margin:2px auto 14px}
+}
+@media(max-width:420px){
+  .ob-step-art{max-width:170px;margin-bottom:12px}
+}
+
 /* ---------------- Reference canvas ---------------- */
 body{
   background-color:var(--refresh-canvas);

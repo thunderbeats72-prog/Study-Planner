@@ -2820,6 +2820,64 @@ button,a,.nav-item,.vtab,.cal-cell,.chip,.task-row,.rate-btn,input,select{touch-
   margin-bottom:12px;padding:12px 14px;border-radius:14px;
   background:var(--status-skipped-bg);color:var(--status-skipped-text);font-size:.8rem;font-weight:750;
 }
+
+/* ═══ ONBOARDING — DETAILS STEP (dynamic per study type) ═══
+   The grid re-flows per selected level: degree gets a full-width
+   institution row then specialisation + term side by side, school and exam
+   modes get two equal columns, and a goal-only level collapses to one
+   column. One alignment system, four tuned layouts. */
+.ob-choice-btn{position:relative}
+.ob-choice-btn.selected::after{
+  content:"✓";position:absolute;top:11px;right:11px;width:21px;height:21px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  background:var(--accent-gradient);color:#fff;font-size:.66rem;font-weight:900;line-height:1;
+  box-shadow:0 2px 8px var(--accent-glow),inset 0 1px 0 rgba(255,255,255,.3);
+}
+.ob-details-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 14px}
+.ob-details-chip{
+  display:inline-flex;align-items:center;gap:7px;padding:6px 13px;border-radius:999px;
+  background:var(--nav-active-bg);color:var(--nav-active-text);border:1px solid var(--nav-active-border);
+  font-size:.74rem;font-weight:800;letter-spacing:.2px;
+}
+.ob-details-chip::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--accent)}
+.ob-details-chip-sub{font-size:.74rem;font-weight:650;color:var(--text-dim)}
+.ob-details-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 16px;margin-bottom:16px}
+/* Shared label baseline (same contract as the schedule grid): a one-line
+   label can never pull its input above the neighbour's. */
+.ob-details-grid > .ob-field > label{display:flex;align-items:center;min-height:2.4em}
+/* Kicker sits closer to the headline now that the intro grid carries the
+   step's vertical rhythm. */
+.ob-card-head{margin-bottom:12px}
+/* Backdrop: the same two-tone accent bloom the main app canvas wears, so
+   setup feels like part of the product, not a separate screen. */
+.ob-overlay{
+  background-image:
+    radial-gradient(900px 420px at 12% -6%,color-mix(in srgb,var(--accent) 11%,transparent),transparent 68%),
+    radial-gradient(760px 360px at 90% 2%,color-mix(in srgb,var(--color-ai) 8%,transparent),transparent 68%);
+}.ob-details-grid--degree .ob-details-field--wide{grid-column:1 / -1}
+.ob-details-grid.ob-details-grid--goal{grid-template-columns:minmax(0,1fr)}
+.ob-details-field label{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ob-field .ob-optional{
+  display:inline-block;padding:2px 8px;border-radius:99px;background:var(--row-bg);
+  border:1px solid var(--glass-border);color:var(--text-dim);
+  font-size:.58rem;font-weight:800;letter-spacing:.6px;text-transform:uppercase;
+}
+.ob-field .ob-field-note{
+  font-style:normal;font-weight:600;font-size:.64rem;letter-spacing:.2px;text-transform:none;
+  color:var(--text-dim);
+}
+.ob-assessing{display:flex;align-items:center;gap:9px}
+.ob-assessing::before{
+  content:"";width:10px;height:10px;border-radius:50%;flex:0 0 auto;
+  border:2px solid color-mix(in srgb,var(--accent) 30%,transparent);border-top-color:var(--accent);
+  animation:obAssessSpin 0.8s linear infinite;
+}
+@keyframes obAssessSpin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.ob-assessing::before{animation-duration:1.6s}}
+@media(max-width:640px){
+  .ob-details-grid{grid-template-columns:1fr;gap:12px}
+  .ob-details-head{margin-bottom:12px}
+}
 body.theme-dark .ob-card,body.theme-obsidian .ob-card,body.theme-nebula .ob-card{
   box-shadow:0 18px 48px rgba(0,0,0,.34),0 2px 10px rgba(0,0,0,.24);
   border-color:color-mix(in srgb,var(--glass-border) 60%,rgba(255,255,255,.08));
@@ -3041,7 +3099,7 @@ svg{flex-shrink:0;vertical-align:middle}
    single biggest source of rubber-banding anywhere in the system. Every
    interactive element now shares one damped curve. */
 .btn,.ob-btn,.vtab,.nav-item,.rate-btn,.ai-quick button,.cmdk-item,
-.ob-level-btn,.ob-choice-btn,.ob-range-chip,.voice-btn,.voice-replay,
+.ob-level-btn,.ob-choice-btn,.voice-btn,.voice-replay,
 .ai-close,.ai-copy,.toast-close,.sb-toggle,.cal-cell,.ai-send,.task-more,
 .ai-fab,.more-options-toggle{
   transition-timing-function:var(--spring-press);
@@ -3358,7 +3416,7 @@ body.theme-dark .pulse-dot.live,body.theme-obsidian .pulse-dot.live,body.theme-n
 ────────────────────────────────────────────────────────────────────── */
 @media (hover:none) and (pointer:coarse){
   .btn,.btn-sm,.btn-xs,.ob-btn,.rate-btn,.vtab,.ai-quick button,
-  .ob-range-chip,.cmdk-item,.ob-level-btn,.ob-choice-btn,
+  .cmdk-item,.ob-level-btn,.ob-choice-btn,
   .task-row-actions > .btn,.ob-course-item{min-height:var(--tap)}
   /* In desktop mode on touch phones/tablets (>640px), keep task row action buttons compact, centered and cleanly aligned */
   @media (min-width:641px){
