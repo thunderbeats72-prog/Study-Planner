@@ -3592,3 +3592,118 @@ body.theme-nebula .ob-overlay { --ob-canvas: var(--app-bg); --ob-surface: var(--
   .ob-step + .ob-step::before { top: 11px; margin-inline: 10px; }
   .ob-card { padding-inline: 14px; }
 }
+
+/* ========================================================================
+   THEME-RESPONSIVE WORKSPACE ART
+   ------------------------------------------------------------------------
+   Planner, Focus Studio and the dashboard now use the same larger editorial
+   desk still-life language as onboarding: calendar + books, desk clock +
+   plant, and lamp + books. The scenes remain decorative (the existing inline
+   SVGs stay in the DOM as the lightweight/tablet fallback), and their palette
+   follows the active app theme. The rendered studio art is deliberately kept
+   to roomy desktop widths; the compact token-driven SVG scenes continue to
+   protect every tablet and phone layout.
+   ======================================================================== */
+.study-scene--dashboard,
+.study-scene--planner,
+.study-scene--focus {
+  --studio-scene-blend: multiply;
+  --studio-scene-filter: none;
+  --studio-scene-opacity: .94;
+}
+
+.study-scene--dashboard { --studio-scene-art: url("./dashboard-lamp-studio-scene.webp"); }
+.study-scene--planner { --studio-scene-art: url("./planner-studio-scene.webp"); }
+.study-scene--focus { --studio-scene-art: url("./focus-clock-studio-scene.webp"); }
+
+/* The studio source artwork starts lavender. Theme-specific filters shift
+   every object — including books, calendar rim, clock and desk lamp — at the
+   exact same instant as the app's live CSS theme tokens change. */
+body.theme-silver-lavender .study-scene--dashboard,
+body.theme-silver-lavender .study-scene--planner,
+body.theme-silver-lavender .study-scene--focus {
+  --studio-scene-filter: saturate(.56) brightness(1.01);
+}
+
+body.theme-mint .study-scene--dashboard,
+body.theme-mint .study-scene--planner,
+body.theme-mint .study-scene--focus {
+  --studio-scene-filter: hue-rotate(-112deg) saturate(1.02) brightness(1.015);
+}
+
+body.theme-sunset .study-scene--dashboard,
+body.theme-sunset .study-scene--planner,
+body.theme-sunset .study-scene--focus {
+  --studio-scene-filter: hue-rotate(118deg) saturate(1.08) brightness(1.015);
+}
+
+/* The source backdrop becomes black after inversion, so screen blending
+   removes its rectangle on dark themes while retaining an accent-tinted desk
+   silhouette. This mirrors the dark onboarding decor treatment. */
+body.theme-dark .study-scene--dashboard,
+body.theme-dark .study-scene--planner,
+body.theme-dark .study-scene--focus {
+  --studio-scene-filter: invert(.9) hue-rotate(170deg) saturate(.8) brightness(.68);
+  --studio-scene-blend: screen;
+  --studio-scene-opacity: .42;
+}
+
+body.theme-obsidian .study-scene--dashboard,
+body.theme-obsidian .study-scene--planner,
+body.theme-obsidian .study-scene--focus {
+  --studio-scene-filter: invert(.88) hue-rotate(130deg) saturate(1.1) brightness(.78);
+  --studio-scene-blend: screen;
+  --studio-scene-opacity: .53;
+}
+
+body.theme-nebula .study-scene--dashboard,
+body.theme-nebula .study-scene--planner,
+body.theme-nebula .study-scene--focus {
+  --studio-scene-filter: invert(.88) hue-rotate(186deg) saturate(1.2) brightness(.76);
+  --studio-scene-blend: screen;
+  --studio-scene-opacity: .5;
+}
+
+@media (min-width: 1101px) {
+  .dash-hero-scene.study-scene--dashboard,
+  .page-header-scene.study-scene--planner,
+  .page-header-scene.study-scene--focus {
+    isolation: isolate;
+    overflow: visible;
+  }
+
+  .dash-hero-scene.study-scene--dashboard::after,
+  .page-header-scene.study-scene--planner::after,
+  .page-header-scene.study-scene--focus::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    background-image: var(--studio-scene-art);
+    background-position: center;
+    background-size: cover;
+    background-repeat: no-repeat;
+    filter: var(--studio-scene-filter);
+    mix-blend-mode: var(--studio-scene-blend);
+    opacity: var(--studio-scene-opacity);
+  }
+
+  /* Preserve the SVG's intrinsic ratio to anchor the art, then visually
+     hand the stage to the detailed studio image. */
+  .dash-hero-scene.study-scene--dashboard > svg,
+  .page-header-scene.study-scene--planner > svg,
+  .page-header-scene.study-scene--focus > svg { opacity: 0; }
+}
+
+/* Users who explicitly reduce transparency receive the original crisp SVG
+   study scenes instead of blended raster decoration. */
+@media (prefers-reduced-transparency: reduce) {
+  .dash-hero-scene.study-scene--dashboard::after,
+  .page-header-scene.study-scene--planner::after,
+  .page-header-scene.study-scene--focus::after { display: none; }
+
+  .dash-hero-scene.study-scene--dashboard > svg,
+  .page-header-scene.study-scene--planner > svg,
+  .page-header-scene.study-scene--focus > svg { opacity: 1; }
+}
