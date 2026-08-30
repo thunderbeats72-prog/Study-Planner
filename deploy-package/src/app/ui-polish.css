@@ -3936,17 +3936,17 @@ body.theme-nebula .ob-overlay {
   }
 }
 
-/* Keep the themed still-lifes visible on compact desktop/tablet screens
-   (including the widths in the supplied captures) without taking form space:
-   they shrink into the two outer gutters and stay behind the card. */
-@media (min-width: 701px) and (max-width: 1100px) {
+/* Keep the themed still-lifes visible at compact desktop, tablet, and
+   landscape-phone widths (including the supplied captures) without taking
+   form space: they shrink into the outer gutters and stay behind the card. */
+@media (min-width: 481px) and (max-width: 1100px) {
   .ob-overlay::before,
   .ob-overlay::after {
     display: block;
     bottom: 0;
     top: auto;
     height: min(48vh, 300px);
-    opacity: .8;
+    opacity: .86;
   }
 
   .ob-overlay::before {
@@ -3968,7 +3968,7 @@ body.theme-nebula .ob-overlay {
   }
 }
 
-@media (max-width: 700px) {
+@media (max-width: 480px) {
   .ob-overlay::before,
   .ob-overlay::after { display: none; }
 }
