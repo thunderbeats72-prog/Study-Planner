@@ -527,12 +527,43 @@ body {
   background-image:
     linear-gradient(165deg, color-mix(in srgb, var(--accent) 10%, var(--surface)), var(--surface) 72%);
 }
+.quote-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
 .quote-mark {
   font-family: Georgia, serif;
   font-size: 2.6rem; line-height: .6;
   color: var(--accent); opacity: .5;
   margin-bottom: 10px;
 }
+.quote-shuffle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--glass-border);
+  background: var(--surface-solid);
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: .72rem;
+  font-weight: 750;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color .16s ease, background .16s ease, color .16s ease, transform .14s ease;
+}
+.quote-shuffle svg { color: var(--accent); }
+.quote-shuffle:hover {
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--glass-border));
+  color: var(--accent);
+  background: var(--surface-hover);
+}
+.quote-shuffle:active { transform: scale(.96); }
+.quote-shuffle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .quote-text {
   margin: 0 0 14px;
   font-size: .98rem; font-weight: 650; line-height: 1.55;
@@ -545,10 +576,21 @@ body {
   border: 1px solid var(--glass-border);
   color: var(--accent);
   font-size: .72rem; font-weight: 750;
+  align-self: flex-start;
 }
 .quote-tag-icon {
   display: inline-flex; color: var(--success-accent);
 }
+.quote-author {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  margin-top: 12px;
+  font-size: .8rem;
+}
+.quote-author-name { font-weight: 800; color: var(--text-main); }
+.quote-author-role { font-size: .74rem; font-weight: 600; color: var(--text-muted); }
 
 /* Up-next card: calmer */
 .up-next { border-radius: var(--rd-radius-card); }

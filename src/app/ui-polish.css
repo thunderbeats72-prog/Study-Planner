@@ -33,7 +33,7 @@
 }
 
 .dash-quote-card {
-  min-height: 148px;
+  min-height: 178px;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -900,12 +900,45 @@ body.theme-nebula .ob-range-value {
 
 .ob-card .ob-schedule-grid > .ob-field { min-width: 0; }
 
-.ob-card .ob-schedule-grid > .ob-field:last-child {
+/* Full-width only where a field asks for it explicitly (ob-field-span-full).
+   The old blanket ":last-child" rule stretched the Year select in the
+   details grid across both columns, which left undergraduate layouts
+   looking ragged — the details grid now lays each study type out
+   deliberately instead of by coincidence of ordering. */
+.ob-card .ob-schedule-grid:not(.ob-details-grid) > .ob-field:last-child {
   grid-column: 1 / -1;
 }
 
 .ob-details-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .ob-details-grid > .ob-field-span-full { grid-column: 1 / -1; }
+/* Details labels are all one line now, so the tall 2.4em baseline the
+   schedule grid reserves for two-line labels would only add dead space. */
+.ob-details-grid > .ob-field > label { min-height: 0; }
+
+/* Small "optional" tag next to optional field labels. */
+.ob-optional {
+  display: inline-block;
+  vertical-align: 1px;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: .58rem;
+  font-weight: 800;
+  letter-spacing: .5px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  background: var(--row-bg);
+  border: 1px solid var(--glass-border);
+}
+
+/* Icon-led field labels (the rhythm step's date fields). Same specificity
+   as the block rule above, later in the file, so no !important is needed. */
+.ob-schedule-grid > .ob-field > label.ob-label-icon {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.ob-label-icon svg { color: var(--accent); }
 
 .ob-field,
 .ob-range-card,
@@ -1537,4 +1570,273 @@ body.theme-nebula .ob-range-value {
 @media (hover: none) {
   .ob-range-chip.active { color: var(--nav-active-text); }
   .cal-cell:not(.empty):active { background: var(--row-hover); }
+}
+
+/* =========================
+   ONBOARDING — STEP ART & SELECTION FLAIR
+   =========================
+   Each wizard step opens with a small themed illustration tile (the same
+   inline-SVG language as the platform's StudyScene headers), level cards
+   carry glyph tiles, and the course list trades its ghost hairline hover
+   for an accent edge + tint so a hovered topic reads as a deliberate
+   choice instead of a faint line appearing under the cursor. */
+
+.ob-card-head {
+  flex-direction: row;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.ob-step-art {
+  width: 64px;
+  height: 56px;
+  flex: 0 0 64px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+  background:
+    radial-gradient(130% 120% at 30% 0%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 62%),
+    linear-gradient(160deg, color-mix(in srgb, var(--accent) 13%, var(--surface-solid)), color-mix(in srgb, var(--accent) 4%, var(--surface-solid)));
+  border: 1px solid color-mix(in srgb, var(--accent) 26%, var(--glass-border));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .16),
+    0 8px 18px -12px color-mix(in srgb, var(--accent) 50%, transparent);
+}
+
+.ob-step-art svg { display: block; }
+
+@media (max-width: 640px) {
+  .ob-step-art { width: 54px; height: 48px; flex-basis: 54px; border-radius: 14px; }
+  .ob-card-head { gap: 11px; }
+}
+
+/* Level cards: a glyph tile above the title so the step reads as a menu
+   of study types rather than a wall of text. */
+.ob-level-icon {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-glow);
+  color: var(--accent);
+}
+
+.ob-level-btn.selected .ob-level-icon {
+  background: color-mix(in srgb, var(--accent) 24%, transparent);
+  color: var(--nav-active-text);
+}
+
+/* Course list: crisp selection checkbox + accent edge on hover. The old
+   behaviour — a 1px faint line that only appeared on hover — is gone. */
+.ob-course-item {
+  position: relative;
+  transition: background .16s ease, border-color .16s ease, box-shadow .16s ease,
+              transform .18s cubic-bezier(.25, 1, .4, 1);
+}
+
+.ob-course-item::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 3px;
+  height: 56%;
+  border-radius: 99px;
+  background: var(--accent-gradient);
+  transform: translateY(-50%) scaleY(.3);
+  opacity: 0;
+  transition: opacity .18s ease, transform .18s var(--spring-soft);
+}
+
+.ob-course-item:hover::before,
+.ob-course-item.selected::before {
+  opacity: 1;
+  transform: translateY(-50%) scaleY(1);
+}
+
+.ob-course-item:hover {
+  border-color: color-mix(in srgb, var(--accent) 32%, var(--glass-border-hover));
+  background: color-mix(in srgb, var(--accent) 5.5%, var(--surface-solid));
+}
+
+.ob-course-check {
+  width: 20px;
+  height: 20px;
+  border-radius: 7px;
+  border: 1.5px solid var(--glass-border-hover);
+  background: var(--surface);
+  color: inherit;
+  box-shadow: inset 0 1px 2px color-mix(in srgb, var(--text-main) 7%, transparent);
+  transition: background .16s ease, border-color .16s ease, box-shadow .16s ease;
+}
+
+.ob-course-item:hover .ob-course-check {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--glass-border-hover));
+  background: color-mix(in srgb, var(--accent) 9%, var(--surface));
+}
+
+.ob-course-item.selected .ob-course-check {
+  background: var(--accent-gradient);
+  border-color: transparent;
+  color: #fff;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .3),
+    0 2px 8px -2px color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .ob-course-item:hover { transform: translateX(3px); }
+}
+
+/* =========================
+   ONBOARDING — SLIDER FLAIR
+   =========================
+   The slider keeps its mechanics (registered --ob-range-fill, drag
+   1:1 tracking) and gains presence: a soft accent wash on the card, an
+   icon tile beside each label, a gradient value badge, tick dots along
+   the rail that light up as the fill passes them, and a slightly larger
+   thumb with a subtle rim. No preset chips — the rail and ticks carry the
+   anchors instead. */
+
+.ob-range-card {
+  background:
+    radial-gradient(130% 95% at 0% 0%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 55%),
+    linear-gradient(180deg, var(--surface) 0%, var(--row-bg) 100%);
+}
+
+.ob-range-icon {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface-solid));
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--glass-border));
+  color: var(--accent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .14);
+}
+
+.ob-range-icon svg { display: block; }
+
+/* Value badge: a solid accent pill instead of a tinted one, so the live
+   number is the brightest element on the card. */
+.ob-range-value {
+  min-width: 84px;
+  padding: 7px 14px;
+  font-size: .85rem;
+  color: #fff;
+  background: var(--accent-gradient);
+  border-color: transparent;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .28),
+    0 4px 14px -6px color-mix(in srgb, var(--accent) 60%, transparent);
+}
+
+.ob-range-card.is-dragging .ob-range-value {
+  background: var(--accent-gradient);
+  border-color: transparent;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .28),
+    0 0 0 4px color-mix(in srgb, var(--accent) 16%, transparent),
+    0 4px 14px -6px color-mix(in srgb, var(--accent) 60%, transparent);
+}
+
+/* Dark themes: the earlier flat tint override would dull the badge. */
+body.theme-dark .ob-range-value,
+body.theme-obsidian .ob-range-value,
+body.theme-nebula .ob-range-value {
+  background: var(--accent-gradient);
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  color: #fff;
+}
+
+/* Tick dots along the rail, inset by half the thumb so they line up with
+   the track exactly; each dot lights up once the fill has passed it.
+   --ob-thumb lives on the CARD (not the input) so the ticks row — a
+   sibling of the input — inherits the same measure. */
+.ob-range-card { --ob-thumb: 26px; }
+
+.ob-range-ticks {
+  position: relative;
+  height: 9px;
+  margin: 2px calc(var(--ob-thumb) / 2) 0;
+}
+
+.ob-range-tick {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--text-main) 14%, transparent);
+  transition: background .18s ease, box-shadow .18s ease;
+}
+
+.ob-range-tick.on {
+  background: var(--accent);
+  box-shadow: 0 0 5px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+body.theme-dark .ob-range-tick,
+body.theme-obsidian .ob-range-tick,
+body.theme-nebula .ob-range-tick {
+  background: rgba(255, 255, 255, .18);
+}
+
+/* Slightly larger thumb with a surface ring + faint accent rim. */
+.ob-range-card .ob-range-input::-webkit-slider-thumb {
+  width: var(--ob-thumb);
+  height: var(--ob-thumb);
+  margin-top: calc((var(--ob-track-h) - var(--ob-thumb)) / 2);
+  border-width: 4px;
+  box-shadow:
+    0 1px 2px color-mix(in srgb, var(--text-main) 30%, transparent),
+    0 3px 10px color-mix(in srgb, var(--accent) 38%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--accent) 20%, transparent),
+    inset 0 1px 1px rgba(255, 255, 255, .4);
+}
+
+.ob-range-card .ob-range-input::-moz-range-thumb {
+  width: var(--ob-thumb);
+  height: var(--ob-thumb);
+  border-width: 4px;
+  box-shadow:
+    0 1px 2px color-mix(in srgb, var(--text-main) 30%, transparent),
+    0 3px 10px color-mix(in srgb, var(--accent) 38%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--accent) 20%, transparent),
+    inset 0 1px 1px rgba(255, 255, 255, .4);
+}
+
+/* Coarse pointers keep the bigger grab thumb; the tick inset follows it
+   because the variable is re-declared on the card itself. */
+@media (pointer: coarse) {
+  .ob-range-card { --ob-thumb: 28px; }
+}
+
+/* Phones: keep icon, label and value badge on one wrapped row instead of
+   the old stacked column, so the icon tile doesn't float on its own line. */
+@media (max-width: 640px) {
+  .ob-range-head { flex-direction: row; align-items: center; flex-wrap: wrap; }
+  .ob-range-head .ob-range-copy { flex: 1 1 0; min-width: 0; }
+  .ob-range-head .ob-range-value { margin-left: auto; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ob-course-item,
+  .ob-course-item::before,
+  .ob-range-tick,
+  .ob-range-value {
+    transition: none;
+    animation: none;
+  }
+  .ob-course-item:hover { transform: none; }
 }

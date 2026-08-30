@@ -103,3 +103,9 @@ export const IconRocket = ({ size = 16 }: P) => (
 export const IconPlus = ({ size = 14 }: P) => (
   <svg {...base(size)}><path d="M12 5v14M5 12h14" /></svg>
 );
+export const IconGraduation = ({ size = 18 }: P) => (
+  <svg {...base(size)}><path d="M22 9 12 4 2 9l10 5 10-5z" /><path d="M6 12.5V17c0 1.66 2.69 3 6 3s6-1.34 6-3v-4.5" /><path d="M22 9v6" /></svg>
+);
+export const IconBriefcase = ({ size = 18 }: P) => (
+  <svg {...base(size)}><rect x="2" y="7" width="20" height="14" rx="2" /><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" /></svg>
+);
