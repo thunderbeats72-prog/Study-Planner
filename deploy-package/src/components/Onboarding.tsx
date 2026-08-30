@@ -3,7 +3,7 @@
 import React, { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { api, addDays, today, dayDiff, prettyLong, type AppState } from "@/lib/client";
 import { countStudyDays, projectCompletionDate } from "@/lib/planner";
-import { IconBook, IconBriefcase, IconCalendar, IconCheck, IconClock, IconFlame, IconGraduation, IconLock, IconLogo, IconTarget } from "./icons";
+import { IconBook, IconBriefcase, IconCalendar, IconCheck, IconClock, IconFlame, IconGraduation, IconLock, IconLogo, IconRocket, IconSpark, IconTarget } from "./icons";
 import OnboardingArt, { type OnboardingArtVariant } from "./OnboardingArt";
 
 type Level = { id: string; label: string; sub: string };
@@ -92,8 +92,41 @@ export function OnboardingSlider({ label, value, valueLabel, hint, min, max, ste
   );
 }
 
+function choiceIcon(group: string, optionId: string) {
+  if (group === "Study Style") {
+    if (optionId === "balanced") return <IconTarget size={17} />;
+    if (optionId === "theory") return <IconBook size={17} />;
+    return <IconSpark size={17} />;
+  }
+  if (group === "Plan Mode") {
+    if (optionId === "syllabus") return <IconTarget size={17} />;
+    if (optionId === "revision") return <IconSpark size={17} />;
+    return <IconRocket size={17} />;
+  }
+  return <IconCalendar size={17} />;
+}
+
 function OnboardingChoiceGroup({ label, hint, value, options, onChange, columns = 1, fullWidth = false }: OnboardingChoiceGroupProps) {
-  return <div className={`ob-field${fullWidth ? " ob-field-span-full" : ""}`}><div className="ob-choice-card"><label>{label}</label>{hint && <div className="ob-range-hint">{hint}</div>}<div className={`ob-choice-grid${columns > 1 ? " compact-choices" : ""}`} style={columns > 1 ? ({ "--ob-choice-cols": String(columns) } as React.CSSProperties) : undefined}>{options.map((option) => <button key={`${label}-${option.id}`} type="button" className={`ob-choice-btn${value === option.id ? " selected" : ""}`} onClick={() => onChange(option.id)}><strong>{option.label}</strong><span>{option.description}</span></button>)}</div></div></div>;
+  return (
+    <div className={`ob-field${fullWidth ? " ob-field-span-full" : ""}`}>
+      <div className="ob-choice-card">
+        <label>{label}</label>
+        {hint && <div className="ob-range-hint">{hint}</div>}
+        <div className={`ob-choice-grid${columns > 1 ? " compact-choices" : ""}`} style={columns > 1 ? ({ "--ob-choice-cols": String(columns) } as React.CSSProperties) : undefined}>
+          {options.map((option) => {
+            const selected = value === option.id;
+            return (
+              <button key={`${label}-${option.id}`} type="button" className={`ob-choice-btn${selected ? " selected" : ""}`} onClick={() => onChange(option.id)}>
+                <span className="ob-choice-icon" aria-hidden="true">{choiceIcon(label, option.id)}</span>
+                <span className="ob-choice-copy"><strong>{option.label}</strong><span>{option.description}</span></span>
+                <span className="ob-choice-check" aria-hidden="true">{selected && <IconCheck size={11} />}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function Onboarding({ onDone, isRerun = false, initialName = "", onCancel }: { onDone: (s: AppState) => void; isRerun?: boolean; initialName?: string; onCancel?: () => void; }) {
