@@ -3936,7 +3936,39 @@ body.theme-nebula .ob-overlay {
   }
 }
 
-@media (max-width: 1100px) {
+/* Keep the themed still-lifes visible on compact desktop/tablet screens
+   (including the widths in the supplied captures) without taking form space:
+   they shrink into the two outer gutters and stay behind the card. */
+@media (min-width: 701px) and (max-width: 1100px) {
+  .ob-overlay::before,
+  .ob-overlay::after {
+    display: block;
+    bottom: 0;
+    top: auto;
+    height: min(48vh, 300px);
+    opacity: .8;
+  }
+
+  .ob-overlay::before {
+    left: 0;
+    width: min(22vw, 220px);
+    background-image: var(--ob-edge-left-art);
+    background-position: left bottom;
+    background-size: auto 100%;
+    background-repeat: no-repeat;
+  }
+
+  .ob-overlay::after {
+    right: 0;
+    width: min(27vw, 270px);
+    background-image: var(--ob-edge-right-art);
+    background-position: right bottom;
+    background-size: auto 72%;
+    background-repeat: no-repeat;
+  }
+}
+
+@media (max-width: 700px) {
   .ob-overlay::before,
   .ob-overlay::after { display: none; }
 }
@@ -3945,4 +3977,66 @@ body.theme-nebula .ob-overlay {
 @media (prefers-reduced-transparency: reduce) {
   .ob-overlay::before,
   .ob-overlay::after { display: none; }
+}
+
+/* Final geometry lock: the label, name input, and support note are one
+   aligned field column on every breakpoint instead of three independently
+   sized card children. */
+.ob-name-field {
+  width: min(100%, 700px);
+  margin-inline: auto;
+}
+
+.ob-name-field > .lbl {
+  display: block;
+  margin-bottom: 7px;
+}
+
+.ob-name-field > .ob-name-input,
+.ob-name-field > .ob-note-panel {
+  display: block;
+  width: 100%;
+  max-width: none;
+  margin-inline: 0;
+}
+
+.ob-name-field > .ob-name-input { margin-bottom: 8px; }
+.ob-name-field > .ob-note-panel { margin-bottom: 0; }
+
+/* Keep the option glyphs optically centred and visible. These direct-child
+   rules beat the broad legacy `.ob-choice-btn span` selector without changing
+   the button's selectable behaviour or its responsive dimensions. */
+.ob-choice-btn > .ob-choice-icon,
+.ob-choice-btn > .ob-choice-check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+}
+
+.ob-choice-btn > .ob-choice-icon {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 13%, var(--surface-solid));
+  border: 1px solid color-mix(in srgb, var(--accent) 17%, var(--glass-border));
+}
+
+.ob-choice-btn > .ob-choice-icon > svg {
+  display: block;
+  width: 17px;
+  height: 17px;
+  flex: 0 0 17px;
+  margin: 0;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.15;
+}
+
+.ob-choice-btn > .ob-choice-check > svg {
+  display: block;
+  width: 11px;
+  height: 11px;
+  flex: 0 0 11px;
+  margin: 0;
+  fill: none;
+  stroke: currentColor;
 }
