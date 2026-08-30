@@ -3721,51 +3721,192 @@ body.theme-nebula .study-scene--focus {
   margin: 0;
 }
 
-/* The two source still-lifes change along with the app palette. Bright
-   themes reuse the bright studio composition; dark themes use a matching
-   low-light render so the lamp, books and plant remain visible on black. */
+/* Each palette receives its own art file rather than a subtle hue rotation.
+   This keeps the plant, books, lamp, and their surrounding canvas genuinely
+   different in every theme — most noticeably in Sunset, Mint, and Obsidian. */
 .ob-overlay {
   --ob-edge-left-art: url("./onboarding-left-decor.png");
   --ob-edge-right-art: url("./onboarding-right-decor.png");
   --ob-edge-art-filter: none;
   --ob-edge-art-blend: normal;
-  --ob-edge-art-opacity: .92;
+  --ob-edge-art-opacity: .96;
 }
 
+/* Default / lavender */
+body.theme-default .ob-overlay {
+  --accent: #6c5ce7;
+  --accent-light: #8b7cf2;
+  --accent-gradient: linear-gradient(160deg, #7d6df0, #5d4de0);
+  --accent-glow: rgba(108, 92, 231, .14);
+  --color-ai: #6d5ef5;
+  --success-accent: #16a37a;
+  --warning-accent: #e59a24;
+  --ob-canvas: #f8f7fc;
+  --ob-surface: #fff;
+  --ob-border: #e9e7f1;
+  --ob-card-tint: #f4f1ff;
+  --ob-art-paper: #fff;
+  --ob-art-soft: #dcd6ff;
+  --ob-art-highlight: #aaa0f5;
+  --ob-art-warm: #e59a24;
+  --ob-art-leaf-stem: #4f9d7d;
+  --ob-art-leaf: #94d5ba;
+  --ob-art-leaf-deep: #54ac86;
+  --ob-art-leaf-light: #c8eddd;
+}
+
+/* Silver Lavender */
 body.theme-silver-lavender .ob-overlay {
-  --ob-edge-art-filter: saturate(.56) brightness(1.015);
+  --ob-edge-left-art: url("./onboarding-left-decor-silver.webp");
+  --ob-edge-right-art: url("./onboarding-right-decor-silver.webp");
+  --accent: #7a70e0;
+  --accent-light: #9a92ec;
+  --accent-gradient: linear-gradient(160deg, #968ee9, #6f63d8);
+  --accent-glow: rgba(122, 112, 224, .14);
+  --color-ai: #8a80e8;
+  --success-accent: #6b9b87;
+  --warning-accent: #b99752;
+  --ob-canvas: #f5f5fa;
+  --ob-surface: #fdfdff;
+  --ob-border: #e1e0eb;
+  --ob-card-tint: #f0eff8;
+  --ob-art-paper: #fff;
+  --ob-art-soft: #d9d8e8;
+  --ob-art-highlight: #aaa7c4;
+  --ob-art-warm: #b8a9a3;
+  --ob-art-leaf-stem: #7f9692;
+  --ob-art-leaf: #b4c7c3;
+  --ob-art-leaf-deep: #839c97;
+  --ob-art-leaf-light: #d9e3e1;
 }
 
+/* Mint Fresh */
 body.theme-mint .ob-overlay {
-  --ob-edge-art-filter: hue-rotate(-112deg) saturate(1.02) brightness(1.015);
+  --ob-edge-left-art: url("./onboarding-left-decor-mint.webp");
+  --ob-edge-right-art: url("./onboarding-right-decor-mint.webp");
+  --accent: #0fa37f;
+  --accent-light: #34d399;
+  --accent-gradient: linear-gradient(180deg, #16b08a, #0fa37f);
+  --accent-glow: rgba(15, 163, 127, .13);
+  --color-ai: #10b389;
+  --success-accent: #16a37a;
+  --warning-accent: #e3a43c;
+  --ob-canvas: #f2fbf7;
+  --ob-surface: #fcfffd;
+  --ob-border: #d2ebdf;
+  --ob-card-tint: #e4f6ee;
+  --ob-art-paper: #fafffc;
+  --ob-art-soft: #a9edd0;
+  --ob-art-highlight: #58cda1;
+  --ob-art-warm: #efb35b;
+  --ob-art-leaf-stem: #248c6b;
+  --ob-art-leaf: #75dcb3;
+  --ob-art-leaf-deep: #249a72;
+  --ob-art-leaf-light: #c5f4df;
 }
 
+/* Sunset — warm canvas, orange art, and an orange mini-illustration rather
+   than the former lavender scene. */
 body.theme-sunset .ob-overlay {
-  --ob-edge-art-filter: hue-rotate(118deg) saturate(1.08) brightness(1.015);
+  --ob-edge-left-art: url("./onboarding-left-decor-sunset.webp");
+  --ob-edge-right-art: url("./onboarding-right-decor-sunset.webp");
+  --accent: #e1620f;
+  --accent-light: #fb923c;
+  --accent-gradient: linear-gradient(180deg, #ee6f1b, #dc5e0c);
+  --accent-glow: rgba(225, 98, 15, .13);
+  --color-ai: #ee7118;
+  --success-accent: #1a9471;
+  --warning-accent: #e1620f;
+  --ob-canvas: #fff6ef;
+  --ob-surface: #fffdfa;
+  --ob-border: #f2d7c2;
+  --ob-card-tint: #fff0e4;
+  --ob-art-paper: #fffaf5;
+  --ob-art-soft: #ffc69d;
+  --ob-art-highlight: #f28f4c;
+  --ob-art-warm: #e1620f;
+  --ob-art-leaf-stem: #6b9879;
+  --ob-art-leaf: #a6d8ad;
+  --ob-art-leaf-deep: #5da57a;
+  --ob-art-leaf-light: #d8efd0;
 }
 
+/* Midnight */
 body.theme-dark .ob-overlay {
   --ob-edge-left-art: url("./onboarding-left-decor-dark.webp");
   --ob-edge-right-art: url("./onboarding-right-decor-dark.webp");
-  --ob-edge-art-filter: saturate(.88) brightness(1.08);
-  --ob-edge-art-blend: normal;
-  --ob-edge-art-opacity: .88;
+  --accent: #8a8af4;
+  --accent-light: #aeaef8;
+  --accent-gradient: linear-gradient(135deg, #9494f5, #6e6ef0);
+  --accent-glow: rgba(138, 138, 244, .2);
+  --color-ai: #9c9cf6;
+  --success-accent: #5ee0a8;
+  --warning-accent: #efbe6e;
+  --ob-canvas: #050506;
+  --ob-surface: #0e0e10;
+  --ob-border: #232326;
+  --ob-card-tint: #16151e;
+  --ob-art-paper: #292931;
+  --ob-art-soft: #5f5fa8;
+  --ob-art-highlight: #9c9cf6;
+  --ob-art-warm: #efbe6e;
+  --ob-art-leaf-stem: #50b889;
+  --ob-art-leaf: #88dbb5;
+  --ob-art-leaf-deep: #45a57e;
+  --ob-art-leaf-light: #c2f0d8;
+  --ob-edge-art-opacity: .9;
 }
 
+/* Obsidian — cool cyan, not a recoloured midnight scene. */
 body.theme-obsidian .ob-overlay {
-  --ob-edge-left-art: url("./onboarding-left-decor-dark.webp");
-  --ob-edge-right-art: url("./onboarding-right-decor-dark.webp");
-  --ob-edge-art-filter: hue-rotate(-18deg) saturate(1.16) brightness(1.08);
-  --ob-edge-art-blend: normal;
-  --ob-edge-art-opacity: .88;
+  --ob-edge-left-art: url("./onboarding-left-decor-obsidian.webp");
+  --ob-edge-right-art: url("./onboarding-right-decor-obsidian.webp");
+  --accent: #38bdf8;
+  --accent-light: #7dd3fc;
+  --accent-gradient: linear-gradient(180deg, #4cc5f9, #22a8e6);
+  --accent-glow: rgba(56, 189, 248, .14);
+  --color-ai: #4cc5f9;
+  --success-accent: #4bc59e;
+  --warning-accent: #e0b35c;
+  --ob-canvas: #070a12;
+  --ob-surface: #131a2a;
+  --ob-border: #263349;
+  --ob-card-tint: #10243c;
+  --ob-art-paper: #273c50;
+  --ob-art-soft: #397893;
+  --ob-art-highlight: #6acffa;
+  --ob-art-warm: #e0b35c;
+  --ob-art-leaf-stem: #2fa48c;
+  --ob-art-leaf: #58c8c2;
+  --ob-art-leaf-deep: #1a97a3;
+  --ob-art-leaf-light: #9ae5dd;
+  --ob-edge-art-opacity: .92;
 }
 
+/* Nebula */
 body.theme-nebula .ob-overlay {
-  --ob-edge-left-art: url("./onboarding-left-decor-dark.webp");
-  --ob-edge-right-art: url("./onboarding-right-decor-dark.webp");
-  --ob-edge-art-filter: hue-rotate(38deg) saturate(1.14) brightness(1.05);
-  --ob-edge-art-blend: normal;
-  --ob-edge-art-opacity: .86;
+  --ob-edge-left-art: url("./onboarding-left-decor-nebula.webp");
+  --ob-edge-right-art: url("./onboarding-right-decor-nebula.webp");
+  --accent: #a855f7;
+  --accent-light: #c495fa;
+  --accent-gradient: linear-gradient(180deg, #b168f8, #9333ea);
+  --accent-glow: rgba(168, 85, 247, .15);
+  --color-ai: #bf7dfa;
+  --success-accent: #58c9aa;
+  --warning-accent: #dfa960;
+  --ob-canvas: #0a0616;
+  --ob-surface: #191230;
+  --ob-border: #32264f;
+  --ob-card-tint: #251844;
+  --ob-art-paper: #352354;
+  --ob-art-soft: #7950b8;
+  --ob-art-highlight: #ca9afd;
+  --ob-art-warm: #dfa960;
+  --ob-art-leaf-stem: #638fb5;
+  --ob-art-leaf: #a080df;
+  --ob-art-leaf-deep: #7559be;
+  --ob-art-leaf-light: #d7c0ff;
+  --ob-edge-art-opacity: .9;
 }
 
 /* Desktop-only on purpose: the real input areas retain their full width on
