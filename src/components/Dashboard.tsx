@@ -434,6 +434,18 @@ export default function Dashboard({
             <span>syllabus complete</span>
           </div>
         </div>
+
+        {/* A slow marquee of the product's promises — quiet brand energy. */}
+        <div className="ed-marquee" aria-hidden="true">
+          <div className="ed-marquee-track">
+            <span className="ed-marquee-seg">
+              Discipline without pressure<em>·</em>Progress without obsession<em>·</em>Technology without complexity<em>·</em>One lesson at a time<em>·</em>
+            </span>
+            <span className="ed-marquee-seg">
+              Discipline without pressure<em>·</em>Progress without obsession<em>·</em>Technology without complexity<em>·</em>One lesson at a time<em>·</em>
+            </span>
+          </div>
+        </div>
       </section>
 
       {/* ── RECOVERY — overdue work is a decision, never a failure. ── */}
