@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import StudyScene from "./StudyScene";
+import StudyOrbit from "./StudyOrbit";
 import MiniCalendar from "./MiniCalendar";
+import heroScene from "../app/dashboard-lamp-studio-scene.webp";
 import { api, addDays, dayDiff, mdToHtml, prettyLong, today, KIND_META, normalizeCheckpointTitle, type AppState, type TaskRow } from "@/lib/client";
 import { mmss } from "@/lib/useTimer";
 import {
@@ -285,6 +286,14 @@ export default function Dashboard({
     const r = Math.round(m * 10) / 10;
     return `${Number.isInteger(r) ? r : r.toFixed(1)}m`;
   };
+  /* Editorial metric labels: “2h 40m” rather than “160”. */
+  const plannedLabel = (() => {
+    const h = Math.floor(totalPlannedMin / 60);
+    const m = Math.round(totalPlannedMin % 60);
+    if (!h) return `${m}m`;
+    if (!m) return `${h}h`;
+    return `${h}h ${m}m`;
+  })();
 
   const hourLabel = new Date().getHours();
   const greeting = hourLabel < 12 ? "Good morning" : hourLabel < 17 ? "Good afternoon" : "Good evening";
@@ -293,102 +302,138 @@ export default function Dashboard({
     <div className="fade-in">
       {/* ── HERO: NOW / NEXT / TODAY / RECOVERY — the actionable answer,
              not a stats wall. ── */}
-      <section className="dash-hero glass-panel">
-        <div className="dash-hero-bg" aria-hidden="true" />
-        <div className="dash-hero-copy">
-          <div className="dash-hero-eyebrow">
-            <span className="streak-badge dash-hero-streak"><IconFlame /> {state.user.streak} day streak</span>
-            <span className="sr-only">{greeting}, {state.user.name}.</span>
+      <section className="ed-hero">
+        <div className="ed-hero-top">
+          <div className="ed-hero-copy">
+            <div className="ed-eyebrow">
+              <span>{prettyLong(t)}</span>
+              <span className="ed-eyebrow-sep" aria-hidden="true">·</span>
+              <span>{state.user.streak} day streak</span>
+            </div>
+            <h1 className="ed-h1">
+              <span className="ed-h1-line"><span>{greeting},</span></span>
+              <span className="ed-h1-line"><span><em>{state.user.name.split(" ")[0]}</em>.</span></span>
+            </h1>
+            <p className="ed-lede">Here&apos;s what deserves your attention today.</p>
           </div>
+          <StudyOrbit className="ed-hero-orbit" density="quiet" />
+        </div>
 
-          {top ? (
-            <>
-              <div className="now-label">
-                {top.priorityLabel}
-                <span className="now-label-sep" aria-hidden="true">·</span>
-                {reasonLabel(top.reason)}
-              </div>
-              <h1 className="dash-hero-title now-title">{topTitle}</h1>
-              <p className="dash-hero-sub">
-                {KIND_META[top.kind]?.label || "Task"} · {top.plannedMinutes} min
-                {state.subjects.find((subject) => subject.id === top.subjectId)
-                  ? ` · ${state.subjects.find((subject) => subject.id === top.subjectId)!.name}`
-                  : ""}
-                {taskStudiedSuffix(state.sessions, top) ? ` · ${taskStudiedSuffix(state.sessions, top)}` : ""}
-              </p>
+        {/* Today's Focus — the primary study action, visually dominant. */}
+        <div className="ed-focus glass-panel">
+          <div className="ed-focus-copy">
+            {top ? (
+              <>
+                <div className="ed-focus-eyebrow">
+                  <span>Today&apos;s focus</span>
+                  <span className="ed-focus-reason">{top.priorityLabel} · {reasonLabel(top.reason)}</span>
+                </div>
+                <div className="ed-focus-subject">
+                  {state.subjects.find((subject) => subject.id === top.subjectId)?.name ?? "Open session"}
+                </div>
+                <h2 className="ed-focus-title">{topTitle}</h2>
+                <div className="ed-focus-meta">
+                  {KIND_META[top.kind]?.label || "Task"} · {top.plannedMinutes} min planned
+                  {taskStudiedSuffix(state.sessions, top) ? ` · ${taskStudiedSuffix(state.sessions, top)}` : ""}
+                </div>
 
-              {heroLive ? (
-                <div className="now-live">
-                  <span className={`up-next-live-chip${clockRunning ? " is-recording" : clockOnBreak ? " is-break" : " is-idle"}`}>
-                    <span className="task-live-dot" aria-hidden="true" />
-                    {clockRunning ? "clock running" : clockOnBreak ? "on break" : "paused"}
-                  </span>
-                  <span className="mono now-live-timer" aria-label="Session time">{mmss(activeClockSeconds ?? 0)}</span>
-                  <div className="flex-row gap-sm">
-                    {!clockOnBreak && (
-                      <button className="btn btn-sm btn-secondary" onClick={onPauseOrResume}>
-                        {clockRunning ? "Pause" : "Resume"}
+                {heroLive ? (
+                  <div className="now-live ed-live">
+                    <span className={`up-next-live-chip${clockRunning ? " is-recording" : clockOnBreak ? " is-break" : " is-idle"}`}>
+                      <span className="task-live-dot" aria-hidden="true" />
+                      {clockRunning ? "clock running" : clockOnBreak ? "on break" : "paused"}
+                    </span>
+                    <span className="mono now-live-timer" aria-label="Session time">{mmss(activeClockSeconds ?? 0)}</span>
+                    <div className="flex-row gap-sm">
+                      {!clockOnBreak && (
+                        <button className="btn btn-sm btn-secondary" onClick={onPauseOrResume}>
+                          {clockRunning ? "Pause" : "Resume"}
+                        </button>
+                      )}
+                      <button className="btn btn-sm btn-danger act-out" onClick={onClockOut}>
+                        Clock Out
                       </button>
-                    )}
-                    <button className="btn btn-sm btn-danger act-out" onClick={onClockOut}>
-                      Clock Out
+                    </div>
+                  </div>
+                ) : (
+                  <div className="ed-focus-actions">
+                    <button className="btn btn-primary btn-lg" onClick={() => onFocusTask(top.id)}>
+                      <IconPlay size={15} /> {clockSessionActive ? "Switch to this" : "Start Session"}
+                    </button>
+                    <button className="btn btn-quiet btn-lg" onClick={onStartFocus}>
+                      Enter focus mode
                     </button>
                   </div>
-                </div>
-              ) : (
-                <div className="dash-hero-actions now-actions">
-                  <button className="btn btn-primary btn-lg" onClick={() => onFocusTask(top.id)}>
-                    <IconPlay size={15} /> {clockSessionActive ? "Switch to this" : "Start"}
-                  </button>
-                  <button className="btn btn-secondary btn-lg" onClick={onStartFocus}>
-                    Start Focus
-                  </button>
-                </div>
-              )}
-
-              {second && !heroLive && (
-                <div className="now-next">
-                  <span className="now-next-label">Next</span>
-                  <span className="now-next-title">{second.title}</span>
-                  <span className="now-next-meta">{second.plannedMinutes} min</span>
-                  <button
-                    className="btn btn-xs btn-secondary now-next-start"
-                    type="button"
-                    onClick={() => onFocusTask(second.id)}
-                  >
-                    Start
-                  </button>
-                </div>
-              )}
-
-              <div className="now-planline">
-                {todayTasks.length
-                  ? `Today: ${doneToday}/${todayTasks.length} done · ${todayPendingMin} min left`
-                  : "No plan yet today — add a task or generate one."}
-                {backlog.count > 0 && (
-                  <span className={canFit ? "now-planline-ok" : "now-planline-warn"}>
-                    {canFit ? " · catch-up fits today" : ` · ${backlog.minutes} min backlog`}
-                  </span>
                 )}
-              </div>
-            </>
-          ) : (
-            <>
-              <h1 className="dash-hero-title">
-                All caught up, {state.user.name.split(" ")[0]}! <span className="wave-emoji" aria-hidden="true">🎉</span>
-              </h1>
-              <p className="dash-hero-sub">
-                Nothing is waiting for you. Pick a weak topic, add a task, or take the rest of the day.
-              </p>
-              <div className="dash-hero-actions">
-                <button className="btn btn-primary btn-lg" onClick={onStartFocus}>
-                  <IconPlay size={15} /> Start Focus
-                </button>
-              </div>
-            </>
-          )}
+
+                {second && !heroLive && (
+                  <div className="now-next ed-next">
+                    <span className="now-next-label">Next</span>
+                    <span className="now-next-title">{second.title}</span>
+                    <span className="now-next-meta">{second.plannedMinutes} min</span>
+                    <button
+                      className="btn btn-xs btn-secondary now-next-start"
+                      type="button"
+                      onClick={() => onFocusTask(second.id)}
+                    >
+                      Start
+                    </button>
+                  </div>
+                )}
+
+                <div className="now-planline ed-planline">
+                  {todayTasks.length
+                    ? `Today: ${doneToday}/${todayTasks.length} done · ${todayPendingMin} min left`
+                    : "No plan yet today — add a task or generate one."}
+                  {backlog.count > 0 && (
+                    <span className={canFit ? "now-planline-ok" : "now-planline-warn"}>
+                      {canFit ? " · catch-up fits today" : ` · ${backlog.minutes} min backlog`}
+                    </span>
+                  )}
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="ed-focus-eyebrow"><span>Today&apos;s focus</span></div>
+                <h2 className="ed-focus-title">All caught up, {state.user.name.split(" ")[0]}.</h2>
+                <div className="ed-focus-meta">
+                  Nothing is waiting for you. Pick a weak topic, add a task, or take the rest of the day.
+                </div>
+                <div className="ed-focus-actions">
+                  <button className="btn btn-primary btn-lg" onClick={onStartFocus}>
+                    <IconPlay size={15} /> Start Focus
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+          <div className="ed-focus-scene" aria-hidden="true">
+            {/* Decorative art layer: CSS mask + object-fit composition, so a
+                plain <img> is intentional here (next/image adds a wrapper). */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={heroScene.src} alt="" draggable={false} />
+          </div>
         </div>
-        <StudyScene variant="dashboard" className="dash-hero-scene" />
+
+        {/* Quiet metrics — present, but never shouting. */}
+        <div className="ed-metrics">
+          <div className="ed-metric">
+            <strong>{Math.max(0, todayTasks.length - doneToday)}</strong>
+            <span>tasks remaining</span>
+          </div>
+          <div className="ed-metric">
+            <strong>{plannedLabel}</strong>
+            <span>planned today</span>
+          </div>
+          <div className="ed-metric">
+            <strong>{consistencyAnim}%</strong>
+            <span>weekly consistency</span>
+          </div>
+          <div className="ed-metric">
+            <strong>{progressAnim}%</strong>
+            <span>syllabus complete</span>
+          </div>
+        </div>
       </section>
 
       {/* ── RECOVERY — overdue work is a decision, never a failure. ── */}

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import StudyScene from "./StudyScene";
+import plannerScene from "../app/planner-studio-scene.webp";
 import {
   addDays, dayDiff, fmtDate, KIND_META, normalizeCheckpointTitle, parseDate, prettyDate, prettyLong, today, type AppState, type TaskRow,
 } from "@/lib/client";
@@ -276,13 +276,16 @@ export default function PlannerView({
 
   return (
     <div className="fade-in">
-      <div className="page-header">
-        <StudyScene variant="planner" className="page-header-scene" />
+      <div className="page-header ed-pagehead">
         <div>
-          <h1 className="page-title">Study Planner</h1>
+          <h1 className="page-title ed-page-title">The week, <em>arranged</em>.</h1>
           <p className="page-subtitle">
             {state.tasks.length} tasks · {state.topics.length} lessons mapped · your plan rebalances automatically
           </p>
+        </div>
+        <div className="ed-pagehead-scene ed-pagehead-scene--slim" aria-hidden="true">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={plannerScene.src} alt="" draggable={false} />
         </div>
         <div className="flex-row gap-md planner-tools">
           <div className="vtabs">

@@ -5,6 +5,11 @@ import { api, addDays, today, dayDiff, prettyLong, type AppState } from "@/lib/c
 import { countStudyDays, projectCompletionDate } from "@/lib/planner";
 import { IconBook, IconCalendar, IconCheck, IconClock, IconLock, IconLogo, IconTarget } from "./icons";
 import OnboardingArt, { type OnboardingArtVariant } from "./OnboardingArt";
+import dynamic from "next/dynamic";
+
+/* The still-life decor ships binary asset imports; loading it dynamically
+   keeps module evaluation light (and test-runner safe). */
+const OnboardingDecor = dynamic(() => import("./OnboardingDecor"), { ssr: false });
 
 type Level = { id: string; label: string; sub: string };
 type SeedSubject = { name: string; units: number; difficulty: string; color: string };
@@ -125,7 +130,9 @@ export default function Onboarding({ onDone, isRerun = false, initialName = "", 
   const addSubject = () => { const n = newSub.trim(); if (!n) return; setSubs((s) => [...s, { name: n, units: 6, difficulty: "Medium", color: PALETTE[s.length % PALETTE.length] }]); setNewSub(""); };
   const launch = async () => { setBusy(true); setErr(""); try { const richName = [resolvedCourseName || "Custom Course", specialisation.trim() ? `(${specialisation.trim()})` : "", institution.trim() ? `— ${institution.trim()}` : ""].filter(Boolean).join(" "); const payload = { name: name.trim(), level, course: course || "custom", courseName: richName, year, institution: institution.trim(), specialisation: specialisation.trim(), board, attempt, priorPrep, subjects: subs.map((s, i) => ({ ...s, color: s.color || PALETTE[i % PALETTE.length] })), startDate: start, examDate: exam, dailyHours: hrs, subjectsPerDay: spd, studyDays: sdays, bufferDays: buffer, planMode, studyStyle: style, weakSubject: weak, revisionWeeks: Number(revision) }; const s = await api<AppState>("/api/onboard", { method: "POST", body: JSON.stringify(payload), timeoutMs: 115_000 }); onDone(s); } catch { setErr("Something went wrong while generating your plan. Please try again."); setBusy(false); } };
 
-  return <div className="ob-overlay" ref={overlayRef}><div className="ob-shell">
+  return <div className="ob-overlay" ref={overlayRef}>
+    <OnboardingDecor />
+    <div className="ob-shell">
     <div className="ob-brand-bar"><div className="ob-brand-mark"><IconLogo size={20} /></div><div className="ob-brand-copy"><div className="ob-brand-name">Study Planner Pro</div><div className="ob-brand-tag">Plan · focus · finish</div></div></div>
     <div className="ob-progress" aria-label={`Step ${step} of ${total}`}>{STEP_META.map((meta, i) => { const n = i + 1; const cls = n === step ? "current" : n < step ? "done" : ""; return <div key={meta.key} className={`ob-step${cls ? ` ${cls}` : ""}`} aria-current={n === step ? "step" : undefined}><span className="ob-step-node">{n < step ? <IconCheck size={11} /> : n}</span><span className="ob-step-label">{meta.label}</span></div>; })}</div>
     <div className="ob-card slide-in" key={step}>

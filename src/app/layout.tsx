@@ -5,11 +5,12 @@ import "./study-planner-refresh.css";
 import "./pastel-ui-system.css";
 import "./study-planner-redesign.css";
 import "./practical-enhancements.css";
-/* ui-polish.css is the single authoritative finish layer: task rows,
-   the ⋮ menu, active/recording state, sliders and calendars are defined
-   ONLY there. The old pass/landing/final-fixes sheets were consolidated
-   into it on purpose — do not add a new override file. */
 import "./ui-polish.css";
+/* editorial.css is the authoritative art-direction layer of the “Study Orbit”
+   redesign: brand tokens, editorial typography, spatial composition and the
+   finish for every surface. It is imported last on purpose so it wins the
+   cascade over the earlier iteration sheets. */
+import "./editorial.css";
 
 const inter = localFont({
   src: "./fonts/inter-latin-variable.woff2",
@@ -25,8 +26,25 @@ const jetBrainsMono = localFont({
   variable: "--font-jetbrains-mono",
 });
 
+/* Fraunces — the editorial display serif of the brand. The “full” variable
+   files carry opsz + wght + SOFT + WONK axes; optical size and softness are
+   dialled per-element with font-variation-settings in editorial.css. */
+const fraunces = localFont({
+  src: "./fonts/fraunces-latin-variable.woff2",
+  display: "swap",
+  weight: "300 700",
+  variable: "--font-fraunces",
+});
+
+const frauncesItalic = localFont({
+  src: "./fonts/fraunces-latin-italic-variable.woff2",
+  display: "swap",
+  weight: "300 700",
+  variable: "--font-fraunces-italic",
+});
+
 export const metadata: Metadata = {
-  title: "Study Planner Pro — AI Study Engine",
+  title: "Study Planner — A quiet place to learn",
   description:
     "An AI study architect that turns any syllabus — school to PhD and competitive exams — into a lesson-by-lesson daily plan, with focus timer, spaced recall and a built-in tutor.",
 };
@@ -36,12 +54,15 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: "cover",
   interactiveWidget: "resizes-content",
-  themeColor: "#5B5CE2",
+  themeColor: "#F2EFE8",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${inter.variable} ${jetBrainsMono.variable}`}>
+    <html
+      lang="en"
+      className={`${inter.variable} ${jetBrainsMono.variable} ${fraunces.variable} ${frauncesItalic.variable}`}
+    >
       <body className="theme-default">{children}</body>
     </html>
   );

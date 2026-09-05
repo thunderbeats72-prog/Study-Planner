@@ -998,8 +998,9 @@ async function runTests() {
   check(retired.every((f) => !existsSync(join(process.cwd(), "src/app", f))),
     "The retired override sheets are really gone (no cascade archaeology)");
   const layoutSrc = readFileSync(join(process.cwd(), "src/app/layout.tsx"), "utf8");
-  check((layoutSrc.match(/import "\.\/[^"]+\.css";/g) || []).length === 6,
-    "Exactly six stylesheets load, ui-polish.css last");
+  const cssImports = layoutSrc.match(/import "\.\/[^"]+\.css";/g) || [];
+  check(cssImports.length === 7 && cssImports[cssImports.length - 1].includes("editorial.css"),
+    "Seven stylesheets load, editorial.css last as the authoritative art-direction layer");
   const flat = (css: string) => css.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\s+/g, "");
   const priorLayers = ["globals.css", "study-planner-refresh.css", "pastel-ui-system.css", "study-planner-redesign.css", "practical-enhancements.css"]
     .map((f) => flat(readFileSync(join(process.cwd(), "src/app", f), "utf8")));

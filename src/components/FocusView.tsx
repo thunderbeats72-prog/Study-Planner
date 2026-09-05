@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import StudyScene from "./StudyScene";
+import React, { useEffect, useRef, useState } from "react";
+import StudyOrbit from "./StudyOrbit";
+import focusScene from "../app/focus-clock-studio-scene.webp";
 import { today, type AppState } from "@/lib/client";
 import { mmss, type TimerMode } from "@/lib/useTimer";
 import type { StudySessionApi } from "@/lib/studySession";
@@ -38,10 +39,29 @@ export default function FocusView({ state, session, onCompleteTask, onZen }: { s
   const timerStateLabel = timer.running ? (timer.isBreak ? "BREAK" : "FOCUSED") : timerInProgress ? "PAUSED" : "READY";
   const selectedSoundLabel = SOUNDS.find((x) => x.id === sound)?.label || "Sound Off";
 
-  return <div className="fade-in focus-view">
-    <div className="page-header focus-page-header">
-      <StudyScene variant="focus" className="page-header-scene" />
-      <div className="focus-header-copy"><div className="focus-eyebrow"><span className="focus-eyebrow-mark" /> Focus Studio</div><h1 className="page-title">Focus Studio</h1><p className="page-subtitle">A calm, distraction-free space. Focus timer and study clock are one session.</p></div>
+  /* A satisfying close: when a counted-down block reaches zero, surface a
+     quiet completion state instead of just snapping back to READY. */
+  const [completed, setCompleted] = useState<{ minutes: number } | null>(null);
+  const prevSeconds = useRef(timer.seconds);
+  useEffect(() => {
+    const prev = prevSeconds.current;
+    prevSeconds.current = timer.seconds;
+    if (timer.mode !== "stopwatch" && timer.total > 0 && prev > 0 && timer.seconds === 0 && !timer.isBreak) {
+      setCompleted({ minutes: Math.max(1, Math.round(timer.total / 60)) });
+    }
+  }, [timer.seconds, timer.mode, timer.total, timer.isBreak]);
+
+  return <div className="fade-in focus-view ed-focusview">
+    <div className="page-header focus-page-header ed-pagehead">
+      <div className="focus-header-copy">
+        <div className="focus-eyebrow ed-eyebrow"><span className="focus-eyebrow-mark" /> Focus Studio</div>
+        <h1 className="page-title ed-page-title">Stay with <em>one thing</em>.</h1>
+        <p className="page-subtitle">A calm, distraction-free space. Focus timer and study clock are one session.</p>
+      </div>
+      <div className="ed-pagehead-scene" aria-hidden="true">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={focusScene.src} alt="" draggable={false} />
+      </div>
       <button className="btn btn-secondary focus-zen-button" type="button" onClick={onZen}><IconExpand /> Zen Focus Mode</button>
     </div>
 
@@ -68,5 +88,24 @@ export default function FocusView({ state, session, onCompleteTask, onZen }: { s
       <div className="focus-side-column"><section className="glass-panel tilt-card section-card ambient-panel" aria-labelledby="ambient-title"><div className="focus-panel-heading"><span className="focus-panel-icon"><IconVolume /></span><div><h2 id="ambient-title" className="section-title">Ambient sounds</h2><p className="focus-panel-description">A quiet layer behind your focus.</p></div></div><div className="sound-grid" role="group" aria-label="Ambient sound">{SOUNDS.map((x) => <button key={x.id} type="button" className={`sound-option ${sound === x.id ? "is-selected" : ""}`} aria-pressed={sound === x.id} onClick={() => pick(x.id)}><span className="sound-option-label">{x.label}</span><span className="sound-option-indicator" aria-hidden="true">{sound === x.id && <IconCheck size={13} />}</span></button>)}</div><label className="vol-label" htmlFor="ambient-volume"><span>Volume</span><strong>{Math.round(vol * 100)}%</strong></label><input id="ambient-volume" type="range" className="vol-range" min={0} max={1} step={0.05} value={vol} aria-label={`Ambient volume ${Math.round(vol * 100)} percent`} aria-valuetext={`${Math.round(vol * 100)} percent`} onChange={(e) => setVol(Number(e.target.value))} style={{ "--vol-fill": `${Math.round(vol * 100)}%` } as React.CSSProperties} /><div className="ambient-current"><span className="ambient-current-dot" /> {selectedSoundLabel}</div></section>
         <section className="glass-panel tilt-card section-card rules-panel" aria-labelledby="rules-title"><div className="focus-panel-heading"><span className="focus-panel-icon focus-panel-icon--soft"><IconCheck /></span><div><h2 id="rules-title" className="section-title">Session rules</h2><p className="focus-panel-description">Small boundaries, better sessions.</p></div></div><ul className="rules-list"><li><span className="rule-icon"><IconCheck size={12} /></span><span>Phone in another room — not face down.</span></li><li><span className="rule-icon"><IconCheck size={12} /></span><span>One task per session. Write it down first.</span></li><li><span className="rule-icon"><IconCheck size={12} /></span><span>If you stall for 2 minutes, do the easiest sub-step.</span></li><li><span className="rule-icon"><IconCheck size={12} /></span><span>Break = stand up + look far away. Not a screen.</span></li></ul></section></div>
     </div>
+
+    {completed && (
+      <div className="ed-complete" role="status" aria-live="polite">
+        <div className="ed-complete-card">
+          <StudyOrbit className="ed-complete-orbit" density="quiet" />
+          <div className="ed-complete-kicker">Focus block finished</div>
+          <h3 className="ed-complete-title">Session complete.</h3>
+          <p className="ed-complete-sub">{completed.minutes} minutes of focused study. That is the work, done.</p>
+          <div className="ed-complete-actions">
+            <button className="btn btn-primary" type="button" onClick={() => { setCompleted(null); session.takeBreak(); }}>
+              Take a break
+            </button>
+            <button className="btn btn-quiet" type="button" onClick={() => setCompleted(null)}>
+              Keep going
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
   </div>;
 }

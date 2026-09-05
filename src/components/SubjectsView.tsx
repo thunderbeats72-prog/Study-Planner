@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import StudyScene from "./StudyScene";
+import StudyOrbit, { OrbitProgress } from "./StudyOrbit";
 import { type AppState, type SubjectRow } from "@/lib/client";
 import { IconSpark, IconTrash, IconClose } from "./icons";
 
@@ -27,14 +27,15 @@ export default function SubjectsView({
 
   return (
     <div className="fade-in">
-      <div className="page-header">
-        <StudyScene variant="subjects" className="page-header-scene" />
+      <div className="page-header ed-pagehead">
         <div>
-          <h1 className="page-title">Subjects &amp; Lessons</h1>
+          <div className="ed-eyebrow"><span>The learning map</span></div>
+          <h1 className="page-title ed-page-title">Subjects &amp; <em>lessons</em>.</h1>
           <p className="page-subtitle">
             {state.subjects.length} subjects · {state.topics.length} AI-generated lessons. Editing rebalances the schedule.
           </p>
         </div>
+        <StudyOrbit className="ed-subjects-orbit" density="quiet" />
       </div>
 
       <div className="subs-wrap">
@@ -47,9 +48,12 @@ export default function SubjectsView({
             return (
               <div className="glass-panel tilt-card section-card accent-edge" key={s.id} style={{ "--edge": s.color } as React.CSSProperties}>
                 <div className="day-head">
-                  <div>
-                    <div className="day-date">{s.name}</div>
-                    <div className="day-meta">{list.length} lessons · {s.difficulty} · {done} completed</div>
+                  <div className="flex-row gap-md" style={{ alignItems: "center" }}>
+                    <OrbitProgress pct={pct} color={s.color} size={46} />
+                    <div>
+                      <div className="day-date">{s.name}</div>
+                      <div className="day-meta">{list.length} lessons · {s.difficulty} · {done} completed · {pct}%</div>
+                    </div>
                   </div>
                   <div className="flex-row gap-sm">
                     <button className="btn btn-xs btn-secondary" onClick={() => setOpenTopics(open ? null : s.id)}>
