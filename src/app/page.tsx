@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { api, ApiError, prettyDate, prettyLong, today, type AppState, type MessageRow, type SessionRow } from "@/lib/client";
+import { api, ApiError, prettyDate, prettyLong, today, type AppState, type MessageRow } from "@/lib/client";
 import { mmss, useFocusTimer, useStudyClock, type ClockApi, type TimerApi, type TimerMode } from "@/lib/useTimer";
 import { useStudySession, type StudySessionApi } from "@/lib/studySession";
 import { nextPendingTask, type CompletedTaskInfo } from "@/lib/completion";
@@ -91,29 +91,6 @@ function savedSessionQueue(raw: string | null): PendingSessionLog[] {
         && typeof value.mode === "string" && typeof value.date === "string";
     }).slice(-200);
   } catch { return []; }
-}
-
-/** Fold not-yet-synced Clock Out rows into displayed sessions so “Xm studied”
- *  never waits on the network — and survives a refresh until the queue drains. */
-function overlayPendingSessions(fresh: AppState, queue: PendingSessionLog[] | null): AppState {
-  if (!queue?.length) return fresh;
-  const have = new Set(fresh.sessions.map((session) => session.eventId).filter(Boolean));
-  const extras: SessionRow[] = [];
-  for (const entry of queue) {
-    if (have.has(entry.eventId)) continue;
-    extras.push({
-      id: -1 - extras.length,
-      userId: fresh.user.id,
-      subjectId: entry.subjectId,
-      taskId: entry.taskId,
-      date: entry.date,
-      minutes: entry.minutes,
-      mode: entry.mode,
-      eventId: entry.eventId,
-      createdAt: new Date().toISOString(),
-    });
-  }
-  return extras.length ? { ...fresh, sessions: [...fresh.sessions, ...extras] } : fresh;
 }
 
 export default function Home() {
@@ -238,13 +215,7 @@ export default function Home() {
   const loadInitialState = useCallback(() => {
     setLoading(true);
     api<AppState>("/api/state", { timeoutMs: 20_000 })
-      .then((fresh) => {
-        if (sessionQueueRef.current == null) {
-          try { sessionQueueRef.current = savedSessionQueue(localStorage.getItem(SESSION_QUEUE_KEY)); }
-          catch { sessionQueueRef.current = []; }
-        }
-        setState(overlayPendingSessions(fresh, sessionQueueRef.current));
-      })
+      .then(setState)
       .catch((error) => notify(error instanceof ApiError ? error.message : "Could not reach the server.", "error"))
       .finally(() => setLoading(false));
   }, [notify]);
@@ -408,7 +379,7 @@ export default function Home() {
           });
           sessionQueueRef.current.shift();
           persistSessionQueue();
-          setState(overlayPendingSessions(fresh, sessionQueueRef.current));
+          setState(fresh);
           if (fresh.completedTask) {
             autoCompleteRef.current(fresh, fresh.completedTask, entry.date);
           }
@@ -436,38 +407,19 @@ export default function Home() {
       const random = typeof crypto.randomUUID === "function"
         ? crypto.randomUUID()
         : `${Date.now()}_${Math.random().toString(36).slice(2)}`;
-      const eventId = `session_${random}`;
-      const date = today();
       sessionQueueRef.current.push({
-        eventId,
+        eventId: `session_${random}`,
         minutes,
         subjectId,
         taskId,
         mode,
         // Send the CLIENT's local date: server timezone must not move a
         // session into a different day than the learner sees.
-        date,
+        date: today(),
       });
       // Keep a hard bound if a device stays offline for a very long time.
       if (sessionQueueRef.current.length > 200) sessionQueueRef.current.splice(0, sessionQueueRef.current.length - 200);
       persistSessionQueue();
-      // Show “Xm studied” immediately — Clock Out must not wait on POST.
-      setState((prev) => {
-        if (!prev) return prev;
-        if (prev.sessions.some((session) => session.eventId === eventId)) return prev;
-        const optimistic: SessionRow = {
-          id: -Date.now(),
-          userId: prev.user.id,
-          subjectId,
-          taskId,
-          date,
-          minutes,
-          mode,
-          eventId,
-          createdAt: new Date().toISOString(),
-        };
-        return { ...prev, sessions: [...prev.sessions, optimistic] };
-      });
       void drainSessionQueue();
     },
     [drainSessionQueue, persistSessionQueue]
@@ -1275,7 +1227,7 @@ export default function Home() {
               <IconFocus2 size={14} /> <span>Focus Mode</span>
             </button>
             <div className="zen-topbar-right">
-              <button className="zen-ghost zen-fs" onClick={toggleZenFullscreen}>
+              <button className="zen-ghost" onClick={toggleZenFullscreen}>
                 <IconExpand2 size={14} /> <span>Full Screen</span>
               </button>
               <button className="zen-ghost zen-exit" onClick={() => setZen(false)}>Exit Zen</button>
@@ -1299,14 +1251,11 @@ export default function Home() {
               <svg className="zen-ring" viewBox="0 0 320 320" aria-hidden="true">
                 <defs>
                   {/* The component owns its gradient: the ring is the one
-                      element in Zen allowed a little colour. The stops read
-                      the active theme's accent tokens (defined on .zen), so
-                      the ring is orange under the sunset theme, teal under
-                      mint, and so on — never a fixed purple. */}
+                      element in Zen allowed a little colour. */}
                   <linearGradient id="zenRingGradient" x1="0" y1="0" x2="1" y2="1">
-                    <stop offset="0" stopColor="var(--zen-ring-1)" />
-                    <stop offset="0.55" stopColor="var(--zen-ring-2)" />
-                    <stop offset="1" stopColor="var(--zen-ring-3)" />
+                    <stop offset="0" stopColor="#b6aaff" />
+                    <stop offset="0.55" stopColor="#9b8bf7" />
+                    <stop offset="1" stopColor="#7d6cf0" />
                   </linearGradient>
                 </defs>
                 <circle cx="160" cy="160" r="140" className="zen-ring-track" />
@@ -1334,23 +1283,15 @@ export default function Home() {
 
             {/* ONE control for the whole session. There is deliberately no
                 separate "Pause Clock": focus and the study clock are the same
-                session, so they pause, resume and end together.
-
-                The secondary buttons share a wrapper: on desktop it renders
-                as `display: contents` (same row as before); on phones it
-                becomes one compact centred row, so Exit Zen / Clock Out stay
-                visible next to the primary CTA instead of stacking into
-                full-width slabs. */}
+                session, so they pause, resume and end together. */}
             <div className="flex-row gap-md zen-actions">
               <button className="btn btn-primary zen-primary" onClick={session.toggle}>
                 {session.active ? "Pause" : clock.sessionActive ? "Resume" : "Start Focus"}
               </button>
-              <div className="zen-actions-secondary">
-                {clock.sessionActive && (
-                  <button className="btn zen-secondary zen-clock-out" onClick={clockOutNow}>Clock Out</button>
-                )}
-                <button className="btn zen-secondary zen-exit-btn" onClick={() => setZen(false)}>Exit Zen</button>
-              </div>
+              {clock.sessionActive && (
+                <button className="btn zen-secondary zen-clock-out" onClick={clockOutNow}>Clock Out</button>
+              )}
+              <button className="btn zen-secondary zen-exit-btn" onClick={() => setZen(false)}>Exit Zen</button>
             </div>
             <p className="zen-hint">
               {session.active

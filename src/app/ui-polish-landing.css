@@ -1,0 +1,61 @@
+/* Final visual cleanup: loaded last so the requested screenshot fixes win the cascade. */
+
+/* Onboarding Step 2: text must use the full card width before the level grid. */
+.ob-card > .ob-lead,
+.ob-card > h1 + .ob-lead,
+.ob-card > h1 + p { width:100% !important; max-width:100% !important; display:block !important; }
+.ob-card .ob-level-grid { width:100% !important; min-width:0 !important; }
+.ob-card .ob-level-grid > * { min-width:0 !important; }
+
+/* Step 4 / review values: long MBA / institution strings remain readable. */
+.ob-program-card,.ob-review-grid,.ob-review-card,.ob-summary-row { min-width:0; }
+.ob-program-main,.ob-program-meta,.ob-program-item { min-width:0; }
+.ob-program-name,.ob-review-value,.ob-summary-row > span:last-child { min-width:0; overflow-wrap:anywhere; word-break:normal; line-height:1.35; }
+.ob-program-main { flex:1 1 100%; }
+
+/* Use a true form grid for degree details where the existing class is available. */
+.ob-details-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.ob-details-grid > .ob-field-span-full { grid-column:1/-1; }
+@media(max-width:680px){ .ob-details-grid { grid-template-columns:1fr; } .ob-details-grid > .ob-field-span-full { grid-column:auto; } }
+
+/* Hide the old horizontal three-dot treatment if any stale selector leaks in. */
+.task-row-actions > .task-more:not(.task-more-wrap .task-more) { display:none !important; }
+
+/* Vertical task options live in the corner. */
+.task-more-wrap { position:absolute !important; top:7px !important; right:7px !important; z-index:20 !important; }
+.task-row .task-main { padding-right:42px !important; }
+.task-row .task-row-actions { margin-right:0 !important; padding-right:0 !important; }
+.task-more { flex:0 0 32px; }
+.task-menu { transform-origin:top right !important; }
+@media(max-width:640px){
+  .task-more-wrap { top:8px !important; right:8px !important; }
+  .task-row .task-main { padding-right:38px !important; }
+  .task-row .task-row-actions { grid-template-columns:minmax(0,1fr) minmax(0,1fr) !important; }
+}
+
+/* Active task: quiet recording state, no cyan/green flashing wash. */
+.task-row.active-clock {
+  position:relative;
+  background:color-mix(in srgb,var(--accent) 4.5%,var(--surface)) !important;
+  border-color:color-mix(in srgb,var(--accent) 24%,var(--glass-border)) !important;
+  box-shadow:inset 2px 0 0 var(--accent),0 2px 12px color-mix(in srgb,var(--accent) 6%,transparent) !important;
+}
+.task-row.active-clock::before { content:""; position:absolute; inset:0 auto 0 0; width:2px; background:var(--accent); opacity:.75; }
+.task-row.active-clock .task-dot { animation:quietTaskPulse 2.2s ease-in-out infinite !important; }
+@keyframes quietTaskPulse { 0%,100%{ transform:scale(1); opacity:.8; } 50%{ transform:scale(1.12); opacity:1; } }
+@media(prefers-reduced-motion:reduce){ .task-row.active-clock .task-dot{animation:none !important;} }
+
+/* Tracker state buttons keep a stable footprint across Clocked in / paused / out. */
+@media(min-width:861px){
+  .tracker-actions { align-items:center !important; }
+  .tracker-actions .btn { white-space:nowrap !important; }
+  .tracker-task { max-width:min(42vw,520px) !important; }
+}
+
+/* Zen: single pause/resume is the only control for a focus-owned session. */
+.zen-actions { align-items:center; justify-content:center; }
+.zen-actions .zen-primary { min-width:122px; }
+.zen-actions .zen-clock-out { min-width:104px; }
+.zen-actions .zen-exit-btn { min-width:92px; }
+.zen-status { display:flex; justify-content:center; align-items:center; gap:4px; flex-wrap:wrap; }
+@media(max-width:520px){ .zen-actions{gap:7px !important;} .zen-actions .btn{min-height:44px !important;} }
