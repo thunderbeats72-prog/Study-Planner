@@ -1,11 +1,18 @@
 "use client";
 
 import React from "react";
-import { mmss } from "@/lib/useTimer";
 
 /**
  * The ONE clock button every task row shares — on the Overview, the
- * Planner and inside day sheets. It always reflects the live clock.
+ * Planner and inside day sheets. It always reflects the live clock:
+ *
+ *  - this task is recording  → red "Clock out" (with a live pulse dot)
+ *  - another task records    → "Switch" (banks the open minutes first)
+ *  - nothing recording       → "Clock in"
+ *
+ * Before this existed, the row button kept saying "Clock in" even while
+ * that very task was timing, and tapping it again silently restarted the
+ * session — which is exactly how "I can start but can't stop" felt.
  */
 export default function TaskClockButton({
   taskId, activeTaskId, sessionActive, onFocusTask, onClockOut,
@@ -17,66 +24,32 @@ export default function TaskClockButton({
   onClockOut: () => void;
 }) {
   const live = !!sessionActive && activeTaskId === taskId;
-
-  const handleClockOut = (event: React.MouseEvent<HTMLButtonElement>) => {
-    event.preventDefault();
-    event.stopPropagation();
-    onClockOut();
-  };
-
-  const handleFocusTask = (event: React.MouseEvent<HTMLButtonElement>) => {
-    event.preventDefault();
-    event.stopPropagation();
-    onFocusTask(taskId);
-  };
-
   if (live) {
     return (
       <button
-        type="button"
         className="btn btn-xs btn-danger task-clock clock-live"
-        onClick={handleClockOut}
+        onClick={onClockOut}
         title="Stop the clock and save your minutes"
-        aria-label="Clock out of this task"
       >
         <span className="clock-live-dot" aria-hidden="true" />
         Clock out
       </button>
     );
   }
-
   if (sessionActive) {
     return (
       <button
-        type="button"
         className="btn btn-xs btn-secondary task-clock"
-        onClick={handleFocusTask}
+        onClick={() => onFocusTask(taskId)}
         title="Save the current session's minutes and continue with this lesson"
       >
         Switch
       </button>
     );
   }
-
   return (
-    <button type="button" className="btn btn-xs btn-secondary task-clock" onClick={handleFocusTask}>
+    <button className="btn btn-xs btn-secondary task-clock" onClick={() => onFocusTask(taskId)}>
       Clock in
     </button>
-  );
-}
-
-export function TaskLiveBadge({ seconds, running }: { seconds?: number; running?: boolean }) {
-  return (
-    <span className={`task-live-badge${running ? " is-recording" : ""}`}>
-      <span className="task-live-dot" aria-hidden="true" />
-      {running ? (
-        <>
-          Recording
-          <span className="mono task-live-time">{mmss(seconds ?? 0)}</span>
-        </>
-      ) : (
-        "Paused"
-      )}
-    </span>
   );
 }

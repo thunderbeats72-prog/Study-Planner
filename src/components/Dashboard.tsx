@@ -6,7 +6,7 @@ import MiniCalendar from "./MiniCalendar";
 import { api, addDays, dayDiff, mdToHtml, prettyLong, today, KIND_META, normalizeCheckpointTitle, type AppState, type TaskRow } from "@/lib/client";
 import { mmss } from "@/lib/useTimer";
 import {
-  IconSpark, IconCalendar, IconTarget, IconClock, IconFlame, IconPlay, IconLeaf, IconRocket, IconRefresh,
+  IconSpark, IconCalendar, IconTarget, IconClock, IconFlame, IconPlay, IconLeaf, IconRocket,
 } from "./icons";
 import TaskEditor, { type TaskPatch } from "./TaskEditor";
 import TaskActions from "./TaskActions";
@@ -14,13 +14,11 @@ import { TaskLiveBadge } from "./TaskClockButton";
 import QuickAdd from "./QuickAdd";
 import Heatmap from "./Heatmap";
 import { prioritizeTasks, weakestSubjectIds, reasonLabel } from "@/lib/prioritization";
-import { taskStudiedSuffix } from "@/lib/studyTime";
 import {
   backlogFor, backlogToDate, canFitToday, dailyCapacityMinutes, pendingOnDate,
   spreadAcrossDays, suggestedRecovery, todayOverload,
 } from "@/lib/recovery";
 import type { QuickAddPayload } from "@/lib/quickAdd";
-import { QUOTES, TONE_TAG, pickDaily, pickNext, readSeen, writeSeen } from "@/lib/quotes";
 
 /** v13 — KPI digits count up to their new value instead of snapping.
  *  Returns a formatted string (integers stay clean, tenths when needed). */
@@ -50,72 +48,20 @@ function useCountUp(target: number): string {
   return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
 }
 
-/* ── Daily thought — persona quotes with a no-repeat rotation ─────────
-   The card shows one quote per calendar day, drawn from a roster of real
-   voices (Osho, Martin Luther, Marcus Aurelius, Rumi, …). "Another thought"
-   advances to the next unseen quote immediately; the seen history lives in
-   localStorage (see lib/quotes.ts) so nothing repeats until the whole pool
-   has been shown. Today's pick is remembered separately so a refresh keeps
-   the same card and a new day always brings a new voice. */
-const QUOTE_TODAY_KEY = "spp-quote-today";
+const QUOTES = [
+  { text: "Small steps every day add up to big results.", tag: "Stay present" },
+  { text: "Focus is saying no to a hundred good ideas.", tag: "Protect your focus" },
+  { text: "You don't have to be great to start, but you have to start to be great.", tag: "You've got this" },
+  { text: "The expert in anything was once a beginner.", tag: "Keep going" },
+  { text: "Discipline is choosing between what you want now and what you want most.", tag: "Stay present" },
+  { text: "One focused hour beats a distracted day.", tag: "Protect your focus" },
+  { text: "Progress, not perfection.", tag: "You've got this" },
+];
 
-function readTodayQuote(): { d: string; i: number } | null {
-  try {
-    const raw = window.localStorage.getItem(QUOTE_TODAY_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as { d?: unknown; i?: unknown };
-    if (typeof parsed.d !== "string" || typeof parsed.i !== "number") return null;
-    return { d: parsed.d, i: parsed.i };
-  } catch {
-    return null;
-  }
-}
-
-function writeTodayQuote(dateKey: string, index: number) {
-  try {
-    window.localStorage.setItem(QUOTE_TODAY_KEY, JSON.stringify({ d: dateKey, i: index }));
-  } catch {
-    /* storage unavailable — rotation still works for the session */
-  }
-}
-
-function useDailyQuote(dateKey: string): [number, () => void] {
-  const [index, setIndex] = useState(() => resolveDailyQuote(dateKey));
-  /* If the calendar day rolls over while the tab stays open, the next
-     quote arrives on its own — checked on a quiet timer and whenever the
-     tab becomes visible again (both are callbacks, never render paths). */
-  useEffect(() => {
-    const check = () => {
-      if (readTodayQuote()?.d !== dateKey) setIndex(resolveDailyQuote(dateKey));
-    };
-    const timer = window.setInterval(check, 60_000);
-    document.addEventListener("visibilitychange", check);
-    return () => {
-      window.clearInterval(timer);
-      document.removeEventListener("visibilitychange", check);
-    };
-  }, [dateKey]);
-  const advance = () => {
-    setIndex((current) => {
-      const pick = pickNext(QUOTES.length, current, readSeen() ?? []);
-      writeSeen(pick.seen);
-      writeTodayQuote(dateKey, pick.index);
-      return pick.index;
-    });
-  };
-  return [index, advance];
-}
-
-/** The day's pick: yesterday's card survives a refresh; a new day draws the
- *  next unseen quote from the pool and records it in the history. */
-function resolveDailyQuote(dateKey: string): number {
-  if (typeof window === "undefined") return pickDaily(QUOTES.length, dateKey, []).index;
-  const stored = readTodayQuote();
-  if (stored && stored.d === dateKey) return stored.i;
-  const pick = pickDaily(QUOTES.length, dateKey, readSeen() ?? []);
-  writeSeen(pick.seen);
-  writeTodayQuote(dateKey, pick.index);
-  return pick.index;
+function dailyQuote(dateKey: string) {
+  let hash = 0;
+  for (let i = 0; i < dateKey.length; i++) hash = (hash * 31 + dateKey.charCodeAt(i)) >>> 0;
+  return QUOTES[hash % QUOTES.length];
 }
 
 /** Checkpoints are cross-subject mock tasks rendered without a subject. */
@@ -163,8 +109,7 @@ export default function Dashboard({
   const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
   const t = today();
   const ctx = state.context;
-  const [quoteIndex, nextQuote] = useDailyQuote(t);
-  const quote = QUOTES[quoteIndex] ?? QUOTES[0];
+  const quote = dailyQuote(t);
 
   const taskProgressVersion = `${state.tasks.length}:${state.tasks.filter((task) => task.status === "done").length}:${state.tasks.filter((task) => task.status === "skipped").length}`;
   const loggedQuarterHour = Math.floor(
@@ -278,8 +223,10 @@ export default function Dashboard({
     const compRate = recent.length ? Math.round((recent.filter((x) => x.status === "done").length / recent.length) * 100) : null;
     return { thisHrs: Math.round((thisMin / 60) * 10) / 10, delta, avgSession, compRate };
   }, [state.sessions, state.tasks, t]);
-  // Per-task study totals come from the shared helper so the Overview and
-  // the Planner word and aggregate them exactly the same way.
+  const taskLogged = (taskId: number) => {
+    const sum = state.sessions.filter((x) => x.taskId === taskId).reduce((a, x) => a + x.minutes, 0);
+    return Math.round(sum * 100) / 100;
+  };
   // 13.5 minutes displays as "13.5m" — never rounded to a different number
   const fmtMin = (m: number) => {
     const r = Math.round(m * 10) / 10;
@@ -314,14 +261,13 @@ export default function Dashboard({
                 {state.subjects.find((subject) => subject.id === top.subjectId)
                   ? ` · ${state.subjects.find((subject) => subject.id === top.subjectId)!.name}`
                   : ""}
-                {taskStudiedSuffix(state.sessions, top) ? ` · ${taskStudiedSuffix(state.sessions, top)}` : ""}
+                {taskLogged(top.id) ? ` · ${fmtMin(taskLogged(top.id))} already logged` : ""}
               </p>
 
               {heroLive ? (
                 <div className="now-live">
-                  <span className={`up-next-live-chip${clockRunning ? " is-recording" : clockOnBreak ? " is-break" : " is-idle"}`}>
-                    <span className="task-live-dot" aria-hidden="true" />
-                    {clockRunning ? "clock running" : clockOnBreak ? "on break" : "paused"}
+                  <span className="up-next-live-chip">
+                    ● {clockRunning ? "clock running" : clockOnBreak ? "on break" : "paused"}
                   </span>
                   <span className="mono now-live-timer" aria-label="Session time">{mmss(activeClockSeconds ?? 0)}</span>
                   <div className="flex-row gap-sm">
@@ -439,115 +385,86 @@ export default function Dashboard({
 
       {/* ── TODAY'S PLAN — the working list comes before every statistic. ── */}
       <div className="dash-today-grid">
-        <div className="dash-today-col">
-          <div className="glass-panel tilt-card section-card dash-today-card">
-            <div className="day-head">
-              <h3 className="section-title">Today&apos;s Plan</h3>
-              <div className="day-head-side">
-                <span className="day-meta">{doneToday}/{todayTasks.length} done · {totalPlannedMin} min planned</span>
-                <QuickAdd state={state} onAdd={onAddTask} />
-              </div>
+        <div className="glass-panel tilt-card section-card dash-today-card">
+          <div className="day-head">
+            <h3 className="section-title">Today&apos;s Plan</h3>
+            <div className="day-head-side">
+              <span className="day-meta">{doneToday}/{todayTasks.length} done · {totalPlannedMin} min planned</span>
+              <QuickAdd state={state} onAdd={onAddTask} />
             </div>
-            {!todayTasks.length && (
-              <div className="empty-state">
-                <div className="empty-state-icon">
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="3" y="4" width="18" height="18" rx="3" /><path d="M16 2v4M8 2v4M3 10h18" />
-                  </svg>
-                </div>
-                <h4 className="empty-state-title">No sessions scheduled today</h4>
-                <p className="empty-state-sub">This may be a rest day, or your plan hasn&apos;t been generated yet.</p>
-                <div className="flex-row gap-sm">
-                  <QuickAdd state={state} onAdd={onAddTask} />
-                  <button className="btn btn-secondary btn-sm" onClick={onReplan} disabled={replanning}>
-                    {replanning ? "Re-planning…" : "Generate Plan"}
-                  </button>
-                </div>
-              </div>
-            )}
-            {todayTasks.length > 0 && doneToday === todayTasks.length && (
-              <div className="day-complete">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M20 6 9 17l-5-5" />
+          </div>
+          {!todayTasks.length && (
+            <div className="empty-state">
+              <div className="empty-state-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="4" width="18" height="18" rx="3" /><path d="M16 2v4M8 2v4M3 10h18" />
                 </svg>
-                All done for today. Well earned — see you tomorrow.
               </div>
-            )}
-            {todayTasks.map((task) => {
-              const meta = KIND_META[task.kind] || KIND_META.learn;
-              const subj = state.subjects.find((s) => s.id === task.subjectId);
-              const isCheckpoint = isCheckpointTask(task);
-              const kindLabel = isCheckpoint ? "Checkpoint" : meta.label;
-              const dotColor = subj?.color || (isCheckpoint ? "var(--color-primary)" : meta.color);
-              const formattedTitle = isCheckpoint ? normalizeCheckpointTitle(task.title) : task.title;
-              // Live state only while a session is actually open: Clock Out
-              // clears the row instantly and leaves the studied minutes behind.
-              const rowLive = !!clockSessionActive && activeTaskId === task.id;
-              const studiedLabel = taskStudiedSuffix(state.sessions, task);
-              return (
-                <div key={task.id} className={`task-row clean-list${task.status === "done" ? " done" : ""}${rowLive ? " active-clock" : ""}`}>
-                  <div className="task-dot" style={{ background: dotColor }} />
-                  <div className="task-main">
-                    <div className="task-title">{formattedTitle}</div>
-                    <div className="task-sub">
-                      <span className="chip chip-kind chip-tight">{kindLabel}</span> · {task.plannedMinutes} min
-                      {isCheckpoint ? " · All Subjects · Comprehensive Review" : ""}
-                      {studiedLabel ? ` · ${studiedLabel}` : ""}
-                      {rowLive && <TaskLiveBadge seconds={activeClockSeconds} running={clockRunning} />}
-                    </div>
-                  </div>
-                  <span className={`chip chip-${task.status}`}>{task.status}</span>
-                  <TaskActions
-                    task={task}
-                    subject={subj}
-                    activeTaskId={activeTaskId}
-                    clockSessionActive={clockSessionActive}
-                    onTaskStatus={onTaskStatus}
-                    onFocusTask={onFocusTask}
-                    onClockOut={onClockOut}
-                    onEdit={setEditingTaskId}
-                    onSkipSubject={onSkipSubject}
-                  />
-                </div>
-              );
-            })}
-          </div>
-
-          {/* The quote sits under the plan so the right rail keeps the shorter,
-              fixed-height calendar; the two columns stay fitted end to end. */}
-          <div className="glass-panel tilt-card section-card dash-quote-card">
-            <button
-              type="button"
-              className="quote-refresh"
-              onClick={nextQuote}
-              title="Another thought"
-              aria-label="Show another thought"
-            >
-              <IconRefresh size={15} />
-            </button>
-            <div className="quote-mark" aria-hidden="true">“</div>
-            <div className="quote-body" key={quoteIndex}>
-              <p className="quote-text">{quote.text}</p>
-              <div className="quote-source">
-                <div className="quote-author">
-                  <strong>{quote.author}</strong>
-                  <span>{quote.role}</span>
-                </div>
-                <span className="quote-tag">
-                  <span className="quote-tag-icon">
-                    {quote.tone === "presence" || quote.tone === "patience" ? <IconLeaf size={12} /> : <IconRocket size={12} />}
-                  </span>
-                  {TONE_TAG[quote.tone]}
-                </span>
+              <h4 className="empty-state-title">No sessions scheduled today</h4>
+              <p className="empty-state-sub">This may be a rest day, or your plan hasn&apos;t been generated yet.</p>
+              <div className="flex-row gap-sm">
+                <QuickAdd state={state} onAdd={onAddTask} />
+                <button className="btn btn-secondary btn-sm" onClick={onReplan} disabled={replanning}>
+                  {replanning ? "Re-planning…" : "Generate Plan"}
+                </button>
               </div>
             </div>
-          </div>
+          )}
+          {todayTasks.length > 0 && doneToday === todayTasks.length && (
+            <div className="day-complete">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 6 9 17l-5-5" />
+              </svg>
+              All done for today. Well earned — see you tomorrow.
+            </div>
+          )}
+          {todayTasks.map((task) => {
+            const meta = KIND_META[task.kind] || KIND_META.learn;
+            const subj = state.subjects.find((s) => s.id === task.subjectId);
+            const isCheckpoint = isCheckpointTask(task);
+            const kindLabel = isCheckpoint ? "Checkpoint" : meta.label;
+            const dotColor = subj?.color || (isCheckpoint ? "var(--color-primary)" : meta.color);
+            const formattedTitle = isCheckpoint ? normalizeCheckpointTitle(task.title) : task.title;
+            return (
+              <div key={task.id} className={`task-row clean-list${task.status === "done" ? " done" : ""}${activeTaskId === task.id ? " active-clock" : ""}`}>
+                <div className="task-dot" style={{ background: dotColor }} />
+                <div className="task-main">
+                  <div className="task-title">{formattedTitle}</div>
+                  <div className="task-sub">
+                    <span className="chip chip-kind chip-tight">{kindLabel}</span> · {task.plannedMinutes} min
+                    {isCheckpoint ? " · All Subjects · Comprehensive Review" : ""}
+                    {taskLogged(task.id) ? ` · ${fmtMin(taskLogged(task.id))} logged` : task.actualMinutes ? ` · ${task.actualMinutes}m logged` : ""}
+                    {activeTaskId === task.id && <TaskLiveBadge seconds={activeClockSeconds} running={clockRunning} />}
+                  </div>
+                </div>
+                <TaskActions
+                  task={task}
+                  subject={subj}
+                  activeTaskId={activeTaskId}
+                  clockSessionActive={clockSessionActive}
+                  onTaskStatus={onTaskStatus}
+                  onFocusTask={onFocusTask}
+                  onClockOut={onClockOut}
+                  onEdit={setEditingTaskId}
+                  onSkipSubject={onSkipSubject}
+                />
+              </div>
+            );
+          })}
         </div>
 
         <div className="dash-side-rail">
           <div className="glass-panel tilt-card section-card dash-cal-card">
             <h3 className="section-title">Calendar</h3>
             <MiniCalendar state={state} />
+          </div>
+          <div className="glass-panel tilt-card section-card dash-quote-card">
+            <div className="quote-mark" aria-hidden="true">“</div>
+            <p className="quote-text">{quote.text}</p>
+            <div className="quote-tag">
+              <span className="quote-tag-icon">{quote.tag === "Stay present" ? <IconLeaf size={12} /> : <IconRocket size={12} />}</span>
+              {quote.tag}
+            </div>
           </div>
         </div>
       </div>
