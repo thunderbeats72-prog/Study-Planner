@@ -17,7 +17,9 @@ export const maxDuration = 120;
 const STUDY_DAYS = ["all", "6days", "weekdays"] as const;
 const PLAN_MODES = ["syllabus", "revision", "mock"] as const;
 const STUDY_STYLES = ["balanced", "theory", "practice"] as const;
-const THEMES = ["default", "silver-lavender", "mint", "sunset", "dark", "obsidian", "nebula"] as const;
+/* v26: "default" retired — Silver Lavender is the canonical light preset.
+   Legacy payloads asking for "default" are transparently upgraded. */
+const THEMES = ["silver-lavender", "mint", "sunset", "dark", "obsidian", "nebula"] as const;
 
 export const PATCH = withDbGuard(patchSettings);
 
@@ -49,7 +51,7 @@ async function patchSettings(req: Request) {
     if (body.planMode != null) patch.planMode = enumValue(body.planMode, "planMode", PLAN_MODES);
     if (body.studyStyle != null) patch.studyStyle = enumValue(body.studyStyle, "studyStyle", STUDY_STYLES);
     if (body.revisionWeeks != null) patch.revisionWeeks = finiteNumber(body.revisionWeeks, "revisionWeeks", { min: 0, max: 52, integer: true });
-    if (body.theme != null) patch.theme = enumValue(body.theme, "theme", THEMES);
+    if (body.theme != null) patch.theme = enumValue(body.theme === "default" ? "silver-lavender" : body.theme, "theme", THEMES);
     if (body.pomodoro != null) patch.pomodoro = finiteNumber(body.pomodoro, "pomodoro", { min: 1, max: 180, integer: true });
     if (body.shortBreak != null) patch.shortBreak = finiteNumber(body.shortBreak, "shortBreak", { min: 1, max: 60, integer: true });
     if (body.longBreak != null) patch.longBreak = finiteNumber(body.longBreak, "longBreak", { min: 1, max: 120, integer: true });

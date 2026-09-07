@@ -71,13 +71,13 @@
   transition: background .16s ease, border-color .16s ease, box-shadow .2s ease;
 }
 
-/* In a day block the rows are list lines with hairline separators, edge to
-   edge — not floating mini-cards (the old look that made the planner feel
-   heavy). */
+/* In a day block the rows sit edge to edge with even vertical rhythm — no
+   hairline separators. The separator line the old design drew between rows
+   read as a faint scratch that appeared whenever the cursor crossed a topic;
+   the hover state below replaces it with a soft rounded highlight. */
 .planner-days .task-row,
 .day-modal .task-row {
   padding: 12px 20px;
-  border-bottom-color: var(--glass-border);
 }
 .planner-days .task-row.last-row,
 .planner-days .task-row:last-child,
@@ -85,12 +85,9 @@
   border-bottom-color: transparent;
 }
 
-/* The Overview keeps a softer inset so its rows sit inside the card. The
-   separator stays a hairline, but is strengthened just enough that the list
-   reads as a fitted column instead of a faint, disconnected line. */
+/* The Overview keeps a softer inset so its rows sit inside the card. */
 .dash-today-card .task-row {
   padding: 12px 14px;
-  border-bottom-color: color-mix(in srgb, var(--glass-border-hover) 70%, var(--glass-border));
 }
 
 .task-dot {
@@ -133,12 +130,27 @@
 
 .chip-tight { margin-right: 5px; }
 
-/* A row only reacts with a barely-there surface tint — the title no longer
-   changes colour and the row never lifts (that was the "boxy, twitchy"
-   read). Hover exists only where hover is honest. */
+/* A row reacts with one quiet rounded highlight — a soft tinted surface
+   with a hairline accent rim, no separators, no lift, no title colour
+   change. The old faint bottom line is gone: hovering a topic now looks
+   like picking it up, not like a scratch appearing under it. */
+.task-row { border-radius: 13px; }
+
 @media (hover: hover) and (pointer: fine) {
-  .task-row:hover { background: color-mix(in srgb, var(--row-hover) 62%, transparent); }
+  .task-row:hover {
+    background: color-mix(in srgb, var(--accent) 5%, var(--row-hover));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 9%, transparent);
+  }
   .task-row.active-clock:hover { background: color-mix(in srgb, var(--accent) 5.5%, var(--row-hover)); }
+}
+
+/* Touch: the press carries the same rounded highlight so phones get the
+   same feedback without a stuck hover. */
+@media (hover: none) and (pointer: coarse) {
+  .task-row:active {
+    background: color-mix(in srgb, var(--accent) 5%, var(--row-hover));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 9%, transparent);
+  }
 }
 
 /* Status chip: a quiet caption on the right edge of the text column, the
@@ -548,20 +560,25 @@
 }
 
 .ob-range-card {
-  padding: 15px 16px 14px;
+  padding: 16px 18px 14px;
   border-radius: 18px;
   border: 1px solid var(--glass-border);
-  background: linear-gradient(180deg, var(--surface) 0%, var(--row-bg) 100%);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--surface-solid) 96%, var(--row-bg)) 0%, var(--row-bg) 100%);
   box-shadow: var(--shadow-sm);
   min-width: 0;
   transition: border-color .18s ease, box-shadow .18s ease, background .18s ease;
 }
 
+/* Dragging: the card leans in — accent-tinged rim, soft accent bloom under
+   the control, and a hairline top light so it reads as a lit surface. */
 .ob-range-card.is-dragging {
   border-color: color-mix(in srgb, var(--accent) 34%, var(--glass-border));
-  background: linear-gradient(180deg, var(--surface) 0%, color-mix(in srgb, var(--accent) 2.5%, var(--row-bg)) 100%);
-  box-shadow: 0 1px 3px color-mix(in srgb, var(--text-main) 5%, transparent),
-              0 8px 22px -14px color-mix(in srgb, var(--text-main) 30%, transparent);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--surface-solid) 94%, color-mix(in srgb, var(--accent) 3%, var(--row-bg))) 0%, color-mix(in srgb, var(--accent) 3%, var(--row-bg)) 100%);
+  box-shadow:
+    0 1px 3px color-mix(in srgb, var(--text-main) 5%, transparent),
+    0 10px 28px -16px color-mix(in srgb, var(--accent) 55%, transparent);
 }
 
 .ob-range-head {
@@ -569,10 +586,28 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 14px;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
 
 .ob-range-copy { flex: 1 1 auto; min-width: 0; }
+
+/* Icon tile: a small gradient-tinted square that anchors each slider's
+   identity (clock for hours, book for subjects, calendar for buffer). */
+.ob-range-icon {
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  margin-top: 1px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+  background:
+    linear-gradient(160deg, color-mix(in srgb, var(--accent) 16%, var(--surface-solid)), color-mix(in srgb, var(--accent) 6%, var(--row-bg)));
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--glass-border));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 30%, transparent);
+}
 
 .ob-range-card .ob-range-copy label {
   display: block;
@@ -593,26 +628,29 @@
   overflow-wrap: break-word;
 }
 
-/* Value badge: fixed-measure, tabular, and it fades its digits in whenever
-   a committed value change re-mounts it (see the key on <output> in
-   Onboarding.tsx). While dragging, the key is stable so the badge reads as
-   one continuous, quiet surface instead of flickering at 60fps. */
+/* Value badge: a solid gradient pill with white digits — the single loudest
+   element on the card, fixed-measure and tabular so it never twitches. It
+   re-mounts on each committed change (see the key on <output>) and stays a
+   continuous surface while the thumb glides. */
 .ob-range-value {
   flex: 0 0 auto;
   align-self: flex-start;
-  min-width: 76px;
-  padding: 6px 12px;
+  min-width: 82px;
+  padding: 7px 14px;
   border-radius: 999px;
   text-align: center;
-  font-size: .82rem;
+  font-size: .86rem;
   font-weight: 800;
   letter-spacing: -.2px;
   font-variant-numeric: tabular-nums;
-  color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 10%, var(--surface-solid));
-  border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
-  box-shadow: none;
-  transition: background .18s ease, border-color .18s ease, color .18s ease;
+  color: #fff;
+  background: var(--accent-gradient);
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .28),
+    0 2px 10px -2px color-mix(in srgb, var(--accent) 55%, transparent);
+  text-shadow: 0 1px 1px color-mix(in srgb, var(--accent) 60%, transparent);
+  transition: box-shadow .18s ease;
   animation: obValueSwap .16s ease both;
 }
 
@@ -623,18 +661,20 @@
 
 .ob-range-card.is-dragging .ob-range-value {
   animation: none;
-  background: color-mix(in srgb, var(--accent) 15%, var(--surface-solid));
-  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .28),
+    0 3px 16px -2px color-mix(in srgb, var(--accent) 75%, transparent);
 }
 
-/* The input is the 34px strip; the visible rail is its 10px track — a
-   recessed channel with a filled accent gradient, and a ringed thumb that
-   reads as a physical control instead of a bare range input. */
+
+/* The input is the 38px strip; the visible rail is its 12px track — a
+   recessed channel with a glowing accent-gradient fill and a ringed knob
+   that reads as a physical dial instead of a bare range input. */
 .ob-range-card .ob-range-input {
-  --ob-track-h: 10px;
+  --ob-track-h: 12px;
   --ob-track-bg: color-mix(in srgb, var(--text-main) 13%, transparent);
   width: 100%;
-  height: 34px;
+  height: 38px;
   margin: 0;
   padding: 0;
   border: none;
@@ -655,9 +695,10 @@
   transition-duration: 0s;
 }
 
-/* Track: the filled lead is a bright accent → accent-light sweep, and the
-   unfilled tail sits in a recessed channel (inset shadow + faint top light)
-   so the rail reads as a machined groove, not a flat line. */
+/* Track: the filled lead is an accent → accent-light sweep that carries its
+   own soft light spill; the unfilled tail sits in a recessed channel (inset
+   shadow + faint top light) so the rail reads as a machined groove, not a
+   flat line. */
 .ob-range-card .ob-range-input::-webkit-slider-runnable-track {
   height: var(--ob-track-h);
   border-radius: 999px;
@@ -668,7 +709,8 @@
     var(--ob-track-bg) 100%);
   box-shadow:
     inset 0 1px 2px color-mix(in srgb, var(--text-main) 16%, transparent),
-    inset 0 -1px 0 rgba(255, 255, 255, .05);
+    inset 0 -1px 0 rgba(255, 255, 255, .05),
+    0 2px 10px -4px color-mix(in srgb, var(--accent) 70%, transparent);
   transition: --ob-range-fill .18s cubic-bezier(.25, 1, .4, 1);
 }
 
@@ -685,54 +727,58 @@
   height: var(--ob-track-h);
   border-radius: 999px 0 0 999px;
   background: linear-gradient(90deg, var(--accent), var(--accent-light));
-  box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 35%, transparent);
+  box-shadow: 0 2px 10px -4px color-mix(in srgb, var(--accent) 70%, transparent);
 }
 
-/* Thumb: a 24px knob with a surface ring, an accent-gradient face and a
-   soft inner top-light so it reads as a raised physical control. */
+/* Thumb: a 26px knob with a thick surface ring, an accent-gradient face and
+   a bright inner top-light so it reads as a raised physical dial. */
 .ob-range-card .ob-range-input::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 24px;
-  height: 24px;
-  margin-top: calc((var(--ob-track-h) - 24px) / 2);
+  width: 26px;
+  height: 26px;
+  margin-top: calc((var(--ob-track-h) - 26px) / 2);
   border-radius: 50%;
-  border: 3px solid var(--surface-solid);
+  border: 4px solid var(--surface-solid);
   background: var(--accent-gradient);
   box-shadow:
-    0 1px 2px color-mix(in srgb, var(--text-main) 30%, transparent),
-    0 3px 8px color-mix(in srgb, var(--accent) 30%, transparent),
-    inset 0 1px 1px rgba(255, 255, 255, .35);
+    0 1px 2px color-mix(in srgb, var(--text-main) 32%, transparent),
+    0 4px 10px color-mix(in srgb, var(--accent) 42%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--accent) 26%, transparent),
+    inset 0 1px 1.5px rgba(255, 255, 255, .45);
   transition: transform .16s ease, box-shadow .16s ease;
 }
 
 .ob-range-card .ob-range-input::-moz-range-thumb {
-  width: 24px;
-  height: 24px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
-  border: 3px solid var(--surface-solid);
+  border: 4px solid var(--surface-solid);
   background: var(--accent-gradient);
   box-shadow:
-    0 1px 2px color-mix(in srgb, var(--text-main) 30%, transparent),
-    0 3px 8px color-mix(in srgb, var(--accent) 30%, transparent),
-    inset 0 1px 1px rgba(255, 255, 255, .35);
+    0 1px 2px color-mix(in srgb, var(--text-main) 32%, transparent),
+    0 4px 10px color-mix(in srgb, var(--accent) 42%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--accent) 26%, transparent),
+    inset 0 1px 1.5px rgba(255, 255, 255, .45);
   transition: transform .16s ease, box-shadow .16s ease;
 }
 
 @media (hover: hover) and (pointer: fine) {
   .ob-range-card .ob-range-input:hover:not(:active)::-webkit-slider-thumb {
-    transform: scale(1.08);
+    transform: scale(1.1);
     box-shadow:
-      0 1px 3px color-mix(in srgb, var(--text-main) 30%, transparent),
-      0 4px 12px color-mix(in srgb, var(--accent) 38%, transparent),
-      inset 0 1px 1px rgba(255, 255, 255, .35);
+      0 1px 3px color-mix(in srgb, var(--text-main) 32%, transparent),
+      0 6px 16px color-mix(in srgb, var(--accent) 52%, transparent),
+      0 0 0 1px color-mix(in srgb, var(--accent) 32%, transparent),
+      inset 0 1px 1.5px rgba(255, 255, 255, .45);
   }
   .ob-range-card .ob-range-input:hover:not(:active)::-moz-range-thumb {
-    transform: scale(1.08);
+    transform: scale(1.1);
     box-shadow:
-      0 1px 3px color-mix(in srgb, var(--text-main) 30%, transparent),
-      0 4px 12px color-mix(in srgb, var(--accent) 38%, transparent),
-      inset 0 1px 1px rgba(255, 255, 255, .35);
+      0 1px 3px color-mix(in srgb, var(--text-main) 32%, transparent),
+      0 6px 16px color-mix(in srgb, var(--accent) 52%, transparent),
+      0 0 0 1px color-mix(in srgb, var(--accent) 32%, transparent),
+      inset 0 1px 1.5px rgba(255, 255, 255, .45);
   }
 }
 
@@ -742,22 +788,24 @@
 
 .ob-range-card .ob-range-input:active::-webkit-slider-thumb,
 .ob-range-card .ob-range-input.is-key-active::-webkit-slider-thumb {
-  transform: scale(1.12);
+  transform: scale(1.15);
   box-shadow:
-    0 0 0 6px color-mix(in srgb, var(--accent) 14%, transparent),
-    0 1px 3px color-mix(in srgb, var(--text-main) 30%, transparent),
-    0 5px 14px color-mix(in srgb, var(--accent) 42%, transparent),
-    inset 0 1px 1px rgba(255, 255, 255, .35);
+    0 0 0 7px color-mix(in srgb, var(--accent) 15%, transparent),
+    0 1px 3px color-mix(in srgb, var(--text-main) 32%, transparent),
+    0 7px 18px color-mix(in srgb, var(--accent) 55%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--accent) 32%, transparent),
+    inset 0 1px 1.5px rgba(255, 255, 255, .45);
 }
 
 .ob-range-card .ob-range-input:active::-moz-range-thumb,
 .ob-range-card .ob-range-input.is-key-active::-moz-range-thumb {
-  transform: scale(1.12);
+  transform: scale(1.15);
   box-shadow:
-    0 0 0 6px color-mix(in srgb, var(--accent) 14%, transparent),
-    0 1px 3px color-mix(in srgb, var(--text-main) 30%, transparent),
-    0 5px 14px color-mix(in srgb, var(--accent) 42%, transparent),
-    inset 0 1px 1px rgba(255, 255, 255, .35);
+    0 0 0 7px color-mix(in srgb, var(--accent) 15%, transparent),
+    0 1px 3px color-mix(in srgb, var(--text-main) 32%, transparent),
+    0 7px 18px color-mix(in srgb, var(--accent) 55%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--accent) 32%, transparent),
+    inset 0 1px 1.5px rgba(255, 255, 255, .45);
 }
 
 /* Keyboard focus: one clean double ring on the thumb, no outline box on
@@ -779,17 +827,11 @@
 }
 
 /* Dark themes need a lighter rail or the unfilled half disappears in the
-   recessed channel. */
+   recessed channel. The badge already carries its own gradient face. */
 body.theme-dark .ob-range-card .ob-range-input,
 body.theme-obsidian .ob-range-card .ob-range-input,
 body.theme-nebula .ob-range-card .ob-range-input {
   --ob-track-bg: rgba(255, 255, 255, .18);
-}
-
-body.theme-dark .ob-range-value,
-body.theme-obsidian .ob-range-value,
-body.theme-nebula .ob-range-value {
-  background: color-mix(in srgb, var(--accent) 20%, transparent);
 }
 
 .ob-range-meta {
@@ -802,71 +844,21 @@ body.theme-nebula .ob-range-value {
   color: var(--text-dim);
 }
 
-.ob-range-presets {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 7px;
-  margin-top: 12px;
-  padding-top: 13px;
-  border-top: 1px solid var(--glass-border);
-}
-
-.ob-range-chip {
-  min-width: 42px;
-  min-height: 32px;
-  padding: 6px 13px;
-  border-radius: 999px;
-  border: 1px solid var(--glass-border);
-  background: var(--surface-solid);
-  color: var(--text-muted);
-  font-size: .74rem;
-  font-weight: 750;
-  font-family: inherit;
-  cursor: pointer;
-  transition: background .16s ease, border-color .16s ease, color .16s ease,
-              transform .14s cubic-bezier(.25, 1, .4, 1), box-shadow .16s ease;
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .ob-range-chip:hover {
-    border-color: color-mix(in srgb, var(--accent) 48%, var(--glass-border));
-    background: var(--surface-hover);
-    color: var(--accent);
-    transform: translateY(-1px);
-  }
-}
-
-.ob-range-chip:active { transform: scale(.96); }
-
-.ob-range-chip:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-.ob-range-chip.active {
-  background: var(--nav-active-bg);
-  border-color: var(--nav-active-border);
-  color: var(--nav-active-text);
-  box-shadow: none;
-}
-
-/* Touch: a bigger grab strip and thumb, without inflating the card. The
-   44px chip floor from the tap-target layer still applies on coarse
-   pointers. */
+/* Touch: a bigger grab strip and thumb, without inflating the card. */
 @media (pointer: coarse) {
   .ob-range-card .ob-range-input { height: 44px; }
   .ob-range-card .ob-range-input::-webkit-slider-thumb {
-    width: 28px;
-    height: 28px;
-    margin-top: calc((var(--ob-track-h) - 28px) / 2);
+    width: 30px;
+    height: 30px;
+    margin-top: calc((var(--ob-track-h) - 30px) / 2);
   }
-  .ob-range-card .ob-range-input::-moz-range-thumb { width: 28px; height: 28px; }
-  .ob-range-chip { min-height: 44px; }
+  .ob-range-card .ob-range-input::-moz-range-thumb { width: 30px; height: 30px; }
 }
 
 @media (max-width: 700px) {
   .ob-range-head { gap: 10px; }
-  .ob-range-value { min-width: 68px; padding: 6px 10px; font-size: .78rem; }
+  .ob-range-icon { width: 34px; height: 34px; border-radius: 11px; }
+  .ob-range-value { min-width: 74px; padding: 6px 11px; font-size: .8rem; }
 }
 
 /* =========================
@@ -879,7 +871,9 @@ body.theme-nebula .ob-range-value {
 .ob-card > p,
 .ob-card > .ob-lead,
 .ob-card > h1 + .ob-lead,
-.ob-card > h1 + p {
+.ob-card > h1 + p,
+.ob-step-copy > p,
+.ob-step-copy > .ob-lead {
   width: 100%;
   max-width: min(68ch, 100%);
   overflow-wrap: break-word;
@@ -1461,7 +1455,6 @@ body.theme-nebula .ob-range-value {
    ========================= */
 .btn:focus-visible,
 .ob-level-btn:focus-visible,
-.ob-range-chip:focus-visible,
 .task-more:focus-visible,
 .task-menu button:focus-visible {
   outline: 2px solid var(--accent);
@@ -1502,7 +1495,6 @@ body.theme-nebula .ob-range-value {
   .ob-range-card .ob-range-input::-webkit-slider-runnable-track,
   .ob-range-card .ob-range-input,
   .ob-range-value,
-  .ob-range-chip,
   .ob-range-card,
   .task-row,
   .task-row.active-clock,
@@ -1524,8 +1516,7 @@ body.theme-nebula .ob-range-value {
 
   .cal-nav-btn:active,
   .mini-cal-btn:active,
-  .task-more:active,
-  .ob-range-chip:active { transform: none; }
+  .task-more:active { transform: none; }
 
   .ob-range-card .ob-range-input:active::-webkit-slider-thumb,
   .ob-range-card .ob-range-input:active::-moz-range-thumb { transform: scale(1); }
@@ -1535,6 +1526,382 @@ body.theme-nebula .ob-range-value {
    above — every hover rule here is already gated on (hover:hover), and
    the press states below carry the feedback instead. */
 @media (hover: none) {
-  .ob-range-chip.active { color: var(--nav-active-text); }
   .cal-cell:not(.empty):active { background: var(--row-hover); }
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   v26 — PREMIUM MOTION & MATERIAL PASS
+   Reference-driven finish (Linea Prompt · Flowty · Opal · Finozest):
+   film grain, live cursor spotlight (JS now feeds --mx/--my), magnetic
+   CTAs, line-mask title reveals, staggered card entrances, slider-driven
+   settings and an app-grade mobile pass. Colour & type stay untouched —
+   this layer is motion, texture and material only.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+:root {
+  --ease-premium: cubic-bezier(.22, 1, .36, 1);
+  --ease-spring: cubic-bezier(.34, 1.56, .64, 1);
+}
+
+/* 1 · Film grain — a whisper of texture over the whole product */
+html::after {
+  content: "";
+  position: fixed;
+  inset: -60px;
+  z-index: 2147483000;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.5'/%3E%3C/svg%3E");
+  background-size: 160px 160px;
+  mix-blend-mode: overlay;
+  opacity: .045;
+}
+html:has(body.theme-dark)::after,
+html:has(body.theme-obsidian)::after,
+html:has(body.theme-nebula)::after { opacity: .06; }
+
+/* 2 · Line-mask reveal — titles rise out of a clipping mask on every
+     view change (views remount, so the reveal replays per navigation). */
+@keyframes v26-title-rise {
+  from { clip-path: inset(0 0 100% 0); transform: translateY(14px); }
+  to   { clip-path: inset(-30% -10% -30% -10%); transform: none; }
+}
+.page-title, .dash-hero-title, .ob-step-copy h1 {
+  animation: v26-title-rise .65s var(--ease-premium) both, textShine 7s ease-in-out 1.2s infinite;
+}
+
+/* 3 · Staggered entrances — cards land in a quiet cascade */
+@keyframes v26-rise {
+  from { opacity: 0; transform: translateY(16px) scale(.985); }
+  to   { opacity: 1; transform: none; }
+}
+.kpi-grid > .kpi-card,
+.dash-grid-2 > *,
+.settings-col > .section-card { animation: v26-rise .55s var(--ease-premium) both; }
+.kpi-grid > .kpi-card:nth-child(2), .settings-col > .section-card:nth-child(2) { animation-delay: .06s; }
+.kpi-grid > .kpi-card:nth-child(3) { animation-delay: .12s; }
+.kpi-grid > .kpi-card:nth-child(4) { animation-delay: .18s; }
+
+/* 4 · Magnetic CTAs get a springy settle (transform is driven inline by
+     the delegated pointer listener in page.tsx). */
+@media (hover: hover) and (pointer: fine) {
+  .btn-primary, .ob-btn-primary {
+    transition: transform .35s var(--ease-spring), box-shadow .3s ease, background .2s ease, border-color .2s ease;
+    will-change: transform;
+  }
+}
+
+/* 5 · Settings sliders — the premium onboarding slider language, stacked */
+.settings-slider-stack { display: flex; flex-direction: column; gap: 10px; }
+.settings-slider-stack .ob-range-card { margin: 0; }
+
+/* 6 · Onboarding — quieter luxury: softer card material, sheen on the CTA,
+     refined progress rail and rounder inputs. */
+.ob-card {
+  border-radius: 26px;
+  border: 1px solid color-mix(in srgb, var(--accent) 15%, var(--glass-border));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 90%, #ffffff 10%), var(--surface));
+  box-shadow:
+    0 30px 80px color-mix(in srgb, var(--accent) 16%, rgba(18, 14, 60, .22)),
+    0 2px 8px rgba(18, 14, 60, .06);
+}
+body.theme-dark .ob-card, body.theme-obsidian .ob-card, body.theme-nebula .ob-card {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 82%, #ffffff 6%), var(--surface));
+  box-shadow: 0 30px 80px rgba(0, 0, 0, .55), 0 2px 8px rgba(0, 0, 0, .35);
+}
+.ob-btn-primary {
+  position: relative;
+  overflow: hidden;
+  border-radius: 14px;
+  box-shadow: 0 10px 26px color-mix(in srgb, var(--accent) 34%, transparent);
+}
+.ob-btn-primary::after {
+  content: "";
+  position: absolute;
+  top: 0; bottom: 0; left: -70%;
+  width: 45%;
+  background: linear-gradient(105deg, transparent, rgba(255, 255, 255, .45), transparent);
+  transform: skewX(-18deg);
+  transition: left .7s var(--ease-premium);
+  pointer-events: none;
+}
+.ob-btn-primary:hover::after { left: 135%; }
+.ob-name-input, .ob-course-search { border-radius: 14px; }
+.ob-step-node { transition: background .3s ease, border-color .3s ease, color .3s ease, transform .3s var(--ease-spring); }
+.ob-step.current .ob-step-node { transform: scale(1.12); }
+
+/* 7 · App-grade mobile pass */
+@media (max-width: 640px) {
+  .ob-card { padding: 20px 16px; border-radius: 20px; }
+  .ob-step-label { display: none; }
+  .ob-step.current .ob-step-label { display: block; }
+  .ob-btn-row { width: 100%; }
+  .ob-btn-row .ob-btn { flex: 1 1 auto; justify-content: center; }
+  .theme-card-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .settings-slider-stack { gap: 8px; }
+  .page-header-scene { display: none; }
+}
+@media (max-width: 400px) {
+  .theme-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ob-progress { gap: 2px; }
+}
+
+/* 8 · Respect reduced motion — the whole v26 layer stands down */
+@media (prefers-reduced-motion: reduce) {
+  html::after { display: none; }
+  html .page-title, html .dash-hero-title, html .ob-step-copy h1 { animation: none; }
+  html .kpi-grid > .kpi-card, html .dash-grid-2 > *, html .settings-col > .section-card { animation: none; }
+  .btn-primary, .ob-btn-primary { transition: none; }
+}
+
+
+/* ══ EDITORIAL SYSTEM (moved into the finish layer per repo convention) ══ */
+/* EDITORIAL SYSTEM — "A calmer way to study."
+   Rebuilds the product's visual voice after the reference redesign:
+   warm paper canvas, ink typography with italic-serif display moments,
+   mono numbered micro-labels, hairline borders, flat calm surfaces.
+   Loaded LAST so it wins the cascade; it restyles presentation only —
+   every selector here is cosmetic, no layout-critical geometry changes,
+   and all behaviour / data / routing stays exactly as before.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+:root {
+  --ed-paper: #f5f2ea;
+  --ed-paper-2: #efebe1;
+  --ed-ink: #201d19;
+  --ed-ink-2: #57524a;
+  --ed-ink-3: #8a847a;
+  --ed-hair: rgba(32, 29, 25, .14);
+  --ed-hair-2: rgba(32, 29, 25, .22);
+  --ed-iris: #544cc2;
+  --ed-iris-soft: #eceafb;
+  --ed-serif: Georgia, "Iowan Old Style", "Times New Roman", ui-serif, serif;
+  --ed-mono: var(--font-jetbrains-mono), ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+/* — Canvas: warm paper, quiet grain already handled upstream — */
+body.theme-default,
+body.theme-silver-lavender {
+  --app-bg: var(--ed-paper);
+  --surface: #fbf9f4;
+  --surface-solid: #fbf9f4;
+  --surface-elevated: #fdfcf8;
+  --surface-hover: #f3efe6;
+  --glass-border: var(--ed-hair);
+  --glass-border-hover: var(--ed-hair-2);
+  --glass-shadow: 0 1px 0 rgba(32, 29, 25, .05);
+  --glass-shadow-hover: 0 14px 34px rgba(32, 29, 25, .09);
+  --text-main: var(--ed-ink);
+  --text-muted: var(--ed-ink-2);
+  --text-dim: var(--ed-ink-3);
+  --accent: var(--ed-iris);
+  --accent-hover: #443da9;
+  --accent-light: #7a72d9;
+  --accent-glow: rgba(84, 76, 194, .14);
+  --accent-gradient: linear-gradient(135deg, #5b53cf, #443da9);
+  --nav-active-bg: var(--ed-iris-soft);
+  --nav-active-text: #3b34a4;
+  --nav-active-border: rgba(84, 76, 194, .3);
+  --row-bg: #f3efe6;
+  --row-hover: #ede8dc;
+  --input-bg: #fdfcf8;
+  --bg-gradient: radial-gradient(900px 420px at 12% -8%, rgba(84, 76, 194, .06), transparent 66%);
+}
+
+/* Dark themes keep the near-black canvas but join the editorial voice. */
+body.theme-dark, body.theme-obsidian, body.theme-nebula {
+  --ed-paper: var(--app-bg);
+  --ed-hair: rgba(244, 242, 238, .12);
+  --ed-hair-2: rgba(244, 242, 238, .2);
+  --glass-shadow: none;
+}
+
+/* — Typography: ink sans body, italic-serif display, mono micro — */
+html .page-title,
+html .dash-hero-title,
+html .ob-card h1,
+html .loader-title {
+  font-family: var(--ed-serif);
+  font-style: italic;
+  font-weight: 600;
+  letter-spacing: -.015em;
+  background: none;
+  -webkit-background-clip: initial;
+  background-clip: initial;
+  color: var(--text-main);
+  animation: none;
+}
+html .page-title em, html .dash-hero-title em { font-style: italic; }
+
+html .page-subtitle, html .dash-hero-sub {
+  font-size: .92rem;
+  color: var(--ed-ink-2);
+}
+
+/* Mono micro-labels: the reference's numbered uppercase voice. */
+html .ob-step-kicker,
+html .lbl,
+html .kpi-label,
+html .section-title,
+html #t-label,
+html .ob-step-label,
+html .streak-badge,
+html .chip {
+  font-family: var(--ed-mono);
+  text-transform: uppercase;
+  letter-spacing: .12em;
+}
+html .section-title {
+  font-size: .72rem;
+  font-weight: 700;
+  color: var(--ed-ink-2);
+}
+html .section-title::after { display: none; }
+
+/* Numbered navigation — 01 / 02 / 03 … like the reference rail. */
+html .nav-list { counter-reset: ed-nav; }
+html .nav-item { counter-increment: ed-nav; border-radius: 10px; }
+html .nav-item::after {
+  content: "0" counter(ed-nav);
+  margin-left: auto;
+  font-family: var(--ed-mono);
+  font-size: .58rem;
+  letter-spacing: .1em;
+  color: var(--ed-ink-3);
+}
+html .nav-item.active::after { color: var(--nav-active-text); }
+
+/* — Surfaces: flat paper cards with hairlines, smaller radius — */
+html .glass-panel,
+html .ob-card,
+html .section-card {
+  border-radius: 14px;
+  border: 1px solid var(--ed-hair);
+  box-shadow: none;
+  background: var(--surface);
+}
+html .tilt-card::before { display: none; }
+html .tilt-card:hover {
+  border-color: var(--ed-hair-2);
+  box-shadow: 0 14px 34px rgba(32, 29, 25, .08);
+  transform: none;
+}
+
+/* — Buttons: ink pills, quiet ghosts — */
+html .btn { border-radius: 999px; font-weight: 650; letter-spacing: .01em; }
+html .btn-primary {
+  background: var(--ed-ink);
+  color: var(--ed-paper);
+  box-shadow: none;
+}
+html .btn-primary:hover { background: #000; }
+body.theme-dark .btn-primary, body.theme-obsidian .btn-primary, body.theme-nebula .btn-primary {
+  background: var(--ed-paper);
+  color: var(--ed-ink);
+}
+html .btn-secondary {
+  background: transparent;
+  border: 1px solid var(--ed-hair-2);
+  color: var(--text-main);
+  box-shadow: none;
+}
+html .ob-btn-primary {
+  background: var(--ed-ink);
+  border-radius: 999px;
+  box-shadow: none;
+}
+html .ob-btn-primary::after { display: none; }
+html .ob-btn-secondary {
+  background: transparent;
+  border: 1px solid var(--ed-hair-2);
+  border-radius: 999px;
+}
+
+/* — Inputs: underline-first, paper fields — */
+html .input-field, html .ob-name-input, html .ob-course-search {
+  border-radius: 10px;
+  border: 1px solid var(--ed-hair);
+  background: var(--input-bg);
+}
+html .input-field:focus, html .ob-name-input:focus, html .ob-course-search:focus {
+  border-color: var(--ed-iris);
+  box-shadow: 0 0 0 3px rgba(84, 76, 194, .14);
+}
+
+/* — Onboarding: the reference's numbered step rail — */
+html .ob-overlay { background: var(--ed-paper); }
+html .ob-card { padding: 38px; }
+html .ob-step-node {
+  border-radius: 999px;
+  width: 30px; height: 30px;
+  background: transparent;
+  border: 1px solid var(--ed-hair-2);
+  color: var(--ed-ink-2);
+  font-family: var(--ed-mono);
+  box-shadow: none;
+}
+html .ob-step.current .ob-step-node {
+  background: var(--ed-ink);
+  border-color: var(--ed-ink);
+  color: var(--ed-paper);
+  box-shadow: none;
+}
+html body.theme-dark .ob-step.current .ob-step-node,
+html body.theme-obsidian .ob-step.current .ob-step-node,
+html body.theme-nebula .ob-step.current .ob-step-node {
+  background: var(--ed-paper);
+  border-color: var(--ed-paper);
+  color: var(--ed-ink);
+}
+html .ob-step.done .ob-step-node {
+  background: transparent;
+  border-color: var(--ed-hair-2);
+  color: var(--ed-ink-2);
+}
+html .ob-step + .ob-step::before { background: var(--ed-hair); height: 1px; }
+html .ob-step.done + .ob-step::before { background: var(--ed-hair-2); }
+html .ob-brand-bar { border-bottom: 1px solid var(--ed-hair); }
+html .brand-title, html .ob-brand-name { font-family: var(--ed-serif); font-style: italic; font-weight: 600; }
+html .ob-brand-tag { font-family: var(--ed-mono); letter-spacing: .18em; }
+html .ob-feature {
+  border: 1px solid var(--ed-hair);
+  border-radius: 12px;
+  background: transparent;
+}
+
+/* — Dashboard hero: editorial masthead — */
+html .dash-hero {
+  border-radius: 16px;
+  border: 1px solid var(--ed-hair);
+  background:
+    radial-gradient(560px 260px at 92% -30%, rgba(84, 76, 194, .08), transparent 68%),
+    var(--surface);
+}
+html .dash-hero-eyebrow .streak-badge {
+  background: transparent;
+  border: 1px solid var(--ed-hair-2);
+  color: var(--ed-ink-2);
+}
+html .kpi-card { border-radius: 14px; }
+html .kpi-value { font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+
+/* — Header rhythm: a hairline under each page masthead — */
+html .page-header {
+  border-bottom: 1px solid var(--ed-hair);
+  padding-bottom: 14px;
+}
+
+/* — Focus: the clock reads like printed type — */
+html #t-digits { font-family: var(--ed-mono); font-weight: 700; letter-spacing: -.04em; }
+
+/* — Theme tiles keep their duotone swatches, gain paper frames — */
+html .theme-card { border-radius: 12px; }
+html .theme-card-swatch { border-radius: 8px; }
+
+/* — Calm the shine/sweep layers that fight the editorial voice — */
+html .btn-primary.w-full::before, html .page-header .btn-primary::before { display: none; }
+
+/* — Reduced motion: editorial layer is static by nature — */
+@media (prefers-reduced-motion: reduce) {
+  html .nav-item, html .btn, html .theme-card { transition: none; }
 }

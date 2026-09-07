@@ -85,6 +85,13 @@ export async function getSettings(userId: number) {
   }
 }
 
+/* v26: the retired "default" preset maps onto Silver Lavender everywhere a
+   settings row leaves the server, so legacy database rows can never paint
+   the removed theme again. */
+function withNormalizedTheme<S extends { theme: string }>(row: S): S {
+  return row.theme === "default" ? { ...row, theme: "silver-lavender" } : row;
+}
+
 async function latestMessages(userId: number, limit = 120) {
   const newestFirst = await db
     .select()
@@ -104,7 +111,7 @@ export async function loadState(userId: number) {
     db.select().from(sessions).where(eq(sessions.userId, userId)).orderBy(desc(sessions.createdAt)).limit(400),
     latestMessages(userId, 120),
   ]);
-  return { settings: st, subjects: subs, topics: tps, tasks: tsk, sessions: ses, messages: msgs };
+  return { settings: withNormalizedTheme(st), subjects: subs, topics: tps, tasks: tsk, sessions: ses, messages: msgs };
 }
 
 export function defaultFallbackState(userKey: string) {
@@ -139,7 +146,7 @@ export function defaultFallbackState(userKey: string) {
       studyStyle: "balanced",
       weakSubject: "none",
       revisionWeeks: 1,
-      theme: "default",
+      theme: "silver-lavender",
       pomodoro: 25,
       shortBreak: 5,
       longBreak: 15,

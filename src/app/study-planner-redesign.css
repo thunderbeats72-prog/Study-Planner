@@ -1396,15 +1396,17 @@ body.theme-silver-lavender {
   --nav-active-text: #4d42b7;
   --nav-active-border: rgba(112, 100, 216, .30);
 }
+/* v26: Midnight goes near-black — a soft charcoal canvas that sits a hair
+   above pure OLED #000 so shadows and elevation still read. */
 body.theme-dark {
-  --app-bg: #0c0c13;
+  --app-bg: #08080b;
   --bg-gradient: radial-gradient(820px 380px at 14% -10%, rgba(138, 138, 244, .05), transparent 62%);
-  --surface: #15151c;
-  --surface-solid: #15151c;
-  --surface-elevated: #1c1c24;
-  --surface-hover: #22222b;
-  --glass-border: #2a2a35;
-  --glass-border-hover: #3a3a47;
+  --surface: #0e0e13;
+  --surface-solid: #0e0e13;
+  --surface-elevated: #14141a;
+  --surface-hover: #1a1a21;
+  --glass-border: #1f1f28;
+  --glass-border-hover: #2c2c37;
   --text-main: #f2f2f6;
   --text-muted: #a6a6b4;
   --text-dim: #6c6c7a;
@@ -1412,9 +1414,9 @@ body.theme-dark {
   --accent-hover: #a2a2f3;
   --accent-light: #aaaef4;
   --accent-glow: rgba(139, 137, 234, .18);
-  --row-bg: rgba(255, 255, 255, .04);
-  --row-hover: rgba(255, 255, 255, .07);
-  --input-bg: #1c1c24;
+  --row-bg: rgba(255, 255, 255, .035);
+  --row-hover: rgba(255, 255, 255, .065);
+  --input-bg: #14141a;
 }
 body.theme-obsidian {
   --app-bg: #0b1220;

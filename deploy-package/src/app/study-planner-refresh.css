@@ -43,6 +43,97 @@
   --scene-pot:color-mix(in srgb,var(--accent) 18%,var(--surface));
   --scene-pot-rim:color-mix(in srgb,var(--accent) 30%,var(--surface));
   --scene-soil:color-mix(in srgb,var(--text-main) 28%,var(--surface));
+
+  /* v26 — studio-still-life material tokens. The rebuilt scenes (desk lamp,
+     spiral calendar, analog clock) mirror the soft-3D reference renders and
+     stay theme-aware: every material is mixed from the live theme tokens so
+     Midnight / Obsidian / Nebula / Mint / Sunset all re-paint the still life. */
+  --scene-bg:color-mix(in srgb,var(--accent) 7%,var(--surface));
+  --scene-book-lav:color-mix(in srgb,var(--accent) 44%,#c9bcf5);
+  --scene-book-pink:color-mix(in srgb,var(--accent) 12%,#f6c6d0);
+  --scene-book-cream:color-mix(in srgb,#efe7d6 84%,var(--surface) 16%);
+  --scene-book-blue:color-mix(in srgb,var(--accent) 16%,#a9c4f2);
+  --scene-book-coral:color-mix(in srgb,var(--accent) 8%,#f0a08c);
+  --scene-pages:color-mix(in srgb,#fdfbf4 92%,var(--surface) 8%);
+  --scene-dial:color-mix(in srgb,#f7f2e7 90%,var(--surface) 10%);
+  --scene-pot-cream:color-mix(in srgb,#ece4d8 84%,var(--surface) 16%);
+  --scene-metal:color-mix(in srgb,#c3c7d2 78%,var(--text-main) 22%);
+  --scene-warm-light:#ffe9b8;
+  --scene-shade:rgba(28,24,58,.14);
+}
+body.theme-dark,body.theme-obsidian,body.theme-nebula{
+  --scene-bg:color-mix(in srgb,var(--accent) 9%,var(--surface));
+  --scene-pages:color-mix(in srgb,#efe9dc 76%,var(--surface) 24%);
+  --scene-dial:color-mix(in srgb,#f1ebde 74%,var(--surface) 26%);
+  --scene-pot-cream:color-mix(in srgb,#d8cec1 56%,var(--surface) 44%);
+  --scene-book-cream:color-mix(in srgb,#d6ccb7 58%,var(--surface) 42%);
+  --scene-book-pink:color-mix(in srgb,var(--accent) 16%,#c98b9b);
+  --scene-book-blue:color-mix(in srgb,var(--accent) 20%,#7d94c4);
+  --scene-book-coral:color-mix(in srgb,var(--accent) 12%,#c07f6e);
+  --scene-metal:color-mix(in srgb,#878c9b 68%,var(--surface) 32%);
+  --scene-warm-light:#ffdf9e;
+  --scene-shade:rgba(0,0,0,.5);
+}
+
+/* ── Onboarding illustration tokens — same pattern as the scene tokens.
+   OnboardingArt paints itself from these vars, so every step illustration
+   follows the active theme (light, dark, obsidian, nebula, mint, sunset):
+   paper cards, warm highlights and leaf greens are re-mixed per palette. */
+:root, body{
+  --ob-art-paper:color-mix(in srgb,var(--surface) 94%,#fff 6%);
+  --ob-art-soft:color-mix(in srgb,var(--accent) 10%,var(--surface));
+  --ob-art-warm:#f2a86b;
+  --ob-art-highlight:#ffd98e;
+  --ob-art-leaf:color-mix(in srgb,var(--success-accent) 66%,#a7d9c9);
+  --ob-art-leaf-deep:color-mix(in srgb,var(--success-accent) 48%,#8fc6b4);
+  --ob-art-leaf-light:color-mix(in srgb,var(--success-accent) 40%,#e6f7f0);
+  --ob-art-leaf-stem:color-mix(in srgb,var(--success-accent) 62%,var(--text-main));
+}
+body.theme-dark,body.theme-obsidian,body.theme-nebula{
+  --ob-art-paper:color-mix(in srgb,var(--surface) 78%,#fff 22%);
+  --ob-art-soft:color-mix(in srgb,var(--accent) 16%,var(--surface));
+  --ob-art-warm:#e0a06a;
+  --ob-art-highlight:#f4cf85;
+  --ob-art-leaf:color-mix(in srgb,var(--success-accent) 55%,#3d6b5c);
+  --ob-art-leaf-deep:color-mix(in srgb,var(--success-accent) 42%,#2f574b);
+  --ob-art-leaf-light:color-mix(in srgb,var(--success-accent) 30%,#20302b);
+}
+body.theme-mint{
+  --ob-art-warm:#e8b184;
+  --ob-art-highlight:#ffe3a3;
+}
+body.theme-sunset{
+  --ob-art-warm:#ec9a5f;
+  --ob-art-highlight:#ffce8f;
+}
+
+/* Onboarding step header: headline + lead on the left, the editorial
+   illustration on the right. Below 700px the art settles under the copy,
+   centred and smaller, so phones keep the same flow without crowding. */
+.ob-step-intro{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) clamp(150px,26%,215px);
+  gap:2px 24px;
+  align-items:center;
+  margin-bottom:6px;
+}
+.ob-step-intro .ob-step-copy{min-width:0;grid-row:1}
+.ob-step-intro h1{margin-bottom:8px}
+.ob-step-intro p{margin-bottom:18px;max-width:52ch}
+.ob-step-art{width:100%;display:block;pointer-events:none;grid-row:1;align-self:center}
+.ob-step-art svg{width:100%;height:auto;display:block;overflow:visible}
+@media (prefers-reduced-motion: no-preference){
+  .ob-step-art{animation:obArtFloat 7.5s ease-in-out infinite alternate}
+  @keyframes obArtFloat{from{transform:translateY(-3px)}to{transform:translateY(3px)}}
+}
+@media(max-width:700px){
+  .ob-step-intro{grid-template-columns:1fr;gap:0}
+  .ob-step-intro .ob-step-copy{grid-row:1}
+  .ob-step-intro p{margin-bottom:14px}
+  .ob-step-art{grid-row:2;max-width:200px;margin:2px auto 14px}
+}
+@media(max-width:420px){
+  .ob-step-art{max-width:170px;margin-bottom:12px}
 }
 
 /* ---------------- Reference canvas ---------------- */
@@ -249,8 +340,9 @@ body.theme-dark,body.theme-obsidian,body.theme-nebula{
 /* Real component illustration — if/when mounted, it gets the same tokens. */
 .study-scene{width:clamp(190px,23vw,300px);height:auto;pointer-events:none;opacity:.98}
 .study-scene svg{display:block;width:100%;height:auto;overflow:visible}
-.study-scene__lamp{transform-origin:220px 50px;animation:sceneLamp 7s ease-in-out infinite alternate}
-.study-scene__plant{transform-origin:188px 140px;animation:scenePlant 6s ease-in-out infinite alternate}
+/* v26 geometry: the rebuilt lamp pivots at its base, the plant at its pot. */
+.study-scene__lamp{transform-origin:305px 164px;animation:sceneLamp 7s ease-in-out infinite alternate}
+.study-scene__plant{transform-origin:251px 166px;animation:scenePlant 6s ease-in-out infinite alternate}
 @keyframes sceneLamp{from{transform:rotate(-1deg)}to{transform:rotate(1deg)}}
 @keyframes scenePlant{from{transform:rotate(-.7deg)}to{transform:rotate(.7deg)}}
 .study-scene--compact{width:210px}

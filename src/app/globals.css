@@ -3293,7 +3293,7 @@ body.theme-dark .cmdk,body.theme-obsidian .cmdk,body.theme-nebula .cmdk{
    accent gets a measured emission: one contact ring + one soft bloom.
    Nothing blooms past ~26px, which is where "glow" turns into "smudge".
 ────────────────────────────────────────────────────────────────────── */
-body.theme-dark{--app-bg:#050506}
+body.theme-dark{--app-bg:#08080b}
 body.theme-obsidian{--app-bg:#070A12}
 body.theme-nebula{--app-bg:#0A0616}
 

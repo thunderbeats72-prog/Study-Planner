@@ -25,7 +25,7 @@ import {
   IconSpark, IconWarn,
 } from "@/components/icons";
 import ZenScene from "@/components/ZenScene";
-import { THEMES } from "@/lib/client";
+import { THEMES, normalizeTheme } from "@/lib/client";
 
 import {
   parseCommand, languageCapabilityReply, instantTutorReply, commandReply,
@@ -254,11 +254,13 @@ export default function Home() {
     return () => window.clearTimeout(timer);
   }, [loadInitialState]);
 
-  const themeSetting = state ? state.settings.theme || "default" : null;
+  // v26: legacy "default" rows normalise to Silver Lavender (the canonical
+  // light preset) so the retired theme can never be applied again.
+  const themeSetting = state ? normalizeTheme(state.settings.theme) : null;
   const themeLevel = state?.user.level || "";
   useEffect(() => {
     // Theme + age-adaptive presentation mode. Waits for state so the
-    // server-rendered `theme-default` never flashes off before data lands.
+    // server-rendered `theme-silver-lavender` never flashes off before data lands.
     if (themeSetting === null) return;
     const theme = `theme-${themeSetting}`;
     const level = themeLevel;
@@ -307,6 +309,59 @@ export default function Home() {
       apply();
     }
   }, [themeSetting, themeLevel]);
+
+  /* v26 — reference motion layer (Linea / Flowty): the v13 cursor spotlight
+     CSS on .tilt-card reads --mx/--my but no listener ever fed them, so the
+     pool of light never followed anyone. One delegated pointermove now drives
+     the spotlight AND gives primary CTAs a subtle magnetic pull toward the
+     cursor. Desktop pointers only; reduced-motion users are left untouched. */
+  useEffect(() => {
+    const fine = window.matchMedia("(hover: hover) and (pointer: fine)");
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
+    if (!fine.matches || reduce.matches) return;
+
+    let raf = 0;
+    let ev: PointerEvent | null = null;
+    const run = () => {
+      raf = 0;
+      if (!ev) return;
+      const target = ev.target as Element | null;
+      if (!target || typeof target.closest !== "function") return;
+      const card = target.closest(".tilt-card") as HTMLElement | null;
+      if (card) {
+        const r = card.getBoundingClientRect();
+        card.style.setProperty("--mx", `${Math.round(ev.clientX - r.left)}px`);
+        card.style.setProperty("--my", `${Math.round(ev.clientY - r.top)}px`);
+      }
+      const btn = target.closest(".btn-primary, .ob-btn-primary") as HTMLElement | null;
+      if (btn) {
+        const r = btn.getBoundingClientRect();
+        const dx = ev.clientX - (r.left + r.width / 2);
+        const dy = ev.clientY - (r.top + r.height / 2);
+        const pullX = Math.max(-4, Math.min(4, dx * 0.12));
+        const pullY = Math.max(-3, Math.min(3, dy * 0.2));
+        btn.style.transform = `translate(${pullX.toFixed(1)}px, ${pullY.toFixed(1)}px)`;
+      }
+    };
+    const move = (e: PointerEvent) => {
+      ev = e;
+      if (!raf) raf = window.requestAnimationFrame(run);
+    };
+    const release = (e: PointerEvent) => {
+      const t = e.target as Element | null;
+      const btn = t && typeof t.closest === "function"
+        ? (t.closest(".btn-primary, .ob-btn-primary") as HTMLElement | null)
+        : null;
+      if (btn) btn.style.transform = "";
+    };
+    document.addEventListener("pointermove", move, { passive: true });
+    document.addEventListener("pointerout", release, { passive: true });
+    return () => {
+      document.removeEventListener("pointermove", move);
+      document.removeEventListener("pointerout", release);
+      if (raf) window.cancelAnimationFrame(raf);
+    };
+  }, []);
 
   /* Calm interaction layer. The old per-click pulse, icon pop, pointer-light
      listener and ripple were removed; hover/focus states now carry the

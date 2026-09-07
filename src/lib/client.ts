@@ -282,8 +282,10 @@ export function normalizeCheckpointTitle(title: string): string {
   return `Weekly Checkpoint · Test #${number}`;
 }
 
+/* v26: the old "Default" preset was retired — Silver Lavender is now the
+   canonical light theme. Stored rows / AI intents may still carry the
+   legacy id, so everything funnels through normalizeTheme(). */
 export const THEMES = [
-  { id: "default", label: "Default" },
   { id: "silver-lavender", label: "Silver Lavender" },
   { id: "mint", label: "Mint Fresh" },
   { id: "sunset", label: "Sunset" },
@@ -291,3 +293,10 @@ export const THEMES = [
   { id: "obsidian", label: "Obsidian" },
   { id: "nebula", label: "Nebula" },
 ];
+
+const THEME_IDS = new Set(THEMES.map((t) => t.id));
+export function normalizeTheme(theme: string | null | undefined): string {
+  if (!theme) return "silver-lavender";
+  if (theme === "default") return "silver-lavender";
+  return THEME_IDS.has(theme) ? theme : "silver-lavender";
+}

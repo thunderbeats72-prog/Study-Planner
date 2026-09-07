@@ -42,7 +42,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${inter.variable} ${jetBrainsMono.variable}`}>
-      <body className="theme-default">{children}</body>
+      <body className="theme-silver-lavender">{children}</body>
     </html>
   );
 }

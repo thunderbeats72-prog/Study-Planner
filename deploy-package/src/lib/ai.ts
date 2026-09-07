@@ -1253,8 +1253,8 @@ export function parseCommand(q: string): TutorReply["action"] | undefined {
     if (/(nebula)/.test(n)) return { type: "theme", payload: "nebula" };
     if (/(emerald|mint)/.test(n)) return { type: "theme", payload: "mint" };
     if (/(sunset|champagne)/.test(n)) return { type: "theme", payload: "sunset" };
-    if (/(default|bright|lighter|light|samsung|clean|white)/.test(n)) return { type: "theme", payload: "default" };
-    if (/(silver|lavender)/.test(n)) return { type: "theme", payload: "silver-lavender" };
+    // v26: the retired "default" preset resolves to Silver Lavender.
+    if (/(default|bright|lighter|light|samsung|clean|white|silver|lavender)/.test(n)) return { type: "theme", payload: "silver-lavender" };
     // Vague requests ("something nicer/brighter/cooler") fall through to
     // the LLM, which understands intent and replies with [[action:theme:x]].
     // The old catch-all returned DARK here and hijacked every vague ask.
@@ -1709,10 +1709,10 @@ APP CONTROL — SHIGUN directly controls this app. When the learner requests an 
 [[action:navigate:planner]]  [[action:navigate:dashboard]]  [[action:navigate:subjects]]
 [[action:navigate:settings]]  [[action:navigate:focus]]
 [[action:theme:dark]]  [[action:theme:obsidian]]  [[action:theme:nebula]]
-[[action:theme:mint]]  [[action:theme:sunset]]  [[action:theme:default]]  [[action:theme:silver-lavender]]
+[[action:theme:mint]]  [[action:theme:sunset]]  [[action:theme:silver-lavender]]
 [[action:startTimer]]  [[action:stopTimer]]  [[action:pause]]  [[action:resume]]
 [[action:break]]  [[action:zen]]  [[action:replan]]
-Theme aliases: default/light/clean/white → default | lavender/silver → silver-lavender |
+Theme aliases: default/light/clean/white/lavender/silver → silver-lavender |
 emerald → mint | champagne → sunset | midnight/dark/black → dark | "previous" → silver-lavender.
 Rules: emit ONE tag max, only when the learner clearly requests that specific action.
 Never claim you cannot control themes, timers, navigation or replanning — you always can.
@@ -1753,7 +1753,11 @@ export function extractLlmAction(reply: string): {
   const BARE = new Set(["startTimer", "stopTimer", "pause", "resume", "break", "zen", "replan"]);
 
   if (type === "navigate" && payload && NAV.has(payload)) return { text, action: { type, payload } };
-  if (type === "theme" && payload && THEMES_SET.has(payload)) return { text, action: { type, payload } };
+  if (type === "theme" && payload && THEMES_SET.has(payload)) {
+    // v26: legacy "default" tag upgrades to the canonical light preset.
+    const themePayload = payload === "default" ? "silver-lavender" : payload;
+    return { text, action: { type, payload: themePayload } };
+  }
   if (BARE.has(type) && !payload) return { text, action: { type } };
   return { text };
 }
