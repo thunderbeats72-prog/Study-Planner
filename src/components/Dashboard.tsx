@@ -171,6 +171,8 @@ export default function Dashboard({
   const progressAnim = useCountUp(ctx.progressPct);
   const hoursAnim = useCountUp(ctx.hoursThisWeek);
   const consistencyAnim = useCountUp(consistency);
+  /* Consistency ring geometry (ported ring KPI). */
+  const ringC = 2 * Math.PI * 30;
 
   const totalPlannedMin = todayTasks.reduce((a, x) => a + x.plannedMinutes, 0);
   const loggedTodayMin = state.sessions.filter((s) => s.date === t).reduce((a, s) => a + s.minutes, 0);
@@ -384,7 +386,7 @@ export default function Dashboard({
       )}
 
       {/* ── TODAY'S PLAN — the working list comes before every statistic. ── */}
-      <div className="dash-today-grid">
+      <div className="dash-today-grid rv">
         <div className="glass-panel tilt-card section-card dash-today-card">
           <div className="day-head">
             <h3 className="section-title">Today&apos;s Plan</h3>
@@ -470,7 +472,7 @@ export default function Dashboard({
       </div>
 
       {/* ── SUPPORTING NUMBERS — progress context, deliberately secondary ── */}
-      <div className="momentum-strip">
+      <div className="momentum-strip rv">
         <span className="momentum-pill">This week <strong>{momentum.thisHrs}h</strong>
           {momentum.delta !== null && (
             <span className={momentum.delta >= 0 ? "up" : "down"}>
@@ -484,13 +486,13 @@ export default function Dashboard({
       </div>
 
       <div className="kpi-grid">
-        <div className="glass-panel tilt-card kpi-card">
+        <div className="glass-panel tilt-card kpi-card rv">
           <div className="kpi-icon kpi-icon--violet"><IconCalendar size={17} /></div>
           <div className="kpi-label">Days Remaining</div>
           <div className="kpi-value">{daysLeftAnim}</div>
           <div className="kpi-sub">Target: {prettyLong(state.settings.examDate)}</div>
         </div>
-        <div className="glass-panel tilt-card kpi-card">
+        <div className="glass-panel tilt-card kpi-card rv" style={{ "--rv-d": "60ms" } as React.CSSProperties}>
           <div className="kpi-icon kpi-icon--indigo"><IconTarget size={17} /></div>
           <div className="kpi-label">Syllabus Progress</div>
           <div className="kpi-value tone-accent">{progressAnim}%</div>
@@ -498,33 +500,57 @@ export default function Dashboard({
             <div className="bar-fill" style={{ width: `${ctx.progressPct}%` }} />
           </div>
         </div>
-        <div className="glass-panel tilt-card kpi-card">
+        <div className="glass-panel tilt-card kpi-card rv" style={{ "--rv-d": "120ms" } as React.CSSProperties}>
           <div className="kpi-icon kpi-icon--mint"><IconClock size={17} /></div>
           <div className="kpi-label">Hours This Week</div>
           <div className="kpi-value">{hoursAnim}</div>
           <div className="kpi-sub">Target {Math.round(state.settings.dailyHours * 7)}h · {fmtMin(loggedTodayMin)} today</div>
         </div>
-        <div className="glass-panel tilt-card kpi-card">
+        <div className="glass-panel tilt-card kpi-card kpi-card--ring rv" style={{ "--rv-d": "180ms" } as React.CSSProperties}>
           <div className="kpi-icon kpi-icon--orange"><IconFlame size={17} /></div>
           <div className="kpi-label">Consistency</div>
-          <div className="kpi-value tone-success">{consistencyAnim}%</div>
+          {/* Ported consistency ring: stroke drains/fills toward the count-up %. */}
+          <div className="kpi-ring" role="img" aria-label={`Consistency ${consistency}%`}>
+            <svg viewBox="0 0 72 72" aria-hidden="true">
+              <circle className="ring-track" cx="36" cy="36" r="30" fill="none" strokeWidth="7" />
+              <circle className="ring-prog" cx="36" cy="36" r="30" fill="none" strokeWidth="7"
+                strokeDasharray={ringC}
+                strokeDashoffset={ringC * (1 - Math.min(100, Math.max(0, consistency)) / 100)} />
+            </svg>
+            <span className="kpi-ring-val">{consistencyAnim}%</span>
+          </div>
           <div className="kpi-sub">{state.user.streak} day streak · {ctx.overdue} overdue</div>
         </div>
       </div>
 
-      <div className="dash-grid-2">
+      <div className="dash-grid-2 rv">
         <div className="glass-panel tilt-card dash-card">
           <h3 className="section-title">Weekly Study Volume</h3>
-          <div className="wk-chart">
-            {week.map((w) => (
-              <div key={w.date} className={`wk-col${w.date === t ? " is-today" : ""}`}>
-                <div className="wk-val">{w.hours || ""}</div>
-                <div className="wk-bar"
-                  title={`${w.label} · ${w.hours}h`}
-                  style={{ "--pct": String(Math.min(1, (w.hours / maxH) * 0.86)) } as React.CSSProperties} />
-                <div className="wk-label">{w.label}</div>
+          {/* Ported week bars: dashed daily-goal line across the plot, per-bar
+              stagger on entry, hover tooltips, and a quiet legend below. */}
+          <div className="wk2">
+            <div className="wk2-plot">
+              <div className="wk2-goal" style={{ bottom: `${Math.min(100, (state.settings.dailyHours / maxH) * 100)}%` }}>
+                <span>goal {state.settings.dailyHours}h</span>
               </div>
-            ))}
+              {week.map((w, i) => (
+                <div key={w.date} className={`wk2-col${w.date === t ? " is-today" : ""}`}>
+                  <div className="wk2-val">{w.hours || ""}</div>
+                  <div className="wk2-bar"
+                    title={`${w.label} · ${w.hours}h studied — goal ${state.settings.dailyHours}h`}
+                    style={{ height: `${Math.max(3, (w.hours / maxH) * 100)}%`, "--i": i } as React.CSSProperties} />
+                </div>
+              ))}
+            </div>
+            <div className="wk2-labels">
+              {week.map((w) => (
+                <span key={w.date} className={`wk2-label${w.date === t ? " is-today" : ""}`}>{w.label}</span>
+              ))}
+            </div>
+            <div className="wk2-legend">
+              <span><i className="swatch-bar" aria-hidden="true" />Actual hours</span>
+              <span><i className="swatch-goal" aria-hidden="true" />Daily goal · {state.settings.dailyHours}h</span>
+            </div>
           </div>
         </div>
         <div className="glass-panel tilt-card dash-card mastery-panel">
@@ -548,9 +574,11 @@ export default function Dashboard({
         </div>
       </div>
 
-      <Heatmap state={state} />
+      <div className="rv">
+        <Heatmap state={state} />
+      </div>
 
-      <div className="glass-panel tilt-card coach-card section-card accent-edge">
+      <div className="glass-panel tilt-card coach-card section-card accent-edge rv">
         <h3 className="section-title section-title--row">
           <IconSpark size={15} /> SHIGUN Coaching Insights
         </h3>
@@ -563,7 +591,7 @@ export default function Dashboard({
       </div>
 
       {intel && intel.readiness && (
-        <div className="glass-panel tilt-card intel-card section-card">
+        <div className="glass-panel tilt-card intel-card section-card rv">
           <div className="day-head">
             <h3 className="section-title">Intelligence</h3>
             <span className="day-meta">learned from your own study data</span>

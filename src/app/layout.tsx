@@ -10,6 +10,7 @@ import "./ui-polish-pass.css";
 import "./ui-polish-landing.css";
 import "./final-ui-fixes.css";
 import "./task-actions-final.css";
+import "./studio-ux.css";
 
 const inter = localFont({
   src: "./fonts/inter-latin-variable.woff2",

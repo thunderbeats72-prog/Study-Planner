@@ -2,10 +2,11 @@
 
 import React, { useEffect, useState } from "react";
 import StudyScene from "./StudyScene";
-import { today, type AppState } from "@/lib/client";
+import { addDays, today, type AppState } from "@/lib/client";
 import { mmss, type TimerMode } from "@/lib/useTimer";
 import type { StudySessionApi } from "@/lib/studySession";
 import { playSound, setVolume, stopSound, currentSound } from "@/lib/sound";
+import PageHead from "./PageHead";
 import { IconCheck, IconClock, IconExpand, IconVolume } from "./icons";
 
 const SOUNDS = [
@@ -38,14 +39,37 @@ export default function FocusView({ state, session, onCompleteTask, onZen }: { s
   const timerStateLabel = timer.running ? (timer.isBreak ? "BREAK" : "FOCUSED") : timerInProgress ? "PAUSED" : "READY";
   const selectedSoundLabel = SOUNDS.find((x) => x.id === sound)?.label || "Sound Off";
 
+  /* Recent logged days — one honest bar per day, ported from the calm-studio
+     focus page. Bars scale against 1.4× the daily goal; days that met the
+     goal read in the success tone. */
+  const goalMin = Math.max(30, (state.settings.dailyHours || 2) * 60);
+  const perDay = new Map<string, number>();
+  for (const s of state.sessions) perDay.set(s.date, (perDay.get(s.date) || 0) + s.minutes);
+  const recentDays = Array.from({ length: 6 }, (_, i) => {
+    const date = addDays(t, -(5 - i));
+    const mins = Math.round((perDay.get(date) || 0) * 10) / 10;
+    return {
+      date,
+      label: new Date(date + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" }),
+      mins,
+      pct: Math.min(100, (mins / (goalMin * 1.4)) * 100),
+      hit: mins >= goalMin,
+      minLabel: `${Number.isInteger(mins) ? mins : mins.toFixed(1)}m`,
+    };
+  });
+
   return <div className="fade-in focus-view">
-    <div className="page-header focus-page-header">
-      <StudyScene variant="focus" className="page-header-scene" />
-      <div className="focus-header-copy"><div className="focus-eyebrow"><span className="focus-eyebrow-mark" /> Focus Studio</div><h1 className="page-title">Focus Studio</h1><p className="page-subtitle">A calm, distraction-free space. Focus timer and study clock are one session.</p></div>
-      <button className="btn btn-secondary focus-zen-button" type="button" onClick={onZen}><IconExpand /> Zen Focus Mode</button>
+    <PageHead
+      eyebrow="Focus Studio"
+      title="A calmer way to study"
+      sub="One calm space — the focus timer and the study clock run as a single session. Breaks never count as study time."
+      scene={<StudyScene variant="focus" />}
+    />
+    <div className="focus-top-actions rv">
+      <button className="btn btn-secondary" type="button" onClick={onZen}><IconExpand /> Zen Focus Mode</button>
     </div>
 
-    <section className="glass-panel tilt-card liquid-card section-card accent-edge accent-edge--success study-clock-panel" aria-labelledby="study-clock-title">
+    <section className="glass-panel tilt-card liquid-card section-card accent-edge accent-edge--success study-clock-panel rv" aria-labelledby="study-clock-title">
       <div className="study-clock-header"><div className="study-clock-text-group"><div className="focus-card-eyebrow"><IconClock size={14} /> Study clock <span className={`clock-state-chip clock-state-chip--${clockState}`}><span className="clock-state-dot" /> {clockStateLabel}</span></div><h2 id="study-clock-title" className="section-title study-clock-title">Real study time</h2><p className="study-clock-description">Active focus time is recorded automatically. Pauses and breaks are excluded.</p><div className="study-clock-status" role="status" aria-live="polite"><span>{clockStateLabel}</span><span className="study-clock-status-separator">·</span><strong>{loggedTodayLabel} min logged today</strong></div></div><div className="study-clock-display"><span className="study-clock-display-label">Active time</span><span className="mono stat-big gradient-text">{mmss(clock.elapsed)}</span></div></div>
       <div className="grid-2 clock-pickers">
         <div className="clock-field"><label className="clock-field-label" htmlFor="clock-subject"><span>Studying subject</span><span className="clock-field-hint">Optional</span></label><select id="clock-subject" className="input-field" value={clock.subjectId ?? ""} onChange={(e) => clock.setSubjectId(e.target.value ? Number(e.target.value) : null)}><option value="">— none —</option>{state.subjects.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></div>
@@ -54,7 +78,7 @@ export default function FocusView({ state, session, onCompleteTask, onZen }: { s
       <div className="clock-actions"><div className="clock-action-buttons"><button className={`btn ${session.active ? "btn-secondary" : "btn-primary"} clock-toggle`} type="button" onClick={session.toggle}>{session.active ? "Pause" : clock.sessionActive ? "Resume" : "Start session"}</button>{clock.running && <button className="btn btn-secondary" type="button" onClick={session.takeBreak}>Take a Break</button>}{clock.sessionActive && <button className="btn btn-danger" type="button" onClick={session.endSession}>Clock Out</button>}</div>{clockTask && <div className="clock-task-actions"><span className="chip chip-kind clock-task-chip">{clockTask.actualMinutes}m / {clockTask.plannedMinutes}m planned</span><button className="btn btn-sm btn-primary" type="button" onClick={() => onCompleteTask(clockTask.id)}>Mark task complete</button></div>}</div>
     </section>
 
-    <div className="focus-grid-2">
+    <div className="focus-grid-2 rv">
       <section className="glass-panel tilt-card liquid-card flex-col section-card timer-panel" aria-labelledby="focus-timer-title">
         <div className="timer-panel-heading"><div className="timer-panel-copy"><div className="timer-kicker">Deep-work ritual</div><h2 id="focus-timer-title" className="timer-title">Focus Timer</h2><p className="timer-description">One rhythm, one task, one session.</p></div><div className="timer-cycle-badge" aria-label={`${timer.cycles} cycles completed`}><strong>{timer.cycles}</strong><span>cycles</span></div></div>
         <div className="timer-mode-heading"><span>Choose a mode</span><span className="timer-mode-note">All controls stay synced with the study clock</span></div>
@@ -68,5 +92,26 @@ export default function FocusView({ state, session, onCompleteTask, onZen }: { s
       <div className="focus-side-column"><section className="glass-panel tilt-card section-card ambient-panel" aria-labelledby="ambient-title"><div className="focus-panel-heading"><span className="focus-panel-icon"><IconVolume /></span><div><h2 id="ambient-title" className="section-title">Ambient sounds</h2><p className="focus-panel-description">A quiet layer behind your focus.</p></div></div><div className="sound-grid" role="group" aria-label="Ambient sound">{SOUNDS.map((x) => <button key={x.id} type="button" className={`sound-option ${sound === x.id ? "is-selected" : ""}`} aria-pressed={sound === x.id} onClick={() => pick(x.id)}><span className="sound-option-label">{x.label}</span><span className="sound-option-indicator" aria-hidden="true">{sound === x.id && <IconCheck size={13} />}</span></button>)}</div><label className="vol-label" htmlFor="ambient-volume"><span>Volume</span><strong>{Math.round(vol * 100)}%</strong></label><input id="ambient-volume" type="range" className="vol-range" min={0} max={1} step={0.05} value={vol} aria-label={`Ambient volume ${Math.round(vol * 100)} percent`} onChange={(e) => setVol(Number(e.target.value))} /><div className="ambient-current"><span className="ambient-current-dot" /> {selectedSoundLabel}</div></section>
         <section className="glass-panel tilt-card section-card rules-panel" aria-labelledby="rules-title"><div className="focus-panel-heading"><span className="focus-panel-icon focus-panel-icon--soft"><IconCheck /></span><div><h2 id="rules-title" className="section-title">Session rules</h2><p className="focus-panel-description">Small boundaries, better sessions.</p></div></div><ul className="rules-list"><li><span className="rule-icon"><IconCheck size={12} /></span><span>Phone in another room — not face down.</span></li><li><span className="rule-icon"><IconCheck size={12} /></span><span>One task per session. Write it down first.</span></li><li><span className="rule-icon"><IconCheck size={12} /></span><span>If you stall for 2 minutes, do the easiest sub-step.</span></li><li><span className="rule-icon"><IconCheck size={12} /></span><span>Break = stand up + look far away. Not a screen.</span></li></ul></section></div>
     </div>
+
+    {/* Recent logged days — the study clock's paper trail. */}
+    <section className="glass-panel tilt-card section-card rv" aria-labelledby="recent-days-title">
+      <h3 id="recent-days-title" className="section-title">Recent logged days</h3>
+      {state.sessions.length === 0 ? (
+        <p className="recent-empty">Clocked study days will appear here — one honest bar per day.</p>
+      ) : (
+        <div className="recent-days">
+          {recentDays.map((d) => (
+            <div className="recent-day" key={d.date}
+              title={`${d.label} · ${d.minLabel} logged — goal ${Math.round(goalMin)}m`}>
+              <span className="rd-date">{d.label}</span>
+              <div className="rd-track bar-track">
+                <div className="rd-fill bar-fill" style={{ width: `${d.pct}%` }} />
+              </div>
+              <span className={`rd-min${d.hit ? " rd-hit" : ""}`}>{d.minLabel}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
   </div>;
 }

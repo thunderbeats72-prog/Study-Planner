@@ -6,6 +6,7 @@ import {
   addDays, dayDiff, fmtDate, KIND_META, normalizeCheckpointTitle, parseDate, prettyDate, prettyLong, today, type AppState, type TaskRow,
 } from "@/lib/client";
 import { IconSpark, IconClose, IconChevron } from "./icons";
+import PageHead from "./PageHead";
 import TaskEditor, { type TaskPatch } from "./TaskEditor";
 import TaskActions from "./TaskActions";
 import { TaskLiveBadge } from "./TaskClockButton";
@@ -258,35 +259,34 @@ export default function PlannerView({
 
   return (
     <div className="fade-in">
-      <div className="page-header">
-        <StudyScene variant="planner" className="page-header-scene" />
-        <div>
-          <h1 className="page-title">Study Planner</h1>
-          <p className="page-subtitle">
-            {state.tasks.length} tasks · {state.topics.length} lessons mapped · your plan rebalances automatically
-          </p>
+      <PageHead
+        eyebrow="Planner"
+        title="Study Planner"
+        sub={`${state.tasks.length} tasks · ${state.topics.length} lessons mapped · your plan rebalances automatically`}
+        scene={<StudyScene variant="planner" />}
+      />
+      {/* Controls get their own calm row under the head — List/Calendar views,
+          subject filter, and the rebalance action. */}
+      <div className="planner-tools-row rv">
+        <div className="vtabs">
+          {(["list", "calendar"] as View[]).map((v) => (
+            <div key={v} className={`vtab${view === v ? " active" : ""}`} onClick={() => setView(v)}>
+              {v[0].toUpperCase() + v.slice(1)}
+            </div>
+          ))}
         </div>
-        <div className="flex-row gap-md planner-tools">
-          <div className="vtabs">
-            {(["list", "calendar"] as View[]).map((v) => (
-              <div key={v} className={`vtab${view === v ? " active" : ""}`} onClick={() => setView(v)}>
-                {v[0].toUpperCase() + v.slice(1)}
-              </div>
-            ))}
-          </div>
-          <select className="input-field filter-select" value={filter} onChange={(e) => setFilter(e.target.value)}>
-            <option value="all">All subjects</option>
-            {state.subjects.map((s) => <option key={s.id} value={String(s.id)}>{s.name}</option>)}
-          </select>
-          <button className="btn btn-primary" onClick={onReplan} disabled={replanning} aria-busy={replanning}>
-            <span className={replanning ? "replanning-spark" : ""}><IconSpark size={14} /></span>
-            {replanning ? "Rebalancing schedule…" : "Rebalance schedule"}
-          </button>
-        </div>
+        <select className="input-field filter-select" value={filter} onChange={(e) => setFilter(e.target.value)}>
+          <option value="all">All subjects</option>
+          {state.subjects.map((s) => <option key={s.id} value={String(s.id)}>{s.name}</option>)}
+        </select>
+        <button className="btn btn-primary" onClick={onReplan} disabled={replanning} aria-busy={replanning}>
+          <span className={replanning ? "replanning-spark" : ""}><IconSpark size={14} /></span>
+          {replanning ? "Rebalancing schedule…" : "Rebalance schedule"}
+        </button>
       </div>
 
       {/* One-line workload glance: what remains today, tomorrow, this week. */}
-      <div className="workload-strip glass-panel">
+      <div className="workload-strip glass-panel rv">
         <span className="workload-item">Today <strong>{fmtMin(todayRemaining)}</strong> to go · {todayPendingCount} left</span>
         <span className="workload-sep" aria-hidden="true" />
         <span className="workload-item">Tomorrow <strong>{fmtMin(tomorrowPlanned)}</strong> planned</span>
@@ -299,7 +299,7 @@ export default function PlannerView({
       </div>
 
       {overdue.length > 0 && (
-        <div className="glass-panel section-card accent-edge accent-edge--warning overdue-strip">
+        <div className="glass-panel section-card accent-edge accent-edge--warning overdue-strip rv">
           <div className="overdue-title">
             {overdue.length} task{overdue.length > 1 ? "s" : ""} from earlier days are still pending.
           </div>
@@ -332,11 +332,12 @@ export default function PlannerView({
             </div>
           )}
           <div className="planner-days">
-          {upcoming.map(([date, list]) => {
+          {upcoming.map(([date, list], dayIndex) => {
             const done = list.filter((x) => x.status === "done").length;
             const mins = list.reduce((a, x) => a + x.plannedMinutes, 0);
             return (
-              <div className="glass-panel tilt-card day-block" key={date}>
+              <div className="glass-panel tilt-card day-block rv" key={date}
+                style={{ "--rv-d": `${Math.min(dayIndex, 6) * 50}ms` } as React.CSSProperties}>
                 <div className="day-head">
                   <div>
                     <div className="day-date">
@@ -357,7 +358,7 @@ export default function PlannerView({
       )}
 
       {view === "calendar" && (
-        <div className="glass-panel section-card cal-panel">
+        <div className="glass-panel section-card cal-panel rv">
           <div className="day-head">
             <div className="day-date">{first.toLocaleDateString(undefined, { month: "long", year: "numeric" })}</div>
             <div className="flex-row gap-sm">

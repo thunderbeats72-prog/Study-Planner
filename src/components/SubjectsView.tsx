@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import StudyScene from "./StudyScene";
 import { type AppState, type SubjectRow } from "@/lib/client";
+import PageHead from "./PageHead";
 import { IconSpark, IconTrash, IconClose } from "./icons";
 
 export default function SubjectsView({
@@ -27,25 +28,23 @@ export default function SubjectsView({
 
   return (
     <div className="fade-in">
-      <div className="page-header">
-        <StudyScene variant="subjects" className="page-header-scene" />
-        <div>
-          <h1 className="page-title">Subjects &amp; Lessons</h1>
-          <p className="page-subtitle">
-            {state.subjects.length} subjects · {state.topics.length} AI-generated lessons. Editing rebalances the schedule.
-          </p>
-        </div>
-      </div>
+      <PageHead
+        eyebrow="Subjects"
+        title="Subjects & lessons"
+        sub={`${state.subjects.length} subjects · ${state.topics.length} AI-generated lessons mapped — editing a subject rebalances the schedule.`}
+        scene={<StudyScene variant="subjects" />}
+      />
 
       <div className="subs-wrap">
         <div className="flex-col gap-md">
-          {state.subjects.map((s) => {
+          {state.subjects.map((s, subjIndex) => {
             const list = state.topics.filter((x) => x.subjectId === s.id);
             const done = list.filter((x) => doneTopicIds.has(x.id)).length;
             const pct = list.length ? Math.round((done / list.length) * 100) : 0;
             const open = openTopics === s.id;
             return (
-              <div className="glass-panel tilt-card section-card accent-edge" key={s.id} style={{ "--edge": s.color } as React.CSSProperties}>
+              <div className="glass-panel tilt-card section-card accent-edge rv" key={s.id}
+                style={{ "--edge": s.color, "--rv-d": `${Math.min(subjIndex, 5) * 60}ms` } as React.CSSProperties}>
                 <div className="day-head">
                   <div>
                     <div className="day-date">{s.name}</div>
@@ -140,7 +139,7 @@ export default function SubjectsView({
           )}
         </div>
 
-        <div className="glass-panel tilt-card section-card side-form">
+        <div className="glass-panel tilt-card section-card side-form rv" style={{ "--rv-d": "90ms" } as React.CSSProperties}>
           <h3 className="section-title">Add New Subject</h3>
           <div className="mb-md">
             <label className="lbl">Subject Name</label>

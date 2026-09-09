@@ -3,7 +3,22 @@
 import React, { useEffect, useState } from "react";
 import StudyScene from "./StudyScene";
 import { THEMES, type AppState } from "@/lib/client";
+import PageHead from "./PageHead";
 import { IconSpark, IconCheck } from "./icons";
+
+/* Reference-studio toggle — a real switch, keyboard- and screen-reader-clean. */
+function UixSwitch({ on, onChange, label }: { on: boolean; onChange: (v: boolean) => void; label: string }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      aria-label={label}
+      className="uix-switch"
+      onClick={() => onChange(!on)}
+    />
+  );
+}
 
 /* Swatch previews for the theme picker — each tile shows the theme's
    canvas→accent duotone so the choice reads at a glance. */
@@ -54,15 +69,14 @@ export default function SettingsView({
 
   return (
     <div className="fade-in settings-view">
-      <div className="page-header">
-        <StudyScene variant="settings" className="page-header-scene" />
-        <div>
-          <h1 className="page-title">Settings</h1>
-          <p className="page-subtitle">Tune your schedule, timer, and appearance.</p>
-        </div>
-      </div>
+      <PageHead
+        eyebrow="Settings"
+        title="Tune the studio"
+        sub="Schedule, timer, appearance and feedback — everything saves to this account."
+        scene={<StudyScene variant="settings" />}
+      />
 
-      <div className="settings-grid">
+      <div className="settings-grid rv">
         {/* ── LEFT: Schedule Engine ── */}
         <div className="flex-col gap-md settings-col">
           <div className="glass-panel tilt-card section-card">
@@ -166,6 +180,34 @@ export default function SettingsView({
                   </button>
                 );
               })}
+            </div>
+
+            {/* Feedback switches — these settings already existed and are
+                honoured app-wide (confetti burst, ambient sound engine), they
+                just never had a visible control. Ported reference toggle. */}
+            <div className="mt-md">
+              <div className="uix-row">
+                <span>
+                  <span className="uix-row-title">Completion celebration</span>
+                  <span className="uix-row-sub">Confetti burst when you finish a lesson</span>
+                </span>
+                <UixSwitch
+                  on={s.confetti !== false}
+                  onChange={(v) => onPatch({ confetti: v })}
+                  label="Completion celebration confetti"
+                />
+              </div>
+              <div className="uix-row">
+                <span>
+                  <span className="uix-row-title">Ambient sounds</span>
+                  <span className="uix-row-sub">Rain, brown noise & binaural layers in Focus Studio</span>
+                </span>
+                <UixSwitch
+                  on={s.sounds !== false}
+                  onChange={(v) => onPatch({ sounds: v })}
+                  label="Ambient sounds"
+                />
+              </div>
             </div>
           </div>
 

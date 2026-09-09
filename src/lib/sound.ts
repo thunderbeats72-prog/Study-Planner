@@ -3,6 +3,13 @@
 type Ctx = { ac: AudioContext; gain: GainNode; nodes: AudioNode[] };
 let current: Ctx | null = null;
 let activeName = "none";
+/* Master switch from Settings → "Ambient sounds". When disabled, playSound
+   is a no-op and nothing can leave audio running behind the user's back. */
+let soundsEnabled = true;
+export function setSoundsEnabled(on: boolean) {
+  soundsEnabled = on;
+  if (!on) stopSound();
+}
 const listeners = new Set<(name: string) => void>();
 function emit() { listeners.forEach((l) => l(activeName)); }
 /** Subscribe to ambient-sound changes; returns unsubscribe. */
@@ -37,7 +44,7 @@ export function currentSound() { return activeName; }
 
 export function playSound(name: string, volume = 0.3) {
   stopSound();
-  if (name === "none") return;
+  if (name === "none" || !soundsEnabled) return;
   const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
   const ac = new AC();
   const gain = ac.createGain();

@@ -15,12 +15,13 @@ import SubjectsView from "@/components/SubjectsView";
 import SettingsView from "@/components/SettingsView";
 import ChatPanel from "@/components/ChatPanel";
 import CommandPalette, { type Command } from "@/components/CommandPalette";
-import { onSoundChange, stopSound } from "@/lib/sound";
+import StudioFx from "@/components/StudioFx";
+import { onSoundChange, setSoundsEnabled, stopSound } from "@/lib/sound";
 import { haptic } from "@/lib/haptics";
 import { useBackClose } from "@/lib/useBackClose";
 import type { TaskPatch } from "@/components/TaskEditor";
 import {
-  IconBolt, IconBell, IconBook, IconCalendar, IconCheck, IconClock, IconExpand2, IconFlame,
+  IconBolt, IconBell, IconBook, IconCalendar, IconCheck, IconChevron, IconClock, IconExpand2, IconFlame,
   IconFocus2, IconGear, IconHome, IconLeaf, IconLogo, IconPalette, IconPanelLeft,
   IconSpark, IconWarn,
 } from "@/components/icons";
@@ -129,6 +130,11 @@ export default function Home() {
   const lastSessionErrorRef = useRef(0);
   const clockApiRef = useRef<ClockApi | null>(null);
   const autoCompleteRef = useRef<(fresh: AppState, completed: CompletedTaskInfo, date: string) => void>(() => {});
+  /* Settings → "Completion celebration" toggle gates the confetti burst. */
+  const confettiEnabledRef = useRef(true);
+  /* Settings → "Ambient sounds" toggle is pushed into the sound engine. */
+  useEffect(() => { setSoundsEnabled(state?.settings.sounds !== false); }, [state?.settings.sounds]);
+  useEffect(() => { confettiEnabledRef.current = state?.settings.confetti !== false; }, [state?.settings.confetti]);
   const [forceWizard, setForceWizard] = useState(false);
   const [confirmWipe, setConfirmWipe] = useState(false);
   useBackClose(confirmWipe, () => setConfirmWipe(false));
@@ -320,7 +326,7 @@ export default function Home() {
       if (!(el instanceof HTMLElement)) return;
       if (reduce.matches) return;
       const label = (el.textContent || "").trim();
-      if (label === "Done" || el.matches(".rate-btn")) {
+      if ((label === "Done" || el.matches(".rate-btn")) && confettiEnabledRef.current) {
         const rect = el.getBoundingClientRect();
         const fromKeyboard = e.detail === 0 || (e.clientX === 0 && e.clientY === 0);
         const px = fromKeyboard ? rect.left + rect.width / 2 : e.clientX;
@@ -908,6 +914,8 @@ export default function Home() {
 
   return (
     <>
+      {/* Spotlight + on-scroll reveal engine (studio UX layer). */}
+      <StudioFx />
       {/* One flex row: [ mark + titles ]  ←→  [ status chip ]. The group keeps
           its own gap, and both ends are bounded so neither stretches.
           There is deliberately no hamburger button: the fixed bottom
@@ -1021,6 +1029,21 @@ export default function Home() {
                 Re-run Setup
               </button>
             </div>
+            {/* Signed-in learner card — collapses to just the avatar when the
+                rail is collapsed; opens Settings from anywhere on desktop. */}
+            <button className="sb-user" type="button" onClick={() => goPage("settings")}
+              title="Open settings" aria-label={`${state.user.name} — open settings`}>
+              <span className="sb-user-avatar" aria-hidden="true">
+                {state.user.name.trim().slice(0, 2).toUpperCase() || "SP"}
+              </span>
+              <span className="sb-user-meta">
+                <span className="sb-user-name">{state.user.name}</span>
+                <span className="sb-user-sub">Keep pushing forward!</span>
+              </span>
+              <span className="sb-user-chev" aria-hidden="true">
+                <span style={{ transform: "rotate(-90deg)", display: "inline-flex" }}><IconChevron size={14} /></span>
+              </span>
+            </button>
           </div>
         </aside>
 
@@ -1247,7 +1270,7 @@ export default function Home() {
               )}
             </div>
 
-            <div className="zen-ring-wrap">
+            <div className={`zen-ring-wrap${timer.running ? " zen-live" : ""}`}>
               <svg className="zen-ring" viewBox="0 0 320 320" aria-hidden="true">
                 <defs>
                   {/* The component owns its gradient: the ring is the one
