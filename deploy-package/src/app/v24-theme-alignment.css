@@ -1,0 +1,343 @@
+/* ══════════════════════════════════════════════════════════════════════
+   v24 — THEME ADAPTIVITY BRIDGE + REFERENCE UI ALIGNMENT
+   ─────────────────────────────────────────────────────────────────────
+   Problem this layer fixes: the newer view components (Planner, Analytics,
+   Dashboard, Focus, Subjects, bits, Illustrations) paint through a set of
+   design tokens (`--surface-2`, `--surface-card`, `--border-subtle`,
+   `--accent2`, `--accent-ink`, `--track`, `--good/--warn/--bad` and the
+   whole `--ill-*` illustration palette) that were never declared on the
+   theme classes. Every usage carried a LIGHT-theme hex fallback, so on
+   dark, obsidian and nebula the inset chips, progress tracks, badges and
+   the desk illustrations stayed light-theme coloured — visibly unadapted.
+
+   This layer is imported LAST, so it also owns the final word on the
+   onboarding centring, the mobile dock polish and the analytics ticker
+   pill strip. Token blocks are per-theme and explicit: no fallbacks.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* ── 1 · TOKEN BRIDGE — light themes ───────────────────────────────── */
+body.theme-default,
+body.theme-silver-lavender,
+body.theme-mint,
+body.theme-sunset {
+  --surface-2: color-mix(in srgb, var(--accent) 4.5%, var(--surface-solid));
+  --surface-card: var(--surface-solid);
+  --border-subtle: var(--glass-border);
+  --accent2: var(--accent-light);
+  --accent-ink: #ffffff;
+  --track: color-mix(in srgb, var(--accent) 10%, var(--surface-solid));
+  --good: var(--success-accent);
+  --warn: var(--warning-accent);
+  --bad: var(--danger-accent);
+}
+body.theme-default {
+  --ill-desk: #e3def2; --ill-metal: #b6adda; --ill-metal2: #9a90c9; --ill-shade: #8d80c8;
+  --ill-paper: #ffffff; --ill-paper2: #efeafa; --ill-pot: #cfc6ea; --ill-pot2: #b9aee0;
+  --ill-leaf: #69bd92; --ill-leaf2: #4aa478;
+  --ill-ba: var(--accent-light); --ill-bb: #e8895a; --ill-bc: #4fb286;
+  --ill-glow: #f2ae4e; --ill-halo: rgba(122, 104, 240, .14); --ill-ink: #6f6890;
+}
+body.theme-silver-lavender {
+  --ill-desk: #e6e6f0; --ill-metal: #b7b7d8; --ill-metal2: #a0a0c8; --ill-shade: #8f8fc4;
+  --ill-paper: #ffffff; --ill-paper2: #f0f0f8; --ill-pot: #d1d1e9; --ill-pot2: #bcbee4;
+  --ill-leaf: #69bd92; --ill-leaf2: #4aa478;
+  --ill-ba: var(--accent-light); --ill-bb: #e8895a; --ill-bc: #4fb286;
+  --ill-glow: #f2ae4e; --ill-halo: rgba(122, 112, 224, .12); --ill-ink: #71708c;
+}
+body.theme-mint {
+  --ill-desk: #dcefe6; --ill-metal: #a9ceb9; --ill-metal2: #8fbfa6; --ill-shade: #7db999;
+  --ill-paper: #ffffff; --ill-paper2: #eef8f2; --ill-pot: #c9e5d7; --ill-pot2: #aed4c0;
+  --ill-leaf: #4aa478; --ill-leaf2: #3a8a63;
+  --ill-ba: var(--accent-light); --ill-bb: #e8895a; --ill-bc: #3f9e77;
+  --ill-glow: #f2ae4e; --ill-halo: rgba(16, 163, 127, .12); --ill-ink: #5b7268;
+}
+body.theme-sunset {
+  --ill-desk: #f0e2d6; --ill-metal: #d9bb9f; --ill-metal2: #c4a184; --ill-shade: #c08a5f;
+  --ill-paper: #ffffff; --ill-paper2: #f9f0e7; --ill-pot: #e4cfba; --ill-pot2: #d5b99d;
+  --ill-leaf: #69bd92; --ill-leaf2: #4aa478;
+  --ill-ba: var(--accent-light); --ill-bb: #e8895a; --ill-bc: #4fb286;
+  --ill-glow: #ffb84d; --ill-halo: rgba(225, 98, 15, .12); --ill-ink: #77604f;
+}
+
+/* ── 2 · TOKEN BRIDGE — dark themes (insets step LIGHTER, ink on accent
+        goes dark so accent-filled chips stay legible) ────────────────── */
+body.theme-dark,
+body.theme-obsidian,
+body.theme-nebula {
+  --surface-2: color-mix(in srgb, #ffffff 4%, var(--surface));
+  --surface-card: var(--surface);
+  --border-subtle: var(--glass-border);
+  --accent2: var(--accent-light);
+  --track: color-mix(in srgb, #ffffff 9%, var(--surface));
+  --good: var(--success-accent);
+  --warn: var(--warning-accent);
+  --bad: var(--danger-accent);
+}
+body.theme-dark {
+  --accent-ink: #0f0f14;
+  --ill-desk: #1d1c28; --ill-metal: #4d4870; --ill-metal2: #3a3560; --ill-shade: #6b61a8;
+  --ill-paper: #201f2c; --ill-paper2: #191824; --ill-pot: #373252; --ill-pot2: #2c2843;
+  --ill-leaf: #3fa477; --ill-leaf2: #2f8b62;
+  --ill-ba: var(--accent-light); --ill-bb: #e8895a; --ill-bc: #4fb286;
+  --ill-glow: #ffbe66; --ill-halo: rgba(139, 124, 246, .13); --ill-ink: #8f8ab0;
+}
+body.theme-obsidian {
+  --accent-ink: #06121d;
+  --ill-desk: #17202f; --ill-metal: #33506b; --ill-metal2: #27405c; --ill-shade: #3f6d94;
+  --ill-paper: #16202f; --ill-paper2: #101926; --ill-pot: #22374e; --ill-pot2: #1b2c40;
+  --ill-leaf: #2f8b62; --ill-leaf2: #25714f;
+  --ill-ba: var(--accent-light); --ill-bb: #e8895a; --ill-bc: #4fb286;
+  --ill-glow: #ffc27d; --ill-halo: rgba(56, 189, 248, .12); --ill-ink: #8fb0cc;
+}
+body.theme-nebula {
+  --accent-ink: #150d24;
+  --ill-desk: #1d1633; --ill-metal: #4a3a75; --ill-metal2: #3a2c60; --ill-shade: #6a55a8;
+  --ill-paper: #1f1836; --ill-paper2: #171129; --ill-pot: #33285a; --ill-pot2: #291f49;
+  --ill-leaf: #3fa477; --ill-leaf2: #2f8b62;
+  --ill-ba: var(--accent-light); --ill-bb: #e8895a; --ill-bc: #4fb286;
+  --ill-glow: #ffbe66; --ill-halo: rgba(168, 85, 247, .13); --ill-ink: #9a8cc4;
+}
+
+/* The one place a light accent needs dark ink on the LIGHT themes too:
+   theme-pop swatches and TODAY flags paint solid accent → keep them on
+   the shared token so every theme reads correctly. */
+.theme-pop-item.active,
+.mbn-item.active {
+  color: var(--nav-active-text);
+}
+
+/* ── 3 · HEADING TYPOGRAPHY — clean, modern, never italic ─────────────
+   MaskWords wraps each word in <i>; the base sheet resets it, but the
+   guard is restated here with the final word so no later layer, font
+   fallback or browser default can ever italicise a display heading. */
+h1, h2, h3, .page-title, .mw i { font-style: normal; }
+.mw i { letter-spacing: inherit; }
+
+/* ── 4 · ONBOARDING — centred shell on wide screens (max-w ~4xl) ────── */
+.ob-shell {
+  width: min(100%, 896px);          /* 4xl-class container */
+  margin-inline: auto;              /* mx-auto */
+  min-height: 100dvh;
+  justify-content: center;          /* vertical centre when it fits,
+                                       plain scroll when it doesn't     */
+  padding: clamp(20px, 4.5vh, 44px) clamp(14px, 2.5vw, 24px)
+            calc(clamp(20px, 4.5vh, 44px) + env(safe-area-inset-bottom));
+}
+.ob-card {
+  max-width: 780px;
+  width: 100%;
+  margin-inline: auto;
+}
+.ob-progress {
+  width: min(100%, 720px);
+  margin-inline: auto;
+}
+@media (max-width: 640px) {
+  .ob-shell { padding-top: max(14px, env(safe-area-inset-top)); }
+  .ob-card { padding: 22px 18px; }
+}
+
+/* ── 5 · MOBILE DOCK — five items, reference pill behind the icon ──── */
+@media (max-width: 860px) {
+  .mobile-bottom-nav {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+  .mbn-item {
+    gap: 4px;
+    min-height: 54px;
+    border-radius: 14px;
+  }
+  /* Reference language: the icon travels inside a soft pill, the label
+     stays plain — the whole cell no longer fills with colour. */
+  .mbn-item.active { background: transparent; }
+  .mbn-icon {
+    display: grid;
+    place-items: center;
+    min-width: 52px;
+    height: 30px;
+    border-radius: 999px;
+    transition: background .25s ease, box-shadow .25s ease;
+  }
+  .mbn-item.active .mbn-icon {
+    background: var(--nav-active-bg);
+    box-shadow: inset 0 0 0 1px var(--nav-active-border);
+  }
+  .mbn-item.active { color: var(--accent); }
+  .mbn-label { font-size: .6rem; font-weight: 750; }
+
+  /* The floating AI button and chat sheet clear the single-row dock. */
+  .ai-fab { bottom: calc(80px + env(safe-area-inset-bottom)); }
+}
+
+/* ── 6 · MOBILE APP BAR — “More” trigger opens the full drawer ──────── */
+.mh-more {
+  flex: 0 0 auto;
+  width: 34px; height: 34px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 11px;
+  border: 1px solid var(--glass-border);
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color .15s ease, border-color .15s ease, background .15s ease;
+}
+.mh-more:hover, .mh-more:active { color: var(--accent); border-color: var(--nav-active-border); }
+.mh-more svg { width: 18px; height: 18px; display: block; }
+
+/* Bell + theme in the app bar — only on phones, where the tracker bar
+   hides its own quick trio below 640px. Between 640 and 860px the
+   tracker's controls are visible, so the header pair stays hidden to
+   avoid two live popovers bound to the same state. */
+.mh-quick { display: none; }
+.mh-qbtn { width: 34px; height: 34px; }
+@media (max-width: 640px) {
+  .mh-quick { display: inline-flex; align-items: center; gap: 6px; }
+  /* Header popovers drop as a near-full-width sheet pinned under the
+     app bar — never clipped by the button's position near the edge. */
+  .mobile-header .quick-popover {
+    position: fixed;
+    top: calc(58px + env(safe-area-inset-top));
+    right: 10px;
+    left: 10px;
+    width: auto;
+    max-width: 420px;
+    margin-left: auto;
+  }
+}
+@media (max-width: 360px) {
+  /* Breathing room on very narrow phones — the streak also lives in the
+     drawer footer and on the dashboard. */
+  .mh-streak { display: none; }
+}
+
+/* ── 7 · ANALYTICS TICKER — single-row pill badge strip ─────────────── */
+.tick-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 6px;
+  padding: 6px 13px;
+  border-radius: 999px;
+  border: 1px solid var(--glass-border);
+  background: var(--surface-2);
+  white-space: nowrap;
+  line-height: 1;
+}
+.tick-pill-icon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--accent);
+  flex: 0 0 auto;
+}
+.tick-pill-icon svg { width: 13px; height: 13px; display: block; }
+.tick-pill-label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.tick-pill-value {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+.tick-pill-value.is-good { color: var(--success-accent); }
+.tick-pill-value.is-warn { color: var(--warning-accent); }
+.tick-pill-value.is-accent { color: var(--accent); }
+/* Keep the strip on ONE measured line inside the marquee. */
+.marquee-track { align-items: center; }
+.marquee .tick-pill { margin: 0 6px; }
+
+/* ── 8 · PLANNER LIST — kind icon + day flags ───────────────────────── */
+.kind-ic {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px; height: 18px;
+  border-radius: 6px;
+  flex: 0 0 auto;
+}
+.kind-ic svg { width: 11px; height: 11px; display: block; }
+.day-flag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  padding: 2.5px 9px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  background: var(--accent);
+  color: var(--accent-ink);
+  vertical-align: 1px;
+  white-space: nowrap;
+}
+.day-flag svg { width: 10px; height: 10px; }
+.day-flag--warn {
+  background: color-mix(in srgb, var(--warning-accent) 16%, transparent);
+  color: var(--warning-accent);
+}
+.day-flag--future {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+}
+
+/* ── 9 · CONSISTENCY RING / TRACK CONTRAST (crisp on every theme) ───── */
+.ring-track { stroke: var(--track); }
+
+/* ── 10 · ILLUSTRATION LIFE — the missing keyframes ───────────────────
+   ClockScene animates its hands with `sweep … infinite` and CalendarScene
+   draws its tick marks with `drawStroke`, but no sheet ever defined those
+   keyframes (nor the ambient .anim-* helpers), so the wall clock sat
+   frozen at 12:00 and the scenes were static. Defined here, once. */
+@keyframes sweep {
+  from { transform: rotate(0turn); }
+  to   { transform: rotate(1turn); }
+}
+@keyframes drawStroke {
+  from { stroke-dashoffset: 20; }
+  to   { stroke-dashoffset: 0; }
+}
+@keyframes illTwinkle {
+  0%, 100% { opacity: .3; transform: scale(.72); }
+  50%      { opacity: 1;  transform: scale(1.08); }
+}
+@keyframes illSway {
+  0%, 100% { transform: rotate(-2.3deg); }
+  50%      { transform: rotate(2.3deg); }
+}
+@keyframes illGlow {
+  0%, 100% { opacity: .55; }
+  50%      { opacity: 1; }
+}
+@keyframes illFloat {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-5px); }
+}
+@keyframes spinCW { to { transform: rotate(1turn); } }
+
+.anim-twinkle { animation: illTwinkle 3.4s ease-in-out infinite; }
+.anim-sway    { animation: illSway 5.6s ease-in-out infinite; }
+.anim-glow    { animation: illGlow 2.9s ease-in-out infinite; }
+.anim-float   { animation: illFloat 6s ease-in-out infinite; }
+.anim-spin    { animation: spinCW .9s linear infinite; }
+
+/* ── 11 · REDUCED MOTION GUARDS for everything this layer adds ────────
+   Decorative loops switch off; the wall clock freezes too — its hands
+   carry an inline rotate() of the real current time, so the scene stays
+   truthful without movement. */
+@media (prefers-reduced-motion: reduce) {
+  .mbn-icon, .mh-more, .tick-pill { transition: none; }
+  .anim-twinkle, .anim-sway, .anim-glow, .anim-float, .anim-spin {
+    animation: none;
+  }
+  .anim-twinkle { opacity: .8; }
+  /* Clock hands stop sweeping; their inline rotate() still shows the
+     true current time. */
+  [style*="sweep"] { animation: none !important; }
+}

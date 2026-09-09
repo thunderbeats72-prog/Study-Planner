@@ -7,9 +7,14 @@ Everything the app actually runs lives in `src/`:
 
   src/app/page.tsx            app shell: sidebar, tracker bar, toasts
   src/app/layout.tsx          viewport / safe-area config
-  src/app/globals.css         ALL styling (themes, responsive, sheets)
-  src/components/*.tsx        Dashboard, Planner, Focus, Subjects,
-                              Settings, Onboarding, ChatPanel, etc.
+  src/app/globals.css         core styling (themes, responsive, sheets)
+  src/app/*.css               layered polish sheets; the last import,
+                              v24-theme-alignment.css, bridges every
+                              theme token (--surface-2, --track, --ill-*)
+                              so all six themes fully adapt
+  src/components/*.tsx        Dashboard, Planner (List+Calendar), Focus,
+                              Subjects, Analytics, Settings, Onboarding,
+                              ChatPanel, TaskActions, etc.
   src/lib/voice.ts            mic listening + spoken replies
   src/lib/useTimer.ts         study clock + focus timer (accurate to
                               the second, fractional-minute logging)
@@ -43,7 +48,7 @@ LOCAL DEVELOPMENT
   npm install
   npm run dev
 
-  npm run check       # strict TypeScript + zero-warning lint + 34+ tests
+  npm run check       # strict TypeScript + zero-warning lint + 215 tests
   npm run build       # applies the Drizzle schema, then builds Next.js
   npm run build:app   # app-only production build (does not touch a database)
 

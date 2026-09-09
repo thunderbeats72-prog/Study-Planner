@@ -1221,6 +1221,7 @@ export function parseCommand(q: string): TutorReply["action"] | undefined {
   if (/\b(subjects?|syllabus|topics?|lessons?)\b/.test(n) && /\b(open|go|show|view|manage|edit)\b/.test(n)) return { type: "navigate", payload: "subjects" };
   if (/\b(settings?|preferences?|options?|profile)\b/.test(n) && /\b(open|go|show|change|edit)\b/.test(n)) return { type: "navigate", payload: "settings" };
   if (/\b(focus( page| view| tab)?|pomodoro)\b/.test(n) && /\b(open|go|show|view|take me|see)\b/.test(n)) return { type: "navigate", payload: "focus" };
+  if (/\b(analytics|insights|trends|reports?)\b/.test(n) && /\b(open|go|show|view|take me|see)\b/.test(n)) return { type: "navigate", payload: "analytics" };
   // Bare page names are valid voice/typed commands too ("planner", "home").
   // Full-message anchors keep a sentence like "the planner looks good" from
   // being misread as navigation.
@@ -1229,11 +1230,13 @@ export function parseCommand(q: string): TutorReply["action"] | undefined {
   if (/^(subjects|syllabus|topics|lessons)$/.test(n)) return { type: "navigate", payload: "subjects" };
   if (/^(settings|preferences|profile)$/.test(n)) return { type: "navigate", payload: "settings" };
   if (/^(focus|pomodoro)$/.test(n)) return { type: "navigate", payload: "focus" };
+  if (/^(analytics|insights|trends)$/.test(n)) return { type: "navigate", payload: "analytics" };
   if (/^\/?(planner|schedule)$/.test(n)) return { type: "navigate", payload: "planner" };
   if (/^\/?(dashboard|overview)$/.test(n)) return { type: "navigate", payload: "dashboard" };
   if (/^\/?(subjects|syllabus)$/.test(n)) return { type: "navigate", payload: "subjects" };
   if (/^\/?(settings)$/.test(n)) return { type: "navigate", payload: "settings" };
   if (/^\/?(focus|pomodoro)$/.test(n)) return { type: "navigate", payload: "focus" };
+  if (/^\/?(analytics|insights)$/.test(n)) return { type: "navigate", payload: "analytics" };
 
   // ── Clock (multilingual: stop is checked before start so a phrase
   //    containing both words resolves to a safe end-of-session) ──
@@ -1748,7 +1751,7 @@ export function extractLlmAction(reply: string): {
   const payload = finalTag[2];
   const text = reply.slice(0, finalTag.index).trim();
 
-  const NAV = new Set(["planner", "dashboard", "subjects", "settings", "focus"]);
+  const NAV = new Set(["planner", "dashboard", "subjects", "settings", "focus", "analytics"]);
   const THEMES_SET = new Set(["default", "dark", "obsidian", "nebula", "mint", "sunset", "silver-lavender"]);
   const BARE = new Set(["startTimer", "stopTimer", "pause", "resume", "break", "zen", "replan"]);
 

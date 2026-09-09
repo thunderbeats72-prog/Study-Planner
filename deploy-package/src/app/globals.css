@@ -6444,3 +6444,95 @@ svg{overflow:visible;flex-shrink:0;max-width:none}
   .ai-message-row.bot .ai-msg{border-radius:18px 18px 18px 7px !important}
   .ai-message-row.user .ai-msg{border-radius:18px 18px 7px 18px !important}
 }
+
+/* ==================================================
+   MICRO-INTERACTIONS & MOTION ENHANCEMENTS
+================================================== */
+.reveal {
+  opacity: 0;
+  transform: translateY(14px);
+  transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1) var(--d, 0ms),
+              transform 0.5s cubic-bezier(0.16, 1, 0.3, 1) var(--d, 0ms);
+  will-change: transform, opacity;
+}
+.reveal.in {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.mw {
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: top;
+}
+.mw i {
+  display: inline-block;
+  font-style: normal;
+  transform: translateY(110%);
+  transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1) var(--d, 0ms);
+}
+.in .mw i {
+  transform: translateY(0);
+}
+
+.spot {
+  position: relative;
+  overflow: hidden;
+}
+.spot::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    380px circle at var(--mx, -200px) var(--my, -200px),
+    rgba(108, 92, 231, 0.08),
+    transparent 70%
+  );
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  z-index: 1;
+}
+.spot:hover::before {
+  opacity: 1;
+}
+
+body.theme-dark .spot::before,
+body.theme-obsidian .spot::before,
+body.theme-nebula .spot::before {
+  background: radial-gradient(
+    380px circle at var(--mx, -200px) var(--my, -200px),
+    rgba(255, 255, 255, 0.06),
+    transparent 70%
+  );
+}
+
+.marquee {
+  display: flex;
+  user-select: none;
+  mask-image: linear-gradient(to right, transparent, black 8%, black 92%, transparent);
+  -webkit-mask-image: linear-gradient(to right, transparent, black 8%, black 92%, transparent);
+}
+.marquee-track {
+  display: flex;
+  width: max-content;
+  animation: marquee-scroll var(--spd, 30s) linear infinite;
+}
+.marquee:hover .marquee-track {
+  animation-play-state: paused;
+}
+@keyframes marquee-scroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+@keyframes wave {
+  0%, 100% { transform: scaleY(0.25); }
+  50% { transform: scaleY(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal { opacity: 1 !important; transform: none !important; transition: none !important; }
+  .mw i { transform: none !important; transition: none !important; }
+  .marquee-track { animation: none !important; }
+}

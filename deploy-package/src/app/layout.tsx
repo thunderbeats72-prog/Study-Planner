@@ -5,6 +5,12 @@ import "./study-planner-refresh.css";
 import "./pastel-ui-system.css";
 import "./study-planner-redesign.css";
 import "./practical-enhancements.css";
+import "./ui-polish.css";
+import "./ui-polish-pass.css";
+import "./ui-polish-landing.css";
+import "./final-ui-fixes.css";
+import "./task-actions-final.css";
+import "./v24-theme-alignment.css";
 
 const inter = localFont({
   src: "./fonts/inter-latin-variable.woff2",
@@ -23,7 +29,7 @@ const jetBrainsMono = localFont({
 export const metadata: Metadata = {
   title: "Study Planner Pro — AI Study Engine",
   description:
-    "An AI study architect that turns any syllabus — nursery to PhD to competitive exams — into a lesson-by-lesson daily plan, with focus timer, spaced recall and a built-in tutor.",
+    "An AI study architect that turns any syllabus — school to PhD and competitive exams — into a lesson-by-lesson daily plan, with focus timer, spaced recall and a built-in tutor.",
 };
 
 export const viewport: Viewport = {
