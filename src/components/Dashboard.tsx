@@ -577,7 +577,7 @@ export default function Dashboard({
             <div className="glass-panel tilt-card section-card relative overflow-hidden p-5">
               <div className="pointer-events-none absolute -right-12 -bottom-12 h-32 w-32 rounded-full bg-[color-mix(in_oklab,var(--accent,#6366f1)_12%,transparent)] blur-xl" />
               <div className="quote-mark text-[var(--accent,#6366f1)]" aria-hidden="true">“</div>
-              <p className="relative mt-2 text-[14.5px] font-bold italic leading-relaxed" style={{ color: "var(--text-main, #211a3a)" }}>
+              <p className="relative mt-2 text-[14.5px] font-bold leading-relaxed" style={{ color: "var(--text-main, #211a3a)" }}>
                 {quote.text}
               </p>
               <div className="mt-3 flex items-center gap-1.5 text-[12px] font-bold" style={{ color: "var(--text-dim, #5f5a7a)" }}>

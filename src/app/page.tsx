@@ -22,7 +22,7 @@ import { useBackClose } from "@/lib/useBackClose";
 import type { TaskPatch } from "@/components/TaskEditor";
 import {
   IconBolt, IconBell, IconChart, IconBook, IconCalendar, IconCheck, IconClock, IconExpand2, IconFlame,
-  IconFocus2, IconGear, IconHome, IconLeaf, IconLogo, IconPalette, IconPanelLeft,
+  IconFocus2, IconGear, IconHome, IconLeaf, IconLogo, IconMenu, IconPalette, IconPanelLeft,
   IconSpark, IconWarn,
 } from "@/components/icons";
 import ZenScene from "@/components/ZenScene";
@@ -50,13 +50,16 @@ function zenGuidance(timer: TimerApi): string {
   return timer.running ? "Stay with this block — one lesson at a time" : "Begin when you are ready";
 }
 
-const NAV: { id: Page; label: string; icon: React.ReactNode }[] = [
-  { id: "dashboard", label: "Overview", icon: <IconHome /> },
-  { id: "planner", label: "Planner", icon: <IconCalendar /> },
-  { id: "focus", label: "Focus", icon: <IconClock /> },
-  { id: "subjects", label: "Subjects", icon: <IconBook /> },
+/* `dock` marks the five primary destinations that fit the mobile bottom
+   navigation. Analytics stays reachable on phones through the drawer
+   ("More" in the app bar) and through the dashboard's deep-links. */
+const NAV: { id: Page; label: string; icon: React.ReactNode; dock?: boolean }[] = [
+  { id: "dashboard", label: "Overview", icon: <IconHome />, dock: true },
+  { id: "planner", label: "Planner", icon: <IconCalendar />, dock: true },
+  { id: "focus", label: "Focus", icon: <IconClock />, dock: true },
+  { id: "subjects", label: "Subjects", icon: <IconBook />, dock: true },
   { id: "analytics", label: "Analytics", icon: <IconChart /> },
-  { id: "settings", label: "Settings", icon: <IconGear /> },
+  { id: "settings", label: "Settings", icon: <IconGear />, dock: true },
 ];
 
 type ToastTone = "success" | "info" | "error";
@@ -911,11 +914,10 @@ export default function Home() {
 
   return (
     <>
-      {/* One flex row: [ mark + titles ]  ←→  [ status chip ]. The group keeps
-          its own gap, and both ends are bounded so neither stretches.
-          There is deliberately no hamburger button: the fixed bottom
-          navigation is the primary mobile navigation, so the app bar starts
-          at the logo and no slot is reserved for a menu trigger. */}
+      {/* One flex row: [ mark + titles ]  ←→  [ streak · More ]. The bottom
+          dock carries the five primary pages; the app-bar "More" trigger
+          opens the full drawer (all six pages + Re-plan + setup), so
+          Analytics and the tools stay one tap away on phones. */}
       <header className="mobile-header">
         <div className="mh-brand">
           <div className="brand-logo-icon brand-logo-sm" aria-hidden="true"><IconLogo size={14} /></div>
@@ -924,7 +926,95 @@ export default function Home() {
             <span className="mh-page">{NAV.find((n) => n.id === page)?.label ?? "Study Planner Pro"}</span>
           </div>
         </div>
-        <span className="streak-badge mh-streak"><IconFlame /> {state.user.streak}d</span>
+        <div className="flex items-center gap-2">
+          <span className="streak-badge mh-streak"><IconFlame /> {state.user.streak}d</span>
+          {/* Quick controls mirror the tracker bar's trio for phones, where
+              the tracker hides them below 640px — same popovers, same state. */}
+          <span className="mh-quick">
+            <span className="quick-popover-wrap">
+              <button
+                type="button"
+                className="icon-quick-btn mh-qbtn"
+                aria-label="Notifications"
+                aria-expanded={notifOpen}
+                onClick={(e) => { e.stopPropagation(); setThemeOpen(false); setNotifOpen((v) => !v); }}
+              >
+                <IconBell size={15} />
+                <span className="icon-quick-dot" aria-hidden="true" />
+              </button>
+              {notifOpen && (
+                <div className="quick-popover notif-popover" role="menu">
+                  <div className="quick-popover-title">Notifications</div>
+                  <div className="notif-row">
+                    <span className="notif-dot notif-dot--orange" />
+                    <div>
+                      <strong>{ctx.overdue > 0 ? `${ctx.overdue} unfinished task${ctx.overdue > 1 ? "s" : ""}` : "Nothing unfinished"}</strong>
+                      <span>{ctx.overdue > 0 ? "Let's recover them — spread them out or re-plan." : "You're up to date."}</span>
+                    </div>
+                  </div>
+                  <div className="notif-row">
+                    <span className="notif-dot notif-dot--green" />
+                    <div>
+                      <strong>{todayDone}/{todayTotal} lessons done today</strong>
+                      <span>{todayTotal ? `${Math.round((todayDone / Math.max(1, todayTotal)) * 100)}% of today's plan` : "Rest day or no plan yet"}</span>
+                    </div>
+                  </div>
+                  <div className="notif-row">
+                    <span className="notif-dot notif-dot--violet" />
+                    <div>
+                      <strong>{state.user.streak} day streak</strong>
+                      <span>{state.user.streak > 0 ? "Your progress is still here, even on days you miss." : "Start today and it will build itself."}</span>
+                    </div>
+                  </div>
+                  <div className="notif-row">
+                    <span className="notif-dot notif-dot--blue" />
+                    <div>
+                      <strong>{ctx.daysLeft} days to {prettyLong(state.settings.examDate)}</strong>
+                      <span>{ctx.progressPct}% of the syllabus complete.</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </span>
+            <span className="quick-popover-wrap">
+              <button
+                type="button"
+                className="icon-quick-btn mh-qbtn"
+                aria-label="Change theme"
+                aria-expanded={themeOpen}
+                onClick={(e) => { e.stopPropagation(); setNotifOpen(false); setThemeOpen((v) => !v); }}
+              >
+                <IconPalette size={15} />
+              </button>
+              {themeOpen && (
+                <div className="quick-popover theme-popover" role="menu">
+                  <div className="quick-popover-title">Theme</div>
+                  {THEMES.map((th) => (
+                    <button
+                      key={th.id}
+                      type="button"
+                      className={`theme-pop-item${state.settings.theme === th.id ? " active" : ""}`}
+                      onClick={(e) => { e.stopPropagation(); void patchSettings({ theme: th.id }); setThemeOpen(false); }}
+                    >
+                      <span className={`theme-pop-swatch theme-swatch--${th.id}`} aria-hidden="true" />
+                      <span>{th.label}</span>
+                      {state.settings.theme === th.id && <IconCheck size={13} />}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </span>
+          </span>
+          <button
+            type="button"
+            className="mh-more"
+            aria-label="Open menu"
+            aria-expanded={drawerOpen}
+            onClick={() => setDrawerOpen(true)}
+          >
+            <IconMenu size={18} />
+          </button>
+        </div>
       </header>
 
       {/* Mobile/tablet navigation drawer + scrim */}
@@ -1170,7 +1260,7 @@ export default function Home() {
               clockRunning={clock.running} clockSessionActive={clock.sessionActive} clockOnBreak={clock.onBreak}
               onClockOut={clockOutNow} onPauseOrResume={pauseOrResume}
               replanning={busy} onReplan={replan} onStartFocus={startFocusSession}
-              onAddTask={addTask} onMoveTasks={moveTasks} />
+              onAddTask={addTask} onMoveTasks={moveTasks} onNavigate={(p) => goPage(p as Page)} />
           )}
           {page === "planner" && (
             <PlannerView state={state} onTaskStatus={setTaskStatus} onTaskUpdate={updateTask}
@@ -1186,7 +1276,7 @@ export default function Home() {
               onZen={() => setZen(true)} />
           )}
           {page === "subjects" && (
-            <SubjectsView state={state} onAdd={addSubject} onEdit={editSubject} onDelete={deleteSubject} busy={busy} onAskTutor={askTutor} />
+            <SubjectsView state={state} onAdd={addSubject} onEdit={editSubject} onDelete={deleteSubject} busy={busy} onAskTutor={askTutor} onNavigate={(p) => goPage(p as Page)} />
           )}
           {page === "analytics" && (
             <AnalyticsView state={state} onAskTutor={askTutor} onStartFocus={startFocusSession} />
@@ -1198,11 +1288,11 @@ export default function Home() {
       </div>
 
       {/* Mobile bottom navigation — the primary page switcher on phones and
-          tablets. Fixed, safe-area aware, shown only ≤ 860px via CSS. It is
-          the only navigation entry point on mobile now that the app bar has
-          no menu trigger. */}
+          tablets. Fixed, safe-area aware, shown only ≤ 860px via CSS.
+          Exactly five primary destinations; everything else (Analytics)
+          lives behind the app-bar "More" drawer. */}
       <nav className="mobile-bottom-nav" aria-label="Primary">
-        {NAV.map((n) => (
+        {NAV.filter((n) => n.dock).map((n) => (
           <button
             key={n.id}
             type="button"

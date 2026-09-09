@@ -1,0 +1,99 @@
+/* Task actions: final geometry fix. The ⋮ menu is a row-level control,
+   separate from Clock/Done so no pointer target can overlap another. */
+.task-row {
+  position: relative !important;
+  min-width: 0 !important;
+}
+
+.task-more-wrap {
+  position: absolute !important;
+  top: 8px !important;
+  right: 8px !important;
+  width: 34px !important;
+  height: 34px !important;
+  z-index: 100 !important;
+  pointer-events: auto !important;
+}
+
+.task-more {
+  width: 34px !important;
+  height: 34px !important;
+  padding: 0 !important;
+  pointer-events: auto !important;
+  touch-action: manipulation !important;
+}
+
+.task-menu {
+  position: absolute !important;
+  top: calc(100% + 7px) !important;
+  right: 0 !important;
+  left: auto !important;
+  z-index: 120 !important;
+  min-width: 190px !important;
+  max-width: min(260px, calc(100vw - 24px)) !important;
+}
+
+.task-row-actions {
+  position: relative !important;
+  z-index: 4 !important;
+  min-width: 0 !important;
+}
+
+@media (min-width: 641px) {
+  .task-row-actions {
+    margin-right: 48px !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .task-row-actions {
+    margin-right: 0 !important;
+  }
+
+  .task-more-wrap {
+    top: 9px !important;
+    right: 9px !important;
+  }
+
+  .task-row .task-main {
+    padding-right: 48px !important;
+  }
+}
+
+/* Active state is static except for the tiny recording dot. */
+.task-row.active-clock {
+  animation: none !important;
+  transform: none !important;
+  background: color-mix(in srgb, var(--accent) 3%, var(--surface)) !important;
+  border-color: color-mix(in srgb, var(--accent) 18%, var(--glass-border)) !important;
+  box-shadow: inset 2px 0 0 var(--accent) !important;
+}
+
+.task-row.active-clock::before,
+.task-row.active-clock::after {
+  animation: none !important;
+  display: none !important;
+}
+
+.task-live-badge,
+.task-clock.clock-live {
+  animation: none !important;
+  box-shadow: none !important;
+}
+
+.task-live-dot,
+.task-clock.clock-live .clock-live-dot {
+  animation: finalTaskRecordingPulse 2s ease-in-out infinite !important;
+}
+
+@keyframes finalTaskRecordingPulse {
+  0%, 100% { opacity: .55; transform: scale(.95); }
+  50% { opacity: 1; transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .task-live-dot,
+  .task-clock.clock-live .clock-live-dot {
+    animation: none !important;
+  }
+}

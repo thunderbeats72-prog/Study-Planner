@@ -2,25 +2,27 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  addDays, dayDiff, fmtDate, KIND_META, normalizeCheckpointTitle, parseDate,
-  prettyDate, prettyLong, today, type AppState, type TaskRow,
+  dayDiff, fmtDate, KIND_META, normalizeCheckpointTitle,
+  prettyLong, today, type AppState, type TaskRow,
 } from "@/lib/client";
 import {
-  IconCalendar, IconCheck, IconChevron, IconClock, IconClose, IconEdit,
-  IconList, IconBoard, IconPlus, IconRefresh, IconSpark, IconTarget,
+  IconCalendar, IconCheck, IconChevron, IconClose, IconEdit,
+  IconList, IconRefresh, IconSpark,
 } from "./icons";
 import TaskEditor, { type TaskPatch } from "./TaskEditor";
 import TaskActions from "./TaskActions";
 import { TaskLiveBadge } from "./TaskClockButton";
 import QuickAdd from "./QuickAdd";
 import { CalendarScene } from "./Illustrations";
-import { PageHead, Seg, StatusChip, KindChip } from "./bits";
-import { Reveal, Spot } from "@/lib/fx";
+import { PageHead, Seg, StatusChip, KindChip, KindIcon } from "./bits";
+import { Reveal } from "@/lib/fx";
 import { useBackClose } from "@/lib/useBackClose";
 import type { QuickAddPayload } from "@/lib/quickAdd";
 import { cn } from "@/lib/cn";
 
-type View = "list" | "calendar" | "kanban";
+/* Two focused views — the Kanban board was retired in favour of the
+   List + Calendar pair; kind is now communicated by icon, not column. */
+type View = "list" | "calendar";
 
 function isCheckpointTask(task: TaskRow): boolean {
   return task.kind === "checkpoint" || (!!task.title && task.title.toLowerCase().startsWith("checkpoint:"));
@@ -109,12 +111,22 @@ export default function PlannerView({
   const firstDow = mDate.getDay();
   const daysInMonth = new Date(mDate.getFullYear(), mDate.getMonth() + 1, 0).getDate();
 
-  /* Kanban columns */
-  const kanbanCols: { k: string; label: string; count: number }[] = [
-    { k: "pending", label: "Pending", count: filtered.filter((tk) => tk.status === "pending").length },
-    { k: "done", label: "Done", count: filtered.filter((tk) => tk.status === "done").length },
-    { k: "skipped", label: "Skipped", count: filtered.filter((tk) => tk.status === "skipped").length },
-  ];
+  /* Chronological day headers read like the reference: a relative flag
+     (Today · Tomorrow · Unfinished · In n days) beside the date, so the
+     list always tells you where you are in the week at a glance. */
+  const dayFlag = (dateKey: string, dayTasks: TaskRow[]) => {
+    const diff = dayDiff(today(), dateKey);
+    if (diff === 0) return { label: "Today", cls: "" };
+    if (diff === 1) return { label: "Tomorrow", cls: "day-flag--future" };
+    if (diff < 0) {
+      const open = dayTasks.some((tk) => tk.status === "pending");
+      return open
+        ? { label: "Unfinished", cls: "day-flag--warn" }
+        : null; // fully handled past days need no flag — the ✓ chip speaks
+    }
+    if (diff <= 7) return { label: `In ${diff} days`, cls: "day-flag--future" };
+    return null;
+  };
 
   return (
     <div className="space-y-6 fade-in">
@@ -135,7 +147,6 @@ export default function PlannerView({
               options={[
                 { v: "list", label: "List", icon: <IconList size={15} /> },
                 { v: "calendar", label: "Calendar", icon: <IconCalendar size={15} /> },
-                { v: "kanban", label: "Kanban", icon: <IconBoard size={15} /> },
               ]}
             />
             <select
@@ -182,10 +193,10 @@ export default function PlannerView({
 
           {grouped.map(([dateKey, tasksForDay], i) => {
             const isToday = dateKey === t;
-            const isPast = dateKey < t;
             const dayMins = tasksForDay.reduce((a, b) => a + b.plannedMinutes, 0);
             const doneCount = tasksForDay.filter((tk) => tk.status === "done").length;
             const allDone = doneCount === tasksForDay.length && tasksForDay.length > 0;
+            const flag = dayFlag(dateKey, tasksForDay);
 
             return (
               <Reveal key={dateKey} delay={Math.min(i, 6) * 45}>
@@ -201,9 +212,9 @@ export default function PlannerView({
                         <IconCalendar size={15} />
                       </span>
                       <div>
-                        <span className="text-[14.5px] font-extrabold tracking-tight" style={{ color: "var(--text-main, #211a3a)" }}>
+                        <span className="flex flex-wrap items-center text-[14.5px] font-extrabold tracking-tight" style={{ color: "var(--text-main, #211a3a)" }}>
                           {prettyLong(dateKey)}
-                          {isToday && <span className="ml-2 rounded-full bg-[var(--accent,#6366f1)] px-2 py-0.5 text-[10.5px] font-bold text-white">TODAY</span>}
+                          {flag && <span className={cn("day-flag", flag.cls)}>{flag.label}</span>}
                         </span>
                         <span className="mono ml-3 text-[12px] font-semibold" style={{ color: "var(--text-dim, #5f5a7a)" }}>
                           {tasksForDay.length} tasks · {dayMins} min · {doneCount} done
@@ -239,6 +250,7 @@ export default function PlannerView({
                             )}
                           >
                             <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: dotColor }} />
+                            <KindIcon kind={task.kind} color={dotColor} />
                             <div className="min-w-0 flex-1 basis-56">
                               <p className={cn("truncate text-[14px] font-bold", isDone && "line-through opacity-50")} style={{ color: "var(--text-main, #211a3a)" }}>
                                 {formattedTitle}
@@ -389,7 +401,7 @@ export default function PlannerView({
                     <span
                       className={cn(
                         "mono mb-1 grid h-6 w-6 place-items-center rounded-full text-[11px] font-bold",
-                        isToday ? "bg-[var(--accent,#6366f1)] text-white" : "text-[var(--text-main,#211a3a)]"
+                        isToday ? "bg-[var(--accent,#6366f1)] text-[var(--accent-ink,#ffffff)]" : "text-[var(--text-main,#211a3a)]"
                       )}
                     >
                       {i + 1}
@@ -429,58 +441,6 @@ export default function PlannerView({
             </div>
           </div>
         </Reveal>
-      )}
-
-      {/* ── 3. KANBAN VIEW ── */}
-      {view === "kanban" && (
-        <div className="grid gap-4 md:grid-cols-3">
-          {kanbanCols.map((col, ci) => {
-            const list = filtered.filter((tk) => tk.status === col.k);
-            return (
-              <Reveal key={col.k} delay={ci * 70}>
-                <div className="glass-panel tilt-card section-card flex min-h-[380px] flex-col overflow-hidden">
-                  <div className="flex items-center justify-between border-b border-[var(--border-subtle,#e4e0f1)] bg-[var(--surface-2,#f4f2fc)] px-4 py-3">
-                    <span className="text-[14px] font-extrabold tracking-tight" style={{ color: "var(--text-main, #211a3a)" }}>
-                      {col.label}
-                    </span>
-                    <span className="mono rounded-md bg-[var(--surface-card,#fcfbff)] px-2 py-0.5 text-[11px] font-bold" style={{ color: "var(--text-dim, #5f5a7a)" }}>
-                      {list.length}
-                    </span>
-                  </div>
-
-                  <div className="flex-1 space-y-2.5 p-3 overflow-y-auto max-h-[600px]">
-                    {list.length === 0 && (
-                      <p className="py-12 text-center text-[12.5px] font-medium" style={{ color: "var(--text-dim, #5f5a7a)" }}>
-                        No {col.label.toLowerCase()} tasks
-                      </p>
-                    )}
-                    {list.map((tk) => {
-                      const sb = subjFor(tk);
-                      return (
-                        <Spot
-                          key={tk.id}
-                          className="glass-panel cursor-pointer rounded-xl border border-[var(--border-subtle,#e4e0f1)] bg-[var(--surface-card,#fcfbff)] p-3.5 transition-shadow hover:shadow-md"
-                          onClick={() => setEditingTaskId(tk.id)}
-                        >
-                          <div className="flex items-center gap-2 mb-1.5">
-                            <span className="h-2 w-2 rounded-full shrink-0" style={{ background: sb?.color || "var(--accent,#6366f1)" }} />
-                            <p className="min-w-0 flex-1 truncate text-[13px] font-bold" style={{ color: "var(--text-main, #211a3a)" }}>
-                              {tk.title}
-                            </p>
-                          </div>
-                          <div className="flex items-center justify-between text-[11px] font-semibold" style={{ color: "var(--text-dim, #5f5a7a)" }}>
-                            <span className="mono">{prettyDate(tk.date)}</span>
-                            <span className="mono">{tk.plannedMinutes} min</span>
-                          </div>
-                        </Spot>
-                      );
-                    })}
-                  </div>
-                </div>
-              </Reveal>
-            );
-          })}
-        </div>
       )}
 
       {/* Task Editor Modal */}
@@ -529,8 +489,9 @@ export default function PlannerView({
                     className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--border-subtle,#e4e0f1)] bg-[var(--surface-2,#f4f2fc)] p-3"
                   >
                     <div className="min-w-0 flex-1 basis-48">
-                      <p className="truncate text-[13.5px] font-bold" style={{ color: "var(--text-main, #211a3a)" }}>
-                        {tk.title}
+                      <p className="flex items-center gap-2 truncate text-[13.5px] font-bold" style={{ color: "var(--text-main, #211a3a)" }}>
+                        <KindIcon kind={tk.kind} color={sb?.color || "var(--accent,#6366f1)"} />
+                        <span className="truncate">{tk.title}</span>
                       </p>
                       <p className="text-[11.5px] font-semibold" style={{ color: "var(--text-dim, #5f5a7a)" }}>
                         {sb?.name} · {tk.plannedMinutes} min · <StatusChip status={tk.status} />
