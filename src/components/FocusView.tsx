@@ -58,6 +58,20 @@ export default function FocusView({ state, session, onCompleteTask, onZen }: { s
     };
   });
 
+  /* Facts strip under the clock — study time only (breaks excluded), so the
+     numbers match what Analytics reports. */
+  const studySess = state.sessions.filter((s) => s.mode !== "break");
+  const perDayStudy = new Map<string, number>();
+  for (const s of studySess) perDayStudy.set(s.date, (perDayStudy.get(s.date) || 0) + s.minutes);
+  const todayStudyMin = perDayStudy.get(t) || 0;
+  const weekSessions = studySess.filter((s) => s.date >= addDays(t, -6)).length;
+  const bestDayMin = Math.max(0, ...perDayStudy.values());
+  const goalDaysHit = Array.from({ length: 7 }, (_, i) => addDays(t, -i)).filter((d) => (perDayStudy.get(d) || 0) >= goalMin).length;
+  const fmtHm = (m: number) => {
+    const r = Math.round(m);
+    return r >= 60 ? `${Math.floor(r / 60)}h ${r % 60}m` : `${r}m`;
+  };
+
   return <div className="fade-in focus-view">
     <PageHead
       eyebrow="Focus Studio"
@@ -77,6 +91,14 @@ export default function FocusView({ state, session, onCompleteTask, onZen }: { s
       </div>
       <div className="clock-actions"><div className="clock-action-buttons"><button className={`btn ${session.active ? "btn-secondary" : "btn-primary"} clock-toggle`} type="button" onClick={session.toggle}>{session.active ? "Pause" : clock.sessionActive ? "Resume" : "Start session"}</button>{clock.running && <button className="btn btn-secondary" type="button" onClick={session.takeBreak}>Take a Break</button>}{clock.sessionActive && <button className="btn btn-danger" type="button" onClick={session.endSession}>Clock Out</button>}</div>{clockTask && <div className="clock-task-actions"><span className="chip chip-kind clock-task-chip">{clockTask.actualMinutes}m / {clockTask.plannedMinutes}m planned</span><button className="btn btn-sm btn-primary" type="button" onClick={() => onCompleteTask(clockTask.id)}>Mark task complete</button></div>}</div>
     </section>
+
+    {/* Quiet facts strip: what the clock has actually collected. */}
+    <div className="focus-facts rv" style={{ "--rv-d": "70ms" } as React.CSSProperties}>
+      <div className="focus-fact"><strong>{fmtHm(todayStudyMin)}</strong><span>focused today</span></div>
+      <div className="focus-fact"><strong>{weekSessions}</strong><span>sessions · 7d</span></div>
+      <div className="focus-fact"><strong>{goalDaysHit}/7</strong><span>goal days</span></div>
+      <div className="focus-fact"><strong>{fmtHm(bestDayMin)}</strong><span>best day</span></div>
+    </div>
 
     <div className="focus-grid-2 rv">
       <section className="glass-panel tilt-card liquid-card flex-col section-card timer-panel" aria-labelledby="focus-timer-title">

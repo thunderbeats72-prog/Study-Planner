@@ -340,7 +340,7 @@ export default function PlannerView({
             const done = list.filter((x) => x.status === "done").length;
             const mins = list.reduce((a, x) => a + x.plannedMinutes, 0);
             return (
-              <div className="glass-panel tilt-card day-block rv" key={date}
+              <div className={`glass-panel tilt-card day-block rv${date === t ? " day-block--today" : ""}`} key={date}
                 style={{ "--rv-d": `${Math.min(dayIndex, 6) * 50}ms` } as React.CSSProperties}>
                 <div className="day-head">
                   <div>

@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import StudyScene from "./StudyScene";
-import { type AppState, type SubjectRow } from "@/lib/client";
+import { type AppState, type SubjectRow, today } from "@/lib/client";
 import PageHead from "./PageHead";
 import { CountUp } from "./StatFx";
 import { IconSpark, IconTrash, IconClose } from "./icons";
@@ -26,6 +26,7 @@ export default function SubjectsView({
   const [openLesson, setOpenLesson] = useState<number | null>(null);
 
   const doneTopicIds = new Set(state.topics.filter((x) => x.status === "done").map((x) => x.id));
+  const todayKey = today();
 
   return (
     <div className="fade-in">
@@ -45,6 +46,8 @@ export default function SubjectsView({
             const open = openTopics === s.id;
             const pending = state.tasks.filter((x) => x.subjectId === s.id && x.status === "pending");
             const pendingMin = pending.reduce((a, x) => a + x.plannedMinutes, 0);
+            // Needs-attention signal: pending tasks that slipped before today.
+            const attn = pending.filter((x) => x.date < todayKey).length;
             return (
               <div className="glass-panel tilt-card section-card accent-edge rv" key={s.id}
                 style={{ "--edge": s.color, "--rv-d": `${Math.min(subjIndex, 5) * 60}ms` } as React.CSSProperties}>
@@ -65,6 +68,7 @@ export default function SubjectsView({
                     </div>
                   </div>
                   <div className="flex-row gap-sm">
+                    {attn > 0 && <span className="chip chip-overdue chip-tight">{attn} overdue</span>}
                     <button className="btn btn-xs btn-secondary" onClick={() => setOpenTopics(open ? null : s.id)}>
                       {open ? "Hide lessons" : "View lessons"}
                     </button>

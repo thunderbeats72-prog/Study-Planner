@@ -661,3 +661,137 @@ body.mode-focused .zen-ring-wrap.zen-live::after,
   .task-row.is-overdue { box-shadow: inset 3px 0 0 CanvasText; }
   .chip-overdue { border: 1px solid CanvasText; }
 }
+
+/* ═════════════════════════════════════════════════════════════════════
+   ROUND 3 — depth pass: Focus facts strip, Planner "today" accent,
+   deeper onboarding treatment, sidebar user card, tracker quick
+   controls, loading/empty states. Additive only.
+   ═════════════════════════════════════════════════════════════════════*/
+
+/* ── Focus facts strip ────────────────────────────────────────────── */
+.focus-facts {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 14px;
+}
+.focus-fact {
+  display: flex; flex-direction: column; align-items: center; gap: 1px;
+  padding: 11px 8px 10px; border-radius: 13px;
+  background: var(--row-bg); border: 1px solid var(--glass-border);
+  transition: border-color .2s ease, transform .2s ease;
+}
+.focus-fact:hover { border-color: var(--glass-border-hover); transform: translateY(-1px); }
+.focus-fact strong {
+  font-size: 1.12rem; font-weight: 750; letter-spacing: -.02em;
+  font-variant-numeric: tabular-nums; line-height: 1.2;
+}
+.focus-fact span {
+  font-size: .62rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--text-dim);
+}
+@media (max-width: 640px) {
+  .focus-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* ── Planner: today's block gets a quiet accent frame ─────────────── */
+.day-block--today {
+  border-color: color-mix(in srgb, var(--accent) 34%, var(--glass-border));
+  box-shadow: var(--glass-shadow, none), 0 0 0 1px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.day-block--today .daybar .bar-fill { background: var(--accent); }
+.day-block--today .day-date { color: var(--accent); }
+
+/* ── Onboarding depth ─────────────────────────────────────────────── */
+.ob-card-head h1 {
+  font-size: clamp(1.4rem, 3.6vw, 1.85rem);
+  font-weight: 800; letter-spacing: -.022em; line-height: 1.12;
+}
+.ob-step-kicker {
+  display: inline-flex; align-items: center; gap: 8px;
+  letter-spacing: 1.1px;
+}
+.ob-step-kicker::before {
+  content: ""; width: 16px; height: 2px; border-radius: 2px;
+  background: var(--accent-gradient);
+}
+.ob-choice-btn.selected {
+  transform: translateY(-1px);
+  box-shadow: 0 0 0 1px var(--accent) inset, 0 10px 24px -14px var(--accent-glow);
+}
+.ob-choice-card.selected,
+.ob-program-card.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent) inset, 0 10px 24px -16px var(--accent-glow);
+}
+.ob-projection-card {
+  border: 1px solid color-mix(in srgb, var(--accent) 26%, var(--glass-border));
+  background: linear-gradient(160deg,
+    color-mix(in srgb, var(--accent) 8%, transparent),
+    transparent 60%), var(--surface);
+}
+.ob-mini-stat { transition: border-color .2s ease, transform .2s ease; }
+.ob-mini-stat:hover { border-color: var(--glass-border-hover); transform: translateY(-1px); }
+.ob-footer-strip { border-top: 1px dashed var(--glass-border); padding-top: 14px; }
+.ob-brand-mark { box-shadow: 0 6px 18px -6px var(--accent-glow); }
+.ob-card [type="range"] { accent-color: var(--accent); }
+
+/* ── Sidebar learner card ─────────────────────────────────────────── */
+.sb-user-avatar {
+  border: 1.5px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 10%, transparent);
+}
+.sb-user { transition: background .2s ease, border-color .2s ease, transform .2s ease; }
+.sb-user:hover { transform: translateY(-1px); }
+
+/* ── Tracker bar quick controls: one quiet icon cluster ───────────── */
+.tracker-quick-controls {
+  background: var(--row-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
+  padding: 3px;
+  margin-left: 2px;
+}
+.icon-quick-btn {
+  transition: color .18s ease, background .18s ease, transform .18s ease !important;
+}
+.icon-quick-btn:hover {
+  color: var(--accent) !important;
+  background: color-mix(in srgb, var(--accent) 10%, transparent) !important;
+  transform: scale(1.06);
+}
+.icon-quick-btn:active { transform: scale(.94); }
+.quick-popover { animation: popIn .22s cubic-bezier(.2, 1.2, .3, 1); transform-origin: top right; }
+@keyframes popIn {
+  from { opacity: 0; transform: scale(.92) translateY(-6px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+.notif-row { border-radius: 10px; padding: 8px; margin: 0 -8px; transition: background .18s ease; }
+.notif-row:hover { background: var(--row-bg); }
+
+/* ── Loading + empty states ───────────────────────────────────────── */
+.panel-lead.is-busy { animation: isBusy 1.4s ease-in-out infinite; }
+@keyframes isBusy { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+.empty-state-icon {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent),
+    0 8px 20px -12px var(--accent-glow);
+}
+
+/* ── Scrollbars: consistent, quiet (app surfaces only) ────────────── */
+.main-workspace::-webkit-scrollbar, .ob-overlay::-webkit-scrollbar { width: 10px; }
+.main-workspace::-webkit-scrollbar-thumb, .ob-overlay::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--accent) 22%, var(--row-bg));
+  border-radius: 99px; border: 2px solid transparent; background-clip: content-box;
+}
+.main-workspace::-webkit-scrollbar-track, .ob-overlay::-webkit-scrollbar-track { background: transparent; }
+.main-workspace, .ob-overlay { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--accent) 22%, var(--row-bg)) transparent; }
+
+/* ── Reduced motion / forced colours for round 3 ──────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .focus-fact:hover, .sb-user:hover, .ob-mini-stat:hover { transform: none; }
+  .quick-popover { animation: none; }
+  .panel-lead.is-busy { animation: none; opacity: .8; }
+  .icon-quick-btn:hover { transform: none; }
+}
+@media (forced-colors: active) {
+  .day-block--today { border-color: Highlight; }
+  .day-block--today .daybar .bar-fill { background: Highlight; }
+  .focus-fact { border: 1px solid CanvasText; }
+}
