@@ -103,3 +103,29 @@ export const IconRocket = ({ size = 16 }: P) => (
 export const IconPlus = ({ size = 14 }: P) => (
   <svg {...base(size)}><path d="M12 5v14M5 12h14" /></svg>
 );
+
+/* ── Studio UX additions ───────────────────────────────────── */
+export const IconChart = ({ size = 18 }: P) => (
+  <svg {...base(size)}><path d="M3 3v18h18" /><path d="M8 17v-4M13 17V7M18 17v-6" /></svg>
+);
+export const IconBookOpen = ({ size = 16 }: P) => (
+  <svg {...base(size)}><path d="M12 7v14" /><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z" /></svg>
+);
+export const IconRefresh = ({ size = 16 }: P) => (
+  <svg {...base(size)}><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /></svg>
+);
+export const IconPencil = ({ size = 16 }: P) => (
+  <svg {...base(size)}><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /></svg>
+);
+export const IconFlag = ({ size = 16 }: P) => (
+  <svg {...base(size)}><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" /><path d="M4 22v-7" /></svg>
+);
+export const IconCoffee = ({ size = 16 }: P) => (
+  <svg {...base(size)}><path d="M17 8h1a3.5 3.5 0 0 1 0 7h-1" /><path d="M3 8h14v6a5 5 0 0 1-5 5H8a5 5 0 0 1-5-5z" /></svg>
+);
+export const IconClipboard = ({ size = 16 }: P) => (
+  <svg {...base(size)}><rect x="8" y="2" width="8" height="4" rx="1" /><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /><path d="m9 13 2 2 4-4" /></svg>
+);
+export const IconSunrise = ({ size = 16 }: P) => (
+  <svg {...base(size)}><path d="M12 3v5" /><path d="M5.6 8.6l2.5 2.5" /><path d="M18.4 8.6 15.9 11" /><path d="M2 18h20" /><path d="M6 22h12" /><path d="M17 18a5 5 0 0 0-10 0" /></svg>
+);

@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import StudyScene from "./StudyScene";
 import { THEMES, type AppState } from "@/lib/client";
 import PageHead from "./PageHead";
-import { IconSpark, IconCheck } from "./icons";
+import { IconSpark, IconCheck, IconCalendar, IconSignal, IconPalette, IconClock } from "./icons";
 
 /* Reference-studio toggle — a real switch, keyboard- and screen-reader-clean. */
 function UixSwitch({ on, onChange, label }: { on: boolean; onChange: (v: boolean) => void; label: string }) {
@@ -80,7 +80,7 @@ export default function SettingsView({
         {/* ── LEFT: Schedule Engine ── */}
         <div className="flex-col gap-md settings-col">
           <div className="glass-panel tilt-card section-card">
-            <h3 className="section-title">Schedule Engine</h3>
+            <h3 className="section-title section-title--row"><IconCalendar size={15} /> Schedule Engine</h3>
 
             <div className="mb-md"><label className="lbl" htmlFor="set-name">Your Name</label>
               <input id="set-name" className="input-field" value={local.name} onChange={(e) => set("name", e.target.value)} /></div>
@@ -161,7 +161,7 @@ export default function SettingsView({
         {/* ── RIGHT: Appearance + Timer ── */}
         <div className="flex-col gap-md settings-col">
           <div className="glass-panel tilt-card section-card">
-            <h3 className="section-title">Appearance</h3>
+            <h3 className="section-title section-title--row"><IconPalette size={14} /> Appearance</h3>
             <div className="theme-card-grid">
               {THEMES.map((th) => {
                 const active = s.theme === th.id;

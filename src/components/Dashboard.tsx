@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import StudyScene from "./StudyScene";
 import MiniCalendar from "./MiniCalendar";
-import { api, addDays, dayDiff, mdToHtml, prettyLong, today, KIND_META, normalizeCheckpointTitle, type AppState, type TaskRow } from "@/lib/client";
+import { api, addDays, dayDiff, mdToHtml, prettyLong, today, KIND_META, normalizeCheckpointTitle, type AppState } from "@/lib/client";
 import { mmss } from "@/lib/useTimer";
 import {
   IconSpark, IconCalendar, IconTarget, IconClock, IconFlame, IconPlay, IconLeaf, IconRocket,
@@ -12,7 +12,7 @@ import TaskEditor, { type TaskPatch } from "./TaskEditor";
 import TaskActions from "./TaskActions";
 import { TaskLiveBadge } from "./TaskClockButton";
 import QuickAdd from "./QuickAdd";
-import Heatmap from "./Heatmap";
+import { TaskKindIcon, isCheckpointTask } from "./taskKind";
 import { prioritizeTasks, weakestSubjectIds, reasonLabel } from "@/lib/prioritization";
 import {
   backlogFor, backlogToDate, canFitToday, dailyCapacityMinutes, pendingOnDate,
@@ -64,11 +64,6 @@ function dailyQuote(dateKey: string) {
   return QUOTES[hash % QUOTES.length];
 }
 
-/** Checkpoints are cross-subject mock tasks rendered without a subject. */
-function isCheckpointTask(task: TaskRow): boolean {
-  return task.title.toLowerCase().includes("checkpoint") || (task.kind === "mock" && !task.subjectId);
-}
-
 export default function Dashboard({
   state, onTaskStatus, onTaskUpdate, onSkipSubject, onFocusTask, activeTaskId, activeClockSeconds,
   clockRunning, clockSessionActive, clockOnBreak, onClockOut, onPauseOrResume, replanning, onReplan,
@@ -93,18 +88,6 @@ export default function Dashboard({
   onMoveTasks: (moves: { id: number; date: string }[], message: string) => void;
 }) {
   const [insights, setInsights] = useState<string>("");
-  const [intel, setIntel] = useState<{
-    upNext?: { id: number; title: string; minutes: number; kind: string; subjectId: number | null } | null;
-    focusSuggestion?: { startHour: number; endHour: number; isNow: boolean } | null;
-    pace: { global: number; samples: number; bySubject: { id: number; name: string; color: string; pace: number }[] } | null;
-    weekdays: number[] | null;
-    peakHour: number | null;
-    tomorrowRisk: number;
-    readiness: { onTrack: boolean; loadPct: number; likelyDays: number; optimisticDays: number; pessimisticDays: number; samples: number; effectiveDailyMinutes?: number };
-    effectiveDailyMinutes?: { minutes: number; activeDays: number; samples: number };
-    memory: { strong: number; fading: number; atRisk: number; tracked: number };
-  } | null>(null);
-  const [intelOpen, setIntelOpen] = useState(false);
   const [loadingIns, setLoadingIns] = useState(true);
   const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
   const t = today();
@@ -116,18 +99,9 @@ export default function Dashboard({
     state.sessions.reduce((total, session) => total + session.minutes, 0) / 15
   );
 
-  // Analytics may change as time is logged, but refreshing on every one-minute
-  // clock flush caused a request loop. A 15-minute bucket stays useful without
-  // hammering the database. Coaching text refreshes only when task progress
-  // changes; the server also caches identical insight snapshots.
-  useEffect(() => {
-    let cancelled = false;
-    api<typeof intel>("/api/analytics")
-      .then((data) => { if (!cancelled) setIntel(data); })
-      .catch(() => undefined);
-    return () => { cancelled = true; };
-  }, [taskProgressVersion, loggedQuarterHour]);
-
+  // Coaching text refreshes only when task progress changes; the server also
+  // caches identical insight snapshots. (The deeper ML analytics panels now
+  // live on the dedicated Analytics page.)
   useEffect(() => {
     let cancelled = false;
     api<{ insights: string }>("/api/insights")
@@ -137,22 +111,20 @@ export default function Dashboard({
     return () => { cancelled = true; };
   }, [taskProgressVersion]);
 
-  const week = useMemo(() => {
-    const arr: { label: string; date: string; hours: number }[] = [];
-    for (let i = 6; i >= 0; i--) {
-      const d = addDays(t, -i);
-      const hours =
-        state.sessions.filter((s) => s.date === d).reduce((a, s) => a + s.minutes, 0) / 60;
-      arr.push({
-        label: new Date(d).toLocaleDateString(undefined, { weekday: "short" }).slice(0, 3),
-        date: d,
-        hours: Math.round(hours * 100) / 100,
-      });
-    }
-    return arr;
-  }, [state.sessions, t]);
+  // Coming-up rail: next 3 days at a glance.
+  const nextDays = useMemo(() => [1, 2, 3].map((off) => {
+    const date = addDays(t, off);
+    const rows = state.tasks.filter((x) => x.date === date && x.status !== "done");
+    const mins = rows.reduce((a, x) => a + x.plannedMinutes, 0);
+    return {
+      date,
+      label: off === 1 ? "Tomorrow" : new Date(date).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" }),
+      count: rows.length,
+      mins,
+      hasExam: state.settings.examDate === date,
+    };
+  }), [state.tasks, state.settings.examDate, t]);
 
-  const maxH = Math.max(1, ...week.map((w) => w.hours), state.settings.dailyHours);
   const todayTasks = state.tasks.filter((x) => x.date === t);
   const doneToday = todayTasks.filter((x) => x.status === "done").length;
   const consistency = (() => {
@@ -425,11 +397,13 @@ export default function Dashboard({
             const subj = state.subjects.find((s) => s.id === task.subjectId);
             const isCheckpoint = isCheckpointTask(task);
             const kindLabel = isCheckpoint ? "Checkpoint" : meta.label;
-            const dotColor = subj?.color || (isCheckpoint ? "var(--color-primary)" : meta.color);
             const formattedTitle = isCheckpoint ? normalizeCheckpointTitle(task.title) : task.title;
+            const overdue = task.status !== "done" && task.date < t;
             return (
-              <div key={task.id} className={`task-row clean-list${task.status === "done" ? " done" : ""}${activeTaskId === task.id ? " active-clock" : ""}`}>
-                <div className="task-dot" style={{ background: dotColor }} />
+              <div key={task.id} className={`task-row clean-list${task.status === "done" ? " done" : ""}${overdue ? " is-overdue" : ""}${activeTaskId === task.id ? " active-clock" : ""}`}>
+                {/* Kind glyph carries the task type; the tile is tinted by the
+                    subject colour so both signals survive in one affordance. */}
+                <TaskKindIcon task={task} color={subj?.color} />
                 <div className="task-main">
                   <div className="task-title">{formattedTitle}</div>
                   <div className="task-sub">
@@ -460,6 +434,28 @@ export default function Dashboard({
             <h3 className="section-title">Calendar</h3>
             <MiniCalendar state={state} />
           </div>
+
+          {/* Coming up: the next three days at a glance — keeps the Overview
+              forward-looking without duplicating anything from Analytics. */}
+          <div className="glass-panel tilt-card section-card dash-coming">
+            <h3 className="section-title">Coming up</h3>
+            <div className="cu-list">
+              {nextDays.map((d) => (
+                <div key={d.date} className={`cu-row${d.hasExam ? " cu-exam" : ""}`}>
+                  <div className="cu-day">
+                    <span className="cu-day-label">{d.label}</span>
+                    {d.hasExam && <span className="chip chip-done chip-tight">Exam</span>}
+                  </div>
+                  <span className="cu-meta">
+                    {d.count === 0
+                      ? "Free day"
+                      : `${d.count} task${d.count === 1 ? "" : "s"} · ${fmtMin(d.mins)}`}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
           <div className="glass-panel tilt-card section-card dash-quote-card">
             <div className="quote-mark" aria-hidden="true">“</div>
             <p className="quote-text">{quote.text}</p>
@@ -523,60 +519,9 @@ export default function Dashboard({
         </div>
       </div>
 
-      <div className="dash-grid-2 rv">
-        <div className="glass-panel tilt-card dash-card">
-          <h3 className="section-title">Weekly Study Volume</h3>
-          {/* Ported week bars: dashed daily-goal line across the plot, per-bar
-              stagger on entry, hover tooltips, and a quiet legend below. */}
-          <div className="wk2">
-            <div className="wk2-plot">
-              <div className="wk2-goal" style={{ bottom: `${Math.min(100, (state.settings.dailyHours / maxH) * 100)}%` }}>
-                <span>goal {state.settings.dailyHours}h</span>
-              </div>
-              {week.map((w, i) => (
-                <div key={w.date} className={`wk2-col${w.date === t ? " is-today" : ""}`}>
-                  <div className="wk2-val">{w.hours || ""}</div>
-                  <div className="wk2-bar"
-                    title={`${w.label} · ${w.hours}h studied — goal ${state.settings.dailyHours}h`}
-                    style={{ height: `${Math.max(3, (w.hours / maxH) * 100)}%`, "--i": i } as React.CSSProperties} />
-                </div>
-              ))}
-            </div>
-            <div className="wk2-labels">
-              {week.map((w) => (
-                <span key={w.date} className={`wk2-label${w.date === t ? " is-today" : ""}`}>{w.label}</span>
-              ))}
-            </div>
-            <div className="wk2-legend">
-              <span><i className="swatch-bar" aria-hidden="true" />Actual hours</span>
-              <span><i className="swatch-goal" aria-hidden="true" />Daily goal · {state.settings.dailyHours}h</span>
-            </div>
-          </div>
-        </div>
-        <div className="glass-panel tilt-card dash-card mastery-panel">
-          <h3 className="section-title">Subject Mastery</h3>
-          <div className="mastery-list">
-            {ctx.subjects.map((s) => {
-              const pct = s.total ? Math.round((s.done / s.total) * 100) : 0;
-              const color = state.subjects.find((x) => x.id === s.id)?.color || "var(--accent)";
-              return (
-                <div key={s.id} className="mastery-row-wrap">
-                  <div className="mastery-row">
-                    <span className="mastery-name">{s.name}</span>
-                    <span className="mastery-count">{s.done}/{s.total}</span>
-                  </div>
-                  <div className="bar-track"><div className="bar-fill" style={{ width: `${pct}%`, background: color }} /></div>
-                </div>
-              );
-            })}
-          </div>
-          {!ctx.subjects.length && <div className="panel-lead">No subjects yet.</div>}
-        </div>
-      </div>
-
-      <div className="rv">
-        <Heatmap state={state} />
-      </div>
+      {/* IA split: Weekly Volume, Subject Mastery, Heatmap and the deep
+          Intelligence panels now live on the dedicated Analytics page. The
+          Overview stays today-focused. */}
 
       <div className="glass-panel tilt-card coach-card section-card accent-edge rv">
         <h3 className="section-title section-title--row">
@@ -589,106 +534,6 @@ export default function Dashboard({
             dangerouslySetInnerHTML={{ __html: mdToHtml(insights) }} />
         )}
       </div>
-
-      {intel && intel.readiness && (
-        <div className="glass-panel tilt-card intel-card section-card rv">
-          <div className="day-head">
-            <h3 className="section-title">Intelligence</h3>
-            <span className="day-meta">learned from your own study data</span>
-          </div>
-
-          <div className="intel-grid">
-            <div className="intel-stat">
-              <span className={`intel-dot ${intel.readiness.onTrack ? "ok" : "warn"}`} />
-              <div>
-                <div className="intel-label">Exam readiness</div>
-                <div className="intel-value">
-                  {intel.readiness.onTrack ? "On track" : "Behind pace"}
-                  <span className="intel-sub"> · needs ~{intel.readiness.likelyDays}d of your remaining time</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="intel-stat">
-              <span className={`intel-dot ${intel.tomorrowRisk < 0.4 ? "ok" : intel.tomorrowRisk < 0.65 ? "mid" : "warn"}`} />
-              <div>
-                <div className="intel-label">Tomorrow&apos;s plan</div>
-                <div className="intel-value">
-                  {intel.tomorrowRisk < 0.4 ? "Looks doable" : intel.tomorrowRisk < 0.65 ? "A bit heavy" : "Overloaded"}
-                  <span className="intel-sub"> · {Math.round(intel.tomorrowRisk * 100)}% skip risk</span>
-                </div>
-              </div>
-            </div>
-
-            {intel.memory.tracked > 0 && (
-              <div className="intel-stat">
-                <span className={`intel-dot ${intel.memory.atRisk === 0 ? "ok" : "mid"}`} />
-                <div>
-                  <div className="intel-label">Memory health</div>
-                  <div className="intel-value">
-                    {intel.memory.strong} strong
-                    {intel.memory.fading > 0 && <span className="intel-sub"> · {intel.memory.fading} fading</span>}
-                    {intel.memory.atRisk > 0 && <span className="intel-sub warn-text"> · {intel.memory.atRisk} need review</span>}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {intel.peakHour !== null && (
-              <div className="intel-stat">
-                <span className="intel-dot ok" />
-                <div>
-                  <div className="intel-label">Your peak focus</div>
-                  <div className="intel-value">{intel.peakHour % 12 || 12}{intel.peakHour < 12 ? "am" : "pm"}–{(intel.peakHour + 2) % 12 || 12}{(intel.peakHour + 2) < 12 || (intel.peakHour + 2) >= 24 ? "am" : "pm"}
-                    <span className="intel-sub"> · schedule hard topics here</span>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <button className="more-options-toggle" onClick={() => setIntelOpen(!intelOpen)}>
-            {intelOpen ? "Hide details" : "More details"}
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"
-              style={{ transform: intelOpen ? "rotate(180deg)" : "none", transition: "transform .25s ease" }}>
-              <path d="m6 9 6 6 6-6" />
-            </svg>
-          </button>
-
-          {intelOpen && (
-            <div className="intel-details slide-in">
-              {intel.pace && intel.pace.samples >= 3 ? (
-                <>
-                  <div className="intel-label intel-subhead intel-subhead--first">Your pace vs plan (learned from {intel.pace.samples} sessions)</div>
-                  {intel.pace.bySubject.slice(0, 6).map((p) => (
-                    <div key={p.id} className="intel-pace-row">
-                      <span className="task-dot" style={{ background: p.color }} />
-                      <span className="intel-pace-name">{p.name}</span>
-                      <span className={`intel-pace-val ${p.pace > 1.15 ? "warn-text" : p.pace < 0.9 ? "ok-text" : ""}`}>
-                        {p.pace > 1.05 ? `${Math.round((p.pace - 1) * 100)}% slower` : p.pace < 0.95 ? `${Math.round((1 - p.pace) * 100)}% faster` : "on pace"}
-                      </span>
-                    </div>
-                  ))}
-                </>
-              ) : (
-                <div className="panel-lead">
-                  Complete a few more sessions and the pace model will show which subjects run faster or slower for you.
-                </div>
-              )}
-              <div className="intel-label intel-subhead">Finish-time projection</div>
-              <div className="panel-lead">
-                Best case ~{intel.readiness.optimisticDays}d · likely ~{intel.readiness.likelyDays}d · worst case ~{intel.readiness.pessimisticDays}d of study time remaining.
-                {intel.effectiveDailyMinutes && intel.effectiveDailyMinutes.activeDays >= 4 && (
-                  <>
-                    {" "}Based on the <strong>{Math.round(intel.effectiveDailyMinutes.minutes)} min/day</strong> you
-                    actually study ({intel.effectiveDailyMinutes.activeDays} active days), not just your target.
-                  </>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
 
       <TaskEditor
         key={editingTaskId ?? "closed"}

@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import StudyScene from "./StudyScene";
 import { type AppState, type SubjectRow } from "@/lib/client";
 import PageHead from "./PageHead";
+import { CountUp } from "./StatFx";
 import { IconSpark, IconTrash, IconClose } from "./icons";
 
 export default function SubjectsView({
@@ -42,13 +43,26 @@ export default function SubjectsView({
             const done = list.filter((x) => doneTopicIds.has(x.id)).length;
             const pct = list.length ? Math.round((done / list.length) * 100) : 0;
             const open = openTopics === s.id;
+            const pending = state.tasks.filter((x) => x.subjectId === s.id && x.status === "pending");
+            const pendingMin = pending.reduce((a, x) => a + x.plannedMinutes, 0);
             return (
               <div className="glass-panel tilt-card section-card accent-edge rv" key={s.id}
                 style={{ "--edge": s.color, "--rv-d": `${Math.min(subjIndex, 5) * 60}ms` } as React.CSSProperties}>
                 <div className="day-head">
-                  <div>
-                    <div className="day-date">{s.name}</div>
-                    <div className="day-meta">{list.length} lessons · {s.difficulty} · {done} completed</div>
+                  <div className="subj-id">
+                    {/* Initial tile tinted by the subject colour — a strong,
+                        cheap per-subject identity cue. */}
+                    <span className="subj-ico" aria-hidden="true"
+                      style={{ background: `color-mix(in srgb, ${s.color} 16%, transparent)`, color: s.color }}>
+                      {s.name.trim().charAt(0).toUpperCase() || "•"}
+                    </span>
+                    <div>
+                      <div className="day-date">{s.name}</div>
+                      <div className="day-meta">
+                        {list.length} lessons · {s.difficulty} · {done} completed
+                        {pending.length > 0 && ` · ${pending.length} task${pending.length === 1 ? "" : "s"} · ${Math.round(pendingMin / 60 * 10) / 10}h left`}
+                      </div>
+                    </div>
                   </div>
                   <div className="flex-row gap-sm">
                     <button className="btn btn-xs btn-secondary" onClick={() => setOpenTopics(open ? null : s.id)}>
@@ -57,7 +71,12 @@ export default function SubjectsView({
                     <button className="btn btn-xs btn-secondary" onClick={() => setEditing(s)}>Edit</button>
                   </div>
                 </div>
-                <div className="bar-track"><div className="bar-fill" style={{ width: `${pct}%`, background: s.color }} /></div>
+                <div className="subj-progress">
+                  <div className="bar-track"><div className="bar-fill" style={{ width: `${pct}%`, background: s.color }} /></div>
+                  <span className="subj-progress-val" aria-label={`${pct}% complete`}>
+                    <CountUp to={pct} />%
+                  </span>
+                </div>
                 {open && (
                   <div className="slide-in subject-lessons">
                     {list.map((tp, i) => (

@@ -375,3 +375,289 @@ body.mode-focused .zen-ring-wrap.zen-live::after,
   .wk2-goal { border-color: CanvasText; }
   .uix-switch { border: 1px solid ButtonBorder; }
 }
+
+/* ═════════════════════════════════════════════════════════════════════
+   ROUND 2 — Analytics page, richer task rows, subject cards, focus
+   ring, tracker-chip polish, onboarding refinement, 6-item mobile nav.
+   Everything below is additive: it layers on top of the existing
+   design tokens and never renames or removes a contract another view
+   depends on.
+   ═════════════════════════════════════════════════════════════════════*/
+
+/* ── Task kind icon tiles (Overview + Planner rows) ───────────────── */
+.task-kind-ico {
+  display: inline-grid; place-items: center;
+  border-radius: 9px; flex: 0 0 auto;
+  border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+}
+/* Overdue pending rows read as "needs action" without shouting. */
+.task-row.is-overdue {
+  background: color-mix(in srgb, #ef4444 5%, transparent);
+  box-shadow: inset 3px 0 0 #ef4444;
+}
+.task-row.is-overdue .task-title { color: var(--text-strong, inherit); }
+.chip-overdue {
+  display: inline-flex; align-items: center;
+  padding: 3px 9px; border-radius: 999px;
+  font-size: .64rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase;
+  background: color-mix(in srgb, #ef4444 14%, transparent);
+  color: #ef4444;
+}
+
+/* ── Dashboard: "Coming up" rail card ─────────────────────────────── */
+.cu-list { display: flex; flex-direction: column; gap: 2px; }
+.cu-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 9px 10px; border-radius: 10px;
+  transition: background .18s ease;
+}
+.cu-row:hover { background: var(--row-bg); }
+.cu-day { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.cu-day-label { font-size: .83rem; font-weight: 650; }
+.cu-meta { font-size: .75rem; color: var(--text-dim); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.cu-row.cu-exam { background: color-mix(in srgb, var(--accent) 7%, transparent); }
+.cu-row.cu-exam:hover { background: color-mix(in srgb, var(--accent) 11%, transparent); }
+
+/* ── Subjects v2 cards ────────────────────────────────────────────── */
+.subj-id { display: flex; align-items: center; gap: 13px; min-width: 0; }
+.subj-ico {
+  width: 42px; height: 42px; border-radius: 13px; flex: 0 0 auto;
+  display: grid; place-items: center;
+  font-size: 1.1rem; font-weight: 750; line-height: 1;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08);
+}
+.subj-progress { display: flex; align-items: center; gap: 14px; margin-top: 12px; }
+.subj-progress .bar-track { flex: 1; margin: 0; }
+.subj-progress-val {
+  font-variant-numeric: tabular-nums; font-weight: 750; font-size: .85rem;
+  color: var(--text-muted); min-width: 42px; text-align: right;
+}
+
+/* ── Focus view: running ring glow ────────────────────────────────── */
+.timer-ring-wrap { position: relative; }
+.timer-ring-prog { transition: stroke-dashoffset .4s linear; }
+.timer-ring-wrap.is-running .timer-ring-prog {
+  filter: drop-shadow(0 0 12px color-mix(in srgb, var(--accent) 55%, transparent));
+}
+.timer-ring-wrap.is-running { animation: ringPulse 3s ease-in-out infinite; }
+.timer-ring-wrap.is-break.is-running .timer-ring-prog {
+  filter: drop-shadow(0 0 12px color-mix(in srgb, var(--success-accent) 55%, transparent));
+}
+@keyframes ringPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.012); }
+}
+
+/* ── Tracker bar: chip-rail polish (structure untouched) ─────────── */
+.tracker-bar { row-gap: 10px; }
+.tracker-status {
+  background: var(--row-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
+  padding: 6px 16px 6px 10px !important;
+  gap: 10px !important;
+}
+.tracker-bar .pulse-dot { margin-right: -2px; }
+.tracker-time { font-size: 1.05rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.tracker-actions .chip { border-radius: 999px !important; font-weight: 700; }
+.tracker-actions .btn { border-radius: 999px !important; }
+
+/* ── Onboarding: quiet refinement, same 8-step architecture ───────── */
+.ob-shell { gap: 20px; }
+.ob-progress { padding: 2px 4px 12px; }
+.ob-step-node { border-width: 2px; }
+.ob-step.current .ob-step-node {
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 16%, transparent),
+    0 4px 14px var(--accent-glow);
+}
+.ob-card {
+  border-radius: 28px;
+  box-shadow: var(--shadow-lg), 0 30px 80px -40px var(--accent-glow);
+  scroll-margin-top: 24px;
+}
+.ob-card-head h1 { letter-spacing: -.01em; }
+.ob-card input:not([type="range"]):not([type="checkbox"]):focus,
+.ob-card select:focus, .ob-card textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+.ob-btn { transition: transform .16s ease, box-shadow .2s ease, background .2s ease, border-color .2s ease; }
+.ob-btn:hover { transform: translateY(-1px); }
+.ob-btn:active { transform: translateY(0) scale(.985); }
+.ob-btn-primary {
+  background: var(--accent-gradient);
+  box-shadow: 0 8px 22px -8px var(--accent-glow);
+}
+.ob-btn-primary:hover { box-shadow: 0 12px 28px -8px var(--accent-glow); }
+.ob-choice-card, .ob-program-card, .ob-choice-btn { transition: transform .16s ease, border-color .2s ease, box-shadow .2s ease; }
+.ob-choice-card:hover, .ob-program-card:hover, .ob-choice-btn:hover { transform: translateY(-1px); }
+
+/* ═════════════════════════════════════════════════════════════════════
+   ANALYTICS PAGE — replicable section grammar:
+   ASection (an-section) → header (tile + title + meta) → content rows
+   (facts, bars, rhythms, loads, recos). New analytics sections use the
+   same .an-* primitives, so the page scales without new CSS.
+   ═════════════════════════════════════════════════════════════════════*/
+.analytics-view { display: flex; flex-direction: column; gap: 16px; }
+
+/* Top-line stat tiles */
+.an-tiles {
+  display: grid; gap: 12px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+.an-tile {
+  padding: 14px 16px; border-radius: 16px;
+  background: var(--surface-solid, var(--surface));
+  display: flex; flex-direction: column; gap: 2px; min-width: 0;
+}
+.an-tile-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.an-tile-label {
+  font-size: .68rem; font-weight: 750; letter-spacing: .05em; text-transform: uppercase;
+  color: var(--text-dim);
+}
+.an-tile-value {
+  font-size: 1.55rem; font-weight: 750; letter-spacing: -.02em;
+  margin-top: 6px; font-variant-numeric: tabular-nums; line-height: 1.15;
+}
+.an-tile-den { font-size: .95rem; font-weight: 650; color: var(--text-dim); }
+.an-tile-sub { font-size: .72rem; color: var(--text-dim); margin-top: 2px; }
+
+/* Section scaffold */
+.an-grid {
+  display: grid; gap: 14px; grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.an-grid--consistency { grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); }
+.an-section { padding: 18px 20px 20px; }
+.an-section-head {
+  display: flex; align-items: center; gap: 11px;
+  margin-bottom: 15px; flex-wrap: wrap;
+}
+.an-section-title { margin: 0; font-size: 1rem; flex: 0 0 auto; }
+.an-section-meta {
+  margin-left: auto; font-size: .72rem; color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Consistency ring + facts */
+.an-consistency { display: flex; align-items: center; gap: 22px; flex-wrap: wrap; }
+.an-ring { position: relative; width: 132px; height: 132px; flex: 0 0 auto; }
+.an-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); display: block; }
+.an-ring .ring-track { stroke: var(--row-bg); }
+.an-ring-prog { stroke-linecap: round; transition: stroke-dashoffset 1s cubic-bezier(.22, 1, .36, 1); }
+.an-ring-center {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 0;
+}
+.an-ring-num { font-size: 1.5rem; font-weight: 750; letter-spacing: -.02em; }
+.an-ring-cap { font-size: .62rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text-dim); }
+.an-consistency-facts { display: flex; flex-direction: column; gap: 10px; min-width: 120px; }
+.an-fact { display: flex; align-items: baseline; gap: 8px; }
+.an-fact strong { font-size: 1.05rem; font-weight: 750; font-variant-numeric: tabular-nums; }
+.an-fact span { font-size: .74rem; color: var(--text-dim); }
+
+/* Weekday rhythm rows */
+.an-rhythm { display: flex; flex-direction: column; gap: 7px; }
+.an-rhythm-row { display: flex; align-items: center; gap: 12px; }
+.an-rhythm-label { width: 34px; font-size: .74rem; font-weight: 700; color: var(--text-muted); }
+.an-rhythm-track {
+  flex: 1; height: 8px; border-radius: 999px; background: var(--row-bg); overflow: hidden;
+}
+.an-rhythm-fill {
+  height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 55%, transparent), var(--accent));
+  transition: width .7s cubic-bezier(.22, 1, .36, 1);
+}
+.an-rhythm-val { width: 44px; text-align: right; font-size: .72rem; color: var(--text-dim); }
+.an-footnote { margin: 13px 0 0; font-size: .74rem; color: var(--text-dim); }
+
+/* Subject performance + pace */
+.an-mastery { gap: 13px; }
+.an-pace {
+  margin-top: 16px; padding-top: 14px;
+  border-top: 1px dashed var(--glass-border);
+  display: flex; flex-direction: column; gap: 8px;
+}
+.an-pace-head { font-size: .74rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; }
+
+/* Remaining-work load bars */
+.an-load { display: flex; flex-direction: column; gap: 9px; }
+.an-load-row { display: flex; align-items: center; gap: 12px; }
+.an-load-name {
+  flex: 0 1 150px; min-width: 0; font-size: .8rem; font-weight: 650;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.an-load-track { flex: 1; height: 9px; border-radius: 999px; background: var(--row-bg); overflow: hidden; }
+.an-load-fill {
+  height: 100%; border-radius: 999px;
+  transition: width .7s cubic-bezier(.22, 1, .36, 1);
+  min-width: 3px;
+}
+.an-load-val { width: 52px; text-align: right; font-size: .72rem; color: var(--text-dim); }
+.an-momentum {
+  margin-top: 16px; padding-top: 14px;
+  border-top: 1px dashed var(--glass-border);
+  display: flex; flex-wrap: wrap; gap: 8px;
+}
+
+/* Recommendations */
+.an-recos { display: grid; gap: 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.an-reco {
+  display: flex; align-items: flex-start; gap: 11px;
+  padding: 12px 14px; border-radius: 13px;
+  background: var(--row-bg);
+  border: 1px solid transparent;
+  transition: border-color .2s ease, background .2s ease;
+}
+.an-reco:hover { border-color: var(--glass-border-hover); }
+.an-reco-text { font-size: .82rem; line-height: 1.5; color: var(--text-muted); }
+.an-reco-text strong { color: var(--text-strong, inherit); }
+
+/* Smaller labels for the 8-week trend chart */
+.wk2-label--sm { font-size: .58rem; letter-spacing: .01em; }
+
+/* ── Analytics responsive ─────────────────────────────────────────── */
+@media (max-width: 1150px) {
+  .an-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 960px) {
+  .an-grid, .an-grid--consistency { grid-template-columns: minmax(0, 1fr); }
+  .an-recos { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 640px) {
+  .an-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .an-section { padding: 15px 15px 17px; }
+  .an-consistency { gap: 16px; }
+  .an-section-meta { width: 100%; margin-left: 43px; margin-top: -6px; }
+  .an-tile-value { font-size: 1.35rem; }
+}
+
+/* ── 6-item mobile bottom nav (Analytics joined the party) ────────── */
+@media (max-width: 860px) {
+  .mobile-bottom-nav { grid-template-columns: repeat(6, minmax(0, 1fr)) !important; gap: 1px !important; }
+  .mbn-item { min-height: 48px !important; font-size: .56rem !important; letter-spacing: 0 !important; border-radius: 11px !important; gap: 2px !important; }
+  .mbn-item svg { width: 18px; height: 18px; }
+}
+@media (max-width: 400px) {
+  .mbn-item { font-size: .5rem !important; }
+  .mbn-item svg { width: 16px; height: 16px; }
+}
+
+/* Tracker bar on narrow screens keeps its pill geometry without waste. */
+@media (max-width: 860px) {
+  .tracker-bar { padding: 10px 12px; gap: 10px; }
+  .tracker-status { padding: 5px 13px 5px 9px !important; }
+  .tracker-time { font-size: .95rem; }
+}
+
+/* ── Reduced motion / forced colours for the new layer ────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .timer-ring-wrap.is-running { animation: none; }
+  .timer-ring-wrap.is-running .timer-ring-prog { filter: none; }
+  .an-ring-prog, .an-rhythm-fill, .an-load-fill { transition: none; }
+  .ob-btn:hover, .ob-choice-card:hover, .ob-program-card:hover, .ob-choice-btn:hover { transform: none; }
+}
+@media (forced-colors: active) {
+  .an-ring-prog, .timer-ring-prog { forced-color-adjust: none; }
+  .task-row.is-overdue { box-shadow: inset 3px 0 0 CanvasText; }
+  .chip-overdue { border: 1px solid CanvasText; }
+}

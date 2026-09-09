@@ -11,6 +11,7 @@ import TaskEditor, { type TaskPatch } from "./TaskEditor";
 import TaskActions from "./TaskActions";
 import { TaskLiveBadge } from "./TaskClockButton";
 import QuickAdd from "./QuickAdd";
+import { TaskKindIcon } from "./taskKind";
 import { useBackClose } from "@/lib/useBackClose";
 import type { QuickAddPayload } from "@/lib/quickAdd";
 
@@ -110,18 +111,20 @@ export default function PlannerView({
     const topic = topicFor(task);
     const isCheckpoint = task.title.toLowerCase().includes("checkpoint") || (task.kind === "mock" && !task.subjectId);
     const kindLabel = isCheckpoint ? "Checkpoint" : meta.label;
-    const dotColor = subj?.color || (isCheckpoint ? "var(--color-primary)" : meta.color);
 
     // Normalize any legacy "#0" or unspaced checkpoint titles (shared helper)
     const formattedTitle = isCheckpoint ? normalizeCheckpointTitle(task.title) : task.title;
+    // Pending tasks from before today are overdue — the row gets a tinted
+    // edge and a chip so they read as needing action, not just "old".
+    const overdue = task.status === "pending" && task.date < t;
 
     const showLessonBrief = options.showLessonBrief !== false;
     const canExpandLessonBrief = showLessonBrief && (!!topic || (isCheckpoint && !!task.detail));
     const open = canExpandLessonBrief && expanded === task.id;
     return (
       <div key={task.id}>
-        <div className={`task-row${task.status === "done" ? " done" : ""}${activeTaskId === task.id ? " active-clock" : ""}${options.lastRow ? " last-row" : ""}`}>
-          <div className="task-dot" style={{ background: dotColor }} />
+        <div className={`task-row${task.status === "done" ? " done" : ""}${overdue ? " is-overdue" : ""}${activeTaskId === task.id ? " active-clock" : ""}${options.lastRow ? " last-row" : ""}`}>
+          <TaskKindIcon task={task} color={subj?.color} />
           <div className={`task-main${canExpandLessonBrief ? " is-expandable" : ""}`}
             role={canExpandLessonBrief ? "button" : undefined}
             tabIndex={canExpandLessonBrief ? 0 : undefined}
@@ -157,6 +160,7 @@ export default function PlannerView({
               {activeTaskId === task.id && <TaskLiveBadge seconds={activeClockSeconds} running={clockRunning} />}
             </div>
           </div>
+          {overdue && <span className="chip chip-overdue chip-tight">Overdue</span>}
           <span className={`chip chip-${task.status}`}>{task.status}</span>
           <TaskActions
             task={task}
