@@ -12,6 +12,7 @@ import Dashboard from "@/components/Dashboard";
 import PlannerView from "@/components/PlannerView";
 import FocusView from "@/components/FocusView";
 import SubjectsView from "@/components/SubjectsView";
+import AnalyticsView from "@/components/AnalyticsView";
 import SettingsView from "@/components/SettingsView";
 import ChatPanel from "@/components/ChatPanel";
 import CommandPalette, { type Command } from "@/components/CommandPalette";
@@ -20,7 +21,7 @@ import { haptic } from "@/lib/haptics";
 import { useBackClose } from "@/lib/useBackClose";
 import type { TaskPatch } from "@/components/TaskEditor";
 import {
-  IconBolt, IconBell, IconBook, IconCalendar, IconCheck, IconClock, IconExpand2, IconFlame,
+  IconBolt, IconBell, IconChart, IconBook, IconCalendar, IconCheck, IconClock, IconExpand2, IconFlame,
   IconFocus2, IconGear, IconHome, IconLeaf, IconLogo, IconPalette, IconPanelLeft,
   IconSpark, IconWarn,
 } from "@/components/icons";
@@ -32,7 +33,7 @@ import {
 } from "@/lib/ai";
 import { appendChatTurn, isFallbackUser } from "@/lib/chatTurn";
 
-type Page = "dashboard" | "planner" | "focus" | "subjects" | "settings";
+type Page = "dashboard" | "planner" | "focus" | "subjects" | "analytics" | "settings";
 
 /** Zen header label for the current focus-timer mode. Display only. */
 const ZEN_MODE_LABEL: Record<TimerMode, string> = {
@@ -54,6 +55,7 @@ const NAV: { id: Page; label: string; icon: React.ReactNode }[] = [
   { id: "planner", label: "Planner", icon: <IconCalendar /> },
   { id: "focus", label: "Focus", icon: <IconClock /> },
   { id: "subjects", label: "Subjects", icon: <IconBook /> },
+  { id: "analytics", label: "Analytics", icon: <IconChart /> },
   { id: "settings", label: "Settings", icon: <IconGear /> },
 ];
 
@@ -894,6 +896,7 @@ export default function Home() {
     { id: "nav-plan", group: "Navigate", label: "Go to Planner", hint: "Schedule", keywords: "tasks lessons", run: () => goPage("planner") },
     { id: "nav-focus", group: "Navigate", label: "Go to Focus", hint: "Pomodoro", keywords: "timer deep work", run: () => goPage("focus") },
     { id: "nav-subj", group: "Navigate", label: "Go to Subjects", hint: "Syllabus", keywords: "units topics", run: () => goPage("subjects") },
+    { id: "nav-analytics", group: "Navigate", label: "Go to Analytics & Trends", hint: "Metrics", keywords: "charts reports trends mastery velocity", run: () => goPage("analytics") },
     { id: "nav-set", group: "Navigate", label: "Go to Settings", keywords: "theme preferences", run: () => goPage("settings") },
     { id: "clock-in", group: "Study Clock", label: session.active ? "Pause Session" : clock.sessionActive ? "Resume Session" : "Clock In", hint: session.active ? "Freeze both timers" : "Start recording", keywords: "timer record attendance pause", run: () => (session.active ? session.pause() : clock.sessionActive ? session.start() : startSmartClock()) },
     { id: "clock-out", group: "Study Clock", label: "Clock Out", hint: clock.sessionActive ? "Stop & save minutes" : "no open session", keywords: "stop end finish timer", run: () => (clock.sessionActive ? clockOutNow() : notify("No open session to close.")) },
@@ -1184,6 +1187,9 @@ export default function Home() {
           )}
           {page === "subjects" && (
             <SubjectsView state={state} onAdd={addSubject} onEdit={editSubject} onDelete={deleteSubject} busy={busy} onAskTutor={askTutor} />
+          )}
+          {page === "analytics" && (
+            <AnalyticsView state={state} onAskTutor={askTutor} onStartFocus={startFocusSession} />
           )}
           {page === "settings" && (
             <SettingsView state={state} onPatch={patchSettings} onRestart={requestWizardRestart} busy={busy} />

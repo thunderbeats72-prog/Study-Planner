@@ -1,24 +1,46 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import StudyScene from "./StudyScene";
 import {
-  addDays, dayDiff, fmtDate, KIND_META, normalizeCheckpointTitle, parseDate, prettyDate, prettyLong, today, type AppState, type TaskRow,
+  addDays, dayDiff, fmtDate, KIND_META, normalizeCheckpointTitle, parseDate,
+  prettyDate, prettyLong, today, type AppState, type TaskRow,
 } from "@/lib/client";
-import { IconSpark, IconClose, IconChevron } from "./icons";
+import {
+  IconCalendar, IconCheck, IconChevron, IconClock, IconClose, IconEdit,
+  IconList, IconBoard, IconPlus, IconRefresh, IconSpark, IconTarget,
+} from "./icons";
 import TaskEditor, { type TaskPatch } from "./TaskEditor";
 import TaskActions from "./TaskActions";
 import { TaskLiveBadge } from "./TaskClockButton";
 import QuickAdd from "./QuickAdd";
+import { CalendarScene } from "./Illustrations";
+import { PageHead, Seg, StatusChip, KindChip } from "./bits";
+import { Reveal, Spot } from "@/lib/fx";
 import { useBackClose } from "@/lib/useBackClose";
 import type { QuickAddPayload } from "@/lib/quickAdd";
+import { cn } from "@/lib/cn";
 
-type View = "list" | "calendar";
-type RenderTaskOptions = { showLessonBrief?: boolean; lastRow?: boolean };
+type View = "list" | "calendar" | "kanban";
+
+function isCheckpointTask(task: TaskRow): boolean {
+  return task.kind === "checkpoint" || (!!task.title && task.title.toLowerCase().startsWith("checkpoint:"));
+}
 
 export default function PlannerView({
-  state, onTaskStatus, onTaskUpdate, onSkipSubject, onFocusTask, activeTaskId, activeClockSeconds,
-  clockRunning, clockSessionActive, onClockOut, onAskTutor, replanning, onReplan, onAddTask,
+  state,
+  onTaskStatus,
+  onTaskUpdate,
+  onSkipSubject,
+  onFocusTask,
+  activeTaskId,
+  activeClockSeconds,
+  clockRunning,
+  clockSessionActive,
+  onClockOut,
+  onAskTutor,
+  replanning,
+  onReplan,
+  onAddTask,
 }: {
   state: AppState;
   onTaskStatus: (id: number, status: string, rating?: number) => void;
@@ -40,16 +62,11 @@ export default function PlannerView({
   const [openDay, setOpenDay] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<number | null>(null);
   const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
-  const [month, setMonth] = useState(() => {
-    const d = new Date(); return { y: d.getFullYear(), m: d.getMonth() };
-  });
+  const [monthOff, setMonthOff] = useState(0);
+
   const t = today();
   useBackClose(!!openDay, () => setOpenDay(null));
 
-  // When a lesson brief opens, bring it into view. Inside the calendar's
-  // day sheet the brief expands *below* the tapped task, which is usually
-  // past the bottom edge of the sheet — without this, users tapped a task
-  // and saw empty space and assumed the lesson/brief was missing.
   const briefRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     if (expanded == null) return;
@@ -75,349 +92,479 @@ export default function PlannerView({
     return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
   }, [filtered]);
 
-  const upcoming = grouped.filter(([d]) => dayDiff(d, t) <= 0);
-  const overdue = grouped.filter(([d]) => dayDiff(d, t) > 0 && d !== t).flatMap(([, v]) => v).filter((x) => x.status === "pending");
-
-  // Workload glance — today's remaining work, tomorrow's plan, this week's total.
-  const weekEnd = addDays(t, 6);
-  const todayRemaining = state.tasks
-    .filter((x) => x.date === t && x.status === "pending")
-    .reduce((sum, x) => sum + x.plannedMinutes, 0);
-  const todayPendingCount = state.tasks.filter((x) => x.date === t && x.status === "pending").length;
-  const tomorrowPlanned = state.tasks
-    .filter((x) => x.date === addDays(t, 1))
-    .reduce((sum, x) => sum + x.plannedMinutes, 0);
-  const weekList = state.tasks.filter((x) => x.date >= t && x.date <= weekEnd && x.status !== "skipped");
-  const weekPlanned = weekList.reduce((sum, x) => sum + x.plannedMinutes, 0);
-  const weekTaskCount = weekList.length;
-
   const topicFor = (task: TaskRow) => state.topics.find((x) => x.id === task.topicId);
   const subjFor = (task: TaskRow) => state.subjects.find((s) => s.id === task.subjectId);
   const taskLogged = (taskId: number) => {
     const sum = state.sessions.filter((x) => x.taskId === taskId).reduce((a, x) => a + x.minutes, 0);
     return Math.round(sum * 100) / 100;
   };
-  // 13.5 minutes displays as "13.5m" — never rounded to a different number
   const fmtMin = (m: number) => {
     const r = Math.round(m * 10) / 10;
     return `${Number.isInteger(r) ? r : r.toFixed(1)}m`;
   };
 
-  const renderTask = (task: TaskRow, options: RenderTaskOptions = {}) => {
-    const meta = KIND_META[task.kind] || KIND_META.learn;
-    const subj = subjFor(task);
-    const topic = topicFor(task);
-    const isCheckpoint = task.title.toLowerCase().includes("checkpoint") || (task.kind === "mock" && !task.subjectId);
-    const kindLabel = isCheckpoint ? "Checkpoint" : meta.label;
-    const dotColor = subj?.color || (isCheckpoint ? "var(--color-primary)" : meta.color);
+  /* Calendar calculations */
+  const baseDate = new Date();
+  const mDate = new Date(baseDate.getFullYear(), baseDate.getMonth() + monthOff, 1);
+  const firstDow = mDate.getDay();
+  const daysInMonth = new Date(mDate.getFullYear(), mDate.getMonth() + 1, 0).getDate();
 
-    // Normalize any legacy "#0" or unspaced checkpoint titles (shared helper)
-    const formattedTitle = isCheckpoint ? normalizeCheckpointTitle(task.title) : task.title;
-
-    const showLessonBrief = options.showLessonBrief !== false;
-    const canExpandLessonBrief = showLessonBrief && (!!topic || (isCheckpoint && !!task.detail));
-    const open = canExpandLessonBrief && expanded === task.id;
-    return (
-      <div key={task.id}>
-        <div className={`task-row${task.status === "done" ? " done" : ""}${activeTaskId === task.id ? " active-clock" : ""}${options.lastRow ? " last-row" : ""}`}>
-          <div className="task-dot" style={{ background: dotColor }} />
-          <div className={`task-main${canExpandLessonBrief ? " is-expandable" : ""}`}
-            role={canExpandLessonBrief ? "button" : undefined}
-            tabIndex={canExpandLessonBrief ? 0 : undefined}
-            aria-expanded={canExpandLessonBrief ? open : undefined}
-            aria-label={canExpandLessonBrief ? `${open ? "Hide" : "Show"} lesson brief: ${formattedTitle}` : undefined}
-            onClick={() => canExpandLessonBrief && setExpanded(open ? null : task.id)}
-            onKeyDown={(e) => {
-              if (canExpandLessonBrief && (e.key === "Enter" || e.key === " ")) {
-                e.preventDefault();
-                setExpanded(open ? null : task.id);
-              }
-            }}>
-            <div className="task-title">
-              {formattedTitle}
-              {canExpandLessonBrief && (
-                <span className={`brief-chev${open ? " open" : ""}`} aria-hidden="true"
-                  title={open ? "Hide lesson brief" : "Show lesson brief"}>
-                  <IconChevron size={12} />
-                </span>
-              )}
-            </div>
-            <div className="task-sub">
-              <span className="chip chip-kind chip-tight">{kindLabel}</span>
-              {task.plannedMinutes} min
-              {topic
-                ? ` · ${topic.unit} · ${topic.difficulty}`
-                : isCheckpoint
-                ? ` · All Subjects · Comprehensive Review`
-                : task.detail
-                ? ` · ${task.detail}`
-                : ""}
-              {taskLogged(task.id) ? ` · ${fmtMin(taskLogged(task.id))} logged` : task.actualMinutes ? ` · ${task.actualMinutes}m logged` : ""}
-              {activeTaskId === task.id && <TaskLiveBadge seconds={activeClockSeconds} running={clockRunning} />}
-            </div>
-          </div>
-          <span className={`chip chip-${task.status}`}>{task.status}</span>
-          <TaskActions
-            task={task}
-            subject={subj}
-            activeTaskId={activeTaskId}
-            clockSessionActive={clockSessionActive}
-            onTaskStatus={onTaskStatus}
-            onFocusTask={onFocusTask}
-            onClockOut={onClockOut}
-            onEdit={setEditingTaskId}
-            onSkipSubject={onSkipSubject}
-          />
-        </div>
-        {canExpandLessonBrief && open && topic && (
-          <div ref={briefRef} className="glass-panel slide-in planner-lesson-brief accent-edge" style={{ "--edge": subj?.color || "var(--accent)" } as React.CSSProperties}>
-            <div className="lesson-brief-heading">
-              Lesson brief · {topic.unit} · {topic.depth || "Core"}
-            </div>
-            <div className="lesson-brief-title">{topic.title}</div>
-            <div className="lesson-brief-meta">
-              {subj && <span className="chip chip-kind">{subj.name}</span>}
-              <span>{topic.difficulty} difficulty</span>
-              <span>~{topic.estMinutes} min lesson</span>
-              <span>Mastery {topic.mastery}%</span>
-            </div>
-            <div className="lesson-summary">{topic.summary}</div>
-            {!!topic.prerequisites?.length && (
-              <div className="lesson-detail-block compact">
-                <strong>Before you start</strong>
-                <span>{topic.prerequisites.join(" · ")}</span>
-              </div>
-            )}
-            {!!topic.keyConcepts?.length && (
-              <div className="lesson-concepts">
-                {topic.keyConcepts.map((concept, i) => <span className="chip chip-kind" key={i}>{concept}</span>)}
-              </div>
-            )}
-            {!!topic.objectives?.length && (
-              <ul className="lesson-outcomes">
-                {topic.objectives.map((o, i) => <li key={i}>{o}</li>)}
-              </ul>
-            )}
-            {topic.practice && <div className="lesson-practice"><strong>Applied practice</strong><span>{topic.practice}</span></div>}
-            {!!topic.sources?.length && (
-              <div className="lesson-source-list compact" aria-label="Lesson sources">
-                {topic.sources.map((source, i) => (
-                  <div className="lesson-source" key={`${source.publisher}-${i}`}>
-                    <span>{source.type}</span>
-                    <div>
-                      {source.url ? <a href={source.url} target="_blank" rel="noreferrer">{source.title}</a> : <b>{source.title}</b>}
-                      <small>{source.publisher}{source.section ? ` · ${source.section}` : ""}</small>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-            <div className="flex-row gap-sm lesson-brief-actions">
-              <button className="btn btn-xs btn-primary" onClick={() => onAskTutor(`Explain "${topic.title}" from ${subj?.name || "my course"} step by step with an example. Address these outcomes: ${(topic.objectives || []).join("; ")}. Use the listed curriculum sources.`)}>
-                <IconSpark size={12} /> Teach me this
-              </button>
-              <button className="btn btn-xs btn-secondary" onClick={() => onAskTutor(`Create a graded practice set for "${topic.title}" based on this requirement: ${topic.practice || "5 practice questions with answers"}.`)}>
-                Practice questions
-              </button>
-            </div>
-          </div>
-        )}
-        {canExpandLessonBrief && open && !topic && task.detail && (
-          <div ref={briefRef} className="glass-panel slide-in planner-lesson-brief accent-edge" style={{ "--edge": "var(--accent)" } as React.CSSProperties}>
-            <div className="lesson-brief-heading">
-              Checkpoint brief · All Subjects · Comprehensive Review
-            </div>
-            <div className="lesson-brief-title">{formattedTitle}</div>
-            <div className="lesson-brief-meta">
-              <span className="chip chip-kind">All Subjects</span>
-              <span className="chip chip-kind chip-tight">Checkpoint</span>
-              <span>{task.plannedMinutes} min</span>
-            </div>
-            <div className="lesson-summary">{task.detail}</div>
-            <div className="flex-row gap-sm lesson-brief-actions">
-              <button className="btn btn-xs btn-primary" onClick={() => onAskTutor(`Generate a 5-question weekly checkpoint quiz covering all my subjects from the past week, with answers and explanations.`)}>
-                <IconSpark size={12} /> Generate Checkpoint Quiz
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  // calendar grid
-  const first = new Date(month.y, month.m, 1);
-  const startPad = first.getDay();
-  const daysInMonth = new Date(month.y, month.m + 1, 0).getDate();
-  const cells: (string | null)[] = [
-    ...Array(startPad).fill(null),
-    ...Array.from({ length: daysInMonth }, (_, i) => fmtDate(new Date(month.y, month.m, i + 1))),
+  /* Kanban columns */
+  const kanbanCols: { k: string; label: string; count: number }[] = [
+    { k: "pending", label: "Pending", count: filtered.filter((tk) => tk.status === "pending").length },
+    { k: "done", label: "Done", count: filtered.filter((tk) => tk.status === "done").length },
+    { k: "skipped", label: "Skipped", count: filtered.filter((tk) => tk.status === "skipped").length },
   ];
 
-  const dayTasks = (d: string) => filtered.filter((x) => x.date === d);
-
   return (
-    <div className="fade-in">
-      <div className="page-header">
-        <StudyScene variant="planner" className="page-header-scene" />
-        <div>
-          <h1 className="page-title">Study Planner</h1>
-          <p className="page-subtitle">
-            {state.tasks.length} tasks · {state.topics.length} lessons mapped · your plan rebalances automatically
-          </p>
-        </div>
-        <div className="flex-row gap-md planner-tools">
-          <div className="vtabs">
-            {(["list", "calendar"] as View[]).map((v) => (
-              <div key={v} className={`vtab${view === v ? " active" : ""}`} onClick={() => setView(v)}>
-                {v[0].toUpperCase() + v.slice(1)}
-              </div>
-            ))}
+    <div className="space-y-6 fade-in">
+      <PageHead
+        eyebrow="STUDY PLANNER"
+        title="Adaptive Schedule"
+        sub={`Lesson-wise intelligent schedule · ${state.tasks.length} total tasks · ${state.topics.length} curriculum lessons mapped`}
+        art={<CalendarScene />}
+      />
+
+      {/* ── CONTROLS ROW ── */}
+      <Reveal>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <Seg
+              value={view}
+              onChange={setView}
+              options={[
+                { v: "list", label: "List", icon: <IconList size={15} /> },
+                { v: "calendar", label: "Calendar", icon: <IconCalendar size={15} /> },
+                { v: "kanban", label: "Kanban", icon: <IconBoard size={15} /> },
+              ]}
+            />
+            <select
+              className="input-field w-auto min-w-[170px]"
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              aria-label="Filter by subject"
+            >
+              <option value="all">All subjects ({state.subjects.length})</option>
+              {state.subjects.map((sb) => (
+                <option key={sb.id} value={String(sb.id)}>
+                  {sb.name}
+                </option>
+              ))}
+            </select>
           </div>
-          <select className="input-field filter-select" value={filter} onChange={(e) => setFilter(e.target.value)}>
-            <option value="all">All subjects</option>
-            {state.subjects.map((s) => <option key={s.id} value={String(s.id)}>{s.name}</option>)}
-          </select>
-          <button className="btn btn-primary" onClick={onReplan} disabled={replanning} aria-busy={replanning}>
-            <span className={replanning ? "replanning-spark" : ""}><IconSpark size={14} /></span>
-            {replanning ? "Rebalancing schedule…" : "Rebalance schedule"}
-          </button>
-        </div>
-      </div>
 
-      {/* One-line workload glance: what remains today, tomorrow, this week. */}
-      <div className="workload-strip glass-panel">
-        <span className="workload-item">Today <strong>{fmtMin(todayRemaining)}</strong> to go · {todayPendingCount} left</span>
-        <span className="workload-sep" aria-hidden="true" />
-        <span className="workload-item">Tomorrow <strong>{fmtMin(tomorrowPlanned)}</strong> planned</span>
-        <span className="workload-sep" aria-hidden="true" />
-        <span className="workload-item">This week <strong>{fmtMin(weekPlanned)}</strong> planned · {weekTaskCount} tasks</span>
-      </div>
-
-      <div className="planner-quickadd-row">
-        <QuickAdd state={state} onAdd={onAddTask} />
-      </div>
-
-      {overdue.length > 0 && (
-        <div className="glass-panel section-card accent-edge accent-edge--warning overdue-strip">
-          <div className="overdue-title">
-            {overdue.length} task{overdue.length > 1 ? "s" : ""} from earlier days are still pending.
+          <div className="flex flex-wrap items-center gap-2">
+            <QuickAdd state={state} onAdd={onAddTask} />
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={onReplan}
+              disabled={replanning}
+              aria-busy={replanning}
+            >
+              <IconRefresh size={15} className={replanning ? "anim-spin" : ""} />
+              <span>{replanning ? "Re-planning…" : "Rebalance Schedule"}</span>
+            </button>
           </div>
-          <div className="panel-lead">
-            Don&apos;t cram them into today — let the engine redistribute them across your remaining days.
-          </div>
-          <button className="btn btn-sm btn-primary" onClick={onReplan} disabled={replanning} aria-busy={replanning}>
-            {replanning && <span className="replanning-spark"><IconSpark size={12} /></span>}
-            {replanning ? "Moving overdue work…" : "Rebalance my schedule"}
-          </button>
         </div>
-      )}
+      </Reveal>
 
+      {/* ── 1. LIST VIEW ── */}
       {view === "list" && (
-        <div className="planner-list">
-          {!upcoming.length && (
-            <div className="glass-panel">
-              <div className="empty-state">
-                <div className="empty-state-icon">
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="3" y="4" width="18" height="18" rx="3" /><path d="M16 2v4M8 2v4M3 10h18" />
-                  </svg>
-                </div>
-                <h4 className="empty-state-title">No upcoming sessions</h4>
-                <p className="empty-state-sub">Generate the next stretch of your schedule and your daily plan will appear here.</p>
-                <button className="btn btn-primary btn-sm" onClick={onReplan} disabled={replanning}>
-                  {replanning ? "Re-planning…" : "Generate Plan"}
-                </button>
-              </div>
+        <div className="space-y-4">
+          {grouped.length === 0 && (
+            <div className="glass-panel tilt-card section-card p-8 text-center">
+              <p className="text-[14px] font-semibold" style={{ color: "var(--text-dim, #5f5a7a)" }}>
+                No tasks match the active filter.
+              </p>
             </div>
           )}
-          <div className="planner-days">
-          {upcoming.map(([date, list]) => {
-            const done = list.filter((x) => x.status === "done").length;
-            const mins = list.reduce((a, x) => a + x.plannedMinutes, 0);
+
+          {grouped.map(([dateKey, tasksForDay], i) => {
+            const isToday = dateKey === t;
+            const isPast = dateKey < t;
+            const dayMins = tasksForDay.reduce((a, b) => a + b.plannedMinutes, 0);
+            const doneCount = tasksForDay.filter((tk) => tk.status === "done").length;
+            const allDone = doneCount === tasksForDay.length && tasksForDay.length > 0;
+
             return (
-              <div className="glass-panel tilt-card day-block" key={date}>
-                <div className="day-head">
-                  <div>
-                    <div className="day-date">
-                      {date === t ? "Today · " : dayDiff(date, t) === -1 ? "Tomorrow · " : ""}{prettyDate(date)}
+              <Reveal key={dateKey} delay={Math.min(i, 6) * 45}>
+                <div
+                  className={cn(
+                    "glass-panel tilt-card section-card overflow-hidden",
+                    isToday && "accent-edge accent-edge--primary"
+                  )}
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border-subtle,#e4e0f1)] bg-[var(--surface-2,#f4f2fc)] px-4 py-3 sm:px-5">
+                    <div className="flex items-center gap-2.5">
+                      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[color-mix(in_oklab,var(--accent,#6366f1)_14%,transparent)] text-[var(--accent,#6366f1)]">
+                        <IconCalendar size={15} />
+                      </span>
+                      <div>
+                        <span className="text-[14.5px] font-extrabold tracking-tight" style={{ color: "var(--text-main, #211a3a)" }}>
+                          {prettyLong(dateKey)}
+                          {isToday && <span className="ml-2 rounded-full bg-[var(--accent,#6366f1)] px-2 py-0.5 text-[10.5px] font-bold text-white">TODAY</span>}
+                        </span>
+                        <span className="mono ml-3 text-[12px] font-semibold" style={{ color: "var(--text-dim, #5f5a7a)" }}>
+                          {tasksForDay.length} tasks · {dayMins} min · {doneCount} done
+                        </span>
+                      </div>
                     </div>
-                    <div className="day-meta">{list.length} tasks · {mins} min · {done} done</div>
+                    {allDone && (
+                      <span className="flex items-center gap-1 text-[12px] font-bold text-[var(--success-accent,#2e9e6d)]">
+                        <IconCheck size={14} /> Completed
+                      </span>
+                    )}
                   </div>
-                  <div className="bar-track daybar">
-                    <div className="bar-fill" style={{ width: `${list.length ? (done / list.length) * 100 : 0}%` }} />
+
+                  <div className="divide-y divide-[var(--border-subtle,#e4e0f1)]">
+                    {tasksForDay.map((task) => {
+                      const meta = KIND_META[task.kind] || KIND_META.learn;
+                      const subj = subjFor(task);
+                      const topic = topicFor(task);
+                      const isCheckpoint = isCheckpointTask(task);
+                      const kindLabel = isCheckpoint ? "Checkpoint" : meta.label;
+                      const dotColor = subj?.color || (isCheckpoint ? "var(--color-primary)" : meta.color);
+                      const formattedTitle = isCheckpoint ? normalizeCheckpointTitle(task.title) : task.title;
+                      const isDone = task.status === "done";
+                      const canExpand = !!topic || (isCheckpoint && !!task.detail);
+                      const isOpen = canExpand && expanded === task.id;
+
+                      return (
+                        <div key={task.id} className="transition-colors">
+                          <div
+                            className={cn(
+                              "flex flex-wrap items-center gap-3 px-4 py-3.5 sm:px-5",
+                              activeTaskId === task.id && "bg-[color-mix(in_oklab,var(--accent,#6366f1)_8%,transparent)]"
+                            )}
+                          >
+                            <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: dotColor }} />
+                            <div className="min-w-0 flex-1 basis-56">
+                              <p className={cn("truncate text-[14px] font-bold", isDone && "line-through opacity-50")} style={{ color: "var(--text-main, #211a3a)" }}>
+                                {formattedTitle}
+                              </p>
+                              <p className="mt-0.5 flex flex-wrap items-center gap-2 text-[11.5px] font-semibold" style={{ color: "var(--text-dim, #5f5a7a)" }}>
+                                <KindChip kind={task.kind} color={dotColor} />
+                                <span className="mono">
+                                  {task.plannedMinutes} min
+                                  {topic?.unit && ` · ${topic.unit}`}
+                                  {topic?.difficulty && ` · ${topic.difficulty}`}
+                                </span>
+                                {taskLogged(task.id) > 0 && (
+                                  <span className="mono font-bold text-[var(--success-accent,#2e9e6d)]">
+                                    {fmtMin(taskLogged(task.id))} logged
+                                  </span>
+                                )}
+                                {activeTaskId === task.id && (
+                                  <TaskLiveBadge seconds={activeClockSeconds} running={clockRunning} />
+                                )}
+                              </p>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              {canExpand && (
+                                <button
+                                  type="button"
+                                  className="btn btn-xs btn-ghost"
+                                  onClick={() => setExpanded(isOpen ? null : task.id)}
+                                >
+                                  {isOpen ? "Hide brief" : "Lesson brief"}
+                                </button>
+                              )}
+                              <TaskActions
+                                task={task}
+                                subject={subj}
+                                activeTaskId={activeTaskId}
+                                clockSessionActive={clockSessionActive}
+                                onTaskStatus={onTaskStatus}
+                                onFocusTask={onFocusTask}
+                                onClockOut={onClockOut}
+                                onEdit={setEditingTaskId}
+                                onSkipSubject={onSkipSubject}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Expandable lesson brief */}
+                          {isOpen && (
+                            <div ref={briefRef} className="border-t border-[var(--border-subtle,#e4e0f1)] bg-[var(--surface-2,#f4f2fc)] p-4 sm:p-5 slide-in">
+                              {topic && (
+                                <div className="space-y-3">
+                                  <p className="text-[13.5px] font-medium leading-relaxed" style={{ color: "var(--text-main, #211a3a)" }}>
+                                    {topic.summary}
+                                  </p>
+                                  {topic.prerequisites?.length > 0 && (
+                                    <div className="text-[12px]">
+                                      <strong className="block mb-1 text-[var(--text-dim,#5f5a7a)]">Prerequisites:</strong>
+                                      <ul className="list-disc pl-4 space-y-0.5" style={{ color: "var(--text-main, #211a3a)" }}>
+                                        {topic.prerequisites.map((pr, pi) => <li key={pi}>{pr}</li>)}
+                                      </ul>
+                                    </div>
+                                  )}
+                                  {topic.keyConcepts?.length > 0 && (
+                                    <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                                      {topic.keyConcepts.map((kc, ki) => (
+                                        <span key={ki} className="chip chip-kind chip-tight">{kc}</span>
+                                      ))}
+                                    </div>
+                                  )}
+                                  <div className="flex justify-end pt-2">
+                                    <button
+                                      type="button"
+                                      className="btn btn-xs btn-primary"
+                                      onClick={() => onAskTutor(`Teach me "${topic.title}" from ${subj?.name || "the syllabus"}. Explain key concepts and give a worked example.`)}
+                                    >
+                                      <IconSpark size={13} /> Ask Tutor to Teach This
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
-                {list.map((task, index) => renderTask(task, { lastRow: index === list.length - 1 }))}
-              </div>
+              </Reveal>
             );
           })}
-          </div>
         </div>
       )}
 
+      {/* ── 2. CALENDAR VIEW ── */}
       {view === "calendar" && (
-        <div className="glass-panel section-card cal-panel">
-          <div className="day-head">
-            <div className="day-date">{first.toLocaleDateString(undefined, { month: "long", year: "numeric" })}</div>
-            <div className="flex-row gap-sm">
-              <button className="btn btn-xs btn-secondary" onClick={() => setMonth((mm) => (mm.m === 0 ? { y: mm.y - 1, m: 11 } : { ...mm, m: mm.m - 1 }))}>‹ Prev</button>
-              <button className="btn btn-xs btn-secondary" onClick={() => setMonth((mm) => (mm.m === 11 ? { y: mm.y + 1, m: 0 } : { ...mm, m: mm.m + 1 }))}>Next ›</button>
+        <Reveal>
+          <div className="glass-panel tilt-card section-card overflow-hidden">
+            <div className="flex items-center justify-between border-b border-[var(--border-subtle,#e4e0f1)] bg-[var(--surface-2,#f4f2fc)] px-5 py-3.5">
+              <button
+                type="button"
+                className="btn btn-xs btn-ghost btn-icon"
+                aria-label="Previous month"
+                onClick={() => setMonthOff((m) => m - 1)}
+              >
+                <IconChevron size={14} style={{ transform: "rotate(90deg)" }} />
+              </button>
+              <h3 className="text-[16px] font-extrabold tracking-tight" style={{ color: "var(--text-main, #211a3a)" }}>
+                {mDate.toLocaleDateString(undefined, { month: "long", year: "numeric" })}
+              </h3>
+              <button
+                type="button"
+                className="btn btn-xs btn-ghost btn-icon"
+                aria-label="Next month"
+                onClick={() => setMonthOff((m) => m + 1)}
+              >
+                <IconChevron size={14} style={{ transform: "rotate(-90deg)" }} />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-7 border-b border-[var(--border-subtle,#e4e0f1)] bg-[var(--surface-2,#f4f2fc)]">
+              {["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"].map((d) => (
+                <span key={d} className="mono py-2 text-center text-[11px] font-extrabold tracking-wider" style={{ color: "var(--text-dim, #5f5a7a)" }}>
+                  {d}
+                </span>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-7">
+              {Array.from({ length: firstDow }, (_, i) => (
+                <div key={`empty-${i}`} className="min-h-20 border-b border-r border-[var(--border-subtle,#e4e0f1)] bg-[var(--surface-2,#f4f2fc)]/40 sm:min-h-24" />
+              ))}
+
+              {Array.from({ length: daysInMonth }, (_, i) => {
+                const dateKey = fmtDate(new Date(mDate.getFullYear(), mDate.getMonth(), i + 1));
+                const dayTasks = filtered.filter((tk) => tk.date === dateKey);
+                const isToday = dateKey === t;
+
+                return (
+                  <button
+                    key={dateKey}
+                    type="button"
+                    onClick={() => dayTasks.length > 0 && setOpenDay(dateKey)}
+                    className={cn(
+                      "min-h-20 border-b border-r border-[var(--border-subtle,#e4e0f1)] p-2 text-left align-top transition-colors hover:bg-[var(--surface-2,#f4f2fc)] sm:min-h-24",
+                      dayTasks.length === 0 && "cursor-default"
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "mono mb-1 grid h-6 w-6 place-items-center rounded-full text-[11px] font-bold",
+                        isToday ? "bg-[var(--accent,#6366f1)] text-white" : "text-[var(--text-main,#211a3a)]"
+                      )}
+                    >
+                      {i + 1}
+                    </span>
+                    <div className="hidden sm:flex flex-col gap-1">
+                      {dayTasks.slice(0, 3).map((tk) => {
+                        const sb = subjFor(tk);
+                        const isDone = tk.status === "done";
+                        return (
+                          <span
+                            key={tk.id}
+                            className={cn(
+                              "truncate rounded px-1.5 py-0.5 text-[10px] font-bold",
+                              isDone && "line-through opacity-45"
+                            )}
+                            style={{
+                              background: `color-mix(in oklab, ${sb?.color || "var(--accent,#6366f1)"} 16%, transparent)`,
+                              color: sb?.color || "var(--accent,#6366f1)",
+                            }}
+                          >
+                            {tk.title}
+                          </span>
+                        );
+                      })}
+                      {dayTasks.length > 3 && (
+                        <span className="mono text-[10px] font-bold text-[var(--text-dim,#5f5a7a)]">
+                          +{dayTasks.length - 3} more
+                        </span>
+                      )}
+                    </div>
+                    <span className="mono text-[10.5px] font-bold text-[var(--accent,#6366f1)] sm:hidden">
+                      {dayTasks.length > 0 && `${dayTasks.length} tasks`}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
-          <div className="cal-grid cal-dow-row">
-            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => <div className="cal-dow" key={d}>{d}</div>)}
-          </div>
-          <div className="cal-grid">
-            {cells.map((d, i) => {
-              if (!d) return <div className="cal-cell empty" key={`e${i}`} />;
-              const list = dayTasks(d);
-              // Soft per-day tint from the first task's subject colour, so a
-              // glance at the month shows where the load is — on phones too.
-              const tint = list.length
-                ? subjFor(list[0])?.color || (KIND_META[list[0].kind] || KIND_META.learn).color
-                : null;
-              return (
-                <div key={d} className={`cal-cell${d === t ? " today" : ""}${list.length ? " has-tasks" : ""}`}
-                  style={tint ? ({ "--cell-tint": tint } as React.CSSProperties) : undefined}
-                  onClick={() => list.length && setOpenDay(d)}>
-                  <div className="cal-num">{parseDate(d).getDate()}</div>
-                  {list.slice(0, 3).map((task) => {
-                    const c = subjFor(task)?.color || (KIND_META[task.kind] || KIND_META.learn).color;
-                    return <div key={task.id} className="cal-pill" style={{ background: c, opacity: task.status === "done" ? 0.45 : 1 }}>{task.title}</div>;
-                  })}
-                  {list.length > 3 && <div className="cal-more">+{list.length - 3} more</div>}
+        </Reveal>
+      )}
+
+      {/* ── 3. KANBAN VIEW ── */}
+      {view === "kanban" && (
+        <div className="grid gap-4 md:grid-cols-3">
+          {kanbanCols.map((col, ci) => {
+            const list = filtered.filter((tk) => tk.status === col.k);
+            return (
+              <Reveal key={col.k} delay={ci * 70}>
+                <div className="glass-panel tilt-card section-card flex min-h-[380px] flex-col overflow-hidden">
+                  <div className="flex items-center justify-between border-b border-[var(--border-subtle,#e4e0f1)] bg-[var(--surface-2,#f4f2fc)] px-4 py-3">
+                    <span className="text-[14px] font-extrabold tracking-tight" style={{ color: "var(--text-main, #211a3a)" }}>
+                      {col.label}
+                    </span>
+                    <span className="mono rounded-md bg-[var(--surface-card,#fcfbff)] px-2 py-0.5 text-[11px] font-bold" style={{ color: "var(--text-dim, #5f5a7a)" }}>
+                      {list.length}
+                    </span>
+                  </div>
+
+                  <div className="flex-1 space-y-2.5 p-3 overflow-y-auto max-h-[600px]">
+                    {list.length === 0 && (
+                      <p className="py-12 text-center text-[12.5px] font-medium" style={{ color: "var(--text-dim, #5f5a7a)" }}>
+                        No {col.label.toLowerCase()} tasks
+                      </p>
+                    )}
+                    {list.map((tk) => {
+                      const sb = subjFor(tk);
+                      return (
+                        <Spot
+                          key={tk.id}
+                          className="glass-panel cursor-pointer rounded-xl border border-[var(--border-subtle,#e4e0f1)] bg-[var(--surface-card,#fcfbff)] p-3.5 transition-shadow hover:shadow-md"
+                          onClick={() => setEditingTaskId(tk.id)}
+                        >
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <span className="h-2 w-2 rounded-full shrink-0" style={{ background: sb?.color || "var(--accent,#6366f1)" }} />
+                            <p className="min-w-0 flex-1 truncate text-[13px] font-bold" style={{ color: "var(--text-main, #211a3a)" }}>
+                              {tk.title}
+                            </p>
+                          </div>
+                          <div className="flex items-center justify-between text-[11px] font-semibold" style={{ color: "var(--text-dim, #5f5a7a)" }}>
+                            <span className="mono">{prettyDate(tk.date)}</span>
+                            <span className="mono">{tk.plannedMinutes} min</span>
+                          </div>
+                        </Spot>
+                      );
+                    })}
+                  </div>
                 </div>
-              );
-            })}
-          </div>
+              </Reveal>
+            );
+          })}
         </div>
       )}
 
+      {/* Task Editor Modal */}
+      {editingTaskId !== null && (
+        <TaskEditor
+          task={state.tasks.find((t) => t.id === editingTaskId) || null}
+          state={state}
+          onClose={() => setEditingTaskId(null)}
+          onSave={onTaskUpdate}
+          onSkipSubject={onSkipSubject}
+        />
+      )}
+
+      {/* Calendar Day Inspection Sheet / Modal */}
       {openDay && (
         <div className="modal-overlay" onClick={() => setOpenDay(null)}>
-          <div className="glass-panel modal-box day-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="day-head">
+          <div
+            className="glass-panel modal-box max-w-xl max-h-[85vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-[var(--border-subtle,#e4e0f1)] pb-3 mb-4">
               <div>
-                <div className="day-date">{prettyLong(openDay)}</div>
-                <div className="day-meta">{dayTasks(openDay).length} tasks scheduled</div>
+                <h3 className="text-[17px] font-extrabold" style={{ color: "var(--text-main, #211a3a)" }}>
+                  {prettyLong(openDay)}
+                </h3>
+                <span className="text-[12px] font-medium" style={{ color: "var(--text-dim, #5f5a7a)" }}>
+                  {filtered.filter((tk) => tk.date === openDay).length} tasks scheduled
+                </span>
               </div>
-              <button className="btn btn-xs btn-secondary" onClick={() => setOpenDay(null)}><IconClose size={13} /></button>
+              <button
+                type="button"
+                className="btn btn-ghost btn-icon"
+                onClick={() => setOpenDay(null)}
+                aria-label="Close"
+              >
+                <IconClose size={16} />
+              </button>
             </div>
-            {dayTasks(openDay).map((task) => renderTask(task, { showLessonBrief: false }))}
-            <button className="btn btn-secondary w-full mt-md" onClick={() => setOpenDay(null)}>Close</button>
+
+            <div className="space-y-2.5">
+              {filtered.filter((tk) => tk.date === openDay).map((tk) => {
+                const sb = subjFor(tk);
+                return (
+                  <div
+                    key={tk.id}
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--border-subtle,#e4e0f1)] bg-[var(--surface-2,#f4f2fc)] p-3"
+                  >
+                    <div className="min-w-0 flex-1 basis-48">
+                      <p className="truncate text-[13.5px] font-bold" style={{ color: "var(--text-main, #211a3a)" }}>
+                        {tk.title}
+                      </p>
+                      <p className="text-[11.5px] font-semibold" style={{ color: "var(--text-dim, #5f5a7a)" }}>
+                        {sb?.name} · {tk.plannedMinutes} min · <StatusChip status={tk.status} />
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        className="btn btn-xs btn-secondary"
+                        onClick={() => {
+                          setOpenDay(null);
+                          setEditingTaskId(tk.id);
+                        }}
+                      >
+                        <IconEdit size={12} /> Edit
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-xs btn-primary"
+                        onClick={() => {
+                          setOpenDay(null);
+                          onFocusTask(tk.id);
+                        }}
+                      >
+                        Clock In
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}
-
-      <TaskEditor
-        key={editingTaskId ?? "closed"}
-        state={state}
-        task={state.tasks.find((x) => x.id === editingTaskId) || null}
-        onClose={() => setEditingTaskId(null)}
-        onSave={onTaskUpdate}
-        onSkipSubject={onSkipSubject}
-      />
     </div>
   );
 }
