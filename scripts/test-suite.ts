@@ -1316,6 +1316,44 @@ async function runTests() {
     check(/body\.mode-focused \.task-row\{padding/.test(globalsCss),
       "Density mode still does its actual job (tighter task rows)");
 
+    /* The onboarding footer is one shared row: the privacy note on the
+       left, Back/Continue on the right. When the button row claimed
+       `width:100%` at base scope it starved the note down to one word per
+       line (the squashed column in the report). The row may only take the
+       full width inside the stacked, phone-only layout. */
+    const obBase: { sel: string; body: string }[] = [];
+    {
+      const stack: string[] = [];
+      let i = 0;
+      const src = uiSystemCss.replace(/\/\*[\s\S]*?\*\//g, "");
+      while (i < src.length) {
+        const c = src[i];
+        if (c === "{") {
+          let j = i - 1;
+          while (j >= 0 && src[j] !== "{" && src[j] !== "}") j--;
+          stack.push(src.slice(j + 1, i).trim()); i++; continue;
+        }
+        if (c === "}") { stack.pop(); i++; continue; }
+        if (c === ".") {
+          let j = i;
+          while (j < src.length && src[j] !== "{") j++;
+          const sel = src.slice(i, j).trim();
+          let k = j + 1;
+          while (k < src.length && src[k] !== "}") k++;
+          if (!stack.some((m) => m.startsWith("@media"))) {
+            obBase.push({ sel, body: src.slice(j + 1, k) });
+          }
+          i = k + 1; continue;
+        }
+        i++;
+      }
+    }
+    const btnRowGreedy = obBase.filter((r) => r.sel === ".ob-btn-row" && /width\s*:\s*100%/.test(r.body));
+    check(btnRowGreedy.length === 0,
+      "The onboarding button row never claims full width beside the privacy note (full-width is phone-only)");
+    const privacyFlex = /\.ob-privacy\{[^}]*flex\s*:\s*1/.test(globalsCss);
+    check(privacyFlex, "The onboarding privacy note gets the flexible space in the footer row");
+
     const importantCount = (sheets.match(/!important/g) ?? []).length;
     check(importantCount <= 900, `The !important count keeps falling (${importantCount} vs 1107 at the merge baseline)`);
     check(!/transform:\s*translate\([^)]*\.[57]px/.test(sheets),

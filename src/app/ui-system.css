@@ -4838,10 +4838,17 @@ body.theme-sunset {
 .inset-note { margin: 0; font-size: .72rem; font-weight: 600; line-height: 1.5; color: var(--text-muted); text-wrap: pretty; }
 .ring-figure { display: grid; place-items: center; gap: 6px; }
 
-/* ── 25.10 · ONBOARDING BUTTON ROW — never squeezed, always centred ─── */
-.ob-btn-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px; width: 100%; }
+/* ── 25.10 · ONBOARDING BUTTON ROW — never squeezed, always centred ───
+   Inside the footer strip this row must NOT claim width:100% — doing so
+   starved the privacy note beside it down to one word per line. It sizes
+   to its buttons; the strip and the privacy note share the rest. On phones
+   the strip stacks, and only there the row goes full-width. */
+.ob-btn-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px; flex-shrink: 0; }
 .ob-btn-row .ob-btn { flex: 0 1 auto; min-width: 132px; justify-content: center; }
 .ob-btn-row .ob-btn:only-child { min-width: 180px; }
+@media (max-width: 640px) {
+  .ob-btn-row { width: 100%; }
+}
 @media (max-width: 420px) {
   .ob-btn-row .ob-btn { flex: 1 1 100%; min-width: 0; }
 }

@@ -2647,7 +2647,7 @@ body.theme-dark .ob-step-label,body.theme-obsidian .ob-step-label,body.theme-neb
 .ob-footer-strip{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:18px;padding-top:18px;border-top:1px solid var(--glass-border)}
 .ob-btn-row{margin-top:0;padding-top:0;border-top:none;flex-shrink:0}
 .ob-btn{min-width:132px;font-weight:800}
-.ob-privacy{margin-top:0;max-width:34rem;font-size:.76rem;justify-content:flex-start}
+.ob-privacy{margin-top:0;max-width:34rem;font-size:.76rem;justify-content:flex-start;flex:1 1 auto;min-width:0}
 .ob-cancel-link{margin-top:10px}
 body.theme-dark .ob-card,body.theme-obsidian .ob-card,body.theme-nebula .ob-card{box-shadow:0 22px 56px rgba(0,0,0,.32),0 2px 10px rgba(0,0,0,.2)}
 @media(max-width:640px){
