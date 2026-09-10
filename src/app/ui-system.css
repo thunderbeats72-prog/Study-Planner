@@ -982,7 +982,11 @@ body {
     linear-gradient(165deg, color-mix(in srgb, var(--accent) 10%, var(--surface)), var(--surface) 72%);
 }
 .quote-mark {
-  font-family: Georgia, serif;
+  /* The last second typeface in the product. A decorative glyph is still a
+     glyph: Georgia is not loaded, so this was silently falling back to the
+     platform serif — a different voice in the one card the user reads every
+     day. It inherits Inter like everything else now. */
+  font-family: inherit;
   font-size: 2.6rem; line-height: .6;
   color: var(--accent); opacity: .5;
   margin-bottom: 10px;
@@ -1355,22 +1359,35 @@ body {
   display: flex; flex-direction: column; align-items: center;
   gap: 9px; text-align: center; min-width: 0;
 }
+/* Every colour here was a white-on-dark / violet-on-dark literal. That held
+   while the Zen room was always the near-black violet overlay, and silently
+   stopped holding the moment the room became theme-driven: on the four light
+   themes the room is light paper with dark ink, so white text measured
+   1.17-1.32:1 and the kicker, the eyebrow and the secondary buttons were
+   effectively invisible. They read the `--zen-*` tokens now, which every
+   theme restates, so one rule is correct in both directions. */
 .zen-emblem {
   display: grid; place-items: center;
   width: 34px; height: 34px; border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, .14);
-  background: rgba(255, 255, 255, .05);
-  color: rgba(196, 188, 255, .9);
-  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--zen-line);
+  background: var(--zen-surface);
+  color: color-mix(in srgb, var(--zen-accent) 50%, var(--zen-ink));
 }
 .zen-eyebrow {
   font-size: .72rem; font-weight: 800; letter-spacing: .3em; text-indent: .3em;
   text-transform: uppercase;
-  color: rgba(196, 188, 255, .8);
+  /* Accent-tinted, but pulled halfway to the room's ink. Raw `--zen-accent`
+     only reaches 2.40:1 on Mint and Sunset — under the 4.5:1 this 11px/800
+     label needs. 50% keeps the accent hue and clears AA in all 7 themes
+     (worst case 5.20:1). */
+  color: color-mix(in srgb, var(--zen-accent) 50%, var(--zen-ink));
   text-align: center;
 }
 .zen-kicker {
-  font-size: .88rem; font-weight: 600; color: rgba(255, 255, 255, .58);
+  /* `--zen-muted` reaches only 3.51:1 at its worst (Default/Silver
+     Lavender). The ink does 11.50:1 and still passes AA at the .78 opacity
+     the rule below applies. */
+  font-size: .88rem; font-weight: 600; color: var(--zen-ink);
   text-align: center; max-width: 52ch; min-width: 0; overflow-wrap: anywhere;
   text-transform: none; letter-spacing: 0; opacity: 1;
 }
@@ -2935,11 +2952,13 @@ body.theme-nebula .ob-range-value {
   height: 6px;
   border-radius: 50%;
   flex-shrink: 0;
-  background: rgba(255,255,255,.38);
+  /* was rgba(255,255,255,.38) — invisible on the light-theme rooms. */
+  background: var(--zen-muted);
 }
 
 .zen-status-dot[data-live="true"] {
-  background: #5EE0A8;
+  /* was a hardcoded #5EE0A8; the theme already owns "good". */
+  background: var(--good);
   animation: liveDotPulse 1.9s ease-in-out infinite;
 }
 
@@ -2962,23 +2981,23 @@ body.theme-nebula .ob-range-value {
 .zen-actions .btn { min-width: 136px; justify-content: center; }
 
 .zen-actions .zen-secondary {
-  background: rgba(255,255,255,.06) !important;
-  border-color: rgba(255,255,255,.13) !important;
-  color: rgba(255,255,255,.74) !important;
+  background: var(--zen-surface) !important;
+  border-color: var(--zen-line) !important;
+  color: var(--zen-ink) !important;
   box-shadow: none !important;
   font-weight: 650;
 }
 
 .zen-actions .zen-secondary:hover {
-  background: rgba(255,255,255,.11) !important;
-  color: rgba(255,255,255,.94) !important;
+  background: var(--zen-surface-hi) !important;
+  color: var(--zen-ink) !important;
 }
 
 /* Clock Out stays a secondary control but reads a little warmer than
    Exit Zen, so the two are never confused at a glance. */
 .zen-actions .zen-clock-out {
-  border-color: rgba(255,255,255,.22) !important;
-  color: rgba(255,255,255,.9) !important;
+  border-color: color-mix(in srgb, var(--danger-accent) 40%, var(--zen-line)) !important;
+  color: color-mix(in srgb, var(--danger-accent) 62%, var(--zen-ink)) !important;
 }
 
 .zen-hint { max-width: 40ch; font-size: .76rem; opacity: .78; }

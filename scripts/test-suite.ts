@@ -1015,17 +1015,97 @@ async function runTests() {
     /* Blur is a *material for floating layers*, not a finish for text. Every
        rule that paints an in-flow surface is checked for `backdrop-filter`,
        because a blurred card under 12px body copy is what read as "the whole
-       app is out of focus". */
+       app is out of focus".
+
+       This guard used to pass while `.glass-panel` — ≈39 usages, i.e. every
+       card in the product — sat frosted at blur(26px)+saturate(180%). Two
+       holes let it through, and both are closed here:
+         · it matched only a literal `backdrop-filter: blur(`, so routing the
+           radius through a token (`backdrop-filter:var(--glass-blur)`) hid it;
+         · `.glass-panel` was missing from the in-flow list entirely. */
     const frostedText: string[] = [];
+    const FROST = /backdrop-filter:\s*(?:blur|var\()/;
     for (const m of sheets.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
       const [, sel, body] = m;
-      if (!/backdrop-filter: *blur/.test(body)) continue;
+      /* `backdrop-filter:none` (the reduced-transparency / forced-colors
+         opt-outs) does not match FROST, so those rules fall out here. */
+      if (!FROST.test(body)) continue;
       const bad = sel.split(",").map((x) => x.trim()).filter((x) =>
-        /\.(section-card|task-card|kpi-card|day-block|dash-card|planner-day|chip|rate-btn|streak-badge|momentum-pill|count-badge|btn|card-title|page-title|task-title|day-date)(?![\w-])/.test(x));
+        /\.(glass-panel|section-card|task-card|kpi-card|day-block|dash-card|planner-day|chip|rate-btn|streak-badge|momentum-pill|count-badge|btn|card-title|page-title|task-title|day-date)(?![\w-])/.test(x));
       if (bad.length) frostedText.push(`${sel.trim().slice(0, 48)} → ${bad[0].slice(0, 30)}`);
     }
     check(frostedText.length === 0,
       `No in-flow text surface is frosted${frostedText.length ? ` (${frostedText.join("; ")})` : ""}`);
+
+    /* Removing the blur is only half of "the app looks soft": the card paint
+       itself was a translucent ladder (`--panel-tint-a/b` at 90%→84%, and
+       88%→80% on the dark themes) with `background-color:transparent` under
+       it, so the page's background gradient showed through every card at
+       10–20%. Blur gone + paint still translucent would have left the same
+       complaint standing. The card tokens must stay opaque. */
+    const translucentCardTokens = [...sheets.matchAll(/--(?:panel|glass)-tint-[ab]:\s*([^;}\n]+)/g)]
+      .filter((m) => /transparent/.test(m[1]))
+      .map((m) => m[0].trim().slice(0, 60));
+    check(translucentCardTokens.length === 0,
+      `Card paint is opaque, not a translucent ladder${translucentCardTokens.length ? ` (${translucentCardTokens.join("; ")})` : " — the surface under text is solid"}`);
+
+    /* ONE typeface. Every `font-family` must resolve to the Inter aliases (or
+       the usual system fallbacks). A decorative glyph still counts: Georgia
+       on the quote mark was the last second voice in the product, and it was
+       not even loaded — it fell back to the platform serif. */
+    /* The aliases, or the usual system fallback stack. A `var()` may carry a
+       fallback (`var(--font-display, inherit)`) — that is still the alias. */
+    const ALLOWED_FONT = /^(inherit|var\(--font-(ui|num|display|inter)(,\s*[^)]+)?\)|-apple-system|BlinkMacSystemFont|Segoe UI|system-ui|ui-sans-serif|sans-serif)$/;
+    /* Split the stack on commas that are NOT inside parens — a naive split
+       tears `var(--font-display, inherit)` in half and reports both pieces. */
+    const splitStack = (v: string) => {
+      const out: string[] = [];
+      let depth = 0, cur = "";
+      for (const ch of v) {
+        if (ch === "(") depth++;
+        else if (ch === ")") depth--;
+        if (ch === "," && depth === 0) { out.push(cur); cur = ""; } else cur += ch;
+      }
+      out.push(cur);
+      return out;
+    };
+    const foreignFonts = [...sheets.matchAll(/font-family:\s*([^;}\n]+)/g)]
+      .flatMap((m) => splitStack(m[1]))
+      .map((f) => f.trim().replace(/^["']|["']$/g, ""))
+      .filter((f) => f.length > 0 && !ALLOWED_FONT.test(f));
+    check([...new Set(foreignFonts)].length === 0,
+      `One typeface everywhere${foreignFonts.length ? ` — foreign: ${[...new Set(foreignFonts)].join(", ")}` : " (no second family in either sheet)"}`);
+
+    /* The Zen room is the theme. A `.zen*` rule may still use a neutral
+       black/white for a shadow or vignette, but it may not paint a
+       *chromatic* colour: that is how a permanently purple room sneaks back
+       into a Sunset or Mint theme. */
+    const toRgb = (c: string): [number, number, number] | null => {
+      if (c.startsWith("#")) {
+        let h = c.slice(1);
+        if (h.length === 3 || h.length === 4) h = h.split("").map((d) => d + d).join("");
+        if (h.length < 6) return null;
+        return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+      }
+      const n = c.match(/\d+/g)?.map(Number);
+      return n && n.length >= 3 ? [n[0], n[1], n[2]] : null;
+    };
+    const chromatic = (v: string) => {
+      const rgb = toRgb(v);
+      return !!rgb && !(rgb[0] === rgb[1] && rgb[1] === rgb[2]);
+    };
+    const zenHardcoded: string[] = [];
+    for (const m of sheets.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      const [, sel, body] = m;
+      if (!/(^|[\s,>])\.zen[\w-]*/.test(sel)) continue;
+      const paints = [...body.matchAll(/#[0-9a-fA-F]{3,8}\b|rgba?\([^)]*\)/g)]
+        .map((x) => x[0])
+        .filter(chromatic);
+      if (paints.length) zenHardcoded.push(`${sel.trim().slice(0, 30)} → ${paints[0]}`);
+    }
+    check(zenHardcoded.length === 0,
+      `Zen paints no hardcoded chromatic colour${zenHardcoded.length ? ` (${zenHardcoded.join("; ")})` : " — the room follows the theme"}`);
+
     const importantCount = (sheets.match(/!important/g) ?? []).length;
     check(importantCount <= 900, `The !important count keeps falling (${importantCount} vs 1107 at the merge baseline)`);
     check(!/transform:\s*translate\([^)]*\.[57]px/.test(sheets),
