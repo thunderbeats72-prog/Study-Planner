@@ -145,6 +145,7 @@ export default function Dashboard({
   onAskTutor?: (question: string) => void;
 }) {
   const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
+  const [expandedTaskId, setExpandedTaskId] = useState<number | null>(null);
   const t = today();
   const ctx = state.context;
   const quote = dailyQuote(t);
@@ -598,28 +599,42 @@ export default function Dashboard({
 
               {todayTasks.length > 0 && (
                 <div className="plan-list">
-                  {todayTasks.map((task) => (
-                    <TaskCard
-                      key={task.id}
-                      task={task}
-                      subject={state.subjects.find(
-                        (sb) => sb.id === task.subjectId,
-                      )}
-                      topic={state.topics.find((tp) => tp.id === task.topicId)}
-                      loggedMinutes={taskLogged(task.id)}
-                      live={activeTaskId === task.id}
-                      liveSeconds={activeClockSeconds}
-                      liveRunning={clockRunning}
-                      activeTaskId={activeTaskId}
-                      clockSessionActive={clockSessionActive}
-                      onTaskStatus={onTaskStatus}
-                      onFocusTask={onFocusTask}
-                      onClockOut={onClockOut}
-                      onEdit={setEditingTaskId}
-                      onSkipSubject={onSkipSubject}
-                      onAskTutor={onAskTutor}
-                    />
-                  ))}
+                  {todayTasks.map((task) => {
+                    const topic = state.topics.find((tp) => tp.id === task.topicId);
+                    return (
+                      <TaskCard
+                        key={task.id}
+                        task={task}
+                        subject={state.subjects.find(
+                          (sb) => sb.id === task.subjectId,
+                        )}
+                        topic={topic}
+                        loggedMinutes={taskLogged(task.id)}
+                        live={activeTaskId === task.id}
+                        liveSeconds={activeClockSeconds}
+                        liveRunning={clockRunning}
+                        briefOpen={expandedTaskId === task.id}
+                        onToggleBrief={
+                          topic || task.detail
+                            ? () =>
+                                setExpandedTaskId(
+                                  expandedTaskId === task.id ? null : task.id,
+                                )
+                            : undefined
+                        }
+                        activeTaskId={activeTaskId}
+                        clockSessionActive={clockSessionActive}
+                        clockRunning={clockRunning}
+                        onPauseOrResume={onPauseOrResume}
+                        onTaskStatus={onTaskStatus}
+                        onFocusTask={onFocusTask}
+                        onClockOut={onClockOut}
+                        onEdit={setEditingTaskId}
+                        onSkipSubject={onSkipSubject}
+                        onAskTutor={onAskTutor}
+                      />
+                    );
+                  })}
                 </div>
               )}
             </Spot>

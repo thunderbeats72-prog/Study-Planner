@@ -51,7 +51,6 @@ import {
   IconHome,
   IconLeaf,
   IconLogo,
-  IconMenu,
   IconPalette,
   IconPanelLeft,
   IconPause,
@@ -91,9 +90,9 @@ function zenGuidance(timer: TimerApi): string {
     : "Begin when you are ready";
 }
 
-/* `dock` marks the five primary destinations that fit the mobile bottom
-   navigation. Analytics stays reachable on phones through the drawer
-   ("More" in the app bar) and through the dashboard's deep-links. */
+/* `dock` marks the primary destinations in the mobile bottom navigation.
+   Analytics rides the dock too: the app-bar "More" hamburger it used to live
+   behind was removed on phones, so the dock is its one obvious door. */
 const NAV: {
   id: Page;
   label: string;
@@ -104,7 +103,7 @@ const NAV: {
   { id: "planner", label: "Planner", icon: <IconCalendar />, dock: true },
   { id: "focus", label: "Focus", icon: <IconClock />, dock: true },
   { id: "subjects", label: "Subjects", icon: <IconBook />, dock: true },
-  { id: "analytics", label: "Analytics", icon: <IconChart /> },
+  { id: "analytics", label: "Analytics", icon: <IconChart />, dock: true },
   { id: "settings", label: "Settings", icon: <IconGear />, dock: true },
 ];
 
@@ -127,6 +126,46 @@ type SessionLogResponse = AppState & {
 
 const SIDEBAR_KEY = "spp-sidebar-collapsed";
 const SESSION_QUEUE_KEY = "spp-pending-session-logs";
+
+/**
+ * Live local time for the tracker bar's idle state. Deliberately its own
+ * component: the one-second tick re-renders only this span, never the page
+ * tree (the study clock's mmss stays the hero while a session is open — this
+ * takes over the moment the bar reads "Not clocked in", so the top bar keeps
+ * visibly moving in real time instead of looking frozen until a refresh).
+ */
+function LiveClock() {
+  const [now, setNow] = useState<Date | null>(null);
+  useEffect(() => {
+    // First tick on the next frame (never synchronously in the effect —
+    // that caused cascading renders), then once per second. State stays
+    // null through the server render, so SSR and hydration agree.
+    const frame = window.requestAnimationFrame(() => setNow(new Date()));
+    const id = window.setInterval(() => setNow(new Date()), 1000);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.clearInterval(id);
+    };
+  }, []);
+  // Server render and the very first client render agree on a stable
+  // placeholder; the real time (and the tick) start once mounted.
+  const label = now
+    ? now.toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      })
+    : "--:--:--";
+  return (
+    <span
+      className="mono tracker-time is-idle"
+      aria-label="Current local time"
+      title="Local time — clock in to start recording study time"
+    >
+      {label}
+    </span>
+  );
+}
 
 function apiFailureMessage(error: unknown, fallback: string): string {
   return error instanceof ApiError && error.message ? error.message : fallback;
@@ -918,16 +957,27 @@ export default function Home() {
 
   // One control for both timers: pause the session while it moves, start
   // (or resume) it when it does not.
-  const pauseOrResume = () => {
-    if (session.active) {
-      session.pause();
-    } else if (clock.sessionActive) {
-      session.start();
-      notify("Resumed — focus timer and study clock are running together.");
-    } else {
-      startSmartClock();
+  const pauseOrResume = useCallback(() => {
+    if (clock.running) {
+      // A manually clocked-in lesson should not unexpectedly start a Pomodoro
+      // timer just because Resume/Pause was pressed in the Planner. Focus-owned
+      // sessions still use the synchronised controller.
+      if (session.focusOwnsClock) session.pause();
+      else clock.pause();
+      return;
     }
-  };
+    if (clock.sessionActive) {
+      if (session.focusOwnsClock) session.start();
+      else clock.resume();
+      notify(
+        session.focusOwnsClock
+          ? "Resumed — focus timer and study clock are running together."
+          : "Study clock resumed — your active minutes are recording again.",
+      );
+      return;
+    }
+    startSmartClock();
+  }, [clock, notify, session, startSmartClock]);
 
   const focusTask = (taskId: number) => {
     const task = state?.tasks.find((x) => x.id === taskId);
@@ -975,19 +1025,18 @@ export default function Home() {
     (type: string) => {
       switch (type) {
         case "startTimer":
-          if (session.active) return;
-          if (clock.sessionActive) session.start();
-          else startSmartClock();
+          if (clock.running) return;
+          pauseOrResume();
           break;
         case "stopTimer":
           if (clock.sessionActive) clockOutNow();
           break;
         case "pause":
-          if (session.active) session.pause();
+          if (clock.running) pauseOrResume();
           else notify("No session running to pause.");
           break;
         case "resume":
-          if (clock.sessionActive || clock.elapsed > 0) session.start();
+          if (clock.sessionActive) pauseOrResume();
           else startSmartClock();
           break;
         case "break":
@@ -1002,11 +1051,12 @@ export default function Home() {
       }
     },
     [
-      clock.elapsed,
       clock.onBreak,
+      clock.running,
       clock.sessionActive,
       clockOutNow,
       notify,
+      pauseOrResume,
       session,
       startSmartClock,
     ],
@@ -1276,19 +1326,14 @@ export default function Home() {
     {
       id: "clock-in",
       group: "Study Clock",
-      label: session.active
+      label: clock.running
         ? "Pause Session"
         : clock.sessionActive
           ? "Resume Session"
           : "Clock In",
-      hint: session.active ? "Freeze both timers" : "Start recording",
-      keywords: "timer record attendance pause",
-      run: () =>
-        session.active
-          ? session.pause()
-          : clock.sessionActive
-            ? session.start()
-            : startSmartClock(),
+      hint: clock.running ? "Freeze the study clock" : "Start recording",
+      keywords: "timer record attendance pause resume",
+      run: pauseOrResume,
     },
     {
       id: "clock-out",
@@ -1385,7 +1430,7 @@ export default function Home() {
             </span>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="mh-actions">
           <span className="streak-badge mh-streak">
             <IconFlame /> {state.user.streak}d
           </span>
@@ -1504,15 +1549,7 @@ export default function Home() {
               )}
             </span>
           </span>
-          <button
-            type="button"
-            className="mh-more"
-            aria-label="Open menu"
-            aria-expanded={drawerOpen}
-            onClick={() => setDrawerOpen(true)}
-          >
-            <IconMenu size={18} />
-          </button>
+
         </div>
       </header>
 
@@ -1691,12 +1728,19 @@ export default function Home() {
               </div>
             </div>
             <div className="tracker-clock">
-              <span
-                className="mono tracker-time"
-                aria-label={`Study clock ${mmss(clock.elapsed)}`}
-              >
-                {mmss(clock.elapsed)}
+              <span className="tracker-clock-icon" aria-hidden="true">
+                <IconClock size={14} />
               </span>
+              {clock.sessionActive ? (
+                <span
+                  className="mono tracker-time"
+                  aria-label={`Study clock ${mmss(clock.elapsed)}`}
+                >
+                  {mmss(clock.elapsed)}
+                </span>
+              ) : (
+                <LiveClock />
+              )}
             </div>
             <div className="tracker-actions">
               <span className="chip chip-kind">
@@ -1722,25 +1766,25 @@ export default function Home() {
                   {/* One slot for the session's primary verb, so the row keeps
                       the same geometry while clocked in, paused and on break. */}
                   <button
-                    className={`btn btn-xs ${session.active ? "btn-secondary" : "btn-primary"} act-toggle`}
+                    className={`btn btn-xs ${clock.running ? "btn-secondary" : "btn-primary"} act-toggle`}
                     onClick={pauseOrResume}
                     title={
-                      session.active
+                      clock.running
                         ? "Pause the study clock"
                         : "Resume the study clock"
                     }
                     aria-label={
-                      session.active
+                      clock.running
                         ? "Pause the study clock"
                         : "Resume the study clock"
                     }
                   >
-                    {session.active ? (
+                    {clock.running ? (
                       <IconPause size={12} />
                     ) : (
                       <IconPlay size={12} />
                     )}
-                    <span>{session.active ? "Pause" : "Resume"}</span>
+                    <span>{clock.running ? "Pause" : "Resume"}</span>
                   </button>
                   {/* Always rendered while a session is open, so the row keeps
                       exactly the same geometry while clocked in and paused. */}
@@ -1955,6 +1999,7 @@ export default function Home() {
               activeClockSeconds={clock.elapsed}
               clockRunning={clock.running}
               clockSessionActive={clock.sessionActive}
+              onPauseOrResume={pauseOrResume}
               onClockOut={clockOutNow}
               onAskTutor={askTutor}
               replanning={busy}

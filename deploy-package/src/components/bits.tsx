@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
 import { KIND_META, type TaskRow as ClientTaskRow } from "@/lib/client";
 import {
   IconBook,
   IconCalendar,
   IconCheck,
+  IconChevron,
   IconClock,
   IconFlame,
   IconSpark,
@@ -256,5 +257,161 @@ export function StartFocusButton({
         <IconSpark size={15} /> {label}
       </button>
     </Magnetic>
+  );
+}
+
+/* ── Select — the one styled listbox every form uses ─────────────────
+   Native <select> popups are the OS's, not ours: the blue-row Android
+   spinner fought every theme and every font decision. This is a real
+   listbox — button trigger, themed popover, arrow-key / Enter / Escape /
+   Home / End support, outside-click dismiss — painted from the same
+   semantic tokens as the rest of the chrome so it follows all themes. */
+export type SelectOption = { value: string; label: string };
+
+export function Select({
+  value,
+  onChange,
+  options,
+  ariaLabel,
+  id,
+  className,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  options: SelectOption[];
+  ariaLabel: string;
+  id?: string;
+  className?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(0);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const btnRef = useRef<HTMLButtonElement | null>(null);
+
+  const selectedIndex = Math.max(0, options.findIndex((o) => o.value === value));
+  const selected = options[selectedIndex];
+
+  const close = (refocus: boolean) => {
+    setOpen(false);
+    if (refocus) btnRef.current?.focus();
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    window.addEventListener("mousedown", onDown);
+    /* focus the list so arrows work immediately */
+    const t = window.setTimeout(() => listRef.current?.focus(), 0);
+    return () => {
+      window.removeEventListener("mousedown", onDown);
+      window.clearTimeout(t);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    listRef.current
+      ?.querySelector<HTMLElement>(".sp-option.is-active")
+      ?.scrollIntoView({ block: "nearest" });
+  }, [active, open]);
+
+  const pick = (v: string) => {
+    onChange(v);
+    close(true);
+  };
+
+  const onButtonKey = (event: React.KeyboardEvent) => {
+    if (["ArrowDown", "ArrowUp"].includes(event.key)) {
+      event.preventDefault();
+      setActive(selectedIndex);
+      setOpen(true);
+    }
+  };
+
+  const onListKey = (event: React.KeyboardEvent) => {
+    switch (event.key) {
+      case "ArrowDown":
+        event.preventDefault();
+        setActive((a) => Math.min(a + 1, options.length - 1));
+        break;
+      case "ArrowUp":
+        event.preventDefault();
+        setActive((a) => Math.max(a - 1, 0));
+        break;
+      case "Home":
+        event.preventDefault();
+        setActive(0);
+        break;
+      case "End":
+        event.preventDefault();
+        setActive(options.length - 1);
+        break;
+      case "Enter":
+      case " ":
+        event.preventDefault();
+        pick(options[active]?.value ?? value);
+        break;
+      case "Escape":
+        event.preventDefault();
+        close(true);
+        break;
+      case "Tab":
+        setOpen(false);
+        break;
+    }
+  };
+
+  return (
+    <div className={cn("sp-select", open && "is-open", className)} ref={rootRef}>
+      <button
+        ref={btnRef}
+        type="button"
+        id={id}
+        className="sp-select-btn"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label={ariaLabel}
+        onClick={() => {
+          if (!open) setActive(selectedIndex);
+          setOpen((o) => !o);
+        }}
+        onKeyDown={onButtonKey}
+      >
+        <span className="sp-select-value">{selected?.label ?? "Select"}</span>
+        <IconChevron size={14} className="sp-select-caret" />
+      </button>
+      {open && (
+        <div
+          className="sp-select-pop"
+          role="listbox"
+          tabIndex={-1}
+          aria-label={ariaLabel}
+          ref={listRef}
+          onKeyDown={onListKey}
+        >
+          {options.map((option, i) => (
+            <button
+              type="button"
+              key={`${option.value}-${i}`}
+              role="option"
+              aria-selected={option.value === value}
+              className={cn(
+                "sp-option",
+                i === active && "is-active",
+                option.value === value && "is-selected",
+              )}
+              onMouseEnter={() => setActive(i)}
+              onClick={() => pick(option.value)}
+            >
+              <span className="sp-option-label">{option.label}</span>
+              {option.value === value ? <IconCheck size={13} /> : null}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

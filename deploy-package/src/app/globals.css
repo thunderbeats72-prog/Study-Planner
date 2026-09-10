@@ -53,6 +53,11 @@
   --pad-card:clamp(16px,1.2vw + 8px,24px);
   --pad-card-sm:clamp(13px,.9vw + 7px,17px);
   --pad-tight:clamp(10px,.6vw + 7px,14px);
+  /* Page gutter. Must only ever GROW with the viewport: a narrower phone gets
+     a narrower gutter, never a wider one. `--pad-shell` cannot express this —
+     its clamp floors at 16px, so a 320px phone was getting wider gutters than
+     a 390px one (and a 414px phone less content width than a 412px phone). */
+  --pad-gutter:clamp(10px,3vw,20px);
   --gap-page:clamp(14px,1vw + 8px,22px);
   --gap-cluster:clamp(10px,.7vw + 7px,14px);
   --row-pad:clamp(11px,.6vw + 8px,15px);
@@ -213,7 +218,10 @@ select.input-field{appearance:none;background-image:linear-gradient(45deg,transp
 .vtab.active{background:var(--surface-solid);color:var(--accent);box-shadow:0 2px 8px rgba(0,0,0,.06)}
 
 /* calendar */
-.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}
+/* The month is ROWS of seven cells (`.cal-row`), not 35 direct children —
+   a 7-column template here would lay the header + week rows side by side as
+   seven crushed strips. Rows own their own columns; the grid only stacks. */
+.cal-grid{display:grid;gap:8px}
 .cal-dow{font-size:.68rem;font-weight:800;text-transform:uppercase;color:var(--text-muted);text-align:center;padding:4px 0}
 .cal-cell{min-height:88px;border-radius:var(--radius-md);background:var(--row-bg);border:1px solid transparent;padding:8px;cursor:pointer;transition:all .2s ease}
 .cal-cell:hover{border-color:var(--accent);background:var(--row-hover)}
@@ -514,7 +522,7 @@ body.theme-dark .tracker-bar,body.theme-obsidian .tracker-bar,body.theme-nebula 
 
 /* ============ RESPONSIVE ============ */
 @media(max-width:860px){
-  .app-wrapper{flex-direction:column;padding:0 12px 90px;gap:0}
+  .app-wrapper{flex-direction:column;gap:0}
   /* CANONICAL mobile dock — the ONLY .sidebar rule at <=860px.
      Floating capsule, near-opaque, safe-area aware. */
   .sidebar{
@@ -589,7 +597,6 @@ body.theme-dark .tracker-bar,body.theme-obsidian .tracker-bar,body.theme-nebula 
   .ob-sub-row .btn{grid-column:3 / 4;grid-row:2 / 3;justify-self:end}
 }
 @media(max-width:420px){
-  .app-wrapper{padding-left:8px;padding-right:8px}
   .kpi-grid{grid-template-columns:1fr}
   .day-block{padding:13px 12px}
   #t-digits{font-size:2.25rem}
@@ -1014,8 +1021,12 @@ body.mode-focused .kpi-value{font-size:1.8rem}
 body.mode-focused .day-block{padding:13px 15px;margin-bottom:10px}
 body.mode-focused .glass-panel{border-radius:var(--radius-lg)}
 /* Focused mode: entrance choreography off — instant, professional */
-body.mode-focused .task-row,body.mode-focused .kpi-value,
-body.mode-focused .main-workspace > :not(.tracker-bar){animation:none}
+/* mode-focused is a DENSITY mode — tighter padding, smaller type, smaller
+   radii. It is not a motion preference: stripping entrance choreography here
+   meant any learner who onboarded as PG / PhD / professional silently lost
+   every animation in the product, with no way to turn it back on. Motion
+   opt-out belongs to `prefers-reduced-motion`, which is platform-aware and
+   user-controlled. The density rules above are untouched. */
 
 /* Young mode on touch devices: extra-comfortable targets */
 @media (hover:none) and (pointer:coarse){
@@ -1107,7 +1118,6 @@ img,svg,video,canvas{max-width:100%;height:auto}
 
 /* 4. S24-class phones (360-430px): the tightest mainstream band */
 @media(max-width:430px){
-  .app-wrapper{padding-left:10px;padding-right:10px}
   .main-workspace{padding-left:0;padding-right:0}
   .tracker-bar .btn-xs{min-width:0;flex:1 1 auto}
   .page-header{gap:10px;margin-bottom:16px}
@@ -1261,8 +1271,7 @@ img,svg,video,canvas{max-width:100%;height:auto}
 
 /* mode-focused: signature layer stays quiet for professionals */
 body.mode-focused .bar-fill::after,body.mode-focused .prog-fill::after,
-body.mode-focused .brand-logo-icon::before,body.mode-focused .cal-cell.today::after{animation:none;opacity:0}
-body.mode-focused .kpi-value{animation:none}
+body.mode-focused .brand-logo-icon::before,body.mode-focused .cal-cell.today::after{opacity:0}
 
 /* reduced motion: everything above respects the global kill switch */
 
@@ -1338,9 +1347,6 @@ body,.glass-panel,.tracker-bar,.sidebar,.task-row,.btn-secondary,.input-field,.a
 /* (browsers auto-pause CSS animations offscreen; loops are opt-in only) */
 
 /* ── O. mode-focused & reduced-motion guards for the new layer ── */
-body.mode-focused .day-block,body.mode-focused .heat-cell,
-body.mode-focused .kanban > *,body.mode-focused .grid-fit-300 > *,
-body.mode-focused .main-workspace > :not(.tracker-bar){animation:none}
 @media (prefers-reduced-motion: reduce){
   .day-block,.heat-cell,.kanban > *,.grid-fit-300 > *,.ai-quick button{animation:none !important}
 }
@@ -1498,7 +1504,6 @@ body.theme-nebula .ai-panel,body.theme-nebula .cmdk,body.theme-nebula .modal-box
 .modal-box:focus{outline:none}
 
 /* mode guards for new decorative pieces */
-body.mode-focused .task-row.active-clock .task-dot{animation:none}
 @media (prefers-reduced-motion: reduce){
   .toast,.ob-card,.chip-done{animation:none !important}
 }
@@ -1572,8 +1577,6 @@ body.theme-switching{animation:themeBlink .3s ease}
 @keyframes themeBlink{0%{filter:brightness(1)}40%{filter:brightness(.96)}100%{filter:brightness(1)}}
 
 /* Guards: focused professionals + reduced motion */
-body.mode-focused .glass-panel::after,body.mode-focused .ai-fab,
-body.mode-focused .pulse-dot.live::after{animation:none;transition:none}
 @media (prefers-reduced-motion: reduce){
   .pulse-dot.live::after,.ai-fab,.skeleton-strong,.toast::after{animation:none !important}
   .glass-panel::after{display:none}
@@ -1701,10 +1704,7 @@ body::before{
 body.mode-young .kpi-card::before{background:linear-gradient(105deg,transparent,rgba(255,255,255,.24),transparent)}
 
 /* Guards */
-body.mode-focused .kpi-card::before,body.mode-focused .day-block::before,
-body.mode-focused .nav-item.active::after,body.mode-focused .ob-level-grid > *,
-body.mode-focused .task-dot,body.mode-focused .wk-bar{animation:none}
-body.mode-focused::before{animation:none;opacity:.4}
+body.mode-focused::before{opacity:.4}
 @media (prefers-reduced-motion: reduce){
   body::before,.ob-level-grid > *,.task-dot,.wk-bar,.nav-item.active::after{animation:none !important}
 }
@@ -2014,7 +2014,6 @@ body.focus-live .tracker-time{color:var(--success-accent)}
 
 /* Zen kiosk lock: explicit exit affordance */
 .zen-exit{position:absolute;top:max(18px,env(safe-area-inset-top));right:18px}
-body.mode-focused .btn-primary.w-full::before,body.mode-focused .page-header .btn-primary::before{animation:none}
 @media (prefers-reduced-motion: reduce){
   body.focus-live::after{animation:none}
   .btn-primary.w-full::before,.page-header .btn-primary::before{animation:none}
@@ -2648,7 +2647,7 @@ body.theme-dark .ob-step-label,body.theme-obsidian .ob-step-label,body.theme-neb
 .ob-footer-strip{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:18px;padding-top:18px;border-top:1px solid var(--glass-border)}
 .ob-btn-row{margin-top:0;padding-top:0;border-top:none;flex-shrink:0}
 .ob-btn{min-width:132px;font-weight:800}
-.ob-privacy{margin-top:0;max-width:34rem;font-size:.76rem;justify-content:flex-start}
+.ob-privacy{margin-top:0;max-width:34rem;font-size:.76rem;justify-content:flex-start;flex:1 1 auto;min-width:0}
 .ob-cancel-link{margin-top:10px}
 body.theme-dark .ob-card,body.theme-obsidian .ob-card,body.theme-nebula .ob-card{box-shadow:0 22px 56px rgba(0,0,0,.32),0 2px 10px rgba(0,0,0,.2)}
 @media(max-width:640px){
@@ -2902,16 +2901,42 @@ h3{font-size:var(--fs-h3);line-height:1.25;letter-spacing:-.01em;text-wrap:balan
 }
 
 /* ──────────────────────────────────────────────────────────────────────
-   2 · DEEP GLASSMORPHISM
-   Three things make glass read as glass rather than as a flat fill:
-   (a) a multi-stop translucent tint, (b) real backdrop refraction,
-   (c) sub-pixel INSET hairlines — a bright top edge and a dim bottom edge.
-   Static surfaces stay legible because the tint never drops below ~76%.
+   2 · CARD MATERIAL — solid surface, real depth
+
+   This block used to frost EVERY card in the product: `.glass-panel`
+   (≈39 usages — every dashboard card, planner card, KPI, analytics panel,
+   quote card) carried `backdrop-filter:blur(26px) saturate(180%)` under a
+   translucent gradient. Two things followed from that:
+
+   (a) Body copy at 12–13px sat on a refracted, saturated backdrop, which is
+       the "the whole app looks out of focus" report — and the file's own
+       comment justified it with "the tint never drops below ~76%", which was
+       untrue for the three dark themes, where it dropped to 25%.
+   (b) A dozen-plus simultaneous blur+saturate layers per page, each one a
+       full compositor pass on scroll.
+
+   Refraction only earns its cost on a surface that actually floats over
+   moving content, where the blur is information ("I am above the page").
+   Those surfaces keep it, because they have always carried their own rules:
+   `.modal-box`, `.cmdk`, `.toast`, `.ai-panel`, `.tracker-bar`,
+   `.mobile-header`, `.sidebar`. In-flow cards are now opaque.
+
+   Depth is kept, not flattened away — the sub-pixel INSET hairlines (bright
+   top edge, dim bottom edge) and the layered soft shadow stay exactly as
+   they were, so a card still reads as a raised surface. Only the
+   translucency and the refraction are gone. `--glass-blur` survives as the
+   single knob for the floating chrome that opts in.
 ────────────────────────────────────────────────────────────────────── */
 :root{
+  /* The ONE frost knob, and it is consumed only by surfaces that float over
+     scrolling content (.cmdk, .modal-box, .toast, .ai-panel, .tracker-bar).
+     Every one of those used to hardcode its own radius — 38px, 24px, 22px,
+     20px, 14px — so the phone cost-control override below changed nothing. */
   --glass-blur:blur(26px) saturate(180%);
-  --glass-tint-a:color-mix(in srgb,var(--surface) 88%,transparent);
-  --glass-tint-b:color-mix(in srgb,var(--surface) 76%,transparent);
+  /* Solid by construction: the card paint IS the surface, so nothing behind
+     a card can bleed through under its text. */
+  --glass-tint-a:var(--surface-solid);
+  --glass-tint-b:var(--surface-solid);
   --glass-edge-top:inset 0 1px 0 var(--lg-rim);
   --glass-edge-bot:inset 0 -1px 0 var(--lg-rim-faint);
   --glass-edge-side:inset 1px 0 0 var(--lg-rim-faint),inset -1px 0 0 var(--lg-rim-faint);
@@ -2920,9 +2945,6 @@ h3{font-size:var(--fs-h3);line-height:1.25;letter-spacing:-.01em;text-wrap:balan
                 0 30px 60px -30px rgba(16,16,26,.16);
 }
 body.theme-dark,body.theme-obsidian,body.theme-nebula{
-  --glass-blur:blur(20px) saturate(220%);
-  --glass-tint-a:color-mix(in srgb,var(--surface) 45%,transparent);
-  --glass-tint-b:color-mix(in srgb,var(--surface) 25%,transparent);
   --glass-depth:0 1px 2px rgba(0,0,0,.5),
                 0 10px 26px -12px rgba(0,0,0,.62),
                 0 34px 70px -34px rgba(0,0,0,.72);
@@ -2933,16 +2955,7 @@ body.theme-dark,body.theme-obsidian,body.theme-nebula{
 .glass-panel:not(.ai-panel){
   border-color:color-mix(in srgb,var(--glass-border) 78%,transparent);
   box-shadow:var(--glass-edge-top),var(--glass-edge-bot),var(--glass-edge-side),var(--glass-depth);
-}
-@supports ((backdrop-filter:blur(2px)) or (-webkit-backdrop-filter:blur(2px))){
-  .glass-panel:not(.ai-panel){
-    background:linear-gradient(168deg,var(--glass-tint-a) 0%,var(--glass-tint-b) 100%);
-    -webkit-backdrop-filter:var(--glass-blur);
-    backdrop-filter:var(--glass-blur);
-  }
-}
-@supports not ((backdrop-filter:blur(2px)) or (-webkit-backdrop-filter:blur(2px))){
-  .glass-panel:not(.ai-panel){background:var(--surface)}
+  background:var(--surface-solid);
 }
 
 /* Command palette: the most translucent surface in the app, because it
@@ -2953,8 +2966,8 @@ body.theme-dark,body.theme-obsidian,body.theme-nebula{
   background:linear-gradient(180deg,
               color-mix(in srgb,var(--surface-solid) 84%,transparent) 0%,
               color-mix(in srgb,var(--surface-solid) 70%,transparent) 100%);
-  -webkit-backdrop-filter:blur(38px) saturate(190%);
-  backdrop-filter:blur(38px) saturate(190%);
+  -webkit-backdrop-filter:var(--glass-blur);
+  backdrop-filter:var(--glass-blur);
   box-shadow:
     inset 0 1px 0 var(--lg-rim),
     inset 0 -1px 0 var(--lg-rim-faint),
@@ -2973,7 +2986,6 @@ body.theme-dark .cmdk,body.theme-obsidian .cmdk,body.theme-nebula .cmdk{
    on a phone. 14px is visually indistinguishable at that scale. */
 @media (hover:none) and (pointer:coarse), (max-width:820px){
   :root{--glass-blur:blur(14px) saturate(165%)}
-  .cmdk{-webkit-backdrop-filter:blur(20px) saturate(175%);backdrop-filter:blur(20px) saturate(175%)}
 }
 /* Honour the OS-level "reduce transparency" switch */
 @media (prefers-reduced-transparency: reduce){
@@ -3047,8 +3059,8 @@ body.theme-dark .pulse-dot.live,body.theme-obsidian .pulse-dot.live,body.theme-n
     width:auto;height:auto;
     padding:7px;border-radius:24px;
     background:color-mix(in srgb,var(--surface-elevated) 80%,transparent);
-    -webkit-backdrop-filter:blur(28px) saturate(185%);
-    backdrop-filter:blur(28px) saturate(185%);
+    -webkit-backdrop-filter:var(--glass-blur);
+    backdrop-filter:var(--glass-blur);
     border:1px solid color-mix(in srgb,var(--glass-border) 80%,transparent);
     box-shadow:
       inset 0 1px 0 var(--lg-rim),
@@ -3086,7 +3098,17 @@ body.theme-dark .pulse-dot.live,body.theme-obsidian .pulse-dot.live,body.theme-n
     padding-top:calc(var(--header-h) + 6px);
     padding-bottom:calc(var(--dock-h) + 26px);
   }
-  .app-wrapper{padding:0 var(--pad-shell) calc(var(--dock-h) + 24px);gap:0}
+  /* Single source of truth for the mobile gutter. Longhands, not a `padding:`
+     shorthand — the shorthand silently discards the safe-area longhands set
+     earlier, which is what let content sit under a notch on every phone
+     outside the old 360–412px band. */
+  .app-wrapper{
+    padding-top:0;
+    padding-bottom:calc(var(--dock-h) + 24px);
+    padding-left:max(var(--pad-gutter),env(safe-area-inset-left));
+    padding-right:max(var(--pad-gutter),env(safe-area-inset-right));
+    gap:0;
+  }
   .tracker-bar{top:calc(var(--header-h) + 4px)}
   .ai-fab{bottom:calc(var(--dock-h) + 14px)}
   .toast{bottom:calc(var(--dock-h) + 14px)}
@@ -3247,10 +3269,6 @@ body.theme-dark .pulse-dot.live,body.theme-obsidian .pulse-dot.live,body.theme-n
 
 /* ── Galaxy S24 class (360–412px, the tightest mainstream band) ── */
 @media(min-width:360px) and (max-width:412px){
-  .app-wrapper{
-    padding-left:max(12px,env(safe-area-inset-left));
-    padding-right:max(12px,env(safe-area-inset-right));
-  }
   .kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
   .nav-item{font-size:.63rem;letter-spacing:-.01em}
   .tracker-bar{border-radius:var(--radius-lg)}
@@ -3587,11 +3605,22 @@ body.theme-switching{animation:themeBlink .7s ease}
    A · MATERIAL TIERS
 ──────────────────────────────────────────────────────────────────────── */
 :root{
-  /* Tier 1 — card body: the tint never drops below 84%, so text contrast
-     is exactly what the v11 sweep validated; the ladder 90%→84% is what
-     gives the glass a direction of light. */
-  --panel-tint-a:color-mix(in srgb,var(--surface) 90%,transparent);
-  --panel-tint-b:color-mix(in srgb,var(--surface) 84%,transparent);
+  /* Tier 1 — card body: OPAQUE.
+
+     This is the layer that actually paints a card (it runs after the
+     material block above and sets `background-color:transparent`, so the
+     whole fill comes from these layers). It used to be a translucent ladder
+     — 90%→84% here, 88%→80% on the dark themes — which meant every card in
+     the product let the page's background gradient show through at 10–20%.
+     Stacked over the frosted backdrop-filter that has now been removed, that
+     was the "everything looks slightly soft" report: not one blurry rule but
+     two half-transparent ones compounding.
+
+     The direction of light is not lost — `--gloss` above still lays a
+     top-lit white fade across the card — it is simply painted on a surface
+     that is actually there. */
+  --panel-tint-a:var(--surface-solid);
+  --panel-tint-b:var(--surface-solid);
   --gloss:linear-gradient(180deg,rgba(255,255,255,.55),rgba(255,255,255,0) 44%);
   --wash-none:linear-gradient(0deg,transparent,transparent);
   --wash-accent:radial-gradient(130% 160% at 0% 0%,color-mix(in srgb,var(--accent) 11%,transparent),transparent 60%);
@@ -3607,8 +3636,8 @@ body.theme-switching{animation:themeBlink .7s ease}
   --edge-w:3px;
 }
 body.theme-dark,body.theme-obsidian,body.theme-nebula{
-  --panel-tint-a:color-mix(in srgb,var(--surface) 88%,transparent);
-  --panel-tint-b:color-mix(in srgb,var(--surface) 80%,transparent);
+  /* Opaque here too: 80% surface over a near-black page is what made dark
+     theme text sit on a see-through card. */
   --gloss:linear-gradient(180deg,rgba(255,255,255,.075),rgba(255,255,255,0) 44%);
   --lg-refract:blur(18px) saturate(210%) brightness(1.5);
 }
@@ -3658,10 +3687,10 @@ body.theme-mint,body.theme-sunset,body.theme-silver-lavender,body.theme-default{
     color-mix(in srgb,var(--surface-elevated) 93%,transparent) 0%,
     color-mix(in srgb,var(--surface-elevated) 86%,transparent) 100%);
   background-repeat:no-repeat;
-  -webkit-backdrop-filter:blur(22px) saturate(170%);
-  backdrop-filter:blur(22px) saturate(170%);
+  -webkit-backdrop-filter:var(--glass-blur);
+  backdrop-filter:var(--glass-blur);
 }
-.modal-box{-webkit-backdrop-filter:blur(24px) saturate(175%);backdrop-filter:blur(24px) saturate(175%)}
+.modal-box{-webkit-backdrop-filter:var(--glass-blur);backdrop-filter:var(--glass-blur)}
 .ai-panel{
   background-color:transparent;
   background-image:
@@ -3671,8 +3700,8 @@ body.theme-mint,body.theme-sunset,body.theme-silver-lavender,body.theme-default{
       color-mix(in srgb,var(--surface-elevated) 92%,transparent),
       color-mix(in srgb,var(--surface-elevated) 85%,transparent));
   background-repeat:no-repeat;
-  -webkit-backdrop-filter:blur(20px) saturate(165%);
-  backdrop-filter:blur(20px) saturate(165%);
+  -webkit-backdrop-filter:var(--glass-blur);
+  backdrop-filter:var(--glass-blur);
 }
 @media(hover:hover) and (pointer:fine){
   .ai-panel{transition:--spec-x .5s var(--spring-soft),--spec-y .5s var(--spring-soft),--spec-o .3s ease,box-shadow .4s ease}
@@ -3681,7 +3710,6 @@ body.theme-mint,body.theme-sunset,body.theme-silver-lavender,body.theme-default{
 /* Cost control: a phone never stacks four blurs. Sheets, toasts and the
    chat sheet drop to the shared 14px budget and the rim thins out. */
 @media (hover:none) and (pointer:coarse), (max-width:820px){
-  .modal-box,.toast,.ai-panel{-webkit-backdrop-filter:blur(14px) saturate(160%);backdrop-filter:blur(14px) saturate(160%)}
   :root{--rim-w:7px;--lg-refract:blur(11px) saturate(175%) brightness(1.12)}
 }
 
@@ -3694,7 +3722,12 @@ body.theme-mint,body.theme-sunset,body.theme-silver-lavender,body.theme-default{
 @media (hover:none) and (pointer:coarse){
   .modal-overlay,.cmdk-overlay{backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px)}
 }
-.zen{background-image:radial-gradient(120% 100% at 50% 0%,rgba(60,52,140,.22),transparent 62%)}
+/* Removed: `.zen{background-image:radial-gradient(...rgba(60,52,140,.22)...)}`
+   — a hardcoded violet wash on the Zen room. ui-system.css already repaints
+   `.zen` from `--zen-*` tokens with the final word, so this rule was dead,
+   but it was the one place left that could put purple back into a Sunset or
+   Mint room if that layer ever moved. The theme owns the room. */
+
 
 /* ──────────────────────────────────────────────────────────────────────
    B · REFRACTIVE RIM
@@ -4234,15 +4267,6 @@ body.theme-mint,body.theme-sunset,body.theme-silver-lavender,body.theme-default{
 /* ──────────────────────────────────────────────────────────────────────
    K · GUARDS
 ──────────────────────────────────────────────────────────────────────── */
-/* mode-focused (PG/professional): the app is a tool, not a showpiece. */
-body.mode-focused .up-next.live::after,
-body.mode-focused .day-block:has(.task-row.active-clock)::after,
-body.mode-focused .loader-ring::before,
-body.mode-focused .section-title::after,
-body.mode-focused .momentum-pill,
-body.mode-focused .wk-bar,
-body.mode-focused .section-card,body.mode-focused .day-block,
-body.mode-focused .kpi-card,body.mode-focused .dash-card{animation:none}
 body.mode-focused .btn-primary{background-position:50% 0}
 @media(hover:hover) and (pointer:fine){
   body.mode-focused .glass-panel:not(.ai-panel):hover{--spec-o:.55}
@@ -4479,12 +4503,12 @@ body.mode-young .section-title::after{width:46px;height:3px;bottom:-8px}
     color-mix(in srgb,var(--surface-elevated) 93%,transparent) 0%,
     color-mix(in srgb,var(--surface-elevated) 86%,transparent) 100%);
   background-repeat:no-repeat;
-  -webkit-backdrop-filter:blur(22px) saturate(170%);
-  backdrop-filter:blur(22px) saturate(170%);
+  -webkit-backdrop-filter:var(--glass-blur);
+  backdrop-filter:var(--glass-blur);
 }
-@media (hover:none) and (pointer:coarse), (max-width:820px){
-  .tracker-bar{-webkit-backdrop-filter:blur(14px) saturate(160%);backdrop-filter:blur(14px) saturate(160%)}
-}
+/* The phone blur override that used to live here is gone: `.tracker-bar`
+   reads `--glass-blur`, so the single cost-control knob at the top of this
+   sheet already drops it to 14px on coarse pointers. */
 
 /* ── Tracker bar · identity + time cluster left, actions flush
       right — no more space-between dead gutter ──────────────────── */
@@ -4602,7 +4626,12 @@ body.mode-young .section-title::after{width:46px;height:3px;bottom:-8px}
 }
 
 /* Zen linked-mode hint under the action buttons */
-.zen-hint{font-size:.8rem;color:rgba(255,255,255,.62);font-weight:550;max-width:46ch;text-align:center;margin-top:2px;line-height:1.5}
+/* Removed: `.zen-hint{color:rgba(255,255,255,.62)}` — hardcoded white. It was
+   already overridden by ui-system.css (`.zen-hint{color:var(--zen-muted)}`),
+   but on the four light themes the Zen room is light paper with dark ink, so
+   white-on-light measured 1.44:1 — if that later layer ever stopped restating
+   the colour the hint would have gone invisible. Theme owns it. */
+
 
 /* ════════════════════════════════════════════════════════════════
    v17 — TRUE ONE-PER-ROW PLANNER LIST · SMOOTH SIDEBAR RAIL ·
@@ -4752,8 +4781,8 @@ body.mode-young .section-title::after{width:46px;height:3px;bottom:-8px}
     height:var(--header-h);
     padding:env(safe-area-inset-top) 12px 0 12px;
     background:color-mix(in srgb,var(--surface-elevated) 90%,transparent);
-    -webkit-backdrop-filter:blur(20px) saturate(180%);
-    backdrop-filter:blur(20px) saturate(180%);
+    -webkit-backdrop-filter:var(--glass-blur);
+    backdrop-filter:var(--glass-blur);
     border-bottom:1px solid color-mix(in srgb,var(--glass-border) 85%,transparent);
   }
   .mh-brand{display:flex;align-items:center;gap:8px;min-width:0;flex:1 1 auto}

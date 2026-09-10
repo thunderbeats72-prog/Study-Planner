@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { demoDataEnabled } from "@/lib/demoGate";
 import { db } from "@/db";
 import { users, settings, subjects, topics, tasks, sessions, messages } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
@@ -121,7 +122,7 @@ export async function POST(req: Request) {
 
   // ── Preview without a database: completing the wizard simply resets the
   // in-memory demo plan (the "hard reset" the real route performs). ─────────
-  if (process.env.SPP_DEMO_DATA === "1") {
+  if (demoDataEnabled()) {
     demoResetMutations();
     const state = await fullState(key);
     return NextResponse.json({ ...state, context: buildContext(state, dateFrom(req)) });

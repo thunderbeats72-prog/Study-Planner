@@ -17,9 +17,10 @@
 import { addDays, todayStr } from "./planner";
 import { defaultFallbackState } from "./state";
 
-export function demoDataEnabled(): boolean {
-  return process.env.SPP_DEMO_DATA === "1";
-}
+/* Re-exported so existing imports keep working; the predicate itself lives in
+   demoGate.ts (dependency-free, so state.ts can use it without a cycle). */
+export { demoDataEnabled } from "./demoGate";
+import { demoDataEnabled } from "./demoGate";
 
 const SUBJECTS = [
   { name: "Financial Accounting", color: "#6366f1", difficulty: "hard", units: 6, weight: 1.2 },

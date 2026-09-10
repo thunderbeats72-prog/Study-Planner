@@ -6,7 +6,7 @@ import {
   IconBook, IconCheck, IconClose, IconEdit, IconPlus, IconSpark, IconTrash,
   IconClock, IconTarget, IconChevron,
 } from "./icons";
-import { PageHead } from "./bits";
+import { PageHead, Select } from "./bits";
 import { CountUp, Reveal, Spot } from "@/lib/fx";
 import { cn } from "@/lib/cn";
 
@@ -168,86 +168,136 @@ export default function SubjectsView({
                   </div>
                 </div>
 
-                {/* ── EXPANDABLE LESSONS LIST ── */}
+                {/* ── EXPANDABLE LESSONS LIST ──
+                    One quiet row per topic: number · title · minutes · state.
+                    Everything else (unit, difficulty, mastery, concepts,
+                    practice, the tutor) lives INSIDE the brief, one tap away —
+                    the row itself stays scannable when a subject has 30
+                    lessons. */}
                 {open && (
-                  <div className="border-t border-[var(--border-subtle)] bg-[var(--surface-2)] p-4 sm:p-5 slide-in">
-                    <div className="space-y-3">
-                      {list.length === 0 && (
-                        <p className="text-[13px] font-medium text-center py-4" style={{ color: "var(--text-dim)" }}>
-                          No lessons generated yet.
-                        </p>
-                      )}
-                      {list.map((tp, li) => {
-                        const isDone = doneTopicIds.has(tp.id);
-                        const isBriefOpen = openLesson === tp.id;
-                        return (
-                          <div
-                            key={tp.id}
-                            className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-card)] p-3.5 transition-all"
+                  <div className="topics-list slide-in">
+                    {list.length === 0 && (
+                      <p className="topics-empty" style={{ color: "var(--text-dim)" }}>
+                        No lessons generated yet.
+                      </p>
+                    )}
+                    {list.map((tp, li) => {
+                      const isDone = doneTopicIds.has(tp.id);
+                      const isBriefOpen = openLesson === tp.id;
+                      return (
+                        <div
+                          key={tp.id}
+                          className={cn(
+                            "topic-row",
+                            isBriefOpen && "is-open",
+                            isDone && "is-done",
+                          )}
+                        >
+                          <button
+                            type="button"
+                            className="topic-row-head"
+                            aria-expanded={isBriefOpen}
+                            aria-controls={`topic-brief-${tp.id}`}
+                            onClick={() =>
+                              setOpenLesson(isBriefOpen ? null : tp.id)
+                            }
+                            title={
+                              isBriefOpen
+                                ? "Hide the lesson brief"
+                                : "Read the lesson brief"
+                            }
                           >
-                            <div className="flex flex-wrap items-center justify-between gap-2.5">
-                              <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                                <span className="mono grid h-6 w-6 shrink-0 place-items-center rounded-md bg-[var(--surface-2)] text-[11px] font-bold" style={{ color: s.color }}>
-                                  {li + 1}
+                            <span
+                              className="topic-row-num mono"
+                              style={{ color: s.color }}
+                            >
+                              {li + 1}
+                            </span>
+                            <span className="topic-row-title">{tp.title}</span>
+                            <span className="topic-row-side">
+                              {isDone ? (
+                                <span className="topic-row-done">
+                                  <IconCheck size={12} /> Done
                                 </span>
-                                <div className="min-w-0 flex-1">
-                                  <p className={cn("truncate text-[13.5px] font-bold", isDone && "line-through opacity-50")} style={{ color: "var(--text-main)" }}>
-                                    {tp.title}
-                                  </p>
-                                  <p className="mono text-[11px] font-semibold" style={{ color: "var(--text-dim)" }}>
-                                    {tp.unit} · {tp.estMinutes} min · {tp.difficulty} · mastery {tp.mastery}%
-                                  </p>
+                              ) : (
+                                <span className="topic-row-mins mono">
+                                  {tp.estMinutes}m
+                                </span>
+                              )}
+                              <IconChevron
+                                size={14}
+                                className={cn(
+                                  "topic-row-caret",
+                                  isBriefOpen && "is-open",
+                                )}
+                              />
+                            </span>
+                          </button>
+
+                          {isBriefOpen && (
+                            <div
+                              id={`topic-brief-${tp.id}`}
+                              className="topic-brief"
+                            >
+                              <p className="topic-brief-meta mono">
+                                {tp.unit} · {tp.difficulty} · mastery{" "}
+                                {tp.mastery}%
+                              </p>
+                              <p className="topic-brief-text">{tp.summary}</p>
+                              {(tp.keyConcepts ?? []).length > 0 && (
+                                <div className="topic-brief-block">
+                                  <strong>Key concepts</strong>
+                                  <div className="topic-brief-concepts">
+                                    {tp.keyConcepts.map((item, j) => (
+                                      <span
+                                        key={j}
+                                        className="chip chip-kind chip-tight"
+                                      >
+                                        {item}
+                                      </span>
+                                    ))}
+                                  </div>
                                 </div>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <button
-                                  type="button"
-                                  className="btn btn-xs btn-ghost"
-                                  onClick={() => setOpenLesson(isBriefOpen ? null : tp.id)}
-                                >
-                                  {isBriefOpen ? "Hide brief" : "Lesson brief"}
-                                </button>
+                              )}
+                              {(tp.prerequisites ?? []).length > 0 && (
+                                <div className="topic-brief-block">
+                                  <strong>Prerequisites</strong>
+                                  <ul>
+                                    {tp.prerequisites.map((item, j) => (
+                                      <li key={j}>{item}</li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                              {tp.practice && (
+                                <div className="topic-brief-practice">
+                                  <span className="topic-brief-practice-label">
+                                    Try this
+                                  </span>
+                                  <span>{tp.practice}</span>
+                                </div>
+                              )}
+                              <div className="topic-brief-foot">
+                                <span className="topic-brief-foot-note">
+                                  Want it explained step by step?
+                                </span>
                                 <button
                                   type="button"
                                   className="btn btn-xs btn-primary"
-                                  onClick={() => onAskTutor(`Teach me "${tp.title}" from ${s.name}. Use objectives: ${(tp.objectives || []).join("; ")}. Explain with a clear worked example.`)}
+                                  onClick={() =>
+                                    onAskTutor(
+                                      `Teach me "${tp.title}" from ${s.name}. Use objectives: ${(tp.objectives || []).join("; ")}. Explain with a clear worked example.`,
+                                    )
+                                  }
                                 >
-                                  <IconSpark size={12} /> Teach
+                                  <IconSpark size={12} /> Teach me
                                 </button>
                               </div>
                             </div>
-
-                            {isBriefOpen && (
-                              <div className="mt-3 border-t border-[var(--border-subtle)] pt-3 text-[12.5px] space-y-2.5 slide-in">
-                                <p className="font-medium" style={{ color: "var(--text-main)" }}>{tp.summary}</p>
-                                {tp.prerequisites?.length > 0 && (
-                                  <div>
-                                    <strong className="block text-[11.5px] uppercase tracking-wider text-[var(--text-dim)] mb-1">Prerequisites</strong>
-                                    <ul className="list-disc pl-4 space-y-0.5">
-                                      {tp.prerequisites.map((item, j) => <li key={j}>{item}</li>)}
-                                    </ul>
-                                  </div>
-                                )}
-                                {tp.keyConcepts?.length > 0 && (
-                                  <div>
-                                    <strong className="block text-[11.5px] uppercase tracking-wider text-[var(--text-dim)] mb-1">Key Concepts</strong>
-                                    <div className="flex flex-wrap gap-1.5">
-                                      {tp.keyConcepts.map((item, j) => <span key={j} className="chip chip-kind chip-tight">{item}</span>)}
-                                    </div>
-                                  </div>
-                                )}
-                                {tp.practice && (
-                                  <div>
-                                    <strong className="block text-[11.5px] uppercase tracking-wider text-[var(--text-dim)] mb-0.5">Applied Practice</strong>
-                                    <p style={{ color: "var(--text-main)" }}>{tp.practice}</p>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </Spot>
@@ -321,16 +371,13 @@ export default function SubjectsView({
                 </div>
                 <div>
                   <label className="lbl" htmlFor="sub-diff">Difficulty</label>
-                  <select
+                  <Select
                     id="sub-diff"
-                    className="input-field"
+                    ariaLabel="Difficulty"
                     value={difficulty}
-                    onChange={(e) => setDifficulty(e.target.value)}
-                  >
-                    <option>Easy</option>
-                    <option>Medium</option>
-                    <option>Hard</option>
-                  </select>
+                    onChange={setDifficulty}
+                    options={["Easy", "Medium", "Hard"].map((d) => ({ value: d, label: d }))}
+                  />
                 </div>
               </div>
 
@@ -418,16 +465,13 @@ export default function SubjectsView({
                 </div>
                 <div>
                   <label className="lbl" htmlFor="edit-sub-diff">Difficulty</label>
-                  <select
+                  <Select
                     id="edit-sub-diff"
-                    className="input-field"
+                    ariaLabel="Difficulty"
                     value={editing.difficulty}
-                    onChange={(e) => setEditing({ ...editing, difficulty: e.target.value })}
-                  >
-                    <option>Easy</option>
-                    <option>Medium</option>
-                    <option>Hard</option>
-                  </select>
+                    onChange={(v) => setEditing({ ...editing, difficulty: v })}
+                    options={["Easy", "Medium", "Hard"].map((d) => ({ value: d, label: d }))}
+                  />
                 </div>
               </div>
 

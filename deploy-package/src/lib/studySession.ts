@@ -68,34 +68,53 @@ export function planSession(snapshot: SessionSnapshot, command: SessionCommand):
 
   switch (command.type) {
     case "start": {
-      if (!snapshot.timerRunning) fx.push({ kind: "timer.start" });
       if (snapshot.timerIsBreak) {
+        if (!snapshot.timerRunning) fx.push({ kind: "timer.start" });
         if (snapshot.clockSessionActive && !snapshot.clockOnBreak) fx.push({ kind: "clock.break" });
         claimOwnership();
         return fx;
       }
-      if (!snapshot.clockSessionActive) fx.push({ kind: "clock.in" });
-      else if (snapshot.clockOnBreak) fx.push({ kind: "clock.endBreak" });
+      if (!snapshot.clockSessionActive) {
+        /* A brand-new session is the Focus flow: countdown and clock start
+           together and Focus takes ownership of the clock. */
+        if (!snapshot.timerRunning) fx.push({ kind: "timer.start" });
+        fx.push({ kind: "clock.in" });
+        claimOwnership();
+        return fx;
+      }
+      /* An EXISTING session only resumes what is paused. A clock the learner
+         started by hand resumes on its own — no focus countdown is spun up
+         and ownership is never grabbed, so "Resume" on a manual session can
+         never surprise anyone with a pomodoro timer. */
+      if (snapshot.clockOnBreak) fx.push({ kind: "clock.endBreak" });
       else if (!snapshot.clockRunning) fx.push({ kind: "clock.resume" });
-      claimOwnership();
+      if (snapshot.focusOwnsClock && !snapshot.timerRunning) fx.push({ kind: "timer.start" });
       return fx;
     }
 
     case "pause": {
-      if (snapshot.timerRunning) fx.push({ kind: "timer.pause" });
-      if (snapshot.focusOwnsClock && snapshot.clockRunning) fx.push({ kind: "clock.pause" });
+      if (snapshot.focusOwnsClock && snapshot.timerRunning) fx.push({ kind: "timer.pause" });
+      /* Pausing rests the clock no matter who started the session — a manual
+         clock-in used to ignore Pause entirely. */
+      if (snapshot.clockRunning) fx.push({ kind: "clock.pause" });
       if (snapshot.focusOwnsClock && snapshot.timerRunning && snapshot.clockRunning) {
         fx.push({ kind: "note", message: "Paused — focus timer and study clock stopped together." });
       }
       return fx;
     }
 
-    case "toggle":
-      return planSession(snapshot, snapshot.timerRunning ? { type: "pause" } : { type: "start" });
+    case "toggle": {
+      const running = snapshot.focusOwnsClock
+        ? snapshot.timerRunning || snapshot.clockRunning
+        : snapshot.clockRunning;
+      return planSession(snapshot, running ? { type: "pause" } : { type: "start" });
+    }
 
     case "break": {
-      if (!snapshot.focusOwnsClock || !snapshot.clockSessionActive || snapshot.clockOnBreak) return fx;
-      if (snapshot.timerRunning) fx.push({ kind: "timer.pause" });
+      /* Breaks work for manual sessions too; only the focus countdown (which
+         a manual session does not have) is paused when owned. */
+      if (!snapshot.clockSessionActive || snapshot.clockOnBreak) return fx;
+      if (snapshot.focusOwnsClock && snapshot.timerRunning) fx.push({ kind: "timer.pause" });
       fx.push({ kind: "clock.break" });
       fx.push({ kind: "note", message: "On a break — study time is paused." });
       return fx;
@@ -300,7 +319,10 @@ export function useStudySession({
     timer,
     clock,
     focusOwnsClock,
-    active: focusOwnsClock && (timer.running || clock.running),
+    /* "Active" means the session is MOVING, whichever flavour it is. A manual
+       clock-in has no focus timer, so for it the clock itself is the source
+       of truth — otherwise Pause/Resume labels desync from reality. */
+    active: focusOwnsClock ? timer.running || clock.running : clock.running,
     start, pause, toggle, takeBreak, endSession, reset, setMode, run,
   };
 }
