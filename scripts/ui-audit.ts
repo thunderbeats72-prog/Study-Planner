@@ -59,7 +59,7 @@ const BUDGET = {
      font-size literals and 797 `!important`s. These are ceilings. */
   conflicts: 372,
   overflowMasks: 1,
-  fixedWidths: 2,
+  fixedWidths: 0,
   typeLiterals: 458,
   important: 769,
 };

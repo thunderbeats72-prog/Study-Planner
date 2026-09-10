@@ -4949,11 +4949,11 @@ body.mode-young .section-title::after{width:46px;height:3px;bottom:-8px}
   .planner-days .task-row{flex-wrap:nowrap;display:flex;align-items:center;gap:12px}
   .planner-days .task-row .task-main{flex:1 1 auto;min-width:0}
   .planner-days .task-row > .chip{flex-shrink:0;min-width:68px;text-align:center;justify-content:center;margin-inline-start:auto}
-  .planner-days .task-row .task-row-actions{flex-shrink:0;min-width:350px;justify-content:flex-end;display:flex;align-items:center;gap:6px}
+  .planner-days .task-row .task-row-actions{flex-shrink:0;min-width:min(350px,55%);justify-content:flex-end;display:flex;align-items:center;gap:6px}
   .planner-days .task-row .task-row-actions > .task-primary{margin-inline-start:0}
   .task-row.clean-list{display:flex;align-items:center;gap:12px}
   .task-row.clean-list .task-main{flex:1 1 auto;min-width:0}
-  .task-row.clean-list .task-row-actions{flex-shrink:0;min-width:350px;justify-content:flex-end}
+  .task-row.clean-list .task-row-actions{flex-shrink:0;min-width:min(350px,55%);justify-content:flex-end}
 }
 
 /* Dock breathing room: the last row of a list must clear the capsule. */
