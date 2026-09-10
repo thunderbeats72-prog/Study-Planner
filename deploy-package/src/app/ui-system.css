@@ -6760,12 +6760,36 @@ body.focus-live .tracker-bar {
   }
   body.focus-live .tracker-status { flex: 1 1 auto !important; min-width: 0; }
   body.focus-live .tracker-actions { gap: 6px; }
-  /* Recording or paused: the state line sits ABOVE the subject, so a long
-     lesson name can never squeeze the state out of the row. */
-  .tracker-bar.session-bar:has(.tracker-clock) .tracker-labels {
+  /* State ABOVE the subject in every session state. On one line the pair
+     ("NOT CLOCKED IN · Free session") needs ~160px, which the verbs leave
+     behind on a 320px screen — the state was being clipped to "NOT CLOCKED".
+     Two short lines never clip and read better. */
+  .tracker-bar.session-bar .tracker-labels {
     flex-direction: column;
     align-items: flex-start;
     gap: 1px;
+    min-width: 0;
+  }
+}
+
+/* Idle on a small phone: the verbs get their own row instead of squeezing
+   the status column down to an ellipsis. */
+@media (max-width: 430px) {
+  .tracker-bar.session-bar:not(:has(.tracker-clock)) {
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-areas: "status" "actions" !important;
+    gap: 8px !important;
+  }
+  .tracker-bar.session-bar:not(:has(.tracker-clock)) .tracker-actions {
+    width: 100% !important;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: 7px;
+  }
+  .tracker-bar.session-bar:not(:has(.tracker-clock)) .tracker-actions .btn {
+    flex: 1 1 auto;
+    min-height: 42px;
   }
 }
 
@@ -6942,7 +6966,10 @@ body.focus-live .tracker-bar {
   }
   .task-btns .btn {
     flex: 1 1 auto;
-    min-width: 0;
+    /* A floor, not zero: labels are `nowrap`, so a button allowed to shrink
+       to nothing would clip its own text ("Don…") at 320px. Too wide to fit
+       on one line, the row wraps instead. */
+    min-width: 68px;
     min-height: 40px;
     justify-content: center;
   }
@@ -6951,6 +6978,11 @@ body.focus-live .tracker-bar {
     flex: 1 1 100%;
     justify-content: center;
   }
+  /* The live pair keeps its own floors — "Pause" and "Clock out" are the two
+     labels that must never wrap or clip mid-session. */
+  .task-clock-group .task-clock-toggle { min-width: 76px; }
+  .task-clock-group .task-clock-out { min-width: 82px; }
+
   /* The ⋮ keeps its own square: it must not stretch like a verb button. */
   .task-card .task-more,
   .task-row .task-more {
