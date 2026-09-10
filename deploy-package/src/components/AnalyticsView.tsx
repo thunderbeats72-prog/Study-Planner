@@ -375,7 +375,12 @@ export default function AnalyticsView({
                   }}
                 />
               </svg>
-              <div className="absolute text-center">
+              {/* `.ring-center` is the ring's readout slot — the same one the
+                  Focus timer uses: absolutely filling the figure, centred on
+                  both axes. The old `absolute text-center` pair was a Tailwind
+                  leftover with no positioned ancestor, so the readout fell out
+                  of the ring's box and sat under it instead of inside it. */}
+              <div className="ring-center">
                 <span className="ring-digits mono">
                   <CountUp to={consistency} suffix="%" />
                 </span>

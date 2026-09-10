@@ -20,16 +20,19 @@ export type { GeneratedTopic, CurriculumSource } from "./curriculum";
 
 /* ============================================================
    SERVER-SIDE PROVIDER CONFIGURATION
-   ─ Cerebras → Mistral → SambaNova → Cohere → Gemini ─
+   ─ Cerebras → Groq → Mistral → SambaNova → Cohere → Gemini → OpenRouter ─
    Design goals (v9 multi-provider + ML-blend architecture):
-   • PRIMARY TIER: Cerebras, Mistral, SambaNova, Cohere — the four
+   • PRIMARY TIER: Cerebras, Groq, Mistral, SambaNova, Cohere — the
      explicitly configured high-speed providers. The app tries them
      in this order first, each with its own MODEL FALLBACK CHAIN so
-     a retired model ID costs only one fast 404 before moving on.
-   • SAFETY NET: Gemini remains as the final cloud fallback, then
-     SHIGUN's deterministic local ML engine (ml.ts — FSRS-lite,
-     pace models, skip-risk, time-of-day profiling) answers from
-     the learner's own logged history without any network call.
+     a retired model ID costs only one fast 404 before moving on
+     (this is what keeps "Cerebras is down" from becoming "AI is
+     down": the next leg answers in the same request).
+   • SAFETY NET: Gemini, then OpenRouter (one key, many vendors) as
+     the widest last cloud leg, then SHIGUN's deterministic local ML
+     engine (ml.ts — FSRS-lite, pace models, skip-risk, time-of-day
+     profiling) answers from the learner's own logged history without
+     any network call.
    • STICKY SUCCESS: the last (provider, model) that answered is
      tried first on the next request — one hop for a working leg.
    • ONE bounded retry for transient (network / 5xx) failures;
@@ -51,7 +54,14 @@ function envValue(...names: string[]): string | null {
 }
 
 type ChatMsg = { role: "user" | "assistant"; content: string };
-type ProviderId = "cerebras" | "mistral" | "sambanova" | "cohere" | "gemini";
+type ProviderId =
+  | "cerebras"
+  | "groq"
+  | "mistral"
+  | "sambanova"
+  | "cohere"
+  | "gemini"
+  | "openrouter";
 export type LlmAttempt = {
   provider: ProviderId;
   model: string;
@@ -110,12 +120,19 @@ type ProviderSpec = {
   extract: (json: any) => { text: string | null; blocked: boolean };
 };
 
-function openAiCompatRequest(url: string, headers: Record<string, string>) {
-  return (model: string, _key: string, system: string, messages: ChatMsg[], maxTokens: number, temperature: number) => ({
+/** Shared OpenAI-compatible POST. `headers` may add provider-specific
+ *  fields (OpenRouter's optional attribution, for example); the bearer
+ *  token is always taken from the provider's own key. */
+function openAiCompatRequest(url: string, headers: Record<string, string> = {}) {
+  return (model: string, key: string, system: string, messages: ChatMsg[], maxTokens: number, temperature: number) => ({
     url,
     init: {
       method: "POST",
-      headers: { "content-type": "application/json", ...headers },
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${key}`,
+        ...headers,
+      },
       body: JSON.stringify({
         model,
         max_tokens: maxTokens,
@@ -141,7 +158,17 @@ const PROVIDERS: Record<ProviderId, ProviderSpec> = {
     keyEnv: () => envValue("CEREBRAS_API_KEY", "NEXT_PUBLIC_CEREBRAS_API_KEY"),
     modelEnv: "CEREBRAS_MODEL",
     // Cerebras WSE-3 runs Llama at up to 2,100 tok/s — ideal primary provider.
-    models: ["llama-3.3-70b", "llama3.1-70b", "llama3.1-8b"],
+    // The chain keeps several CURRENT ids so a retired model costs one fast
+    // 404 and the next leg answers, instead of the whole provider dropping
+    // out (which is what "Cerebras stopped working" used to look like).
+    models: [
+      "llama-3.3-70b",
+      "gpt-oss-120b",
+      "qwen-3-32b",
+      "llama-4-scout-17b-16e-instruct",
+      "zai-glm-4.6",
+      "llama3.1-8b",
+    ],
     request: (model, key, system, messages, maxTokens, temperature) => ({
       url: "https://api.cerebras.ai/v1/chat/completions",
       init: {
@@ -158,6 +185,26 @@ const PROVIDERS: Record<ProviderId, ProviderSpec> = {
         }),
       },
     }),
+    extract: openAiCompatExtract,
+  },
+
+  /* ── Groq (LPU inference, OpenAI-compatible, free tier) ────────
+     Added as the first fallback after Cerebras: same OpenAI wire
+     format, very low latency, and a free developer tier, so a Cerebras
+     outage or a retired Cerebras model id costs milliseconds. */
+  groq: {
+    id: "groq",
+    label: "Groq",
+    keyEnv: () => envValue("GROQ_API_KEY", "NEXT_PUBLIC_GROQ_API_KEY"),
+    modelEnv: "GROQ_MODEL",
+    models: [
+      "llama-3.3-70b-versatile",
+      "openai/gpt-oss-120b",
+      "qwen/qwen3-32b",
+      "moonshotai/kimi-k2-instruct",
+      "llama-3.1-8b-instant",
+    ],
+    request: openAiCompatRequest("https://api.groq.com/openai/v1/chat/completions", {}),
     extract: openAiCompatExtract,
   },
 
@@ -284,12 +331,35 @@ const PROVIDERS: Record<ProviderId, ProviderSpec> = {
       return { text: text && text.trim() ? text : null, blocked };
     },
   },
+
+  /* ── OpenRouter (meta-provider: last cloud leg before the local ──
+     engine). One key reaches many vendors, so it is the widest safety
+     net: if every direct provider is down, retired or rate-limited,
+     this is the leg that still answers. */
+  openrouter: {
+    id: "openrouter",
+    label: "OpenRouter",
+    keyEnv: () => envValue("OPENROUTER_API_KEY", "NEXT_PUBLIC_OPENROUTER_API_KEY"),
+    modelEnv: "OPENROUTER_MODEL",
+    models: [
+      "openai/gpt-oss-120b",
+      "meta-llama/llama-3.3-70b-instruct",
+      "google/gemini-2.5-flash",
+      "mistralai/mistral-small",
+    ],
+    request: openAiCompatRequest("https://openrouter.ai/api/v1/chat/completions", {
+      "HTTP-Referer": "https://study-planner-pro.local",
+      "X-Title": "Study Planner Pro",
+    }),
+    extract: openAiCompatExtract,
+  },
 };
 
-// Priority order: Cerebras (fastest) → Mistral → SambaNova → Cohere → Gemini (safety net).
+// Priority order: Cerebras (fastest) → Groq → Mistral → SambaNova → Cohere →
+// Gemini (safety net) → OpenRouter (widest last cloud leg).
 // The local ML engine (ml.ts) always runs last if every cloud call fails.
 const DEFAULT_PROVIDER_ORDER: ProviderId[] = [
-  "cerebras", "mistral", "sambanova", "cohere", "gemini",
+  "cerebras", "groq", "mistral", "sambanova", "cohere", "gemini", "openrouter",
 ];
 
 function providerKeys(): Record<ProviderId, string | null> {
@@ -438,6 +508,20 @@ export async function callLLMDetailed(
     return result;
   };
 
+  /* Sticky-provider hygiene: the last leg that answered is tried first, but
+     a provider that has started rejecting, throttling or blocking us must
+     lose that slot immediately — otherwise every request pays for its
+     failure before the healthy providers behind it get a turn. */
+  const forgetSticky = (provider: ProviderId) => {
+    if (aiGlobal.__studyPlannerPreferred?.provider === provider) {
+      delete aiGlobal.__studyPlannerPreferred;
+    }
+  };
+  /* Per-call timeout ledger: one slow answer is a slow model; two is a slow
+     HOST, and a hanging host must not eat the shared budget while every
+     healthy provider queued behind it is skipped. */
+  const timeoutsSeen = new Map<ProviderId, number>();
+
   for (const provider of providers) {
     if (deadline - Date.now() < 300) break;
     const spec = PROVIDERS[provider];
@@ -452,7 +536,10 @@ export async function callLLMDetailed(
         if (deadline - Date.now() < 300) break;
         try {
           const { url, init } = spec.request(model, key, safeSystem, safeMessages, safeMaxTokens, temperature);
-          const { response, json, detail } = await requestJson(url, init, deadline, 9_000);
+          // Once a provider has timed out, its remaining attempts get a
+          // shorter leash so the rest of the chain keeps a usable slice.
+          const budget = timeoutsSeen.get(provider) ? 4_500 : 9_000;
+          const { response, json, detail } = await requestJson(url, init, deadline, budget);
           if (response.ok) {
             const { text, blocked } = spec.extract(json);
             if (text) return success(text, provider, model);
@@ -465,7 +552,7 @@ export async function callLLMDetailed(
           if (error === "auth") {
             // A rejected key invalidates this provider (and its sticky slot):
             // every other model would fail identically, so do not loop them.
-            if (aiGlobal.__studyPlannerPreferred?.provider === provider) delete aiGlobal.__studyPlannerPreferred;
+            forgetSticky(provider);
             abandonProvider = true;
             break;
           }
@@ -474,15 +561,29 @@ export async function callLLMDetailed(
             retried = true; // one fast retry for transient failures
             continue;
           }
-          abandonProvider = true; // rate_limit / blocked / bad request → next provider
+          // rate_limit / blocked / bad request → next provider, and the
+          // sticky slot goes with it (a throttled provider is not "the last
+          // one that worked" any more).
+          forgetSticky(provider);
+          abandonProvider = true;
           break;
         } catch (error) {
           const timedOut = error instanceof DOMException && error.name === "AbortError";
           attempts.push({ provider, model, status: null, error: timedOut ? "timeout" : "network" });
-          if (!timedOut && !retried) { retried = true; continue; }
-          // A slow model must not block the chain — next model. A hard network
-          // failure affects this provider's whole host — next provider.
-          abandonProvider = !timedOut;
+          if (timedOut) {
+            const seen = (timeoutsSeen.get(provider) || 0) + 1;
+            timeoutsSeen.set(provider, seen);
+            // One timeout: try the next model on a shorter leash. Two: the
+            // host is the problem — leave it and spend the budget elsewhere.
+            if (seen >= 2) {
+              forgetSticky(provider);
+              abandonProvider = true;
+            }
+            break;
+          }
+          if (!retried) { retried = true; continue; }
+          // A hard network failure affects this provider's whole host.
+          abandonProvider = true;
           break;
         }
       }
