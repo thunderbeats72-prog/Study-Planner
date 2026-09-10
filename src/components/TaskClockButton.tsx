@@ -6,6 +6,7 @@ import {
   IconCheck,
   IconPause,
   IconPlay,
+  IconStop,
   IconStopwatch,
   IconSwap,
 } from "./icons";
@@ -96,8 +97,8 @@ export default function TaskClockButton({
         aria-label="Clock out of this task"
       >
         <span className="clock-live-dot" aria-hidden="true" />
-        <IconCheck size={13} />
-        <span>Clock out</span>
+        <IconStop size={13} />
+        <span>End session</span>
       </button>
     );
   }

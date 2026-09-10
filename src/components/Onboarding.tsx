@@ -8,6 +8,7 @@ import {
   IconArrowRight, IconArrowLeft,
 } from "./icons";
 import { LampScene } from "./Illustrations";
+import { Select } from "./bits";
 import { MaskWords, Scramble, Reveal } from "@/lib/fx";
 import { cn } from "@/lib/cn";
 
@@ -572,11 +573,15 @@ export default function Onboarding({
                   </div>
                   <div className="ob-field">
                     <label>Year / Semester (narrows to that term)</label>
-                    <select value={year} onChange={(e) => setYear(e.target.value)}>
-                      {Object.entries(YEAR_LABELS).map(([value, text]) => (
-                        <option key={value} value={value}>{text}</option>
-                      ))}
-                    </select>
+                    <Select
+                      ariaLabel="Year or semester"
+                      value={year}
+                      onChange={setYear}
+                      options={Object.entries(YEAR_LABELS).map(([value, text]) => ({
+                        value,
+                        label: text,
+                      }))}
+                    />
                   </div>
                 </>
               )}
@@ -585,23 +590,30 @@ export default function Onboarding({
                 <>
                   <div className="ob-field">
                     <label>Board</label>
-                    <select value={board} onChange={(e) => setBoard(e.target.value)}>
-                      <option>CBSE</option>
-                      <option>ICSE</option>
-                      <option>State Board</option>
-                      <option>IB</option>
-                      <option>IGCSE / Cambridge</option>
-                    </select>
+                    <Select
+                      ariaLabel="Board"
+                      value={board}
+                      onChange={setBoard}
+                      options={["CBSE", "ICSE", "State Board", "IB", "IGCSE / Cambridge"].map((b) => ({
+                        value: b,
+                        label: b,
+                      }))}
+                    />
                   </div>
                   <div className="ob-field">
                     <label>Stream (for class 11-12)</label>
-                    <select value={specialisation} onChange={(e) => setSpecialisation(e.target.value)}>
-                      <option value="">Not applicable</option>
-                      <option value="Science (PCM)">Science (PCM)</option>
-                      <option value="Science (PCB)">Science (PCB)</option>
-                      <option value="Commerce">Commerce</option>
-                      <option value="Arts / Humanities">Arts / Humanities</option>
-                    </select>
+                    <Select
+                      ariaLabel="Stream"
+                      value={specialisation}
+                      onChange={setSpecialisation}
+                      options={[
+                        { value: "", label: "Not applicable" },
+                        ...["Science (PCM)", "Science (PCB)", "Commerce", "Arts / Humanities"].map((s) => ({
+                          value: s,
+                          label: s,
+                        })),
+                      ]}
+                    />
                   </div>
                 </>
               )}
@@ -610,18 +622,28 @@ export default function Onboarding({
                 <>
                   <div className="ob-field">
                     <label>Attempt</label>
-                    <select value={attempt} onChange={(e) => setAttempt(e.target.value)}>
-                      <option value="first">First attempt</option>
-                      <option value="repeat">Repeat / re-attempt</option>
-                    </select>
+                    <Select
+                      ariaLabel="Attempt"
+                      value={attempt}
+                      onChange={setAttempt}
+                      options={[
+                        { value: "first", label: "First attempt" },
+                        { value: "repeat", label: "Repeat / re-attempt" },
+                      ]}
+                    />
                   </div>
                   <div className="ob-field">
                     <label>How much have you already prepared?</label>
-                    <select value={priorPrep} onChange={(e) => setPriorPrep(e.target.value)}>
-                      <option value="fresh">Starting fresh (0-20%)</option>
-                      <option value="partial">Partly done (20-60%)</option>
-                      <option value="revision">Mostly done (60%+)</option>
-                    </select>
+                    <Select
+                      ariaLabel="Preparation so far"
+                      value={priorPrep}
+                      onChange={setPriorPrep}
+                      options={[
+                        { value: "fresh", label: "Starting fresh (0-20%)" },
+                        { value: "partial", label: "Partly done (20-60%)" },
+                        { value: "revision", label: "Mostly done (60%+)" },
+                      ]}
+                    />
                   </div>
                 </>
               )}
@@ -675,14 +697,12 @@ export default function Onboarding({
                     value={s.units}
                     onChange={(e) => setSubs((p) => p.map((x, j) => (j === i ? { ...x, units: Number(e.target.value) } : x)))}
                   />
-                  <select
+                  <Select
+                    ariaLabel={`Difficulty for ${s.name}`}
                     value={s.difficulty}
-                    onChange={(e) => setSubs((p) => p.map((x, j) => (j === i ? { ...x, difficulty: e.target.value } : x)))}
-                  >
-                    <option>Easy</option>
-                    <option>Medium</option>
-                    <option>Hard</option>
-                  </select>
+                    onChange={(v) => setSubs((p) => p.map((x, j) => (j === i ? { ...x, difficulty: v } : x)))}
+                    options={["Easy", "Medium", "Hard"].map((d) => ({ value: d, label: d }))}
+                  />
                   <button className="btn btn-xs btn-danger" onClick={() => setSubs((p) => p.filter((_, j) => j !== i))}>
                     ✕
                   </button>
@@ -750,10 +770,15 @@ export default function Onboarding({
                 <div className="ob-choice-card">
                   <label>Weakest Subject</label>
                   <div className="ob-range-hint">If one subject needs extra reinforcement, the planner can give it more attention.</div>
-                  <select value={weak} onChange={(e) => setWeak(e.target.value)}>
-                    <option value="-1">None / not sure</option>
-                    {subs.map((s, i) => <option key={i} value={String(i)}>{s.name}</option>)}
-                  </select>
+                  <Select
+                    ariaLabel="Weakest subject"
+                    value={weak}
+                    onChange={setWeak}
+                    options={[
+                      { value: "-1", label: "None / not sure" },
+                      ...subs.map((s, i) => ({ value: String(i), label: s.name })),
+                    ]}
+                  />
                 </div>
               </div>
               <OnboardingChoiceGroup label="Study Style" hint="Choose the learning mix that feels most natural to you." value={style} options={STYLE_OPTIONS} onChange={setStyle} columns={3} fullWidth />

@@ -6,7 +6,7 @@ import {
   IconBook, IconCheck, IconClose, IconEdit, IconPlus, IconSpark, IconTrash,
   IconClock, IconTarget, IconChevron,
 } from "./icons";
-import { PageHead } from "./bits";
+import { PageHead, Select } from "./bits";
 import { CountUp, Reveal, Spot } from "@/lib/fx";
 import { cn } from "@/lib/cn";
 
@@ -321,16 +321,13 @@ export default function SubjectsView({
                 </div>
                 <div>
                   <label className="lbl" htmlFor="sub-diff">Difficulty</label>
-                  <select
+                  <Select
                     id="sub-diff"
-                    className="input-field"
+                    ariaLabel="Difficulty"
                     value={difficulty}
-                    onChange={(e) => setDifficulty(e.target.value)}
-                  >
-                    <option>Easy</option>
-                    <option>Medium</option>
-                    <option>Hard</option>
-                  </select>
+                    onChange={setDifficulty}
+                    options={["Easy", "Medium", "Hard"].map((d) => ({ value: d, label: d }))}
+                  />
                 </div>
               </div>
 
@@ -418,16 +415,13 @@ export default function SubjectsView({
                 </div>
                 <div>
                   <label className="lbl" htmlFor="edit-sub-diff">Difficulty</label>
-                  <select
+                  <Select
                     id="edit-sub-diff"
-                    className="input-field"
+                    ariaLabel="Difficulty"
                     value={editing.difficulty}
-                    onChange={(e) => setEditing({ ...editing, difficulty: e.target.value })}
-                  >
-                    <option>Easy</option>
-                    <option>Medium</option>
-                    <option>Hard</option>
-                  </select>
+                    onChange={(v) => setEditing({ ...editing, difficulty: v })}
+                    options={["Easy", "Medium", "Hard"].map((d) => ({ value: d, label: d }))}
+                  />
                 </div>
               </div>
 

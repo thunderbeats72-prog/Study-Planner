@@ -22,6 +22,7 @@ import {
   demoResetMutations, demoSessionMinutesForTask,
 } from "../src/lib/demoState";
 import { nextAction, prioritizeTasks, weakestSubjectIds } from "../src/lib/prioritization";
+import { demoDataEnabled } from "../src/lib/demoGate";
 import {
   backlogFor, backlogToDate, canFitToday, dailyCapacityMinutes, pendingOnDate,
   spreadAcrossDays, suggestedRecovery, todayOverload, GENTLE_EXTRA_PER_DAY,
@@ -520,6 +521,62 @@ async function runTests() {
       demoFallbackState("u_demo_test").tasks.length === 28,
       "Demo reset restores the baseline plan"
     );
+
+    /* ── The gate that decides "is this a database-less preview?" ──────────
+       This one bug made the whole app feel broken. With the flag unset,
+       `fullState()` fell back to a *static* sample plan (so every READ
+       returned 200 and the planner looked alive), while every WRITE route
+       skipped its demo branch, hit the unavailable database and returned 503:
+
+         POST /api/sessions   503   ← the study clock could not log a session
+         PATCH /api/settings  503   ← settings could not be saved
+         POST /api/tasks      503   ← a task could not be added
+         GET  /api/analytics  503   ← analytics had nothing to show
+
+       Because reads and writes disagreed, nothing the visitor did had any
+       effect — which reads as "the clock is missing" and "there are no
+       animations", since every animation worth seeing is triggered by a
+       successful interaction. Reads and writes must consult ONE predicate. */
+    /* Next.js types `NODE_ENV` read-only, so drive the gate through a
+       mutable view of the same object rather than fighting the types. */
+    const env = process.env as Record<string, string | undefined>;
+    const savedFlag = env.SPP_DEMO_DATA;
+    const savedUrl = env.DATABASE_URL;
+    const savedEnv = env.NODE_ENV;
+    try {
+      delete env.DATABASE_URL;
+      env.NODE_ENV = "development";
+      env.SPP_DEMO_DATA = "1";
+      check(demoDataEnabled() === true, "Preview mode is on when it is asked for explicitly");
+      env.SPP_DEMO_DATA = "0";
+      check(demoDataEnabled() === false,
+        "Preview mode honours an explicit opt-out, so a real deployment never serves sample data");
+      delete env.SPP_DEMO_DATA;
+      check(demoDataEnabled() === true,
+        "With no database outside production the app is interactive instead of a wall of 503s");
+      env.DATABASE_URL = "postgres://example/db";
+      check(demoDataEnabled() === false,
+        "A configured database turns the demo layer off, so writes go to Postgres");
+      delete env.DATABASE_URL;
+      env.NODE_ENV = "production";
+      check(demoDataEnabled() === false,
+        "Production without a database stays honest and returns 503 rather than fake data");
+    } finally {
+      if (savedFlag === undefined) delete env.SPP_DEMO_DATA; else env.SPP_DEMO_DATA = savedFlag;
+      if (savedUrl === undefined) delete env.DATABASE_URL; else env.DATABASE_URL = savedUrl;
+      if (savedEnv === undefined) delete env.NODE_ENV; else env.NODE_ENV = savedEnv;
+    }
+
+    /* The drift above could only happen because the predicate was copied.
+       Forbid the copy: exactly one module may read the flag. */
+    const flagReaders = ["src/lib/state.ts", "src/lib/demoState.ts", "src/lib/demoGate.ts",
+      "src/app/api/onboard/route.ts", "src/app/api/sessions/route.ts", "src/app/api/settings/route.ts",
+      "src/app/api/tasks/route.ts", "src/app/api/subjects/route.ts", "src/app/api/analytics/route.ts",
+      "src/app/api/replan/route.ts"]
+      .filter((f) => /process\.env\.SPP_DEMO_DATA/.test(
+        readFileSync(join(process.cwd(), f), "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\*.*$/gm, "")));
+    check(flagReaders.length === 1 && flagReaders[0] === "src/lib/demoGate.ts",
+      `Exactly one module reads SPP_DEMO_DATA${flagReaders.length === 1 ? " (demoGate.ts)" : ` (${flagReaders.join(", ") || "none"})`}`);
   }
 
   console.log("\n--- 6. Curriculum Ground Truth ---");
@@ -807,6 +864,24 @@ async function runTests() {
   check(isBreakMode("short") && isBreakMode("long") && !isBreakMode("pomodoro") && !isBreakMode("stopwatch"),
     "Only the short and long modes count as breaks");
 
+  /* A clock the learner started by hand (Planner "Clock in", a task row) is a
+     first-class session too: Pause must stop it, Resume must restart it and
+     Break must take it off the bill — none of which may spin up the focus
+     countdown or grab ownership. This used to be the missing half: manual
+     sessions ignored Pause and Break entirely. */
+  const manual = snap({ clockSessionActive: true, clockRunning: true });
+  effects = planEffects({ type: "pause" }, manual);
+  check(effects.includes("clock.pause") && !effects.includes("timer.pause"),
+    "Pause rests a hand-started clock without touching the focus timer");
+  effects = planEffects({ type: "start" }, snap({ clockSessionActive: true }));
+  check(effects.includes("clock.resume") && !effects.includes("timer.start") && !effects.includes("own.focus"),
+    "Resume restarts a paused manual clock without starting a pomodoro or grabbing ownership");
+  effects = planEffects({ type: "break" }, manual);
+  check(effects.includes("clock.break") && !effects.includes("timer.pause"),
+    "Take a break works for manual sessions too");
+  check(planEffects({ type: "toggle" }, manual).includes("clock.pause"),
+    "The single toggle pauses a running manual session");
+
   // The invariant: the two timers of a focus-owned session may never drift.
   check(planEffects({ type: "reconcile" }, live).length === 0, "A session already in step needs no repair");
   check(planEffects({ type: "reconcile" },
@@ -980,8 +1055,27 @@ async function runTests() {
     check(/--pad-card:/.test(sheets) && /--pad-tight:/.test(sheets) && /--gap-page:/.test(sheets),
       "Spacing comes from the shared pad/gap tokens, not per-card numbers");
 
+    /* The month is rows of seven cells; the grid only stacks the rows. A
+       seven-column template on `.cal-grid` would lay the header + week rows
+       side by side as seven crushed strips — exactly the broken month that
+       shipped on phones. */
+    const calGridCols = [...sheets.matchAll(/\.cal-grid\s*\{([^}]*)\}/g)]
+      .some(([, body]) => /grid-template-columns\s*:/.test(body));
+    check(!calGridCols, "The calendar grid stacks week rows (rows own their seven columns)");
+
     check(!/var\(--[a-z0-9-]+,\s*#/.test(componentFiles),
       "No hardcoded hex fallbacks are left inside var() in the components");
+
+    /* Native <select> hands the open popup to the OS — the blue-row Android
+       spinner that fought every theme. Every dropdown is now the shared
+       themed listbox from bits.tsx. */
+    const allComponents = componentFiles +
+      ["Onboarding.tsx", "SettingsView.tsx", "SubjectsView.tsx", "FocusView.tsx", "QuickAdd.tsx", "TaskEditor.tsx"]
+        .map((f) => readFileSync(join(process.cwd(), `src/components/${f}`), "utf8"))
+        .map(strip)
+        .join("\n");
+    check(!/<select/.test(allComponents),
+      "No native <select> remains in the views — dropdowns use the themed listbox");
     check(!/JetBrains\s*Mono/.test(sheets),
       "No second font-family name for the numerals — --font-num is the alias");
     check(/--font-num:/.test(sheets), "--font-num (tabular numerals) is defined once");
@@ -1015,17 +1109,251 @@ async function runTests() {
     /* Blur is a *material for floating layers*, not a finish for text. Every
        rule that paints an in-flow surface is checked for `backdrop-filter`,
        because a blurred card under 12px body copy is what read as "the whole
-       app is out of focus". */
+       app is out of focus".
+
+       This guard used to pass while `.glass-panel` — ≈39 usages, i.e. every
+       card in the product — sat frosted at blur(26px)+saturate(180%). Two
+       holes let it through, and both are closed here:
+         · it matched only a literal `backdrop-filter: blur(`, so routing the
+           radius through a token (`backdrop-filter:var(--glass-blur)`) hid it;
+         · `.glass-panel` was missing from the in-flow list entirely. */
     const frostedText: string[] = [];
+    const FROST = /backdrop-filter:\s*(?:blur|var\()/;
     for (const m of sheets.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
       const [, sel, body] = m;
-      if (!/backdrop-filter: *blur/.test(body)) continue;
+      /* `backdrop-filter:none` (the reduced-transparency / forced-colors
+         opt-outs) does not match FROST, so those rules fall out here. */
+      if (!FROST.test(body)) continue;
       const bad = sel.split(",").map((x) => x.trim()).filter((x) =>
-        /\.(section-card|task-card|kpi-card|day-block|dash-card|planner-day|chip|rate-btn|streak-badge|momentum-pill|count-badge|btn|card-title|page-title|task-title|day-date)(?![\w-])/.test(x));
+        /\.(glass-panel|section-card|task-card|kpi-card|day-block|dash-card|planner-day|chip|rate-btn|streak-badge|momentum-pill|count-badge|btn|card-title|page-title|task-title|day-date)(?![\w-])/.test(x));
       if (bad.length) frostedText.push(`${sel.trim().slice(0, 48)} → ${bad[0].slice(0, 30)}`);
     }
     check(frostedText.length === 0,
       `No in-flow text surface is frosted${frostedText.length ? ` (${frostedText.join("; ")})` : ""}`);
+
+    /* Removing the blur is only half of "the app looks soft": the card paint
+       itself was a translucent ladder (`--panel-tint-a/b` at 90%→84%, and
+       88%→80% on the dark themes) with `background-color:transparent` under
+       it, so the page's background gradient showed through every card at
+       10–20%. Blur gone + paint still translucent would have left the same
+       complaint standing. The card tokens must stay opaque. */
+    const translucentCardTokens = [...sheets.matchAll(/--(?:panel|glass)-tint-[ab]:\s*([^;}\n]+)/g)]
+      .filter((m) => /transparent/.test(m[1]))
+      .map((m) => m[0].trim().slice(0, 60));
+    check(translucentCardTokens.length === 0,
+      `Card paint is opaque, not a translucent ladder${translucentCardTokens.length ? ` (${translucentCardTokens.join("; ")})` : " — the surface under text is solid"}`);
+
+    /* ONE typeface. Every `font-family` must resolve to the Inter aliases (or
+       the usual system fallbacks). A decorative glyph still counts: Georgia
+       on the quote mark was the last second voice in the product, and it was
+       not even loaded — it fell back to the platform serif. */
+    /* The aliases, or the usual system fallback stack. A `var()` may carry a
+       fallback (`var(--font-display, inherit)`) — that is still the alias. */
+    const ALLOWED_FONT = /^(inherit|var\(--font-(ui|num|display|inter)(,\s*[^)]+)?\)|-apple-system|BlinkMacSystemFont|Segoe UI|system-ui|ui-sans-serif|sans-serif)$/;
+    /* Split the stack on commas that are NOT inside parens — a naive split
+       tears `var(--font-display, inherit)` in half and reports both pieces. */
+    const splitStack = (v: string) => {
+      const out: string[] = [];
+      let depth = 0, cur = "";
+      for (const ch of v) {
+        if (ch === "(") depth++;
+        else if (ch === ")") depth--;
+        if (ch === "," && depth === 0) { out.push(cur); cur = ""; } else cur += ch;
+      }
+      out.push(cur);
+      return out;
+    };
+    const foreignFonts = [...sheets.matchAll(/font-family:\s*([^;}\n]+)/g)]
+      .flatMap((m) => splitStack(m[1]))
+      .map((f) => f.trim().replace(/^["']|["']$/g, ""))
+      .filter((f) => f.length > 0 && !ALLOWED_FONT.test(f));
+    check([...new Set(foreignFonts)].length === 0,
+      `One typeface everywhere${foreignFonts.length ? ` — foreign: ${[...new Set(foreignFonts)].join(", ")}` : " (no second family in either sheet)"}`);
+
+    /* The Zen room is the theme. A `.zen*` rule may still use a neutral
+       black/white for a shadow or vignette, but it may not paint a
+       *chromatic* colour: that is how a permanently purple room sneaks back
+       into a Sunset or Mint theme. */
+    const toRgb = (c: string): [number, number, number] | null => {
+      if (c.startsWith("#")) {
+        let h = c.slice(1);
+        if (h.length === 3 || h.length === 4) h = h.split("").map((d) => d + d).join("");
+        if (h.length < 6) return null;
+        return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+      }
+      const n = c.match(/\d+/g)?.map(Number);
+      return n && n.length >= 3 ? [n[0], n[1], n[2]] : null;
+    };
+    const chromatic = (v: string) => {
+      const rgb = toRgb(v);
+      return !!rgb && !(rgb[0] === rgb[1] && rgb[1] === rgb[2]);
+    };
+    const zenHardcoded: string[] = [];
+    for (const m of sheets.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      const [, sel, body] = m;
+      if (!/(^|[\s,>])\.zen[\w-]*/.test(sel)) continue;
+      const paints = [...body.matchAll(/#[0-9a-fA-F]{3,8}\b|rgba?\([^)]*\)/g)]
+        .map((x) => x[0])
+        .filter(chromatic);
+      if (paints.length) zenHardcoded.push(`${sel.trim().slice(0, 30)} → ${paints[0]}`);
+    }
+    check(zenHardcoded.length === 0,
+      `Zen paints no hardcoded chromatic colour${zenHardcoded.length ? ` (${zenHardcoded.join("; ")})` : " — the room follows the theme"}`);
+
+    /* ── The mobile gutter must be monotonic ──────────────────────────────
+       Five different rules used to set `.app-wrapper`'s horizontal padding.
+       Three of them were dead, and the one that actually won on phones was a
+       `padding:` shorthand carrying `--pad-shell` — a clamp whose floor is
+       16px — while a narrower 360–412px band overrode it with 12px. Net
+       effect on real hardware:
+
+         320px phone → 16px gutters   (288px of content)
+         412px phone → 12px gutters   (388px of content)
+         414px phone → 16px gutters   (382px of content)
+
+       So the *narrowest* phone got the widest gutters, and a 414px phone had
+       less room than a 412px one. The shorthand was also silently discarding
+       the `env(safe-area-inset-*)` longhands set earlier in the file, so on a
+       notched device content could sit under the cut-out.
+
+       Rather than assert one hardcoded number, resolve the real cascade the
+       way the browser does and require that content width never *shrinks* as
+       the viewport grows. */
+    const gutterAt = (() => {
+      const rules: { line: number; mq: string; body: string }[] = [];
+      const stack: string[] = [];
+      let i = 0;
+      const src = globalsCss.replace(/\/\*[\s\S]*?\*\//g, "");
+      while (i < src.length) {
+        const c = src[i];
+        if (c === "{") {
+          let j = i - 1;
+          while (j >= 0 && src[j] !== "{" && src[j] !== "}") j--;
+          stack.push(src.slice(j + 1, i).trim());
+          i++; continue;
+        }
+        if (c === "}") { stack.pop(); i++; continue; }
+        if (c === ".") {
+          let j = i;
+          while (j < src.length && src[j] !== "{") j++;
+          const sel = src.slice(i, j).trim();
+          let k = j + 1;
+          while (k < src.length && src[k] !== "}") k++;
+          const body = src.slice(j + 1, k);
+          if (sel === ".app-wrapper" &&
+              /padding-(left|right)|padding\s*:/.test(body)) {
+            rules.push({ line: src.slice(0, i).split("\n").length,
+              mq: stack.filter((m) => m.startsWith("@media")).join(" "), body });
+          }
+          i = k; continue;
+        }
+        i++;
+      }
+      return (w: number): { px: number; rule: string } => {
+        for (const r of rules.slice().reverse()) {
+          const min = [...r.mq.matchAll(/min-width:\s*(\d+)px/g)].map((m) => +m[1]);
+          const max = [...r.mq.matchAll(/max-width:\s*(\d+)px/g)].map((m) => +m[1]);
+          if (min.some((v) => v > w) || max.some((v) => w > v)) continue;
+          const b = r.body;
+          const resolve = (px: number, vw: number) => Math.min(Math.max(px, (vw / 100) * w), 1e9);
+          if (b.includes("--pad-gutter")) return { px: Math.min(Math.max(10, 0.03 * w), 20), rule: `${r.line}:--pad-gutter` };
+          const long = b.match(/padding-(?:left|right)\s*:\s*(?:max\()?\s*(\d+(?:\.\d+)?)px/);
+          if (long) return { px: +long[1], rule: `${r.line}:longhand` };
+          if (b.includes("--pad-shell")) return { px: Math.min(Math.max(16, 0.025 * w), 32), rule: `${r.line}:--pad-shell` };
+          const sh = b.match(/padding\s*:\s*(?:\S+\s+)?(\d+(?:\.\d+)?)px/);
+          if (sh) return { px: +sh[1], rule: `${r.line}:shorthand` };
+        }
+        return { px: 20, rule: "none" };
+      };
+    })();
+
+    const widths = [320, 360, 375, 390, 412, 414, 430, 480, 768, 860];
+    const shrink: string[] = [];
+    for (let n = 1; n < widths.length; n++) {
+      const a = widths[n - 1], b = widths[n];
+      const contentA = a - 2 * gutterAt(a).px, contentB = b - 2 * gutterAt(b).px;
+      /* A wider viewport must never yield less room than a narrower one. */
+      if (contentB < contentA - 0.5) {
+        shrink.push(`${a}px→${b}px (${contentA.toFixed(0)}px→${contentB.toFixed(0)}px)`);
+      }
+    }
+    check(shrink.length === 0,
+      `The page gutter is monotonic — content never shrinks as the phone gets wider${shrink.length ? ` (${shrink.join("; ")})` : ""}`);
+
+    /* The winning mobile rule has to keep the safe-area term. Written as a
+       `padding:` shorthand it cannot: the shorthand resets all four
+       longhands, throwing the `env()` away with them. */
+    const mobileWinner = gutterAt(390).rule;
+    check(/--pad-gutter/.test(mobileWinner),
+      `One token owns the mobile gutter (390px resolves via ${mobileWinner})`);
+    check(/padding-left\s*:\s*max\(\s*var\(--pad-gutter\)\s*,\s*env\(safe-area-inset-left\)/.test(globalsCss) &&
+          /padding-right\s*:\s*max\(\s*var\(--pad-gutter\)\s*,\s*env\(safe-area-inset-right\)/.test(globalsCss),
+      "The gutter keeps the notch safe-area inset at every width");
+
+    /* ── A density mode must not also be a motion kill-switch ──────────────
+       `body.mode-focused` is applied automatically to anyone who onboards as
+       PG / PhD / professional (page.tsx). Eleven separate rules used to hang
+       `animation:none` off it, which switched off the entrance choreography
+       for panels, task rows, KPI counters, day blocks, heatmap cells, kanban
+       columns and the weekly bars — for those learners the app simply had no
+       animations, and nothing in Settings could put them back.
+
+       Motion opt-out is `prefers-reduced-motion`'s job: it is user-controlled
+       and platform-aware. A presentation-density preference is not an
+       accessibility signal and must not be read as one. */
+    const motionKilledByDensity: string[] = [];
+    for (const m of sheets.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      const [, sel, body] = m;
+      if (!/mode-focused/.test(sel)) continue;
+      if (/(animation|transition)\s*:\s*none/.test(body)) {
+        motionKilledByDensity.push(sel.trim().slice(0, 44));
+      }
+    }
+    check(motionKilledByDensity.length === 0,
+      `Density mode leaves the animations on${motionKilledByDensity.length ? ` (${motionKilledByDensity.join("; ")})` : " — reduced-motion remains the only motion opt-out"}`);
+    check(/prefers-reduced-motion/.test(sheets),
+      "prefers-reduced-motion still opts out of motion for those who ask");
+    check(/body\.mode-focused \.task-row\{padding/.test(globalsCss),
+      "Density mode still does its actual job (tighter task rows)");
+
+    /* The onboarding footer is one shared row: the privacy note on the
+       left, Back/Continue on the right. When the button row claimed
+       `width:100%` at base scope it starved the note down to one word per
+       line (the squashed column in the report). The row may only take the
+       full width inside the stacked, phone-only layout. */
+    const obBase: { sel: string; body: string }[] = [];
+    {
+      const stack: string[] = [];
+      let i = 0;
+      const src = uiSystemCss.replace(/\/\*[\s\S]*?\*\//g, "");
+      while (i < src.length) {
+        const c = src[i];
+        if (c === "{") {
+          let j = i - 1;
+          while (j >= 0 && src[j] !== "{" && src[j] !== "}") j--;
+          stack.push(src.slice(j + 1, i).trim()); i++; continue;
+        }
+        if (c === "}") { stack.pop(); i++; continue; }
+        if (c === ".") {
+          let j = i;
+          while (j < src.length && src[j] !== "{") j++;
+          const sel = src.slice(i, j).trim();
+          let k = j + 1;
+          while (k < src.length && src[k] !== "}") k++;
+          if (!stack.some((m) => m.startsWith("@media"))) {
+            obBase.push({ sel, body: src.slice(j + 1, k) });
+          }
+          i = k + 1; continue;
+        }
+        i++;
+      }
+    }
+    const btnRowGreedy = obBase.filter((r) => r.sel === ".ob-btn-row" && /width\s*:\s*100%/.test(r.body));
+    check(btnRowGreedy.length === 0,
+      "The onboarding button row never claims full width beside the privacy note (full-width is phone-only)");
+    const privacyFlex = /\.ob-privacy\{[^}]*flex\s*:\s*1/.test(globalsCss);
+    check(privacyFlex, "The onboarding privacy note gets the flexible space in the footer row");
+
     const importantCount = (sheets.match(/!important/g) ?? []).length;
     check(importantCount <= 900, `The !important count keeps falling (${importantCount} vs 1107 at the merge baseline)`);
     check(!/transform:\s*translate\([^)]*\.[57]px/.test(sheets),

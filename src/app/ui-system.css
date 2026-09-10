@@ -982,7 +982,11 @@ body {
     linear-gradient(165deg, color-mix(in srgb, var(--accent) 10%, var(--surface)), var(--surface) 72%);
 }
 .quote-mark {
-  font-family: Georgia, serif;
+  /* The last second typeface in the product. A decorative glyph is still a
+     glyph: Georgia is not loaded, so this was silently falling back to the
+     platform serif — a different voice in the one card the user reads every
+     day. It inherits Inter like everything else now. */
+  font-family: inherit;
   font-size: 2.6rem; line-height: .6;
   color: var(--accent); opacity: .5;
   margin-bottom: 10px;
@@ -1159,7 +1163,7 @@ body {
      always win. */
   .mobile-bottom-nav {
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
     gap: 2px;
     /* z stays under the chat sheet (201), modals (300), drawer (350) and
        toasts (400) so every overlay can cover the bar when it needs to. */
@@ -1355,22 +1359,35 @@ body {
   display: flex; flex-direction: column; align-items: center;
   gap: 9px; text-align: center; min-width: 0;
 }
+/* Every colour here was a white-on-dark / violet-on-dark literal. That held
+   while the Zen room was always the near-black violet overlay, and silently
+   stopped holding the moment the room became theme-driven: on the four light
+   themes the room is light paper with dark ink, so white text measured
+   1.17-1.32:1 and the kicker, the eyebrow and the secondary buttons were
+   effectively invisible. They read the `--zen-*` tokens now, which every
+   theme restates, so one rule is correct in both directions. */
 .zen-emblem {
   display: grid; place-items: center;
   width: 34px; height: 34px; border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, .14);
-  background: rgba(255, 255, 255, .05);
-  color: rgba(196, 188, 255, .9);
-  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--zen-line);
+  background: var(--zen-surface);
+  color: color-mix(in srgb, var(--zen-accent) 50%, var(--zen-ink));
 }
 .zen-eyebrow {
   font-size: .72rem; font-weight: 800; letter-spacing: .3em; text-indent: .3em;
   text-transform: uppercase;
-  color: rgba(196, 188, 255, .8);
+  /* Accent-tinted, but pulled halfway to the room's ink. Raw `--zen-accent`
+     only reaches 2.40:1 on Mint and Sunset — under the 4.5:1 this 11px/800
+     label needs. 50% keeps the accent hue and clears AA in all 7 themes
+     (worst case 5.20:1). */
+  color: color-mix(in srgb, var(--zen-accent) 50%, var(--zen-ink));
   text-align: center;
 }
 .zen-kicker {
-  font-size: .88rem; font-weight: 600; color: rgba(255, 255, 255, .58);
+  /* `--zen-muted` reaches only 3.51:1 at its worst (Default/Silver
+     Lavender). The ink does 11.50:1 and still passes AA at the .78 opacity
+     the rule below applies. */
+  font-size: .88rem; font-weight: 600; color: var(--zen-ink);
   text-align: center; max-width: 52ch; min-width: 0; overflow-wrap: anywhere;
   text-transform: none; letter-spacing: 0; opacity: 1;
 }
@@ -2070,7 +2087,8 @@ body::after { content: none !important; display: none !important; }
   animation: pageInBack .34s cubic-bezier(.22, 1, .36, 1) both !important;
 }
 /* The dense "focused" presentation mode stays completely still. */
-body.mode-focused .main-workspace > :not(.tracker-bar) { animation: none !important; }
+/* Density, not a motion preference — entrance choreography stays on for
+   PG / professional learners. `prefers-reduced-motion` owns motion opt-out. */
 
 /* ── Buttons: lift on hover, settle on press ──────────────────────────── */
 .btn {
@@ -2935,11 +2953,13 @@ body.theme-nebula .ob-range-value {
   height: 6px;
   border-radius: 50%;
   flex-shrink: 0;
-  background: rgba(255,255,255,.38);
+  /* was rgba(255,255,255,.38) — invisible on the light-theme rooms. */
+  background: var(--zen-muted);
 }
 
 .zen-status-dot[data-live="true"] {
-  background: #5EE0A8;
+  /* was a hardcoded #5EE0A8; the theme already owns "good". */
+  background: var(--good);
   animation: liveDotPulse 1.9s ease-in-out infinite;
 }
 
@@ -2962,23 +2982,23 @@ body.theme-nebula .ob-range-value {
 .zen-actions .btn { min-width: 136px; justify-content: center; }
 
 .zen-actions .zen-secondary {
-  background: rgba(255,255,255,.06) !important;
-  border-color: rgba(255,255,255,.13) !important;
-  color: rgba(255,255,255,.74) !important;
+  background: var(--zen-surface) !important;
+  border-color: var(--zen-line) !important;
+  color: var(--zen-ink) !important;
   box-shadow: none !important;
   font-weight: 650;
 }
 
 .zen-actions .zen-secondary:hover {
-  background: rgba(255,255,255,.11) !important;
-  color: rgba(255,255,255,.94) !important;
+  background: var(--zen-surface-hi) !important;
+  color: var(--zen-ink) !important;
 }
 
 /* Clock Out stays a secondary control but reads a little warmer than
    Exit Zen, so the two are never confused at a glance. */
 .zen-actions .zen-clock-out {
-  border-color: rgba(255,255,255,.22) !important;
-  color: rgba(255,255,255,.9) !important;
+  border-color: color-mix(in srgb, var(--danger-accent) 40%, var(--zen-line)) !important;
+  color: color-mix(in srgb, var(--danger-accent) 62%, var(--zen-ink)) !important;
 }
 
 .zen-hint { max-width: 40ch; font-size: .76rem; opacity: .78; }
@@ -3876,10 +3896,10 @@ h1, h2, h3, .page-title, .mw i { font-style: normal; }
   .ob-card { padding: 22px 18px; }
 }
 
-/* ── 5 · MOBILE DOCK — five items, reference pill behind the icon ──── */
+/* ── 5 · MOBILE DOCK — six items, reference pill behind the icon ───── */
 @media (max-width: 860px) {
   .mobile-bottom-nav {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
   }
   .mbn-item {
     gap: 4px;
@@ -3908,20 +3928,10 @@ h1, h2, h3, .page-title, .mw i { font-style: normal; }
   .ai-fab { bottom: calc(80px + env(safe-area-inset-bottom)); }
 }
 
-/* ── 6 · MOBILE APP BAR — “More” trigger opens the full drawer ──────── */
-.mh-more {
-  flex: 0 0 auto;
-  width: 34px; height: 34px;
-  display: inline-flex; align-items: center; justify-content: center;
-  border-radius: 11px;
-  border: 1px solid var(--glass-border);
-  background: var(--surface);
-  color: var(--text-muted);
-  cursor: pointer;
-  transition: color .15s ease, border-color .15s ease, background .15s ease;
-}
-.mh-more:hover, .mh-more:active { color: var(--accent); border-color: var(--nav-active-border); }
-.mh-more svg { width: 18px; height: 18px; display: block; }
+/* ── 6 · MOBILE APP BAR ────────────────────────────────────────────────
+   The three-line "More" trigger is gone: Analytics rides the bottom dock
+   and every drawer tool has a home elsewhere, so the hamburger was just a
+   second, vaguer door. The app bar now carries brand + streak only. */
 
 /* Bell + theme in the app bar — only on phones, where the tracker bar
    hides its own quick trio below 640px. Between 640 and 860px the
@@ -4828,10 +4838,17 @@ body.theme-sunset {
 .inset-note { margin: 0; font-size: .72rem; font-weight: 600; line-height: 1.5; color: var(--text-muted); text-wrap: pretty; }
 .ring-figure { display: grid; place-items: center; gap: 6px; }
 
-/* ── 25.10 · ONBOARDING BUTTON ROW — never squeezed, always centred ─── */
-.ob-btn-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px; width: 100%; }
+/* ── 25.10 · ONBOARDING BUTTON ROW — never squeezed, always centred ───
+   Inside the footer strip this row must NOT claim width:100% — doing so
+   starved the privacy note beside it down to one word per line. It sizes
+   to its buttons; the strip and the privacy note share the rest. On phones
+   the strip stacks, and only there the row goes full-width. */
+.ob-btn-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px; flex-shrink: 0; }
 .ob-btn-row .ob-btn { flex: 0 1 auto; min-width: 132px; justify-content: center; }
 .ob-btn-row .ob-btn:only-child { min-width: 180px; }
+@media (max-width: 640px) {
+  .ob-btn-row { width: 100%; }
+}
 @media (max-width: 420px) {
   .ob-btn-row .ob-btn { flex: 1 1 100%; min-width: 0; }
 }
@@ -4956,6 +4973,71 @@ body.theme-sunset {
 }
 @media (prefers-reduced-motion: reduce) {
   .planner-day { transition: none; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   SELECT — one styled listbox everywhere.
+   Native <select> popups are the OS's, not ours: the blue-row Android
+   spinner fought every theme. This is a real listbox — button trigger,
+   popover list, full keyboard support — painted from the same semantic
+   tokens as the rest of the chrome, so it follows all seven themes.
+   ═══════════════════════════════════════════════════════════════════ */
+.sp-select { position: relative; min-width: 0; }
+.sp-select-btn {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  width: 100%; min-height: 42px; padding: 9px 13px;
+  border: 1px solid var(--glass-border); border-radius: var(--radius-md);
+  background: var(--surface); color: var(--text-main);
+  font-family: inherit; font-size: .84rem; font-weight: 600; line-height: 1.3;
+  text-align: left; cursor: pointer;
+  transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
+}
+.sp-select-btn:hover { border-color: var(--nav-active-border); }
+.sp-select-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.sp-select-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sp-select-caret { flex: 0 0 auto; color: var(--text-dim); transition: transform .18s ease; }
+.sp-select.is-open .sp-select-caret { transform: rotate(180deg); }
+.sp-select-pop {
+  position: absolute; z-index: 90; top: calc(100% + 6px); left: 0; right: 0;
+  max-height: min(300px, 42vh); overflow-y: auto; padding: 5px;
+  background: var(--surface-elevated);
+  border: 1px solid var(--glass-border); border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg); outline: none;
+  animation: sp-pop .16s ease backwards;
+  overscroll-behavior: contain;
+}
+@keyframes sp-pop { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+.sp-option {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  width: 100%; padding: 9px 10px; border: none; border-radius: 9px;
+  background: transparent; color: var(--text-main);
+  font-family: inherit; font-size: .82rem; font-weight: 550; line-height: 1.35;
+  text-align: left; cursor: pointer;
+}
+.sp-option + .sp-option { margin-top: 1px; }
+.sp-option.is-active { background: var(--row-hover); }
+.sp-option.is-selected { color: var(--accent); font-weight: 750; }
+.sp-option-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sp-option > svg { flex: 0 0 auto; color: var(--accent); }
+.sp-select-pop .sp-option:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+@media (max-width: 480px) {
+  .sp-select-btn { min-height: 44px; font-size: .82rem; }
+  .sp-option { padding: 10px 10px; font-size: .82rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sp-select-pop { animation: none; }
+  .sp-select-caret { transition: none; }
+}
+
+/* ── chrome alignment: one visual row-height in the tracker bar ─────── */
+.tracker-quick-controls .icon-quick-btn { width: 32px; height: 32px; border-radius: 10px; }
+.tracker-quick-controls .icon-quick-btn svg { width: 15px; height: 15px; }
+.planner-filter .sp-select { flex: 1 1 auto; min-width: 0; }
+
+/* Six dock tabs on the narrowest phones: keep labels legible, not clipped */
+@media (max-width: 400px) {
+  .mbn-item { font-size: .58rem; letter-spacing: 0; }
+  .mbn-item svg { width: 19px; height: 19px; }
 }
 
 /* ══════════════════════════════════════════════════════════════════════
@@ -5329,4 +5411,5 @@ span.cal-cell.is-empty:hover {
     min-height: 0 !important;
     padding-right: 0 !important;
   }
+
 }

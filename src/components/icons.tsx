@@ -43,6 +43,12 @@ export const IconBook = ({ size = 18, className, style }: P) => (
     <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
   </svg>
 );
+export const IconBookOpen = ({ size = 18, className, style }: P) => (
+  <svg {...base(size)} className={className} style={style}>
+    <path d="M2 4h6a4 4 0 0 1 4 4v12a3 3 0 0 0-3-3H2z" />
+    <path d="M22 4h-6a4 4 0 0 0-4 4v12a3 3 0 0 1 3-3h7z" />
+  </svg>
+);
 export const IconChart = ({ size = 18, className, style }: P) => (
   <svg {...base(size)} className={className} style={style}>
     <path d="M3 3v18h18" />
@@ -296,10 +302,18 @@ export const IconFilter = ({ size = 16, className, style }: P) => (
 /* v25 additions — same 24×24 stroke grid, same `base()`, so the set stays a
    single family. `IconUndo` labels the reversible Done action, `IconStopwatch`
    is the session verb every Clock-in / Clock-out control shares. */
+/* Redrawn at button size (13–16px): the old undo was a near-full circle that
+   read as "refresh". This is the open-arrow hook — one corner + one arc —
+   which stays legible when the stroke is a fifth of the glyph. */
 export const IconUndo = ({ size = 16, className, style }: P) => (
   <svg {...base(size)} className={className} style={style}>
     <path d="M9 14 4 9l5-5" />
     <path d="M4 9h10a6 6 0 0 1 0 12h-1" />
+  </svg>
+);
+export const IconStop = ({ size = 16, className, style }: P) => (
+  <svg {...base(size)} className={className} style={style}>
+    <rect x="7" y="7" width="10" height="10" rx="2" />
   </svg>
 );
 export const IconPause = ({ size = 16, className, style }: P) => (
@@ -313,6 +327,9 @@ export const IconSwap = ({ size = 16, className, style }: P) => (
     <path d="M4 17h16" />
   </svg>
 );
+/* Redrawn: the old stopwatch carried a base line and a stem that crossed the
+   dial, and at 13px it collapsed into a circle-with-a-dot. Now it is exactly
+   three parts — crown, dial, hand — with nothing touching the rim. */
 export const IconStopwatch = ({ size = 16, className, style }: P) => (
   <svg {...base(size)} className={className} style={style}>
     <circle cx="12" cy="13" r="8" />
