@@ -4957,3 +4957,349 @@ body.theme-sunset {
 @media (prefers-reduced-motion: reduce) {
   .planner-day { transition: none; }
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   v26 · ANDROID POLISH — calm app chrome, clear clock actions, and a
+   lesson brief that reads like a useful study card rather than an opened
+   text dump. This is intentionally the final layer: one place for the
+   phone fixes requested after the v25 responsive pass.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* The mobile app bar keeps the drawer, but replaces the ambiguous hamburger
+   glyph with a labelled action. It is easier to discover and keeps the logo,
+   streak, quick icons and clock controls on the same visual baseline. */
+.mh-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+.mh-more {
+  width: auto;
+  min-width: 54px;
+  min-height: 36px;
+  height: 36px;
+  padding: 0 12px;
+  gap: 0;
+  font-family: inherit;
+  font-size: .72rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: .01em;
+  white-space: nowrap;
+}
+.mh-more span { display: block; }
+.mh-more:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.mobile-header .mh-quick,
+.mobile-header .mh-streak { flex: 0 0 auto; }
+
+/* The time is a real cluster now, not a bare number that can sit a few pixels
+   high next to an icon button. */
+.tracker-clock {
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 34px;
+}
+.tracker-clock-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 25px;
+  height: 25px;
+  border-radius: 8px;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 11%, transparent);
+}
+.tracker-clock-icon svg { display: block; }
+.tracker-actions,
+.tracker-quick-controls,
+.tracker-actions .btn,
+.icon-quick-btn { align-items: center; }
+.tracker-actions .btn { line-height: 1; }
+
+/* Every native select gets one shared arrow, hit area and focus treatment.
+   Android still owns the option sheet, but the closed control now matches the
+   rest of the product in Settings, Planner, Focus, Quick Add and onboarding. */
+select:not([multiple]) {
+  -webkit-appearance: none;
+  appearance: none;
+  min-height: 44px;
+  padding-right: 38px;
+  border-radius: 12px;
+  border: 1px solid var(--glass-border);
+  background-color: var(--input-bg);
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--text-muted) 50%),
+    linear-gradient(135deg, var(--text-muted) 50%, transparent 50%);
+  background-position: calc(100% - 17px) 50%, calc(100% - 12px) 50%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  color: var(--text-main);
+  font-family: inherit;
+  cursor: pointer;
+}
+select:not([multiple]):hover { border-color: var(--glass-border-hover); }
+select:not([multiple]):focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+  outline: none;
+}
+select:not([multiple]) option {
+  background: var(--surface-solid);
+  color: var(--text-main);
+}
+.ob-sub-row select:not([multiple]) {
+  min-height: 36px;
+  padding-right: 25px;
+  background-position: calc(100% - 11px) 50%, calc(100% - 7px) 50%;
+  background-size: 4px 4px, 4px 4px;
+}
+
+/* Calendar: blank cells are quiet, not a field of dotted outlines. The cells
+   with a date remain selectable; only the visual dashes are removed. */
+.cal-cell.is-empty,
+.cal-cell.is-empty:hover { border-style: solid; }
+/* A date with no work is still a useful, selectable calendar cell; only the
+   leading/trailing filler cells should visually disappear. */
+button.cal-cell.is-empty,
+button.cal-cell.is-empty:hover {
+  border-color: color-mix(in srgb, var(--border-subtle) 60%, transparent);
+  cursor: pointer;
+}
+span.cal-cell.is-empty,
+span.cal-cell.is-empty:hover {
+  border-color: transparent;
+}
+.cal-arrow {
+  width: 42px;
+  min-width: 42px;
+  height: 42px;
+  min-height: 42px;
+}
+.cal-today {
+  min-height: 42px;
+  padding-inline: 14px;
+}
+
+/* Planner controls stack intentionally on a phone: the view switch is easy to
+   hit, and the subject filter gets a full-width label/control relationship. */
+@media (max-width: 860px) {
+  /* Keep Android/iOS from zooming a form when a select receives focus. The
+     compact subject-row control is deliberately the one exception. */
+  select:not([multiple]) { font-size: 16px; }
+  .ob-sub-row select:not([multiple]) { font-size: .75rem; }
+}
+@media (max-width: 640px) {
+  .mh-actions { gap: 6px; }
+  .mh-more { min-width: 52px; padding-inline: 11px; }
+  .planner-toolbar {
+    align-items: stretch;
+    gap: 10px;
+  }
+  .planner-toolbar .seg {
+    display: flex;
+    width: 100%;
+  }
+  .planner-toolbar .seg-btn {
+    flex: 1 1 0;
+    justify-content: center;
+    min-height: 40px;
+  }
+  .planner-filter {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    width: 100%;
+    max-width: none;
+    gap: 9px;
+  }
+  .planner-filter .input-field {
+    min-width: 0;
+  }
+  .cal-bar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "label nav"
+      "summary summary";
+    align-items: center;
+    gap: 9px 10px;
+  }
+  .cal-label { grid-area: label; min-width: 0; font-size: 1rem; }
+  .cal-nav { grid-area: nav; justify-content: flex-end; }
+  .cal-summary {
+    grid-area: summary;
+    justify-content: flex-start;
+    padding-top: 2px;
+    font-size: .7rem;
+  }
+  .cal-arrow { width: 40px; min-width: 40px; height: 40px; min-height: 40px; }
+  .cal-today { min-height: 40px; padding-inline: 11px; }
+  .tracker-clock { gap: 6px; }
+  .tracker-clock-icon { width: 23px; height: 23px; border-radius: 7px; }
+  .tracker-time { line-height: 1; }
+  .tracker-actions .btn {
+    min-height: 38px;
+    height: 38px;
+    justify-content: center;
+  }
+}
+@media (max-width: 380px) {
+  .mh-more { min-width: 48px; padding-inline: 9px; font-size: .68rem; }
+  .planner-filter-label { font-size: .62rem; }
+  .cal-summary { gap: 5px; font-size: .66rem; }
+}
+
+/* Task-row clock actions: one clear primary verb plus a safe, explicit exit.
+   A paused session therefore reads Resume instead of looking like a dead row. */
+.task-clock-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+.task-clock-group .task-clock {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+}
+.task-clock-group .task-clock-toggle { min-width: 76px; }
+.task-clock-group .task-clock-out { min-width: 82px; }
+.task-clock-group .task-clock svg { flex: 0 0 auto; }
+.task-clock-group .btn { white-space: nowrap; }
+
+/* Lesson brief: hierarchy, scan-friendly labels and a footer action. */
+.task-brief-btn {
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--glass-border));
+  background: color-mix(in srgb, var(--accent) 6%, var(--surface));
+  color: var(--accent);
+  min-height: 36px;
+  padding-inline: 11px;
+}
+.task-brief-btn:hover {
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--glass-border));
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+  color: var(--accent-hover);
+}
+.task-card-brief-panel {
+  gap: 13px;
+  margin-top: 10px;
+  padding: 15px;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--accent) 4%, var(--surface-2));
+  border: 1px solid color-mix(in srgb, var(--accent) 17%, var(--border-subtle));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--surface) 70%, transparent);
+}
+.task-brief-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.task-brief-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 13%, transparent);
+}
+.task-brief-icon svg { display: block; }
+.task-brief-kicker,
+.task-brief-context {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.task-brief-kicker {
+  margin: 0 0 2px;
+  color: var(--text-main);
+  font-size: .76rem;
+  font-weight: 800;
+  letter-spacing: .02em;
+}
+.task-brief-context {
+  color: var(--text-muted);
+  font-size: .7rem;
+  font-weight: 650;
+}
+.task-brief-text {
+  color: var(--text-main);
+  font-size: .84rem;
+  line-height: 1.62;
+  font-weight: 560;
+}
+.task-brief-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.task-brief-block > strong,
+.task-brief-practice-label {
+  color: var(--text-dim);
+  font-size: .62rem;
+  font-weight: 850;
+  letter-spacing: .12em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+.task-brief-block ul:not(.task-brief-concepts) {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text-muted);
+  font-size: .78rem;
+  line-height: 1.58;
+}
+.task-brief-block li + li { margin-top: 3px; }
+.task-brief-concepts { gap: 6px; }
+.task-brief-practice {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 11px;
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--success-accent) 8%, transparent);
+  color: var(--text-muted);
+  font-size: .76rem;
+  line-height: 1.5;
+}
+.task-brief-practice-label { color: var(--success-accent); }
+.task-brief-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 11px;
+  border-top: 1px solid color-mix(in srgb, var(--accent) 13%, var(--border-subtle));
+}
+.task-brief-footer-note {
+  color: var(--text-muted);
+  font-size: .72rem;
+  font-weight: 650;
+}
+.task-card-actions { align-items: center; }
+
+@media (max-width: 640px) {
+  .task-card-actions .btn-xs { min-height: 38px; }
+  .task-clock-group { gap: 5px; }
+  .task-clock-group .task-clock-toggle { min-width: 0; }
+  .task-clock-group .task-clock-out { min-width: 0; }
+  .task-clock-group .task-clock { padding-inline: 9px; }
+  .task-card-brief-panel { padding: 13px; border-radius: 14px; }
+  .task-brief-text { font-size: .82rem; }
+  .task-brief-footer-note { flex: 1 1 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mh-more,
+  .task-brief-btn,
+  .task-card-brief-panel { transition: none; }
+}

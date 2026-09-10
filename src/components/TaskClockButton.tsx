@@ -2,24 +2,36 @@
 
 import React from "react";
 import { mmss } from "@/lib/useTimer";
-import { IconCheck, IconStopwatch, IconSwap } from "./icons";
+import {
+  IconCheck,
+  IconPause,
+  IconPlay,
+  IconStopwatch,
+  IconSwap,
+} from "./icons";
 
 /**
- * The ONE clock button every task row shares — on the Overview, the
- * Planner and inside day sheets. It always reflects the live clock.
+ * The ONE clock control every task row shares — on the Overview, the
+ * Planner and inside day sheets. It reflects the live session and keeps the
+ * pause/resume action beside the lesson instead of making the learner hunt
+ * for it in the top bar.
  */
 export default function TaskClockButton({
   taskId,
   activeTaskId,
   sessionActive,
+  clockRunning,
   onFocusTask,
   onClockOut,
+  onPauseOrResume,
 }: {
   taskId: number;
   activeTaskId?: number | null;
   sessionActive?: boolean;
+  clockRunning?: boolean;
   onFocusTask: (taskId: number) => void;
   onClockOut: () => void;
+  onPauseOrResume?: () => void;
 }) {
   const live = !!sessionActive && activeTaskId === taskId;
 
@@ -29,11 +41,50 @@ export default function TaskClockButton({
     onClockOut();
   };
 
+  const handlePauseOrResume = (
+    event: React.MouseEvent<HTMLButtonElement>,
+  ) => {
+    event.preventDefault();
+    event.stopPropagation();
+    onPauseOrResume?.();
+  };
+
   const handleFocusTask = (event: React.MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
     event.stopPropagation();
     onFocusTask(taskId);
   };
+
+  if (live && onPauseOrResume) {
+    return (
+      <span
+        className="task-clock-group"
+        role="group"
+        aria-label="Study clock controls"
+      >
+        <button
+          type="button"
+          className={`btn btn-xs task-clock task-clock-toggle ${clockRunning ? "btn-secondary" : "btn-primary"}`}
+          onClick={handlePauseOrResume}
+          title={clockRunning ? "Pause this study session" : "Resume this study session"}
+          aria-label={clockRunning ? "Pause this study session" : "Resume this study session"}
+        >
+          {clockRunning ? <IconPause size={13} /> : <IconPlay size={13} />}
+          <span>{clockRunning ? "Pause" : "Resume"}</span>
+        </button>
+        <button
+          type="button"
+          className="btn btn-xs btn-danger task-clock task-clock-out"
+          onClick={handleClockOut}
+          title="Stop the clock and save your minutes"
+          aria-label="Clock out of this task"
+        >
+          <IconCheck size={13} />
+          <span>Clock out</span>
+        </button>
+      </span>
+    );
+  }
 
   if (live) {
     return (
@@ -46,7 +97,7 @@ export default function TaskClockButton({
       >
         <span className="clock-live-dot" aria-hidden="true" />
         <IconCheck size={13} />
-        <span>End session</span>
+        <span>Clock out</span>
       </button>
     );
   }
