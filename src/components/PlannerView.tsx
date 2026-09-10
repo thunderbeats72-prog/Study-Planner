@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   dayDiff,
   fmtDate,
@@ -220,37 +220,40 @@ export default function PlannerView({
 
   /** Bring the picked day's block into view. Uses rAF + retries to survive
    *  the React commit that mounts the list after a view switch. */
-  function scrollToDayBlock(dateKey: string, attempt = 0) {
-    const node = dayRefs.current[dateKey];
-    if (!node) {
-      if (attempt < 14) {
-        if (attempt === 0) {
-          window.requestAnimationFrame(() =>
+  const scrollToDayBlock = useCallback((dateKey: string) => {
+    let attempt = 0;
+    const tryScroll = () => {
+      const node = dayRefs.current[dateKey];
+      if (!node) {
+        if (attempt < 14) {
+          attempt++;
+          if (attempt === 1) {
             window.requestAnimationFrame(() =>
-              scrollToDayBlock(dateKey, attempt + 1),
-            ),
-          );
-        } else {
-          window.setTimeout(() => scrollToDayBlock(dateKey, attempt + 1), 60);
+              window.requestAnimationFrame(tryScroll),
+            );
+          } else {
+            window.setTimeout(tryScroll, 60);
+          }
         }
+        return;
       }
-      return;
-    }
-    const reduce = window.matchMedia?.(
-      "(prefers-reduced-motion: reduce)",
-    ).matches;
-    node.scrollIntoView({
-      block: "start",
-      behavior: reduce ? "auto" : "smooth",
-    });
-  }
+      const reduce = window.matchMedia?.(
+        "(prefers-reduced-motion: reduce)",
+      ).matches;
+      node.scrollIntoView({
+        block: "start",
+        behavior: reduce ? "auto" : "smooth",
+      });
+    };
+    tryScroll();
+  }, []);
 
   useEffect(() => {
     if (!pickedDay) return;
     if (view !== "list") return;
     const id = window.setTimeout(() => scrollToDayBlock(pickedDay), 80);
     return () => window.clearTimeout(id);
-  }, [pickedDay, view, grouped]);
+  }, [pickedDay, view, grouped, scrollToDayBlock]);
 
   const pickDay = (dateKey: string) => {
     setSelDay(dateKey);

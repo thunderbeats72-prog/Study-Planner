@@ -44,7 +44,6 @@ import {
   IconCheck,
   IconClock,
   IconExpand2,
-  IconFlame,
   IconClose,
   IconFocus2,
   IconGear,
@@ -103,7 +102,7 @@ const NAV: {
   { id: "planner", label: "Planner", icon: <IconCalendar />, dock: true },
   { id: "focus", label: "Focus", icon: <IconClock />, dock: true },
   { id: "subjects", label: "Subjects", icon: <IconBook />, dock: true },
-  { id: "analytics", label: "Analytics", icon: <IconChart />, dock: true },
+  { id: "analytics", label: "Analytics", icon: <IconChart />, dock: false },
   { id: "settings", label: "Settings", icon: <IconGear />, dock: true },
 ];
 
@@ -127,45 +126,6 @@ type SessionLogResponse = AppState & {
 const SIDEBAR_KEY = "spp-sidebar-collapsed";
 const SESSION_QUEUE_KEY = "spp-pending-session-logs";
 
-/**
- * Live local time for the tracker bar's idle state. Deliberately its own
- * component: the one-second tick re-renders only this span, never the page
- * tree (the study clock's mmss stays the hero while a session is open — this
- * takes over the moment the bar reads "Not clocked in", so the top bar keeps
- * visibly moving in real time instead of looking frozen until a refresh).
- */
-function LiveClock() {
-  const [now, setNow] = useState<Date | null>(null);
-  useEffect(() => {
-    // First tick on the next frame (never synchronously in the effect —
-    // that caused cascading renders), then once per second. State stays
-    // null through the server render, so SSR and hydration agree.
-    const frame = window.requestAnimationFrame(() => setNow(new Date()));
-    const id = window.setInterval(() => setNow(new Date()), 1000);
-    return () => {
-      window.cancelAnimationFrame(frame);
-      window.clearInterval(id);
-    };
-  }, []);
-  // Server render and the very first client render agree on a stable
-  // placeholder; the real time (and the tick) start once mounted.
-  const label = now
-    ? now.toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-      })
-    : "--:--:--";
-  return (
-    <span
-      className="mono tracker-time is-idle"
-      aria-label="Current local time"
-      title="Local time — clock in to start recording study time"
-    >
-      {label}
-    </span>
-  );
-}
 
 function apiFailureMessage(error: unknown, fallback: string): string {
   return error instanceof ApiError && error.message ? error.message : fallback;
@@ -1432,7 +1392,7 @@ export default function Home() {
         </div>
         <div className="mh-actions">
           <span className="streak-badge mh-streak">
-            <IconFlame /> {state.user.streak}d
+            🔥 {state.user.streak}d
           </span>
           {/* Quick controls mirror the tracker bar's trio for phones, where
               the tracker hides them below 640px — same popovers, same state. */}
@@ -1618,7 +1578,7 @@ export default function Home() {
             desktop tracker-bar palette), so it is not repeated here. */}
         <div className="drawer-foot">
           <div className="streak-badge foot-badge">
-            <IconFlame /> {state.user.streak} Day Streak
+            🔥 {state.user.streak} Day Streak
           </div>
           <p className="foot-sub">
             {ctx.daysLeft} days left · {ctx.progressPct}% syllabus completed.
@@ -1685,7 +1645,7 @@ export default function Home() {
           <div className="sidebar-foot">
             <div className="glass-panel tilt-card accent-edge accent-edge--warning">
               <div className="streak-badge foot-badge">
-                <IconFlame /> {state.user.streak} Day Streak
+                🔥 {state.user.streak} Day Streak
               </div>
               <h4 className="foot-title">Keep Moving</h4>
               <p className="foot-sub">
@@ -1727,21 +1687,19 @@ export default function Home() {
                 </span>
               </div>
             </div>
-            <div className="tracker-clock">
-              <span className="tracker-clock-icon" aria-hidden="true">
-                <IconClock size={14} />
-              </span>
-              {clock.sessionActive ? (
+            {clock.sessionActive && (
+              <div className="tracker-clock is-live">
+                <span className="tracker-clock-icon" aria-hidden="true">
+                  <IconClock size={14} />
+                </span>
                 <span
                   className="mono tracker-time"
                   aria-label={`Study clock ${mmss(clock.elapsed)}`}
                 >
                   {mmss(clock.elapsed)}
                 </span>
-              ) : (
-                <LiveClock />
-              )}
-            </div>
+              </div>
+            )}
             <div className="tracker-actions">
               <span className="chip chip-kind">
                 {todayDone}/{todayTotal} today

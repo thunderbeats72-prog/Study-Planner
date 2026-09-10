@@ -268,6 +268,14 @@ export default function TaskActions({
     </div>
   );
 
+  const renderedMenu = menuOpen ? (
+    portalTarget ? (
+      createPortal(menuNode, portalTarget)
+    ) : (
+      menuNode
+    )
+  ) : null;
+
   return (
     <>
       <div className="task-btns" role="group" aria-label="Task actions">
@@ -315,7 +323,7 @@ export default function TaskActions({
           </button>
         </div>
       </div>
-      {menuOpen && menuNode}
+      {renderedMenu}
       {ratingOpen && !done && (
         <div
           className="rating-strip glass-panel slide-in"
