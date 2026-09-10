@@ -133,29 +133,54 @@ const SESSION_QUEUE_KEY = "spp-pending-session-logs";
  * tree (the study clock's mmss stays the hero while a session is open — this
  * takes over the moment the bar reads "Not clocked in", so the top bar keeps
  * visibly moving in real time instead of looking frozen until a refresh).
+ *
+ * v28: aligns first tick to the next second boundary so the seconds visibly
+ * tick every 1000ms without drift, and uses a stable RAF + timeout + interval
+ * chain that survives StrictMode remounts.
  */
 function LiveClock() {
   const [now, setNow] = useState<Date | null>(null);
   useEffect(() => {
-    // First tick on the next frame (never synchronously in the effect —
-    // that caused cascading renders), then once per second. State stays
-    // null through the server render, so SSR and hydration agree.
-    const frame = window.requestAnimationFrame(() => setNow(new Date()));
-    const id = window.setInterval(() => setNow(new Date()), 1000);
+    let cancelled = false;
+    let rafId = 0;
+    let timeoutId: number | undefined;
+    let intervalId: number | undefined;
+
+    const tick = () => {
+      if (cancelled) return;
+      setNow(new Date());
+    };
+
+    // First paint on next frame, then align to next second boundary.
+    rafId = window.requestAnimationFrame(() => {
+      if (cancelled) return;
+      tick();
+      const msToNext = 1000 - (Date.now() % 1000);
+      timeoutId = window.setTimeout(() => {
+        if (cancelled) return;
+        tick();
+        intervalId = window.setInterval(tick, 1000);
+      }, msToNext) as unknown as number;
+    });
+
     return () => {
-      window.cancelAnimationFrame(frame);
-      window.clearInterval(id);
+      cancelled = true;
+      window.cancelAnimationFrame(rafId);
+      if (timeoutId) window.clearTimeout(timeoutId);
+      if (intervalId) window.clearInterval(intervalId);
     };
   }, []);
-  // Server render and the very first client render agree on a stable
-  // placeholder; the real time (and the tick) start once mounted.
+
+  // Server and first client render agree on placeholder — hydration safe.
   const label = now
     ? now.toLocaleTimeString([], {
         hour: "2-digit",
         minute: "2-digit",
         second: "2-digit",
+        hour12: false,
       })
     : "--:--:--";
+
   return (
     <span
       className="mono tracker-time is-idle"

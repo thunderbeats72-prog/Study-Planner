@@ -112,26 +112,20 @@ export default function SubjectsView({
                       </span>
                     </div>
 
-                    <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-[var(--surface-2)]">
+                    <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-[var(--surface-2)]">
                       <div
                         className="h-full rounded-full transition-all duration-1000"
                         style={{ width: `${pct}%`, background: s.color }}
                       />
                     </div>
 
-                    <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-[12px] font-semibold" style={{ color: "var(--text-dim)" }}>
-                      <span className="flex items-center gap-1.5">
-                        <IconCheck size={14} className="text-[var(--success-accent)]" />
-                        {done}/{list.length || s.units} completed
+                    <div className="mt-3 flex items-center gap-2 text-[11px] font-semibold" style={{ color: "var(--text-muted)" }}>
+                      <span className="inline-flex items-center gap-1">
+                        <IconCheck size={11} className="text-[var(--success-accent)]" />
+                        {done}/{list.length || s.units}
                       </span>
-                      <span className="flex items-center gap-1.5">
-                        <IconTarget size={14} />
-                        {pendingTasks.length} pending tasks
-                      </span>
-                      <span className="mono flex items-center gap-1.5">
-                        <IconClock size={14} />
-                        {pendingMins}m left
-                      </span>
+                      <span className="h-1 w-1 rounded-full bg-[var(--border-subtle)]" aria-hidden="true" />
+                      <span className="mono truncate">{pendingMins > 0 ? `${pendingMins}m planned` : "All caught up"}</span>
                     </div>
                   </div>
 
