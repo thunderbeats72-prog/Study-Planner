@@ -6721,10 +6721,42 @@ body.focus-live .tracker-bar {
   /* Nothing in the session bar wraps mid-glyph on a 320px screen. */
   .tracker-bar.session-bar .tracker-actions .btn { white-space: nowrap; }
 }
+@media (max-width: 380px) {
+  /* Ultra-narrow used to drop the session context entirely
+     (`.tracker-task { display: none }`). The bar's whole job is "what am I
+     on, and for how long" — keep it, one clamped line. */
+  .tracker-bar.session-bar .tracker-task {
+    display: block !important;
+    font-size: .68rem !important;
+  }
+}
 @media (max-width: 360px) {
   .tracker-bar.session-bar { padding: 9px 10px; }
   .tracker-bar.session-bar .tracker-clock-icon { display: none; }
   .tracker-bar.session-bar .tracker-actions .btn { font-size: .7rem; padding-inline: 8px; }
+}
+
+/* While the clock runs, `body.focus-live .tracker-labels` used to be hidden
+   on phones — a recording session showed a bare timer with no idea WHAT was
+   being recorded. The session bar keeps its state line and its subject/task
+   name; there is room for them because the verbs already own their own row. */
+@media (max-width: 860px) {
+  /* The selector has to out-specify the legacy
+     `body.focus-live .tracker-bar .tracker-labels { display: none }`, which
+     is why `.session-bar` rides along. */
+  body.focus-live .tracker-bar.session-bar .tracker-labels {
+    display: flex !important;
+    min-width: 0;
+  }
+  body.focus-live .tracker-status { flex: 1 1 auto !important; min-width: 0; }
+  body.focus-live .tracker-actions { gap: 6px; }
+  /* Recording or paused: the state line sits ABOVE the subject, so a long
+     lesson name can never squeeze the state out of the row. */
+  .tracker-bar.session-bar:has(.tracker-clock) .tracker-labels {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1px;
+  }
 }
 
 /* ── 3 · BOTTOM DOCK — four destinations, safe-area aware ────────────── */
