@@ -33,23 +33,44 @@ export default function ChatPanel({
   const submitLock = useRef(false);
   useEffect(() => { if (!thinking) submitLock.current = false; }, [thinking]);
 
-  // Fetch health once per open — only to know if cloud is up; never display provider names.
-  // Read with a raw fetch: /api/health answers 503 when the DATABASE is
-  // unavailable, and `api()` turns any non-2xx into a thrown ApiError — that
-  // used to discard the body, which still carries `ai.configuredProviders`,
-  // so a deployment with working AI keys but a DB hiccup showed "Local mode".
+  // Fetch health on every open — cheap, no-store, and we use raw fetch so
+  // a 503 (db down) still preserves ai.configuredProviders from the body.
+  // Also probe /api/ai-status GET for the shared llm snapshot.
   useEffect(() => {
-    if (!open || health) return;
+    if (!open) return;
     let alive = true;
-    fetch("/api/health", { cache: "no-store" })
-      .then((res) => res.json().catch(() => ({})))
-      .then((snapshot: HealthSnapshot) => {
-        if (alive && snapshot && typeof snapshot === "object")
-          setHealth(snapshot);
-      })
-      .catch(() => { /* fall back to provider prop */ });
-    return () => { alive = false; };
-  }, [open, health]);
+    const fetchHealth = async () => {
+      try {
+        const res = await fetch("/api/health", { cache: "no-store" });
+        const json = await res.json().catch(() => ({}));
+        if (alive && json && typeof json === "object") {
+          setHealth(json as HealthSnapshot);
+          return;
+        }
+      } catch {}
+      // Fallback to dedicated ai-status endpoint (doesn't need DB)
+      try {
+        const res2 = await fetch("/api/ai-status", { cache: "no-store" });
+        const json2 = await res2.json().catch(() => ({}));
+        if (alive && json2 && typeof json2 === "object") {
+          // Normalize to HealthSnapshot shape
+          const snap: HealthSnapshot = {
+            ai: {
+              mode: (json2 as any).mode,
+              configuredProviders: (json2 as any).configuredProviders,
+            },
+          };
+          setHealth(snap);
+        }
+      } catch {
+        /* fall back to provider prop */
+      }
+    };
+    fetchHealth();
+    return () => {
+      alive = false;
+    };
+  }, [open]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });

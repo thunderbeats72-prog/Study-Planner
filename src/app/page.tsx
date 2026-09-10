@@ -44,7 +44,6 @@ import {
   IconCheck,
   IconClock,
   IconExpand2,
-  IconFlame,
   IconClose,
   IconFocus2,
   IconGear,
@@ -103,7 +102,7 @@ const NAV: {
   { id: "planner", label: "Planner", icon: <IconCalendar />, dock: true },
   { id: "focus", label: "Focus", icon: <IconClock />, dock: true },
   { id: "subjects", label: "Subjects", icon: <IconBook />, dock: true },
-  { id: "analytics", label: "Analytics", icon: <IconChart />, dock: true },
+  { id: "analytics", label: "Analytics", icon: <IconChart />, dock: false },
   { id: "settings", label: "Settings", icon: <IconGear />, dock: true },
 ];
 
@@ -127,70 +126,6 @@ type SessionLogResponse = AppState & {
 const SIDEBAR_KEY = "spp-sidebar-collapsed";
 const SESSION_QUEUE_KEY = "spp-pending-session-logs";
 
-/**
- * Live local time for the tracker bar's idle state. Deliberately its own
- * component: the one-second tick re-renders only this span, never the page
- * tree (the study clock's mmss stays the hero while a session is open — this
- * takes over the moment the bar reads "Not clocked in", so the top bar keeps
- * visibly moving in real time instead of looking frozen until a refresh).
- *
- * v28: aligns first tick to the next second boundary so the seconds visibly
- * tick every 1000ms without drift, and uses a stable RAF + timeout + interval
- * chain that survives StrictMode remounts.
- */
-function LiveClock() {
-  const [now, setNow] = useState<Date | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    let rafId = 0;
-    let timeoutId: number | undefined;
-    let intervalId: number | undefined;
-
-    const tick = () => {
-      if (cancelled) return;
-      setNow(new Date());
-    };
-
-    // First paint on next frame, then align to next second boundary.
-    rafId = window.requestAnimationFrame(() => {
-      if (cancelled) return;
-      tick();
-      const msToNext = 1000 - (Date.now() % 1000);
-      timeoutId = window.setTimeout(() => {
-        if (cancelled) return;
-        tick();
-        intervalId = window.setInterval(tick, 1000);
-      }, msToNext) as unknown as number;
-    });
-
-    return () => {
-      cancelled = true;
-      window.cancelAnimationFrame(rafId);
-      if (timeoutId) window.clearTimeout(timeoutId);
-      if (intervalId) window.clearInterval(intervalId);
-    };
-  }, []);
-
-  // Server and first client render agree on placeholder — hydration safe.
-  const label = now
-    ? now.toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-        hour12: false,
-      })
-    : "--:--:--";
-
-  return (
-    <span
-      className="mono tracker-time is-idle"
-      aria-label="Current local time"
-      title="Local time — clock in to start recording study time"
-    >
-      {label}
-    </span>
-  );
-}
 
 function apiFailureMessage(error: unknown, fallback: string): string {
   return error instanceof ApiError && error.message ? error.message : fallback;
@@ -1457,7 +1392,7 @@ export default function Home() {
         </div>
         <div className="mh-actions">
           <span className="streak-badge mh-streak">
-            <IconFlame /> {state.user.streak}d
+            🔥 {state.user.streak}d
           </span>
           {/* Quick controls mirror the tracker bar's trio for phones, where
               the tracker hides them below 640px — same popovers, same state. */}
@@ -1643,7 +1578,7 @@ export default function Home() {
             desktop tracker-bar palette), so it is not repeated here. */}
         <div className="drawer-foot">
           <div className="streak-badge foot-badge">
-            <IconFlame /> {state.user.streak} Day Streak
+            🔥 {state.user.streak} Day Streak
           </div>
           <p className="foot-sub">
             {ctx.daysLeft} days left · {ctx.progressPct}% syllabus completed.
@@ -1710,7 +1645,7 @@ export default function Home() {
           <div className="sidebar-foot">
             <div className="glass-panel tilt-card accent-edge accent-edge--warning">
               <div className="streak-badge foot-badge">
-                <IconFlame /> {state.user.streak} Day Streak
+                🔥 {state.user.streak} Day Streak
               </div>
               <h4 className="foot-title">Keep Moving</h4>
               <p className="foot-sub">
@@ -1752,21 +1687,19 @@ export default function Home() {
                 </span>
               </div>
             </div>
-            <div className="tracker-clock">
-              <span className="tracker-clock-icon" aria-hidden="true">
-                <IconClock size={14} />
-              </span>
-              {clock.sessionActive ? (
+            {clock.sessionActive && (
+              <div className="tracker-clock is-live">
+                <span className="tracker-clock-icon" aria-hidden="true">
+                  <IconClock size={14} />
+                </span>
                 <span
                   className="mono tracker-time"
                   aria-label={`Study clock ${mmss(clock.elapsed)}`}
                 >
                   {mmss(clock.elapsed)}
                 </span>
-              ) : (
-                <LiveClock />
-              )}
-            </div>
+              </div>
+            )}
             <div className="tracker-actions">
               <span className="chip chip-kind">
                 {todayDone}/{todayTotal} today
