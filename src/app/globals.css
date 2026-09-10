@@ -53,6 +53,11 @@
   --pad-card:clamp(16px,1.2vw + 8px,24px);
   --pad-card-sm:clamp(13px,.9vw + 7px,17px);
   --pad-tight:clamp(10px,.6vw + 7px,14px);
+  /* Page gutter. Must only ever GROW with the viewport: a narrower phone gets
+     a narrower gutter, never a wider one. `--pad-shell` cannot express this —
+     its clamp floors at 16px, so a 320px phone was getting wider gutters than
+     a 390px one (and a 414px phone less content width than a 412px phone). */
+  --pad-gutter:clamp(10px,3vw,20px);
   --gap-page:clamp(14px,1vw + 8px,22px);
   --gap-cluster:clamp(10px,.7vw + 7px,14px);
   --row-pad:clamp(11px,.6vw + 8px,15px);
@@ -514,7 +519,7 @@ body.theme-dark .tracker-bar,body.theme-obsidian .tracker-bar,body.theme-nebula 
 
 /* ============ RESPONSIVE ============ */
 @media(max-width:860px){
-  .app-wrapper{flex-direction:column;padding:0 12px 90px;gap:0}
+  .app-wrapper{flex-direction:column;gap:0}
   /* CANONICAL mobile dock — the ONLY .sidebar rule at <=860px.
      Floating capsule, near-opaque, safe-area aware. */
   .sidebar{
@@ -589,7 +594,6 @@ body.theme-dark .tracker-bar,body.theme-obsidian .tracker-bar,body.theme-nebula 
   .ob-sub-row .btn{grid-column:3 / 4;grid-row:2 / 3;justify-self:end}
 }
 @media(max-width:420px){
-  .app-wrapper{padding-left:8px;padding-right:8px}
   .kpi-grid{grid-template-columns:1fr}
   .day-block{padding:13px 12px}
   #t-digits{font-size:2.25rem}
@@ -1014,8 +1018,12 @@ body.mode-focused .kpi-value{font-size:1.8rem}
 body.mode-focused .day-block{padding:13px 15px;margin-bottom:10px}
 body.mode-focused .glass-panel{border-radius:var(--radius-lg)}
 /* Focused mode: entrance choreography off — instant, professional */
-body.mode-focused .task-row,body.mode-focused .kpi-value,
-body.mode-focused .main-workspace > :not(.tracker-bar){animation:none}
+/* mode-focused is a DENSITY mode — tighter padding, smaller type, smaller
+   radii. It is not a motion preference: stripping entrance choreography here
+   meant any learner who onboarded as PG / PhD / professional silently lost
+   every animation in the product, with no way to turn it back on. Motion
+   opt-out belongs to `prefers-reduced-motion`, which is platform-aware and
+   user-controlled. The density rules above are untouched. */
 
 /* Young mode on touch devices: extra-comfortable targets */
 @media (hover:none) and (pointer:coarse){
@@ -1107,7 +1115,6 @@ img,svg,video,canvas{max-width:100%;height:auto}
 
 /* 4. S24-class phones (360-430px): the tightest mainstream band */
 @media(max-width:430px){
-  .app-wrapper{padding-left:10px;padding-right:10px}
   .main-workspace{padding-left:0;padding-right:0}
   .tracker-bar .btn-xs{min-width:0;flex:1 1 auto}
   .page-header{gap:10px;margin-bottom:16px}
@@ -1261,8 +1268,7 @@ img,svg,video,canvas{max-width:100%;height:auto}
 
 /* mode-focused: signature layer stays quiet for professionals */
 body.mode-focused .bar-fill::after,body.mode-focused .prog-fill::after,
-body.mode-focused .brand-logo-icon::before,body.mode-focused .cal-cell.today::after{animation:none;opacity:0}
-body.mode-focused .kpi-value{animation:none}
+body.mode-focused .brand-logo-icon::before,body.mode-focused .cal-cell.today::after{opacity:0}
 
 /* reduced motion: everything above respects the global kill switch */
 
@@ -1338,9 +1344,6 @@ body,.glass-panel,.tracker-bar,.sidebar,.task-row,.btn-secondary,.input-field,.a
 /* (browsers auto-pause CSS animations offscreen; loops are opt-in only) */
 
 /* ── O. mode-focused & reduced-motion guards for the new layer ── */
-body.mode-focused .day-block,body.mode-focused .heat-cell,
-body.mode-focused .kanban > *,body.mode-focused .grid-fit-300 > *,
-body.mode-focused .main-workspace > :not(.tracker-bar){animation:none}
 @media (prefers-reduced-motion: reduce){
   .day-block,.heat-cell,.kanban > *,.grid-fit-300 > *,.ai-quick button{animation:none !important}
 }
@@ -1498,7 +1501,6 @@ body.theme-nebula .ai-panel,body.theme-nebula .cmdk,body.theme-nebula .modal-box
 .modal-box:focus{outline:none}
 
 /* mode guards for new decorative pieces */
-body.mode-focused .task-row.active-clock .task-dot{animation:none}
 @media (prefers-reduced-motion: reduce){
   .toast,.ob-card,.chip-done{animation:none !important}
 }
@@ -1572,8 +1574,6 @@ body.theme-switching{animation:themeBlink .3s ease}
 @keyframes themeBlink{0%{filter:brightness(1)}40%{filter:brightness(.96)}100%{filter:brightness(1)}}
 
 /* Guards: focused professionals + reduced motion */
-body.mode-focused .glass-panel::after,body.mode-focused .ai-fab,
-body.mode-focused .pulse-dot.live::after{animation:none;transition:none}
 @media (prefers-reduced-motion: reduce){
   .pulse-dot.live::after,.ai-fab,.skeleton-strong,.toast::after{animation:none !important}
   .glass-panel::after{display:none}
@@ -1701,10 +1701,7 @@ body::before{
 body.mode-young .kpi-card::before{background:linear-gradient(105deg,transparent,rgba(255,255,255,.24),transparent)}
 
 /* Guards */
-body.mode-focused .kpi-card::before,body.mode-focused .day-block::before,
-body.mode-focused .nav-item.active::after,body.mode-focused .ob-level-grid > *,
-body.mode-focused .task-dot,body.mode-focused .wk-bar{animation:none}
-body.mode-focused::before{animation:none;opacity:.4}
+body.mode-focused::before{opacity:.4}
 @media (prefers-reduced-motion: reduce){
   body::before,.ob-level-grid > *,.task-dot,.wk-bar,.nav-item.active::after{animation:none !important}
 }
@@ -2014,7 +2011,6 @@ body.focus-live .tracker-time{color:var(--success-accent)}
 
 /* Zen kiosk lock: explicit exit affordance */
 .zen-exit{position:absolute;top:max(18px,env(safe-area-inset-top));right:18px}
-body.mode-focused .btn-primary.w-full::before,body.mode-focused .page-header .btn-primary::before{animation:none}
 @media (prefers-reduced-motion: reduce){
   body.focus-live::after{animation:none}
   .btn-primary.w-full::before,.page-header .btn-primary::before{animation:none}
@@ -3099,7 +3095,17 @@ body.theme-dark .pulse-dot.live,body.theme-obsidian .pulse-dot.live,body.theme-n
     padding-top:calc(var(--header-h) + 6px);
     padding-bottom:calc(var(--dock-h) + 26px);
   }
-  .app-wrapper{padding:0 var(--pad-shell) calc(var(--dock-h) + 24px);gap:0}
+  /* Single source of truth for the mobile gutter. Longhands, not a `padding:`
+     shorthand — the shorthand silently discards the safe-area longhands set
+     earlier, which is what let content sit under a notch on every phone
+     outside the old 360–412px band. */
+  .app-wrapper{
+    padding-top:0;
+    padding-bottom:calc(var(--dock-h) + 24px);
+    padding-left:max(var(--pad-gutter),env(safe-area-inset-left));
+    padding-right:max(var(--pad-gutter),env(safe-area-inset-right));
+    gap:0;
+  }
   .tracker-bar{top:calc(var(--header-h) + 4px)}
   .ai-fab{bottom:calc(var(--dock-h) + 14px)}
   .toast{bottom:calc(var(--dock-h) + 14px)}
@@ -3260,10 +3266,6 @@ body.theme-dark .pulse-dot.live,body.theme-obsidian .pulse-dot.live,body.theme-n
 
 /* ── Galaxy S24 class (360–412px, the tightest mainstream band) ── */
 @media(min-width:360px) and (max-width:412px){
-  .app-wrapper{
-    padding-left:max(12px,env(safe-area-inset-left));
-    padding-right:max(12px,env(safe-area-inset-right));
-  }
   .kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
   .nav-item{font-size:.63rem;letter-spacing:-.01em}
   .tracker-bar{border-radius:var(--radius-lg)}
@@ -4262,15 +4264,6 @@ body.theme-mint,body.theme-sunset,body.theme-silver-lavender,body.theme-default{
 /* ──────────────────────────────────────────────────────────────────────
    K · GUARDS
 ──────────────────────────────────────────────────────────────────────── */
-/* mode-focused (PG/professional): the app is a tool, not a showpiece. */
-body.mode-focused .up-next.live::after,
-body.mode-focused .day-block:has(.task-row.active-clock)::after,
-body.mode-focused .loader-ring::before,
-body.mode-focused .section-title::after,
-body.mode-focused .momentum-pill,
-body.mode-focused .wk-bar,
-body.mode-focused .section-card,body.mode-focused .day-block,
-body.mode-focused .kpi-card,body.mode-focused .dash-card{animation:none}
 body.mode-focused .btn-primary{background-position:50% 0}
 @media(hover:hover) and (pointer:fine){
   body.mode-focused .glass-panel:not(.ai-panel):hover{--spec-o:.55}

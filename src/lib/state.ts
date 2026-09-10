@@ -1,4 +1,5 @@
 import { db } from "@/db";
+import { demoDataEnabled } from "./demoGate";
 import { users, settings, subjects, topics, tasks, sessions, messages } from "@/db/schema";
 import { and, eq, desc, asc, sql } from "drizzle-orm";
 import { createHash } from "node:crypto";
@@ -56,7 +57,7 @@ export async function getOrCreateUser(userKey: string) {
     return user;
   } catch (error) {
     // Preview without a database: serve the demo learner instead of failing.
-    if (process.env.SPP_DEMO_DATA === "1") {
+    if (demoDataEnabled()) {
       const { demoFallbackState } = await import("./demoState");
       return (await demoFallbackState(userKey)).user;
     }
@@ -77,7 +78,7 @@ export async function getSettings(userId: number) {
     if (!row) throw new Error("Could not initialise learner settings.");
     return row;
   } catch (error) {
-    if (process.env.SPP_DEMO_DATA === "1") {
+    if (demoDataEnabled()) {
       const { demoFallbackState } = await import("./demoState");
       return (await demoFallbackState("u_demo_settings")).settings;
     }
@@ -206,10 +207,13 @@ export async function fullState(userKey: string) {
     return { user, ...rest, topics: enrichedTopics };
   } catch (error) {
     console.warn("DB unavailable during fullState; using fallback state:", error instanceof Error ? error.message : error);
-    // Sandbox/preview escape hatch: with SPP_DEMO_DATA=1 and no database, the
-    // UI is served a deterministic sample plan so the interface can be
-    // reviewed. Never active in a normal deployment.
-    if (process.env.SPP_DEMO_DATA === "1") {
+    // Sandbox/preview escape hatch: with no database, the UI is served a
+    // deterministic sample plan so the interface can be reviewed. This MUST
+    // use the same predicate the write routes use — if reads fall back to the
+    // sample plan while writes fall through to the database, the app renders
+    // a plan that cannot be changed (every clock-out and Done tap 503s).
+    // Never active in a normal deployment.
+    if (demoDataEnabled()) {
       const { demoFallbackState } = await import("./demoState");
       return demoFallbackState(userKey);
     }

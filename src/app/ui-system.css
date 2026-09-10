@@ -2087,7 +2087,8 @@ body::after { content: none !important; display: none !important; }
   animation: pageInBack .34s cubic-bezier(.22, 1, .36, 1) both !important;
 }
 /* The dense "focused" presentation mode stays completely still. */
-body.mode-focused .main-workspace > :not(.tracker-bar) { animation: none !important; }
+/* Density, not a motion preference — entrance choreography stays on for
+   PG / professional learners. `prefers-reduced-motion` owns motion opt-out. */
 
 /* ── Buttons: lift on hover, settle on press ──────────────────────────── */
 .btn {
