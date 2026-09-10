@@ -48,6 +48,8 @@ export type TaskCardProps = {
   live?: boolean;
   liveSeconds?: number;
   liveRunning?: boolean;
+  /** Optional scroll target used when a planner brief opens. */
+  briefRef?: React.RefObject<HTMLElement | null>;
   /** Planner passes handlers so the full brief can be expanded. */
   briefOpen?: boolean;
   onToggleBrief?: () => void;
@@ -56,6 +58,8 @@ export type TaskCardProps = {
   /* ── action wiring (mirrors TaskActions) ── */
   activeTaskId?: number | null;
   clockSessionActive?: boolean;
+  clockRunning?: boolean;
+  onPauseOrResume?: () => void;
   onTaskStatus: (id: number, status: string, rating?: number) => void;
   onFocusTask: (taskId: number) => void;
   onClockOut: () => void;
@@ -89,12 +93,15 @@ export default function TaskCard({
   live,
   liveSeconds,
   liveRunning,
+  briefRef,
   briefOpen,
   onToggleBrief,
   onAskTutor,
   className,
   activeTaskId,
   clockSessionActive,
+  clockRunning,
+  onPauseOrResume,
   onTaskStatus,
   onFocusTask,
   onClockOut,
@@ -111,13 +118,14 @@ export default function TaskCard({
   const title = checkpoint
     ? task.title.replace(/^checkpoint:\s*/i, "").trim() || task.title
     : task.title;
-  const brief =
-    topic?.summary || (checkpoint && task.detail ? task.detail : "");
-  const hasBriefPanel = !!topic || (!!task.detail && checkpoint);
+  const brief = topic?.summary || task.detail || "";
+  const hasBriefPanel = !!topic || !!task.detail;
   const due = dueLabel(task.date);
 
   return (
     <article
+      ref={briefRef}
+      data-task-card={task.id}
       className={cn(
         "task-card",
         done && "is-done",
@@ -188,6 +196,7 @@ export default function TaskCard({
               className="btn btn-xs btn-ghost task-brief-btn"
               onClick={onToggleBrief}
               aria-expanded={!!briefOpen}
+              aria-controls={`lesson-brief-${task.id}`}
               title={
                 briefOpen
                   ? "Hide the lesson brief"
@@ -203,6 +212,8 @@ export default function TaskCard({
             subject={subject}
             activeTaskId={activeTaskId}
             clockSessionActive={clockSessionActive}
+            clockRunning={clockRunning}
+            onPauseOrResume={onPauseOrResume}
             onTaskStatus={onTaskStatus}
             onFocusTask={onFocusTask}
             onClockOut={onClockOut}
@@ -211,41 +222,82 @@ export default function TaskCard({
           />
         </div>
 
-        {briefOpen && topic && (
-          <div className="task-card-brief-panel">
-            <p className="task-brief-text">{topic.summary}</p>
-            {topic.prerequisites?.length > 0 && (
+        {briefOpen && (topic || task.detail) && (
+          <div
+            id={`lesson-brief-${task.id}`}
+            className="task-card-brief-panel"
+            aria-label="Lesson brief"
+          >
+            <div className="task-brief-head">
+              <span className="task-brief-icon" aria-hidden="true">
+                <IconSpark size={14} />
+              </span>
+              <div>
+                <strong className="task-brief-kicker">Lesson brief</strong>
+                <span className="task-brief-context">
+                  {topic?.title || "Study note"}
+                </span>
+              </div>
+            </div>
+
+            <p className="task-brief-text">
+              {topic?.summary || task.detail}
+            </p>
+
+            {(topic?.objectives ?? []).length > 0 && (
+              <div className="task-brief-block">
+                <strong>By the end</strong>
+                <ul>
+                  {(topic?.objectives ?? []).slice(0, 3).map((objective, i) => (
+                    <li key={i}>{objective}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {(topic?.prerequisites ?? []).length > 0 && (
               <div className="task-brief-block">
                 <strong>Prerequisites</strong>
                 <ul>
-                  {topic.prerequisites.map((pr, i) => (
+                  {(topic?.prerequisites ?? []).slice(0, 3).map((pr, i) => (
                     <li key={i}>{pr}</li>
                   ))}
                 </ul>
               </div>
             )}
-            {topic.keyConcepts?.length > 0 && (
-              <ul className="task-brief-concepts">
-                {topic.keyConcepts.map((kc, i) => (
-                  <li key={i} className="chip chip-kind chip-tight">
-                    {kc}
-                  </li>
-                ))}
-              </ul>
+            {(topic?.keyConcepts ?? []).length > 0 && (
+              <div className="task-brief-block">
+                <strong>Key concepts</strong>
+                <ul className="task-brief-concepts">
+                  {(topic?.keyConcepts ?? []).map((kc, i) => (
+                    <li key={i} className="chip chip-kind chip-tight">
+                      {kc}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {topic?.practice && (
+              <div className="task-brief-practice">
+                <span className="task-brief-practice-label">Try this</span>
+                <span>{topic.practice}</span>
+              </div>
             )}
             {onAskTutor && (
-              <button
-                type="button"
-                className="btn btn-xs btn-primary"
-                onClick={() =>
-                  onAskTutor(
-                    `Teach me "${topic.title}" from ${subject?.name || "the syllabus"}. Explain key concepts and give a worked example.`,
-                  )
-                }
-              >
-                <IconSpark size={13} />
-                <span>Ask Tutor to teach this</span>
-              </button>
+              <div className="task-brief-footer">
+                <span className="task-brief-footer-note">Need a worked example?</span>
+                <button
+                  type="button"
+                  className="btn btn-xs btn-primary"
+                  onClick={() =>
+                    onAskTutor(
+                      `Teach me "${topic?.title || task.title}" from ${subject?.name || "the syllabus"}. Explain key concepts and give a worked example.`,
+                    )
+                  }
+                >
+                  <IconSpark size={13} />
+                  <span>Ask Tutor</span>
+                </button>
+              </div>
             )}
           </div>
         )}

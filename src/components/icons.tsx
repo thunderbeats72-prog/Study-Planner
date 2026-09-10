@@ -298,8 +298,8 @@ export const IconFilter = ({ size = 16, className, style }: P) => (
    is the session verb every Clock-in / Clock-out control shares. */
 export const IconUndo = ({ size = 16, className, style }: P) => (
   <svg {...base(size)} className={className} style={style}>
-    <path d="M3 7v6h6" />
-    <path d="M3.5 13a9 9 0 1 0 2.6-6.4L3 9.5" />
+    <path d="M9 14 4 9l5-5" />
+    <path d="M4 9h10a6 6 0 0 1 0 12h-1" />
   </svg>
 );
 export const IconPause = ({ size = 16, className, style }: P) => (
@@ -315,10 +315,9 @@ export const IconSwap = ({ size = 16, className, style }: P) => (
 );
 export const IconStopwatch = ({ size = 16, className, style }: P) => (
   <svg {...base(size)} className={className} style={style}>
-    <path d="M18 20H6" />
-    <path d="M12 20v-4" />
     <circle cx="12" cy="13" r="8" />
-    <path d="M12 9v4l2.5 1.6" />
-    <path d="M9 2h6" />
+    <path d="M12 9v4l2.5 1.5" />
+    <path d="M9 2h6M12 2v3" />
+    <path d="m17 5 2-2" />
   </svg>
 );

@@ -51,7 +51,6 @@ import {
   IconHome,
   IconLeaf,
   IconLogo,
-  IconMenu,
   IconPalette,
   IconPanelLeft,
   IconPause,
@@ -918,16 +917,27 @@ export default function Home() {
 
   // One control for both timers: pause the session while it moves, start
   // (or resume) it when it does not.
-  const pauseOrResume = () => {
-    if (session.active) {
-      session.pause();
-    } else if (clock.sessionActive) {
-      session.start();
-      notify("Resumed — focus timer and study clock are running together.");
-    } else {
-      startSmartClock();
+  const pauseOrResume = useCallback(() => {
+    if (clock.running) {
+      // A manually clocked-in lesson should not unexpectedly start a Pomodoro
+      // timer just because Resume/Pause was pressed in the Planner. Focus-owned
+      // sessions still use the synchronised controller.
+      if (session.focusOwnsClock) session.pause();
+      else clock.pause();
+      return;
     }
-  };
+    if (clock.sessionActive) {
+      if (session.focusOwnsClock) session.start();
+      else clock.resume();
+      notify(
+        session.focusOwnsClock
+          ? "Resumed — focus timer and study clock are running together."
+          : "Study clock resumed — your active minutes are recording again.",
+      );
+      return;
+    }
+    startSmartClock();
+  }, [clock, notify, session, startSmartClock]);
 
   const focusTask = (taskId: number) => {
     const task = state?.tasks.find((x) => x.id === taskId);
@@ -975,19 +985,18 @@ export default function Home() {
     (type: string) => {
       switch (type) {
         case "startTimer":
-          if (session.active) return;
-          if (clock.sessionActive) session.start();
-          else startSmartClock();
+          if (clock.running) return;
+          pauseOrResume();
           break;
         case "stopTimer":
           if (clock.sessionActive) clockOutNow();
           break;
         case "pause":
-          if (session.active) session.pause();
+          if (clock.running) pauseOrResume();
           else notify("No session running to pause.");
           break;
         case "resume":
-          if (clock.sessionActive || clock.elapsed > 0) session.start();
+          if (clock.sessionActive) pauseOrResume();
           else startSmartClock();
           break;
         case "break":
@@ -1002,11 +1011,12 @@ export default function Home() {
       }
     },
     [
-      clock.elapsed,
       clock.onBreak,
+      clock.running,
       clock.sessionActive,
       clockOutNow,
       notify,
+      pauseOrResume,
       session,
       startSmartClock,
     ],
@@ -1276,19 +1286,14 @@ export default function Home() {
     {
       id: "clock-in",
       group: "Study Clock",
-      label: session.active
+      label: clock.running
         ? "Pause Session"
         : clock.sessionActive
           ? "Resume Session"
           : "Clock In",
-      hint: session.active ? "Freeze both timers" : "Start recording",
-      keywords: "timer record attendance pause",
-      run: () =>
-        session.active
-          ? session.pause()
-          : clock.sessionActive
-            ? session.start()
-            : startSmartClock(),
+      hint: clock.running ? "Freeze the study clock" : "Start recording",
+      keywords: "timer record attendance pause resume",
+      run: pauseOrResume,
     },
     {
       id: "clock-out",
@@ -1385,7 +1390,7 @@ export default function Home() {
             </span>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="mh-actions">
           <span className="streak-badge mh-streak">
             <IconFlame /> {state.user.streak}d
           </span>
@@ -1507,11 +1512,11 @@ export default function Home() {
           <button
             type="button"
             className="mh-more"
-            aria-label="Open menu"
+            aria-label="Open more navigation"
             aria-expanded={drawerOpen}
             onClick={() => setDrawerOpen(true)}
           >
-            <IconMenu size={18} />
+            <span>More</span>
           </button>
         </div>
       </header>
@@ -1691,6 +1696,9 @@ export default function Home() {
               </div>
             </div>
             <div className="tracker-clock">
+              <span className="tracker-clock-icon" aria-hidden="true">
+                <IconClock size={14} />
+              </span>
               <span
                 className="mono tracker-time"
                 aria-label={`Study clock ${mmss(clock.elapsed)}`}
@@ -1722,25 +1730,25 @@ export default function Home() {
                   {/* One slot for the session's primary verb, so the row keeps
                       the same geometry while clocked in, paused and on break. */}
                   <button
-                    className={`btn btn-xs ${session.active ? "btn-secondary" : "btn-primary"} act-toggle`}
+                    className={`btn btn-xs ${clock.running ? "btn-secondary" : "btn-primary"} act-toggle`}
                     onClick={pauseOrResume}
                     title={
-                      session.active
+                      clock.running
                         ? "Pause the study clock"
                         : "Resume the study clock"
                     }
                     aria-label={
-                      session.active
+                      clock.running
                         ? "Pause the study clock"
                         : "Resume the study clock"
                     }
                   >
-                    {session.active ? (
+                    {clock.running ? (
                       <IconPause size={12} />
                     ) : (
                       <IconPlay size={12} />
                     )}
-                    <span>{session.active ? "Pause" : "Resume"}</span>
+                    <span>{clock.running ? "Pause" : "Resume"}</span>
                   </button>
                   {/* Always rendered while a session is open, so the row keeps
                       exactly the same geometry while clocked in and paused. */}
@@ -1955,6 +1963,7 @@ export default function Home() {
               activeClockSeconds={clock.elapsed}
               clockRunning={clock.running}
               clockSessionActive={clock.sessionActive}
+              onPauseOrResume={pauseOrResume}
               onClockOut={clockOutNow}
               onAskTutor={askTutor}
               replanning={busy}
