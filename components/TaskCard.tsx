@@ -164,7 +164,11 @@ export default function TaskCard({
               />
             ) : null}
             <IconBook size={11} />
-            {subject?.name ?? "General"}
+            {/* The name is its own box so a long subject ellipsises instead
+                of pushing the icon, the chip or the row out of shape. */}
+            <span className="task-subject-name">
+              {subject?.name ?? "General"}
+            </span>
           </span>
           {live && (
             <TaskLiveBadge seconds={liveSeconds} running={liveRunning} />

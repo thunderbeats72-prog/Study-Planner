@@ -1122,6 +1122,19 @@ async function runTests() {
     check(/--topbar-h: *calc\(var\(--header-h\)/.test(sheets) &&
           /padding-top: *calc\(var\(--topbar-h\)/.test(sheets),
       "One variable owns the top-bar footprint (header + safe area)");
+
+    /* (v31) The consistency ring. Its readout used to be two Tailwind
+       utilities — `absolute text-center` — and `.ring-figure` was never a
+       containing block, so the percentage and the ACTIVE label kept their
+       static position (under the ring) instead of centring inside it. The
+       Focus timer's ring never had the bug: its `.ring-wrap` is
+       `position: relative`. */
+    const analyticsSource = strip(readFileSync(join(process.cwd(), "src/components/AnalyticsView.tsx"), "utf8"));
+    check(/className="ring-center"/.test(analyticsSource) &&
+          !/className="absolute text-center"/.test(analyticsSource),
+      "The consistency ring's readout uses the ring-center slot, so it sits inside the ring");
+    check(/\.ring-figure\s*\{[^}]*position: *relative/.test(sheets),
+      "The ring figure is a containing block for its centred readout");
     check(/\.sidebar\s*\{/.test(sheets) && /@media *\(max-width: *1024px\)/.test(sheets),
       "The desktop rail is real and collapses at a documented breakpoint");
 

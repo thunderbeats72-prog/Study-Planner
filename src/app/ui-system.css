@@ -7085,3 +7085,114 @@ body > .task-menu button { min-height: 40px; }
   }
   .planner-day { overflow: visible; }
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   v31 · THREE ALIGNMENT / SIZING DEFECTS
+   ──────────────────────────────────────────────────────────────────────
+   1. The Analytics consistency ring's readout (86% / ACTIVE) was built from
+      two Tailwind utilities — `absolute text-center` — with no positioned
+      ancestor anywhere in the card, so the percentage never sat inside the
+      ring: it kept its static position, i.e. UNDER the ring, next to the
+      footnote. The component now uses `.ring-center`, the design system's
+      own readout slot (the same one the Focus timer uses), and `.ring-figure`
+      is the positioned box it needs.
+   2. Desktop navigation rows had no icon sizing at all above 860px, so every
+      destination rendered its icon at the component default in a differently
+      filled 24-box — the Settings gear (the densest glyph in the set) read
+      as oversized and off the row's optical line.
+   3. The task-card subject carried body-scale weight next to quieter
+      metadata, so it dominated the row on phones.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* ── 1 · CONSISTENCY RING — readout centred in the ring ──────────────── */
+/* `.ring-center` is `position: absolute; inset: 0`, so the figure has to be
+   the containing block. Without this the readout is positioned against the
+   nearest positioned ancestor (the card, or the page) — the bug. */
+.ring-figure {
+  position: relative;
+  /* Sized by the ring itself (the card centres it), so `inset: 0` on the
+     readout is exactly the ring's box — the readout centres on the ring,
+     not on the card. */
+  justify-self: center;
+}
+.ring-center {
+  text-align: center;
+  /* The digits and the label share one centred column; the ring's own
+     stroke is 7/80 of the box, so a 62% inner box can never touch it. */
+  padding: 12%;
+  pointer-events: none;
+}
+.ring-digits { line-height: 1; }
+/* Uppercase labels are tracked out, and `letter-spacing` adds a trailing
+   space AFTER the last glyph. Centred, that space reads as the text being
+   pushed half a step to the LEFT — cancel it so "ACTIVE" is optically
+   centred under the percentage. */
+.ring-state {
+  margin-right: -.18em;
+  line-height: 1;
+  white-space: nowrap;
+}
+/* The analytics ring is smaller than the Focus ring (170px vs 248px), so it
+   needs its own digit scale: big enough to read, small enough that "100%"
+   never reaches the stroke. */
+.ana-ring-card .ring-digits {
+  font-size: clamp(1.45rem, 1rem + 3.1vw, 2.1rem);
+  letter-spacing: -.03em;
+}
+.ana-ring-card .ring-state { font-size: .64rem; }
+@media (prefers-reduced-motion: reduce) {
+  .ring-svg circle { transition: none !important; }
+}
+
+/* ── 2 · DESKTOP NAV + STREAK — one optical line ─────────────────────── */
+@media (min-width: 861px) {
+  .nav-item {
+    /* One row geometry for every destination, Settings included. */
+    min-height: 42px;
+    gap: 12px;
+    padding: 10px 12px;
+  }
+  .nav-item svg {
+    /* One box and one stroke for all six icons. The gear is the densest
+       glyph in the set, so at the default weight it read as a size larger
+       than Home / Calendar / Clock sitting on the same rail. */
+    width: 20px;
+    height: 20px;
+    flex: 0 0 auto;
+    stroke-width: 1.9;
+  }
+  /* The collapse toggle sits on the same 40px grid as the brand mark, and
+     clears the rail's edge instead of hanging off it. */
+  .sb-toggle { top: 0; right: 2px; }
+}
+/* The fire glyph is an emoji: it arrives with its own line box, which is
+   what made the pill look inflated and the value sit low. Sized and lined
+   up like the text beside it. */
+.streak-badge { line-height: 1; }
+.streak-flame {
+  display: inline-block;
+  font-size: 1.05em;
+  line-height: 1;
+  /* Emoji baselines sit lower than the Latin baseline in most emoji fonts. */
+  transform: translateY(-.04em);
+}
+
+/* ── 3 · MOBILE TASK CARD — subject is metadata, not a heading ────────── */
+@media (max-width: 860px) {
+  .task-card-subject {
+    font-size: .68rem;
+    font-weight: 650;
+    line-height: 1.35;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .task-subject-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  /* The filter's value text is chrome, not content — it must not compete
+     with the day date or the task title beside it. */
+  .planner-filter .sp-select-btn { font-size: .8rem; }
+}

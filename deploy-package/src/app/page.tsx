@@ -1397,7 +1397,10 @@ export default function Home() {
         </div>
         <div className="mh-actions">
           <span className="streak-badge mh-streak">
-            🔥 {state.user.streak}d
+            <span className="streak-flame" aria-hidden="true">
+              🔥
+            </span>
+            {state.user.streak}d
           </span>
           {/* Quick controls mirror the tracker bar's trio for phones, where
               the tracker hides them below 640px — same popovers, same state. */}
@@ -1596,7 +1599,8 @@ export default function Home() {
             desktop tracker-bar palette), so it is not repeated here. */}
         <div className="drawer-foot">
           <div className="streak-badge foot-badge">
-            🔥 {state.user.streak} Day Streak
+            <span className="streak-flame" aria-hidden="true">🔥</span>{" "}
+            {state.user.streak} Day Streak
           </div>
           <p className="foot-sub">
             {ctx.daysLeft} days left · {ctx.progressPct}% syllabus completed.
@@ -1663,7 +1667,8 @@ export default function Home() {
           <div className="sidebar-foot">
             <div className="glass-panel tilt-card accent-edge accent-edge--warning">
               <div className="streak-badge foot-badge">
-                🔥 {state.user.streak} Day Streak
+                <span className="streak-flame" aria-hidden="true">🔥</span>{" "}
+            {state.user.streak} Day Streak
               </div>
               <h4 className="foot-title">Keep Moving</h4>
               <p className="foot-sub">
