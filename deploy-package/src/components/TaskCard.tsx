@@ -154,6 +154,15 @@ export default function TaskCard({
             color={kindColor}
           />
           <span className="task-card-subject">
+            {/* The subject's own colour, as a dot: the same token the
+                calendar chips use, so a row and its day cell agree. */}
+            {subject?.color ? (
+              <span
+                className="task-subject-dot"
+                style={{ "--subj-c": subject.color } as React.CSSProperties}
+                aria-hidden="true"
+              />
+            ) : null}
             <IconBook size={11} />
             {subject?.name ?? "General"}
           </span>

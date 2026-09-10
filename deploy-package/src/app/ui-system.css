@@ -4354,6 +4354,16 @@ body.theme-sunset {
   font-size: .7rem; font-weight: 700; color: var(--text-muted);
 }
 .task-card-subject > svg { flex: 0 0 auto; opacity: .8 }
+/* Subject colour at a glance — the calendar paints the same token on its
+   day chips, so a task and its cell can never disagree. */
+.task-subject-dot {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--subj-c, var(--accent));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--subj-c, var(--accent)) 15%, transparent);
+}
 .task-card-title {
   margin: 0; font-size: .95rem; font-weight: 750; line-height: 1.35; letter-spacing: -.011em;
   color: var(--text-main);
@@ -7004,6 +7014,9 @@ body > .task-menu button { min-height: 40px; }
   /* Add Task and Rebalance share the row when there is room and stack
      when the phone is narrow — both stay full-width touch targets. */
   .page-head-actions > * { flex: 1 1 150px; min-width: 0; }
+  /* An open Quick Add tray takes the whole row — the form needs the width,
+     and the Rebalance button drops below it instead of squeezing it. */
+  .page-head-actions > *:has(.quick-add-panel) { flex: 1 1 100%; }
   .page-head-actions .btn { width: 100%; min-height: 42px; justify-content: center; }
   .page-title { overflow-wrap: anywhere; text-wrap: balance; }
   .page-subtitle { overflow-wrap: anywhere; text-wrap: pretty; line-height: 1.5; }
