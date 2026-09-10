@@ -3,9 +3,26 @@
 import React, { useEffect, useState } from "react";
 import { cn } from "@/lib/cn";
 import { KIND_META, type TaskRow as ClientTaskRow } from "@/lib/client";
-import { IconBook, IconCalendar, IconCheck, IconClock, IconFlame, IconSpark, IconTarget } from "./icons";
+import {
+  IconBook,
+  IconCalendar,
+  IconCheck,
+  IconClock,
+  IconFlame,
+  IconSpark,
+  IconTarget,
+} from "./icons";
 import { Magnetic, MaskWords, Scramble, useInView } from "@/lib/fx";
 
+/* ── Page head — the editorial block that opens every view (v25).
+   It used to be a private pile of inline styles while the design system
+   already owned a `.page-header / .page-title / .page-subtitle /
+   .page-header-scene` contract (right-hand padding that reserves room for the
+   illustration, a stacking-order fix below 860px, per-breakpoint title sizes).
+   Adopting the contract is what makes the six headers behave identically from
+   320px to 1920px, and it puts heading typography on the shared type scale
+   instead of a per-component clamp() — the "different redesigns" feeling came
+   mostly from six headers each owning their own numbers. */
 export function PageHead({
   eyebrow,
   title,
@@ -20,26 +37,24 @@ export function PageHead({
   actions?: React.ReactNode;
 }) {
   return (
-    <div className="relative mb-6 grid gap-4 md:mb-8 md:grid-cols-[1fr_auto] md:items-end">
-      <div>
-        <p className="mb-2 flex items-center gap-2 text-[11px] font-extrabold tracking-[0.14em] uppercase text-accent" style={{ color: "var(--accent, var(--color-primary, #6366f1))" }}>
-          <span className="h-1.5 w-1.5 rounded-full" style={{ background: "var(--accent, var(--color-primary, #6366f1))" }} />
+    <header className="page-header">
+      <div className="page-head-copy">
+        <p className="page-head-eyebrow">
+          <span className="page-head-tick" aria-hidden="true" />
           <Scramble text={eyebrow} />
         </p>
-        <h1 className="text-[28px] font-extrabold leading-[1.1] tracking-tight sm:text-[36px]" style={{ color: "var(--text-main, #211a3a)" }}>
+        <h1 className="page-title">
           <MaskWords text={title} />
         </h1>
-        <p className="mt-2 max-w-2xl text-[14px] font-medium leading-relaxed" style={{ color: "var(--text-dim, #5f5a7a)" }}>
-          {sub}
-        </p>
-        {actions && <div className="mt-4 flex flex-wrap items-center gap-2.5">{actions}</div>}
+        <p className="page-subtitle">{sub}</p>
+        {actions ? <div className="page-head-actions">{actions}</div> : null}
       </div>
-      {art && (
-        <div className="pointer-events-none relative hidden h-[180px] w-[320px] select-none md:block [&>svg]:h-full [&>svg]:w-full">
+      {art ? (
+        <div className="page-header-scene" aria-hidden="true">
           {art}
         </div>
-      )}
-    </div>
+      ) : null}
+    </header>
   );
 }
 
@@ -49,15 +64,11 @@ export function StatusChip({ status }: { status: string }) {
   return (
     <span
       className={cn(
-        "mono inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10.5px] font-bold tracking-wider uppercase",
-        isDone
-          ? "bg-[color-mix(in_oklab,var(--success-accent,#2e9e6d)_16%,transparent)] text-[var(--success-accent,#2e9e6d)]"
-          : isSkipped
-            ? "bg-[var(--surface-2,#f4f2fc)] text-[var(--text-dim,#8f8aa6)]"
-            : "bg-[color-mix(in_oklab,var(--warning-accent,#c07a10)_16%,transparent)] text-[var(--warning-accent,#c07a10)]"
+        "status-chip",
+        isDone ? "is-done" : isSkipped ? "is-skipped" : "is-pending",
       )}
     >
-      {isDone ? "DONE" : isSkipped ? "SKIPPED" : "PENDING"}
+      {isDone ? "Done" : isSkipped ? "Skipped" : "Pending"}
     </span>
   );
 }
@@ -66,7 +77,10 @@ export function StatusChip({ status }: { status: string }) {
  *  every row leads with a small tinted icon square next to the subject
  *  dot: Lesson → book, Recall → spark, Practice → flame, Test → target,
  *  Buffer → clock. Unknown kinds fall back to a spark. */
-export const KIND_ICON: Record<string, React.ComponentType<{ size?: number }>> = {
+export const KIND_ICON: Record<
+  string,
+  React.ComponentType<{ size?: number }>
+> = {
   learn: IconBook,
   revise: IconSpark,
   revision: IconClock,
@@ -76,38 +90,56 @@ export const KIND_ICON: Record<string, React.ComponentType<{ size?: number }>> =
   buffer: IconClock,
 };
 
-export function KindIcon({ kind, color }: { kind: string; color?: string }) {
-  const meta = KIND_META[kind] || { label: kind, color: color || "var(--accent, #6366f1)" };
+export function KindIcon({
+  kind,
+  color,
+  label,
+}: {
+  kind: string;
+  color?: string;
+  label?: string;
+}) {
+  const meta = KIND_META[kind];
   const Ic = KIND_ICON[kind] || IconSpark;
-  const c = color || meta.color;
   return (
     <span
       className="kind-ic"
-      title={meta.label}
-      style={{
-        background: `color-mix(in oklab, ${c} 15%, transparent)`,
-        color: c,
-      }}
+      title={label || meta?.label || kind}
+      style={
+        {
+          "--kind-c": color || meta?.color || "var(--accent)",
+        } as React.CSSProperties
+      }
     >
       <Ic size={11} />
     </span>
   );
 }
 
-export function KindChip({ kind, color }: { kind: string; color?: string }) {
-  const meta = KIND_META[kind] || { label: kind, color: color || "var(--accent, #6366f1)" };
-  const c = color || meta.color;
+/** Icon + word, never colour alone — and the colour is the same token the
+ *  card rail and the calendar dot read, so one kind always looks the same. */
+export function KindChip({
+  kind,
+  color,
+  label,
+}: {
+  kind: string;
+  color?: string;
+  label?: string;
+}) {
+  const meta = KIND_META[kind];
   const Ic = KIND_ICON[kind] || IconSpark;
   return (
     <span
-      className="mono inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10.5px] font-bold tracking-wider uppercase"
-      style={{
-        background: `color-mix(in oklab, ${c} 16%, transparent)`,
-        color: c,
-      }}
+      className="kind-chip"
+      style={
+        {
+          "--kind-c": color || meta?.color || "var(--accent)",
+        } as React.CSSProperties
+      }
     >
       <Ic size={10} />
-      {meta.label.toUpperCase()}
+      {label || meta?.label || kind}
     </span>
   );
 }
@@ -122,21 +154,14 @@ export function Seg<T extends string>({
   options: { v: T; label: string; icon?: React.ReactNode }[];
 }) {
   return (
-    <div className="inline-flex rounded-xl border border-[var(--border-subtle,#e4e0f1)] bg-[var(--surface-2,#f4f2fc)] p-1">
+    <div className="seg" role="group">
       {options.map((o) => (
         <button
           key={o.v}
           type="button"
           onClick={() => onChange(o.v)}
-          className={cn(
-            "flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-[13px] font-bold transition-all duration-300",
-            value === o.v
-              ? "bg-[var(--surface-card,#fcfbff)] shadow-sm"
-              : "opacity-60 hover:opacity-100"
-          )}
-          style={{
-            color: value === o.v ? "var(--accent, var(--color-primary, #6366f1))" : "var(--text-main, #211a3a)",
-          }}
+          className={cn("seg-btn", value === o.v && "is-on")}
+          aria-pressed={value === o.v}
         >
           {o.icon}
           {o.label}
@@ -175,62 +200,41 @@ export function WeekBars({
   };
 
   return (
-    <div ref={ref} className="w-full">
-      <div className="relative flex items-end gap-2 sm:gap-3" style={{ height }}>
-        {/* goal dashed line */}
+    <div ref={ref} className="weekbars">
+      <div className="weekbars-track" style={{ height }}>
         <div
-          className="pointer-events-none absolute inset-x-0 border-t border-dashed"
-          style={{
-            bottom: `${Math.min(95, (goal / max) * 100)}%`,
-            borderColor: "color-mix(in oklab, var(--accent, #6366f1) 50%, transparent)",
-          }}
+          className="weekbars-goal-line"
+          style={{ bottom: `${Math.min(95, (goal / max) * 100)}%` }}
         >
-          <span
-            className="mono absolute -top-4 right-0 text-[10px] font-bold tracking-wider"
-            style={{ color: "var(--accent, #6366f1)" }}
-          >
-            goal {fmtMin(goal)}
-          </span>
+          <span className="weekbars-goal">goal {fmtMin(goal)}</span>
         </div>
 
         {days.map((d, i) => {
           const isMet = d.minutes >= goal && goal > 0;
           const pct = Math.max(4, (d.minutes / max) * 100);
           return (
-            <div key={d.key} className="group relative flex h-full flex-1 flex-col justify-end">
-              {/* Tooltip on hover */}
-              <div
-                className="pointer-events-none absolute -top-2 left-1/2 z-20 -translate-x-1/2 -translate-y-full rounded-lg border border-[var(--border-subtle,#e4e0f1)] bg-[var(--surface-card,#fcfbff)] px-2 py-1 text-[11px] font-bold opacity-0 shadow-md transition-opacity duration-200 group-hover:opacity-100"
-                style={{ color: "var(--text-main, #211a3a)" }}
-              >
+            <div key={d.key} className="weekbars-col">
+              <div className="weekbars-tip">
                 <span className="mono">{fmtMin(d.minutes)}</span>
               </div>
               <div
-                className={cn(
-                  "w-full rounded-t-lg transition-all duration-700 ease-[cubic-bezier(.22,1,.36,1)]",
-                  isMet
-                    ? "shadow-[0_-4px_14px_-4px_var(--accent,#6366f1)]"
-                    : "opacity-60 group-hover:opacity-100"
-                )}
-                style={{
-                  height: on ? `${pct}%` : "4%",
-                  background: isMet
-                    ? "linear-gradient(to top, var(--accent, #6366f1), var(--accent2, #8b7cf6))"
-                    : "var(--accent, #6366f1)",
-                  transitionDelay: `${i * 50}ms`,
-                }}
+                className={cn("weekbars-bar", isMet && "is-met")}
+                title={`${d.label} · ${fmtMin(d.minutes)} studied`}
+                style={
+                  {
+                    height: on ? `${pct}%` : "4%",
+                    "--bar-c": isMet ? "var(--good)" : "var(--accent)",
+                    transitionDelay: `${i * 50}ms`,
+                  } as React.CSSProperties
+                }
               />
             </div>
           );
         })}
       </div>
-      <div className="mt-2.5 flex gap-2 sm:gap-3 border-t border-[var(--border-subtle,#e4e0f1)] pt-2">
+      <div className="weekbars-axis">
         {days.map((d) => (
-          <span
-            key={d.key}
-            className="mono flex-1 text-center text-[11px] font-bold"
-            style={{ color: "var(--text-dim, #8f8aa6)" }}
-          >
+          <span key={d.key} className="weekbars-axis-label">
             {d.label}
           </span>
         ))}
@@ -248,11 +252,7 @@ export function StartFocusButton({
 }) {
   return (
     <Magnetic>
-      <button
-        type="button"
-        onClick={onStart}
-        className="btn btn-primary"
-      >
+      <button type="button" onClick={onStart} className="btn btn-primary">
         <IconSpark size={15} /> {label}
       </button>
     </Magnetic>

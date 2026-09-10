@@ -1,36 +1,57 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { today, type AppState } from "@/lib/client";
 import { mmss, type TimerMode } from "@/lib/useTimer";
 import type { StudySessionApi } from "@/lib/studySession";
 import { playSound, setVolume, stopSound, currentSound } from "@/lib/sound";
 import {
-  IconCheck, IconClock, IconExpand, IconVolume, IconPlay, IconBolt,
-  IconSpark, IconLeaf, IconTarget, IconFlame,
+  IconCheck,
+  IconClock,
+  IconExpand,
+  IconVolume,
+  IconPlay,
+  IconPause,
+  IconLeaf,
+  IconSpark,
+  IconTarget,
+  IconClose,
+  IconFlame,
 } from "./icons";
 import { ClockScene } from "./Illustrations";
 import { PageHead } from "./bits";
-import { CountUp, Reveal, Spot } from "@/lib/fx";
+import { Reveal, Spot } from "@/lib/fx";
 import { cn } from "@/lib/cn";
 
 const SOUNDS = [
-  { id: "none", label: "Sound Off" },
-  { id: "rain", label: "Soft Rain" },
-  { id: "binaural", label: "40Hz Binaural" },
-  { id: "brown", label: "Brown Noise" },
-  { id: "ocean", label: "Ocean Waves" },
-  { id: "wind", label: "Forest Wind" },
+  { id: "none", label: "Sound off" },
+  { id: "rain", label: "Soft rain" },
+  { id: "binaural", label: "40Hz binaural" },
+  { id: "brown", label: "Brown noise" },
+  { id: "ocean", label: "Ocean waves" },
+  { id: "wind", label: "Forest wind" },
 ];
 
 const MODES: { id: TimerMode; label: string }[] = [
   { id: "pomodoro", label: "Focus" },
-  { id: "short", label: "Short Break" },
-  { id: "long", label: "Long Break" },
+  { id: "short", label: "Short break" },
+  { id: "long", label: "Long break" },
   { id: "stopwatch", label: "Stopwatch" },
   { id: "custom", label: "Custom" },
 ];
 
+/* ══════════════════════════════════════════════════════════════════════
+   Focus (v25) — same session logic, one visual contract.
+
+   Every colour used to be `var(--token, #hex)`: on the five dark themes the
+   fallback was invisible and on the light ones it fought the theme, which is
+   most of why this page looked like a different product per theme. The
+   fallbacks are gone, the markup reads through the shared card classes
+   (`.card-head`, `.card-title`, `.section-card`) and the numerals use the
+   shared tabular figure style. Nothing here replaced a working control: the
+   study clock, breaks, soundscape, volume and the ring all still drive the
+   real `useTimer` session.
+   ══════════════════════════════════════════════════════════════════════ */
 export default function FocusView({
   state,
   session,
@@ -44,6 +65,7 @@ export default function FocusView({
 }) {
   const [sound, setSound] = useState(() => currentSound());
   const [vol, setVol] = useState(0.3);
+  const [isFull, setIsFull] = useState(false);
   const { timer, clock } = session;
   const t = today();
   const todayTasks = state.tasks.filter((x) => x.date === t);
@@ -51,6 +73,23 @@ export default function FocusView({
   useEffect(() => {
     setVolume(vol);
   }, [vol]);
+
+  /* Real Fullscreen API, mirroring Zen's own toggle: it can be blocked or
+     unavailable, and the page must keep working when it is. */
+  useEffect(() => {
+    const sync = () => setIsFull(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", sync);
+    return () => document.removeEventListener("fullscreenchange", sync);
+  }, []);
+  const toggleFullscreen = useCallback(() => {
+    const el = document.documentElement;
+    try {
+      if (document.fullscreenElement) void document.exitFullscreen();
+      else void el.requestFullscreen?.();
+    } catch {
+      /* blocked — the focus page works without it */
+    }
+  }, []);
 
   const pick = (id: string) => {
     setSound(id);
@@ -67,154 +106,217 @@ export default function FocusView({
   const circ = 2 * Math.PI * 104;
 
   const clockTask = state.tasks.find((x) => x.id === clock.taskId);
-  const loggedTodayRaw = state.sessions.filter((x) => x.date === t).reduce((a, x) => a + x.minutes, 0);
+  const loggedTodayRaw = state.sessions
+    .filter((x) => x.date === t)
+    .reduce((a, x) => a + x.minutes, 0);
   const loggedToday = Math.round(loggedTodayRaw * 10) / 10;
-  const loggedTodayLabel = Number.isInteger(loggedToday) ? String(loggedToday) : loggedToday.toFixed(1);
+  const loggedTodayLabel = Number.isInteger(loggedToday)
+    ? String(loggedToday)
+    : loggedToday.toFixed(1);
 
-  const clockState = clock.running ? "running" : clock.onBreak ? "break" : clock.sessionActive ? "paused" : "idle";
-  const clockStateLabel = clock.running ? "Recording now" : clock.onBreak ? "On a break" : clock.sessionActive ? "Paused" : "Ready to start";
-  const timerInProgress = timer.mode === "stopwatch" ? timer.seconds > 0 : timer.seconds < timer.total;
-  const timerStateLabel = timer.running ? (timer.isBreak ? "BREAK" : "FOCUSED") : timerInProgress ? "PAUSED" : "READY";
-  const selectedSoundLabel = SOUNDS.find((x) => x.id === sound)?.label || "Sound Off";
+  const clockStateLabel = clock.running
+    ? "Recording now"
+    : clock.onBreak
+      ? "On a break"
+      : clock.sessionActive
+        ? "Paused"
+        : "Ready to start";
+  const timerInProgress =
+    timer.mode === "stopwatch"
+      ? timer.seconds > 0
+      : timer.seconds < timer.total;
+  const timerStateLabel = timer.running
+    ? timer.isBreak
+      ? "BREAK"
+      : "FOCUSED"
+    : timerInProgress
+      ? "PAUSED"
+      : "READY";
 
   return (
-    <div className="space-y-6 fade-in focus-view">
+    <div className="page-stack fade-in focus-view">
       <PageHead
         eyebrow="FOCUS STUDIO"
         title="A calmer way to study"
         sub="Record real study time with the clock, protected by distraction-free focus blocks and ambient soundscapes."
         art={<ClockScene />}
         actions={
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={onZen}
-          >
-            <IconExpand size={14} /> Zen Focus Mode
-          </button>
+          <>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={toggleFullscreen}
+              aria-pressed={isFull}
+              title={
+                isFull
+                  ? "Leave full screen"
+                  : "Hide the browser chrome while you work"
+              }
+            >
+              <IconExpand size={14} />{" "}
+              <span>{isFull ? "Exit full screen" : "Full screen"}</span>
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={onZen}
+              title="Distraction-free Zen room with the same session"
+            >
+              <IconLeaf size={14} /> <span>Zen focus mode</span>
+            </button>
+          </>
         }
       />
 
-      {/* ── 1. STUDY CLOCK CARD ── */}
+      {/* ── 1 · STUDY CLOCK — the functional heart of the page ───────── */}
       <Reveal>
-        <Spot className="glass-panel tilt-card section-card p-5 sm:p-7 accent-edge accent-edge--success">
-          <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr] lg:items-center">
-            <div>
-              <div className="flex flex-wrap items-center gap-3">
-                <span className="grid h-10 w-10 place-items-center rounded-xl bg-[color-mix(in_oklab,var(--success-accent,#2e9e6d)_15%,transparent)] text-[var(--success-accent,#2e9e6d)]">
-                  <IconClock size={20} />
-                </span>
-                <h2 className="text-[19px] font-extrabold tracking-tight" style={{ color: "var(--text-main, #211a3a)" }}>
-                  Study Clock
-                </h2>
-                <span
-                  className={cn(
-                    "flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-extrabold",
-                    clock.running
-                      ? "bg-[color-mix(in_oklab,var(--success-accent,#2e9e6d)_14%,transparent)] text-[var(--success-accent,#2e9e6d)]"
-                      : clock.sessionActive
-                        ? "bg-[color-mix(in_oklab,var(--warning-accent,#c07a10)_14%,transparent)] text-[var(--warning-accent,#c07a10)]"
-                        : "bg-[var(--surface-2,#f4f2fc)] text-[var(--text-dim,#5f5a7a)]"
-                  )}
-                >
-                  <span className={cn("h-1.5 w-1.5 rounded-full bg-current", clock.running && "pulse-dot")} />
-                  {clockStateLabel}
-                </span>
-              </div>
-
-              <h3 className="mt-4 text-[24px] font-extrabold tracking-tight sm:text-[27px]" style={{ color: "var(--text-main, #211a3a)" }}>
-                Track your real study time
-              </h3>
-              <p className="mt-2 max-w-md text-[14px] font-medium leading-relaxed" style={{ color: "var(--text-dim, #5f5a7a)" }}>
-                The study clock logs active minutes directly into your schedule. Pauses and breaks are excluded automatically.
-              </p>
-              <p className="mt-3 flex flex-wrap items-center gap-2.5 text-[13px] font-bold">
-                <span style={{ color: "var(--text-main, #211a3a)" }}>{clockStateLabel}</span>
-                <span style={{ color: "var(--text-dim, #5f5a7a)" }}>·</span>
-                <span className="text-[var(--success-accent,#2e9e6d)] font-extrabold">
-                  {loggedToday > 0 ? `${loggedTodayLabel} min logged today` : "0 min logged today"}
-                </span>
-              </p>
-            </div>
-
-            <div className="relative overflow-hidden rounded-2xl border border-[var(--border-subtle,#e4e0f1)] bg-[var(--surface-2,#f4f2fc)] p-6 text-center">
-              <span className="text-[11px] font-extrabold uppercase tracking-wider block mb-1" style={{ color: "var(--text-dim, #5f5a7a)" }}>
-                Active Session Time
+        <Spot className="glass-panel tilt-card section-card focus-clock-card accent-edge accent-edge--success">
+          <div className="focus-clock-top">
+            <div className="focus-clock-id">
+              <span className="card-icon is-good" aria-hidden="true">
+                <IconClock size={18} />
               </span>
-              <p className="mono text-[44px] font-extrabold leading-none tracking-tight sm:text-[52px]" style={{ color: "var(--accent, #6366f1)" }}>
-                {mmss(clock.elapsed)}
+              <div className="focus-clock-copy">
+                <h2 className="card-title section-title">Study clock</h2>
+                <p className="card-sub">
+                  Active minutes land straight in your schedule. Pauses and
+                  breaks are excluded automatically.
+                </p>
+              </div>
+            </div>
+            <span
+              className={cn(
+                "state-pill",
+                clock.running
+                  ? "is-live"
+                  : clock.sessionActive
+                    ? "is-paused"
+                    : "is-idle",
+              )}
+            >
+              <span className="state-dot" aria-hidden="true" />
+              {clockStateLabel}
+            </span>
+          </div>
+
+          <div className="focus-clock-body">
+            <div className="focus-clock-read">
+              <span className="focus-clock-read-label">
+                Active session time
+              </span>
+              <p className="focus-clock-digits mono">{mmss(clock.elapsed)}</p>
+              <p className="focus-clock-logged">
+                {loggedToday > 0
+                  ? `${loggedTodayLabel} min logged today`
+                  : "Nothing logged today yet"}
               </p>
-              {/* Subtle decorative wave SVG */}
-              <svg viewBox="0 0 300 40" className="pointer-events-none absolute bottom-0 left-0 w-full" preserveAspectRatio="none">
-                <path d="M0 26 C 50 12 90 34 150 22 C 200 12 250 30 300 18 V40 H0 Z" fill="var(--success-accent, #2e9e6d)" opacity="0.12" />
-                <path d="M0 34 C 60 22 120 40 180 30 C 230 22 270 34 300 28 V40 H0 Z" fill="var(--success-accent, #2e9e6d)" opacity="0.16" />
+              <svg
+                className="focus-clock-wave"
+                viewBox="0 0 300 40"
+                preserveAspectRatio="none"
+                aria-hidden="true"
+              >
+                <path d="M0 26 C 50 12 90 34 150 22 C 200 12 250 30 300 18 V40 H0 Z" />
+                <path
+                  d="M0 34 C 60 22 120 40 180 30 C 230 22 270 34 300 28 V40 H0 Z"
+                  className="is-2"
+                />
               </svg>
             </div>
+
+            <div className="focus-clock-fields">
+              <div className="field">
+                <div className="field-label-row">
+                  <label className="field-label" htmlFor="clock-subject">
+                    Studying subject
+                  </label>
+                  <span className="field-hint">Optional</span>
+                </div>
+                <select
+                  id="clock-subject"
+                  className="input-field"
+                  value={clock.subjectId ?? ""}
+                  onChange={(e) =>
+                    clock.setSubjectId(
+                      e.target.value ? Number(e.target.value) : null,
+                    )
+                  }
+                >
+                  <option value="">— none —</option>
+                  {state.subjects.map((x) => (
+                    <option key={x.id} value={x.id}>
+                      {x.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="field">
+                <div className="field-label-row">
+                  <label className="field-label" htmlFor="clock-task">
+                    Attach to today&apos;s task
+                  </label>
+                  <span className="field-hint">Optional</span>
+                </div>
+                <select
+                  id="clock-task"
+                  className="input-field"
+                  value={clock.taskId ?? ""}
+                  onChange={(e) => {
+                    const v = e.target.value ? Number(e.target.value) : null;
+                    clock.setTaskId(v);
+                    const task = state.tasks.find((x) => x.id === v);
+                    if (task?.subjectId) clock.setSubjectId(task.subjectId);
+                  }}
+                >
+                  <option value="">— free session —</option>
+                  {todayTasks.map((x) => (
+                    <option key={x.id} value={x.id}>
+                      {x.title}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
           </div>
 
-          <div className="mt-6 grid gap-4 border-t border-[var(--border-subtle,#e4e0f1)] pt-5 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <div className="flex items-baseline justify-between text-[13px] font-bold">
-                <span style={{ color: "var(--text-main, #211a3a)" }}>Studying subject</span>
-                <span className="text-[11px] font-medium" style={{ color: "var(--text-dim, #5f5a7a)" }}>Optional</span>
-              </div>
-              <select
-                id="clock-subject"
-                className="input-field"
-                value={clock.subjectId ?? ""}
-                onChange={(e) => clock.setSubjectId(e.target.value ? Number(e.target.value) : null)}
-              >
-                <option value="">— none —</option>
-                {state.subjects.map((x) => (
-                  <option key={x.id} value={x.id}>
-                    {x.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-1.5">
-              <div className="flex items-baseline justify-between text-[13px] font-bold">
-                <span style={{ color: "var(--text-main, #211a3a)" }}>Attach to today&apos;s task</span>
-                <span className="text-[11px] font-medium" style={{ color: "var(--text-dim, #5f5a7a)" }}>Optional</span>
-              </div>
-              <select
-                id="clock-task"
-                className="input-field"
-                value={clock.taskId ?? ""}
-                onChange={(e) => {
-                  const v = e.target.value ? Number(e.target.value) : null;
-                  clock.setTaskId(v);
-                  const task = state.tasks.find((x) => x.id === v);
-                  if (task?.subjectId) clock.setSubjectId(task.subjectId);
-                }}
-              >
-                <option value="">— free session —</option>
-                {todayTasks.map((x) => (
-                  <option key={x.id} value={x.id}>
-                    {x.title}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-2.5">
+          <div className="focus-clock-actions">
+            <div className="btn-row">
               <button
                 type="button"
-                className={cn("btn clock-toggle", session.active ? "btn-secondary" : "btn-primary")}
+                className={cn(
+                  "btn clock-toggle",
+                  session.active ? "btn-secondary" : "btn-primary",
+                )}
                 onClick={session.toggle}
+                aria-pressed={session.active}
+                title={
+                  session.active
+                    ? "Pause the study clock and the timer"
+                    : "Start the study clock and the timer"
+                }
               >
-                <IconPlay size={15} /> {session.active ? "Pause" : clock.sessionActive ? "Resume" : "Start session"}
+                {session.active ? (
+                  <IconPause size={15} />
+                ) : (
+                  <IconPlay size={15} />
+                )}
+                <span>
+                  {session.active
+                    ? "Pause"
+                    : clock.sessionActive
+                      ? "Resume"
+                      : "Start session"}
+                </span>
               </button>
               {clock.running && (
                 <button
                   type="button"
                   className="btn btn-secondary"
                   onClick={session.takeBreak}
+                  title="Break time is never logged as study time"
                 >
-                  Take a Break
+                  <IconLeaf size={14} /> <span>Take a break</span>
                 </button>
               )}
               {clock.sessionActive && (
@@ -222,23 +324,26 @@ export default function FocusView({
                   type="button"
                   className="btn btn-danger"
                   onClick={session.endSession}
+                  title="Save the minutes so far and close the session"
                 >
-                  Clock Out
+                  <IconCheck size={14} /> <span>Clock out</span>
                 </button>
               )}
             </div>
 
             {clockTask && (
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="focus-clock-task">
                 <span className="chip chip-kind">
-                  {clockTask.actualMinutes}m / {clockTask.plannedMinutes}m planned
+                  {clockTask.actualMinutes}m / {clockTask.plannedMinutes}m
+                  planned
                 </span>
                 <button
                   type="button"
                   className="btn btn-xs btn-primary"
                   onClick={() => onCompleteTask(clockTask.id)}
+                  title="Mark this task done without leaving the session"
                 >
-                  Mark complete
+                  <IconTarget size={12} /> <span>Mark complete</span>
                 </button>
               </div>
             )}
@@ -246,38 +351,35 @@ export default function FocusView({
         </Spot>
       </Reveal>
 
-      {/* ── 2. FOCUS TIMER & AMBIENCE GRID ── */}
-      <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
+      {/* ── 2 · TIMER + RITUAL ─────────────────────────────────────────── */}
+      <div className="focus-grid">
         <Reveal delay={60}>
-          <Spot className="glass-panel tilt-card section-card p-5 sm:p-7">
-            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <Spot className="glass-panel tilt-card section-card focus-timer-card">
+            <div className="card-head">
               <div>
-                <div className="text-[11.5px] font-extrabold uppercase tracking-wider" style={{ color: "var(--accent, #6366f1)" }}>
-                  Deep Work Ritual
-                </div>
-                <h3 className="text-[20px] font-extrabold tracking-tight" style={{ color: "var(--text-main, #211a3a)" }}>
-                  Focus Timer
-                </h3>
+                <p className="card-eyebrow">Deep work ritual</p>
+                <h3 className="card-title section-title">Focus timer</h3>
               </div>
-              <div className="flex items-center gap-2 rounded-xl border border-[var(--border-subtle,#e4e0f1)] bg-[var(--surface-2,#f4f2fc)] px-3 py-1.5">
-                <strong className="mono text-[14px]" style={{ color: "var(--accent, #6366f1)" }}>{timer.cycles}</strong>
-                <span className="text-[11.5px] font-bold" style={{ color: "var(--text-dim, #5f5a7a)" }}>cycles</span>
-              </div>
+              <span className="cycle-chip" title="Completed focus cycles today">
+                <strong className="mono">{timer.cycles}</strong>{" "}
+                <span>cycles</span>
+              </span>
             </div>
 
-            <div className="mb-4">
-              <span className="text-[12.5px] font-bold block mb-2" style={{ color: "var(--text-dim, #5f5a7a)" }}>
+            <div className="mode-block">
+              <span className="block-label" id="focus-mode-label">
                 Choose timer mode
               </span>
-              <div className="flex flex-wrap gap-2" role="group" aria-label="Focus timer mode">
+              <div
+                className="mode-row"
+                role="group"
+                aria-labelledby="focus-mode-label"
+              >
                 {MODES.map((m) => (
                   <button
                     key={m.id}
                     type="button"
-                    className={cn(
-                      "btn btn-xs rounded-xl",
-                      timer.mode === m.id ? "btn-primary" : "btn-secondary"
-                    )}
+                    className={cn("mode-btn", timer.mode === m.id && "is-on")}
                     aria-pressed={timer.mode === m.id}
                     onClick={() => session.setMode(m.id)}
                   >
@@ -288,114 +390,138 @@ export default function FocusView({
             </div>
 
             {timer.mode === "custom" && (
-              <div className="mb-5 rounded-xl border border-[var(--border-subtle,#e4e0f1)] bg-[var(--surface-2,#f4f2fc)] p-3.5">
-                <label className="text-[12.5px] font-bold block mb-1.5" htmlFor="custom-min">
+              <div className="custom-length">
+                <label className="block-label" htmlFor="custom-min">
                   Custom length (minutes)
                 </label>
-                <div className="flex items-center gap-3">
+                <div className="custom-length-row">
                   <input
                     id="custom-min"
                     type="number"
-                    className="input-field w-28 mono font-bold"
+                    className="input-field mono custom-length-input"
                     min={1}
                     max={180}
                     value={timer.customMin}
-                    onChange={(e) => timer.setCustomMin(Number(e.target.value) || 1)}
+                    onChange={(e) =>
+                      timer.setCustomMin(Number(e.target.value) || 1)
+                    }
                   />
-                  <span className="text-[12.5px] font-semibold" style={{ color: "var(--text-dim, #5f5a7a)" }}>
-                    1 to 180 min
-                  </span>
+                  <span className="field-hint">1 to 180 min</span>
                 </div>
               </div>
             )}
 
-            {/* Timer Ring */}
-            <div className="my-6 grid place-items-center">
-              <div className="relative grid place-items-center" role="timer" aria-label={`${mmss(timer.seconds)} ${timerStateLabel.toLowerCase()}`}>
-                <svg viewBox="0 0 240 240" className="h-56 w-56 -rotate-90">
+            <div className="ring-block">
+              <div
+                className="ring-wrap"
+                role="timer"
+                aria-label={`${mmss(timer.seconds)} ${timerStateLabel.toLowerCase()}`}
+              >
+                <svg
+                  className="ring-svg"
+                  viewBox="0 0 240 240"
+                  aria-hidden="true"
+                >
                   <circle
+                    className="ring-track"
                     cx="120"
                     cy="120"
                     r="104"
-                    stroke="var(--border-subtle, #e4e0f1)"
                     strokeWidth="8"
                     fill="transparent"
                   />
                   <circle
+                    className={cn("ring-progress", timer.isBreak && "is-break")}
                     cx="120"
                     cy="120"
                     r="104"
-                    stroke={timer.isBreak ? "var(--success-accent, #2e9e6d)" : "var(--accent, #6366f1)"}
                     strokeWidth="8"
                     fill="transparent"
                     strokeDasharray={circ}
                     strokeDashoffset={circ * (1 - pct)}
                     strokeLinecap="round"
-                    style={{ transition: "stroke-dashoffset .4s linear" }}
                   />
                 </svg>
-                <div className="absolute text-center">
-                  <div className="mono text-[42px] font-extrabold tracking-tight" style={{ color: "var(--text-main, #211a3a)" }}>
+                <div className="ring-center">
+                  <span className="ring-digits mono">
                     {mmss(timer.seconds)}
-                  </div>
-                  <div className="text-[12px] font-extrabold uppercase tracking-widest mt-0.5" style={{ color: timer.isBreak ? "var(--success-accent, #2e9e6d)" : "var(--accent, #6366f1)" }}>
+                  </span>
+                  <span
+                    className={cn("ring-state", timer.isBreak && "is-break")}
+                  >
                     {timerStateLabel}
-                  </div>
+                  </span>
                 </div>
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center justify-center gap-3">
+            <div className="timer-actions">
               <button
                 type="button"
-                className="btn btn-primary px-6"
+                className="btn btn-primary"
                 onClick={session.toggle}
+                title={
+                  session.active
+                    ? "Pause this block"
+                    : "Start or resume this block"
+                }
               >
-                {session.active ? "Pause" : timer.isBreak ? "Start Break" : timerInProgress ? "Resume" : "Start Focus"}
+                {session.active ? (
+                  <IconPause size={15} />
+                ) : (
+                  <IconPlay size={15} />
+                )}
+                <span>
+                  {session.active
+                    ? "Pause"
+                    : timer.isBreak
+                      ? "Start break"
+                      : timerInProgress
+                        ? "Resume"
+                        : "Start focus"}
+                </span>
               </button>
               <button
                 type="button"
-                className="btn btn-secondary px-5"
+                className="btn btn-secondary"
                 onClick={session.reset}
+                title="Reset the countdown to its full length"
               >
-                Reset
+                <IconClose size={14} /> <span>Reset</span>
               </button>
             </div>
-            <p className="mt-4 text-center text-[12px] font-medium" style={{ color: "var(--text-dim, #5f5a7a)" }}>
-              Timer and study clock run in sync. Breaks are automatically excluded from logged study time.
+            <p className="timer-note">
+              Timer and study clock run in sync. Breaks are automatically
+              excluded from logged study time.
             </p>
           </Spot>
         </Reveal>
 
-        {/* Right side: Ambient sounds & Session rules */}
-        <div className="space-y-4">
+        <div className="page-stack">
           <Reveal delay={80}>
-            <Spot className="glass-panel tilt-card section-card p-5">
-              <div className="mb-4 flex items-center gap-2">
-                <span className="grid h-8 w-8 place-items-center rounded-xl bg-[color-mix(in_oklab,var(--accent,#6366f1)_14%,transparent)] text-[var(--accent,#6366f1)]">
+            <Spot className="glass-panel tilt-card section-card">
+              <div className="card-head card-head--tight">
+                <span className="card-icon" aria-hidden="true">
                   <IconVolume size={16} />
                 </span>
-                <div>
-                  <h3 className="text-[15px] font-extrabold" style={{ color: "var(--text-main, #211a3a)" }}>
-                    Ambient Sounds
-                  </h3>
-                  <p className="text-[11.5px] font-medium" style={{ color: "var(--text-dim, #5f5a7a)" }}>
-                    Calm background audio layer
+                <div className="card-head-copy">
+                  <h3 className="card-title section-title">Ambient sounds</h3>
+                  <p className="card-sub">
+                    Calm background layer — never a playlist
                   </p>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2" role="group" aria-label="Ambient sound">
+              <div
+                className="sound-grid"
+                role="group"
+                aria-label="Ambient sound"
+              >
                 {SOUNDS.map((x) => (
                   <button
                     key={x.id}
                     type="button"
-                    className={cn(
-                      "flex items-center justify-between rounded-xl border p-2.5 text-[12.5px] font-bold transition-all",
-                      sound === x.id
-                        ? "border-[var(--accent,#6366f1)] bg-[color-mix(in_oklab,var(--accent,#6366f1)_10%,transparent)] text-[var(--accent,#6366f1)]"
-                        : "border-[var(--border-subtle,#e4e0f1)] bg-[var(--surface-2,#f4f2fc)] opacity-75 hover:opacity-100"
-                    )}
+                    className={cn("sound-btn", sound === x.id && "is-on")}
                     aria-pressed={sound === x.id}
                     onClick={() => pick(x.id)}
                   >
@@ -405,15 +531,19 @@ export default function FocusView({
                 ))}
               </div>
 
-              <div className="mt-4 border-t border-[var(--border-subtle,#e4e0f1)] pt-3">
-                <div className="flex items-center justify-between text-[12px] font-bold mb-1.5">
-                  <span style={{ color: "var(--text-main, #211a3a)" }}>Sound Volume</span>
-                  <span className="mono" style={{ color: "var(--accent, #6366f1)" }}>{Math.round(vol * 100)}%</span>
+              <div className="volume-block">
+                <div className="field-label-row">
+                  <label className="field-label" htmlFor="ambient-volume">
+                    Sound volume
+                  </label>
+                  <span className="field-value mono">
+                    {Math.round(vol * 100)}%
+                  </span>
                 </div>
                 <input
                   id="ambient-volume"
                   type="range"
-                  className="w-full accent-[var(--accent,#6366f1)] cursor-pointer"
+                  className="volume-range"
                   min={0}
                   max={1}
                   step={0.05}
@@ -426,33 +556,47 @@ export default function FocusView({
           </Reveal>
 
           <Reveal delay={120}>
-            <Spot className="glass-panel tilt-card section-card p-5">
-              <div className="mb-3 flex items-center gap-2">
-                <span className="grid h-8 w-8 place-items-center rounded-xl bg-[color-mix(in_oklab,var(--success-accent,#2e9e6d)_14%,transparent)] text-[var(--success-accent,#2e9e6d)]">
-                  <IconCheck size={16} />
+            <Spot className="glass-panel tilt-card section-card">
+              <div className="card-head card-head--tight">
+                <span className="card-icon is-good" aria-hidden="true">
+                  <IconFlame size={15} />
                 </span>
-                <h3 className="text-[15px] font-extrabold" style={{ color: "var(--text-main, #211a3a)" }}>
-                  Deep Work Principles
-                </h3>
+                <div className="card-head-copy">
+                  <h3 className="card-title section-title">
+                    Deep work principles
+                  </h3>
+                  <p className="card-sub">
+                    Four habits that make the block count
+                  </p>
+                </div>
               </div>
-              <ul className="space-y-2 text-[12.5px] font-semibold" style={{ color: "var(--text-dim, #5f5a7a)" }}>
-                <li className="flex items-start gap-2">
-                  <IconCheck size={14} className="text-[var(--success-accent,#2e9e6d)] shrink-0 mt-0.5" />
-                  <span>Phone out of reach, not face down on desk.</span>
+              <ul className="principle-list">
+                <li>
+                  <IconCheck size={14} />
+                  <span>Phone out of reach, not face down on the desk.</span>
                 </li>
-                <li className="flex items-start gap-2">
-                  <IconCheck size={14} className="text-[var(--success-accent,#2e9e6d)] shrink-0 mt-0.5" />
-                  <span>One single lesson per block — close unrelated tabs.</span>
+                <li>
+                  <IconCheck size={14} />
+                  <span>One lesson per block — close unrelated tabs.</span>
                 </li>
-                <li className="flex items-start gap-2">
-                  <IconCheck size={14} className="text-[var(--success-accent,#2e9e6d)] shrink-0 mt-0.5" />
-                  <span>If stuck for 2 min, write down the simplest next sub-step.</span>
+                <li>
+                  <IconCheck size={14} />
+                  <span>
+                    If stuck for two minutes, write the simplest next sub-step.
+                  </span>
                 </li>
-                <li className="flex items-start gap-2">
-                  <IconCheck size={14} className="text-[var(--success-accent,#2e9e6d)] shrink-0 mt-0.5" />
-                  <span>Breaks mean standing up &amp; looking outside — not another screen.</span>
+                <li>
+                  <IconCheck size={14} />
+                  <span>
+                    Breaks mean standing up and looking outside, not another
+                    screen.
+                  </span>
                 </li>
               </ul>
+              <p className="principle-note">
+                <IconSpark size={13} /> Ask the tutor for a worked example any
+                time — the clock keeps running.
+              </p>
             </Spot>
           </Reveal>
         </div>

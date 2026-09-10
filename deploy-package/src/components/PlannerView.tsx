@@ -2,19 +2,30 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  dayDiff, fmtDate, KIND_META, normalizeCheckpointTitle,
-  prettyLong, today, type AppState, type TaskRow,
+  dayDiff,
+  fmtDate,
+  KIND_META,
+  parseDate,
+  prettyLong,
+  today,
+  type AppState,
+  type TaskRow,
 } from "@/lib/client";
 import {
-  IconCalendar, IconCheck, IconChevron, IconClose, IconEdit,
-  IconList, IconRefresh, IconSpark,
+  IconArrowLeft,
+  IconArrowRight,
+  IconCalendar,
+  IconCheck,
+  IconClose,
+  IconList,
+  IconRefresh,
+  IconTarget,
 } from "./icons";
 import TaskEditor, { type TaskPatch } from "./TaskEditor";
-import TaskActions from "./TaskActions";
-import { TaskLiveBadge } from "./TaskClockButton";
 import QuickAdd from "./QuickAdd";
 import { CalendarScene } from "./Illustrations";
-import { PageHead, Seg, StatusChip, KindChip, KindIcon } from "./bits";
+import { PageHead, Seg, StatusChip, KindIcon } from "./bits";
+import TaskCard from "./TaskCard";
 import { Reveal } from "@/lib/fx";
 import { useBackClose } from "@/lib/useBackClose";
 import type { QuickAddPayload } from "@/lib/quickAdd";
@@ -24,10 +35,30 @@ import { cn } from "@/lib/cn";
    List + Calendar pair; kind is now communicated by icon, not column. */
 type View = "list" | "calendar";
 
+const KIND_ORDER = ["learn", "revise", "practice", "mock", "buffer"] as const;
+
 function isCheckpointTask(task: TaskRow): boolean {
-  return task.kind === "checkpoint" || (!!task.title && task.title.toLowerCase().startsWith("checkpoint:"));
+  return (
+    task.kind === "checkpoint" ||
+    (!!task.title && task.title.toLowerCase().startsWith("checkpoint:"))
+  );
 }
 
+/* ══════════════════════════════════════════════════════════════════════
+   Planner (v25)
+
+   • The calendar is ONE component that is designed for both ends of the
+     range instead of a desktop grid that gets squeezed: below 900px a day
+     cell carries its number, up to four kind dots and a count (indicators
+     live INSIDE the cell — nothing overflows the grid); from 900px up the
+     cells grow, gain title chips and a "+N more" tail, and the header swaps
+     its stacked label for an inline month title with a kind legend.
+   • Rows are the shared TaskCard, so the Planner list and the Overview's
+     Today's Plan are the same object with the same padding, wrapping and
+     action row.
+   • Page rhythm comes from `.page-stack` + the shared spacing scale rather
+     than `space-y-*` on a wrapper.
+   ══════════════════════════════════════════════════════════════════════ */
 export default function PlannerView({
   state,
   onTaskStatus,
@@ -65,24 +96,30 @@ export default function PlannerView({
   const [expanded, setExpanded] = useState<number | null>(null);
   const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
   const [monthOff, setMonthOff] = useState(0);
+  const [selDay, setSelDay] = useState<string>(today());
 
   const t = today();
   useBackClose(!!openDay, () => setOpenDay(null));
 
+  const dayRefs = useRef<Record<string, HTMLElement | null>>({});
   const briefRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     if (expanded == null) return;
     const timer = window.setTimeout(() => {
-      const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-      briefRef.current?.scrollIntoView({ block: "nearest", behavior: reduce ? "auto" : "smooth" });
+      const reduce = window.matchMedia?.(
+        "(prefers-reduced-motion: reduce)",
+      ).matches;
+      briefRef.current?.scrollIntoView({
+        block: "nearest",
+        behavior: reduce ? "auto" : "smooth",
+      });
     }, 80);
     return () => window.clearTimeout(timer);
   }, [expanded]);
 
   const filtered = useMemo(() => {
-    let list = state.tasks;
-    if (filter !== "all") list = list.filter((x) => String(x.subjectId) === filter);
-    return list;
+    if (filter === "all") return state.tasks;
+    return state.tasks.filter((x) => String(x.subjectId) === filter);
   }, [state.tasks, filter]);
 
   const grouped = useMemo(() => {
@@ -94,77 +131,110 @@ export default function PlannerView({
     return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
   }, [filtered]);
 
-  const topicFor = (task: TaskRow) => state.topics.find((x) => x.id === task.topicId);
-  const subjFor = (task: TaskRow) => state.subjects.find((s) => s.id === task.subjectId);
+  const topicFor = (task: TaskRow) =>
+    state.topics.find((x) => x.id === task.topicId);
+  const subjFor = (task: TaskRow) =>
+    state.subjects.find((s) => s.id === task.subjectId);
   const taskLogged = (taskId: number) => {
-    const sum = state.sessions.filter((x) => x.taskId === taskId).reduce((a, x) => a + x.minutes, 0);
+    const sum = state.sessions
+      .filter((x) => x.taskId === taskId)
+      .reduce((a, x) => a + x.minutes, 0);
     return Math.round(sum * 100) / 100;
   };
-  const fmtMin = (m: number) => {
-    const r = Math.round(m * 10) / 10;
-    return `${Number.isInteger(r) ? r : r.toFixed(1)}m`;
-  };
-
-  /* Calendar calculations */
-  const baseDate = new Date();
-  const mDate = new Date(baseDate.getFullYear(), baseDate.getMonth() + monthOff, 1);
+  /* ── Calendar geometry: the real month, always 7 columns ───────────── */
+  const anchor = new Date();
+  const mDate = new Date(anchor.getFullYear(), anchor.getMonth() + monthOff, 1);
+  const year = mDate.getFullYear();
+  const month = mDate.getMonth();
   const firstDow = mDate.getDay();
-  const daysInMonth = new Date(mDate.getFullYear(), mDate.getMonth() + 1, 0).getDate();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
 
-  /* Chronological day headers read like the reference: a relative flag
-     (Today · Tomorrow · Unfinished · In n days) beside the date, so the
-     list always tells you where you are in the week at a glance. */
+  const tasksByDate = useMemo(() => {
+    const map = new Map<string, TaskRow[]>();
+    for (const tk of filtered) {
+      if (!map.has(tk.date)) map.set(tk.date, []);
+      map.get(tk.date)!.push(tk);
+    }
+    return map;
+  }, [filtered]);
+
+  /* Week rows are built as complete 7-cell lines (leading and trailing blanks
+     included) so the grid never depends on a browser's implicit placement, and
+     a month that starts on Sunday is not a 6-row surprise. Kept as plain
+     derivation — 42 cells is cheaper to rebuild than to memoise. */
+  const weeks: (string | null)[][] = [];
+  {
+    let row: (string | null)[] = Array(firstDow).fill(null);
+    for (let d = 1; d <= daysInMonth; d++) {
+      row.push(fmtDate(new Date(year, month, d)));
+      if (row.length === 7) {
+        weeks.push(row);
+        row = [];
+      }
+    }
+    if (row.length) {
+      while (row.length < 7) row.push(null);
+      weeks.push(row);
+    }
+  }
+
+  let dueThisMonth = 0;
+  let doneThisMonth = 0;
+  let busyDays = 0;
+  for (const [dateKey, list] of tasksByDate) {
+    const d = parseDate(dateKey);
+    if (d.getFullYear() !== year || d.getMonth() !== month) continue;
+    dueThisMonth += list.length;
+    doneThisMonth += list.filter((x) => x.status === "done").length;
+    if (list.length) busyDays += 1;
+  }
+
   const dayFlag = (dateKey: string, dayTasks: TaskRow[]) => {
     const diff = dayDiff(today(), dateKey);
     if (diff === 0) return { label: "Today", cls: "" };
     if (diff === 1) return { label: "Tomorrow", cls: "day-flag--future" };
     if (diff < 0) {
       const open = dayTasks.some((tk) => tk.status === "pending");
-      return open
-        ? { label: "Unfinished", cls: "day-flag--warn" }
-        : null; // fully handled past days need no flag — the ✓ chip speaks
+      return open ? { label: "Unfinished", cls: "day-flag--warn" } : null;
     }
     if (diff <= 7) return { label: `In ${diff} days`, cls: "day-flag--future" };
     return null;
   };
 
+  const goToday = () => {
+    setMonthOff(0);
+    setSelDay(today());
+  };
+
+  const pickDay = (dateKey: string) => {
+    setSelDay(dateKey);
+    const dayTasks = tasksByDate.get(dateKey) || [];
+    if (view === "calendar" && dayTasks.length > 0) {
+      // Narrow screens have no room for a second column, so the day opens as
+      // a sheet; on desktop the list below is only a scroll away.
+      if (window.matchMedia?.("(max-width: 900px)").matches) {
+        setOpenDay(dateKey);
+        return;
+      }
+      setView("list");
+      window.setTimeout(() => {
+        dayRefs.current[dateKey]?.scrollIntoView({
+          block: "start",
+          behavior: "smooth",
+        });
+      }, 40);
+    }
+  };
+
   return (
-    <div className="space-y-6 fade-in">
+    <div className="planner-view page-stack fade-in">
       <PageHead
-        eyebrow="STUDY PLANNER"
-        title="Adaptive Schedule"
-        sub={`Lesson-wise intelligent schedule · ${state.tasks.length} total tasks · ${state.topics.length} curriculum lessons mapped`}
+        eyebrow="PLANNER"
+        title="Your month, mapped."
+        sub={`${state.tasks.length} scheduled tasks · ${state.topics.length} curriculum lessons mapped · drag nothing, decide everything`}
         art={<CalendarScene />}
-      />
-
-      {/* ── CONTROLS ROW ── */}
-      <Reveal>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-3">
-            <Seg
-              value={view}
-              onChange={setView}
-              options={[
-                { v: "list", label: "List", icon: <IconList size={15} /> },
-                { v: "calendar", label: "Calendar", icon: <IconCalendar size={15} /> },
-              ]}
-            />
-            <select
-              className="input-field w-auto min-w-[170px]"
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              aria-label="Filter by subject"
-            >
-              <option value="all">All subjects ({state.subjects.length})</option>
-              {state.subjects.map((sb) => (
-                <option key={sb.id} value={String(sb.id)}>
-                  {sb.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
+        actions={
+          <>
             <QuickAdd state={state} onAdd={onAddTask} />
             <button
               type="button"
@@ -172,281 +242,365 @@ export default function PlannerView({
               onClick={onReplan}
               disabled={replanning}
               aria-busy={replanning}
+              title="Re-balance the schedule around your logged minutes"
             >
-              <IconRefresh size={15} className={replanning ? "anim-spin" : ""} />
-              <span>{replanning ? "Re-planning…" : "Rebalance Schedule"}</span>
+              <IconRefresh
+                size={15}
+                className={replanning ? "anim-spin" : ""}
+              />
+              <span>{replanning ? "Re-planning…" : "Rebalance schedule"}</span>
             </button>
-          </div>
+          </>
+        }
+      />
+
+      <Reveal>
+        <div className="planner-toolbar">
+          <Seg
+            value={view}
+            onChange={setView}
+            options={[
+              { v: "list", label: "List", icon: <IconList size={15} /> },
+              {
+                v: "calendar",
+                label: "Calendar",
+                icon: <IconCalendar size={15} />,
+              },
+            ]}
+          />
+          <label className="planner-filter">
+            <span className="planner-filter-label">Subject</span>
+            <select
+              className="input-field"
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              aria-label="Filter tasks by subject"
+            >
+              <option value="all">
+                All subjects ({state.subjects.length})
+              </option>
+              {state.subjects.map((sb) => (
+                <option key={sb.id} value={String(sb.id)}>
+                  {sb.name}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
       </Reveal>
 
-      {/* ── 1. LIST VIEW ── */}
-      {view === "list" && (
-        <div className="space-y-4">
-          {grouped.length === 0 && (
-            <div className="glass-panel tilt-card section-card p-8 text-center">
-              <p className="text-[14px] font-semibold" style={{ color: "var(--text-dim, #5f5a7a)" }}>
-                No tasks match the active filter.
+      {/* ── 1 · CALENDAR — the full month, built for every width ─────── */}
+      {view === "calendar" && (
+        <Reveal>
+          <section
+            className="planner-cal glass-panel section-card"
+            aria-label="Study calendar"
+          >
+            <div className="cal-bar">
+              <div className="cal-nav">
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-icon cal-arrow"
+                  onClick={() => setMonthOff((m) => m - 1)}
+                  aria-label="Previous month"
+                  title="Previous month"
+                >
+                  <IconArrowLeft size={15} />
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-xs cal-today"
+                  onClick={goToday}
+                  title="Jump to the current month"
+                >
+                  Today
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-icon cal-arrow"
+                  onClick={() => setMonthOff((m) => m + 1)}
+                  aria-label="Next month"
+                  title="Next month"
+                >
+                  <IconArrowRight size={15} />
+                </button>
+              </div>
+              <h2 className="cal-label">
+                {mDate.toLocaleDateString(undefined, { month: "long" })}{" "}
+                <span className="cal-label-year">
+                  {mDate.toLocaleDateString(undefined, { year: "numeric" })}
+                </span>
+              </h2>
+              <p className="cal-summary">
+                <span className="mono">{dueThisMonth}</span> due
+                <span className="cal-dot-sep" aria-hidden="true" />
+                <span className="mono">{doneThisMonth}</span> done
+                <span className="cal-dot-sep" aria-hidden="true" />
+                <span className="mono">{busyDays}</span> active days
               </p>
+            </div>
+
+            <div className="cal-legend" aria-hidden="true">
+              {KIND_ORDER.map((k) => (
+                <span className="cal-legend-item" key={k}>
+                  <span
+                    className="cal-legend-dot"
+                    style={{ background: KIND_META[k]?.color }}
+                  />
+                  {KIND_META[k]?.label ?? k}
+                </span>
+              ))}
+            </div>
+
+            <div
+              className="cal-grid"
+              role="grid"
+              aria-label={`${mDate.toLocaleDateString(undefined, { month: "long", year: "numeric" })} study plan`}
+            >
+              <div className="cal-row cal-row-head" role="row">
+                {[
+                  "Sunday",
+                  "Monday",
+                  "Tuesday",
+                  "Wednesday",
+                  "Thursday",
+                  "Friday",
+                  "Saturday",
+                ].map((d, i) => (
+                  <span
+                    key={d}
+                    className="cal-dow"
+                    role="columnheader"
+                    aria-label={d}
+                  >
+                    <span className="cal-dow-min" aria-hidden="true">
+                      {["S", "M", "T", "W", "T", "F", "S"][i]}
+                    </span>
+                    <span className="cal-dow-full" aria-hidden="true">
+                      {d.slice(0, 3)}
+                    </span>
+                  </span>
+                ))}
+              </div>
+
+              {weeks.map((week, wi) => (
+                <div className="cal-row" role="row" key={`w-${wi}`}>
+                  {week.map((dateKey, di) => {
+                    if (!dateKey)
+                      return (
+                        <span
+                          className="cal-cell is-empty"
+                          key={`v-${wi}-${di}`}
+                          role="gridcell"
+                          aria-hidden="true"
+                        />
+                      );
+                    const dayTasks = tasksByDate.get(dateKey) || [];
+                    const dom = parseDate(dateKey).getDate();
+                    const isToday = dateKey === t;
+                    const isSel = dateKey === selDay;
+                    const open = dayTasks.filter(
+                      (x) => x.status !== "done",
+                    ).length;
+                    const overdueDay =
+                      open > 0 && dayDiff(today(), dateKey) < 0;
+                    const dots = dayTasks.slice(0, 4);
+                    const extra = dayTasks.length - dots.length;
+                    return (
+                      <button
+                        type="button"
+                        role="gridcell"
+                        key={dateKey}
+                        onClick={() => pickDay(dateKey)}
+                        aria-selected={isSel}
+                        aria-label={`${prettyLong(dateKey)} — ${dayTasks.length === 0 ? "no tasks" : `${dayTasks.length} task${dayTasks.length > 1 ? "s" : ""}${open ? `, ${open} open` : ""}`} ${isToday ? "(today)" : ""}`}
+                        className={cn(
+                          "cal-cell",
+                          dayTasks.length === 0 && "is-empty",
+                          isToday && "is-today",
+                          isSel && "is-sel",
+                          overdueDay && "is-overdue",
+                        )}
+                      >
+                        <span className="cal-daynum mono">{dom}</span>
+
+                        {/* mobile + tablet: dots and a count, all inside the cell */}
+                        <span className="cal-dots">
+                          {dots.map((tk) => (
+                            <span
+                              key={tk.id}
+                              className="cal-dot"
+                              style={{
+                                background:
+                                  tk.status === "done"
+                                    ? "transparent"
+                                    : subjFor(tk)?.color ||
+                                      KIND_META[tk.kind]?.color ||
+                                      "var(--accent)",
+                                borderColor:
+                                  tk.status === "done"
+                                    ? "var(--good)"
+                                    : "transparent",
+                              }}
+                            />
+                          ))}
+                        </span>
+                        {dayTasks.length > 0 && (
+                          <span className="cal-count mono">
+                            {dayTasks.length - open === 0
+                              ? `${dayTasks.length}`
+                              : `${open}/${dayTasks.length}`}
+                          </span>
+                        )}
+                        {extra > 0 && (
+                          <span className="cal-extra mono">+{extra}</span>
+                        )}
+
+                        {/* ≥900px: the same tasks as readable chips */}
+                        <span className="cal-chips">
+                          {dayTasks.slice(0, 3).map((tk) => {
+                            const done = tk.status === "done";
+                            const color =
+                              subjFor(tk)?.color ||
+                              KIND_META[tk.kind]?.color ||
+                              "var(--accent)";
+                            return (
+                              <span
+                                key={tk.id}
+                                className={cn("cal-chip", done && "is-done")}
+                                style={
+                                  { "--chip-c": color } as React.CSSProperties
+                                }
+                              >
+                                {isCheckpointTask(tk)
+                                  ? "Weekly Checkpoint"
+                                  : tk.title}
+                              </span>
+                            );
+                          })}
+                          {dayTasks.length > 3 && (
+                            <span className="cal-chip cal-chip--more">
+                              +{dayTasks.length - 3} more
+                            </span>
+                          )}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+
+            <p className="cal-hint">
+              <IconTarget size={12} /> Tap any day to open its plan
+            </p>
+          </section>
+        </Reveal>
+      )}
+
+      {/* ── 2 · LIST — day groups of shared TaskCards ─────────────────── */}
+      {view === "list" && (
+        <div className="planner-list">
+          {grouped.length === 0 && (
+            <div className="glass-panel section-card planner-empty">
+              <IconCalendar size={22} />
+              <p>No tasks match the active filter.</p>
+              <QuickAdd state={state} onAdd={onAddTask} />
             </div>
           )}
 
-          {grouped.map(([dateKey, tasksForDay], i) => {
+          {grouped.map(([dateKey, dayTasks], i) => {
             const isToday = dateKey === t;
-            const dayMins = tasksForDay.reduce((a, b) => a + b.plannedMinutes, 0);
-            const doneCount = tasksForDay.filter((tk) => tk.status === "done").length;
-            const allDone = doneCount === tasksForDay.length && tasksForDay.length > 0;
-            const flag = dayFlag(dateKey, tasksForDay);
+            const dayMins = dayTasks.reduce((a, b) => a + b.plannedMinutes, 0);
+            const doneCount = dayTasks.filter(
+              (tk) => tk.status === "done",
+            ).length;
+            const allDone =
+              doneCount === dayTasks.length && dayTasks.length > 0;
+            const flag = dayFlag(dateKey, dayTasks);
 
             return (
               <Reveal key={dateKey} delay={Math.min(i, 6) * 45}>
-                <div
+                <section
+                  ref={(node) => {
+                    dayRefs.current[dateKey] = node;
+                  }}
                   className={cn(
-                    "glass-panel tilt-card section-card overflow-hidden",
-                    isToday && "accent-edge accent-edge--primary"
+                    "day-block planner-day glass-panel tilt-card section-card",
+                    isToday && "is-today",
                   )}
+                  aria-labelledby={`day-${dateKey}`}
                 >
-                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border-subtle,#e4e0f1)] bg-[var(--surface-2,#f4f2fc)] px-4 py-3 sm:px-5">
-                    <div className="flex items-center gap-2.5">
-                      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[color-mix(in_oklab,var(--accent,#6366f1)_14%,transparent)] text-[var(--accent,#6366f1)]">
-                        <IconCalendar size={15} />
-                      </span>
-                      <div>
-                        <span className="flex flex-wrap items-center text-[14.5px] font-extrabold tracking-tight" style={{ color: "var(--text-main, #211a3a)" }}>
-                          {prettyLong(dateKey)}
-                          {flag && <span className={cn("day-flag", flag.cls)}>{flag.label}</span>}
-                        </span>
-                        <span className="mono ml-3 text-[12px] font-semibold" style={{ color: "var(--text-dim, #5f5a7a)" }}>
-                          {tasksForDay.length} tasks · {dayMins} min · {doneCount} done
-                        </span>
-                      </div>
+                  <header className="day-head">
+                    <span className="planner-day-badge" aria-hidden="true">
+                      <IconCalendar size={14} />
+                    </span>
+                    <div className="day-id">
+                      <h2 id={`day-${dateKey}`} className="day-date">
+                        {prettyLong(dateKey)}
+                        {flag && (
+                          <span className={cn("day-flag", flag.cls)}>
+                            {flag.label}
+                          </span>
+                        )}
+                      </h2>
+                      <p className="day-meta mono">
+                        {dayTasks.length} tasks · {dayMins} min · {doneCount}{" "}
+                        done
+                      </p>
                     </div>
                     {allDone && (
-                      <span className="flex items-center gap-1 text-[12px] font-bold text-[var(--success-accent,#2e9e6d)]">
-                        <IconCheck size={14} /> Completed
+                      <span className="day-flag day-flag--done">
+                        <IconCheck size={13} /> Completed
                       </span>
                     )}
-                  </div>
+                  </header>
 
-                  <div className="divide-y divide-[var(--border-subtle,#e4e0f1)]">
-                    {tasksForDay.map((task) => {
-                      const meta = KIND_META[task.kind] || KIND_META.learn;
-                      const subj = subjFor(task);
+                  <div className="planner-day-list">
+                    {dayTasks.map((task) => {
                       const topic = topicFor(task);
-                      const isCheckpoint = isCheckpointTask(task);
-                      const kindLabel = isCheckpoint ? "Checkpoint" : meta.label;
-                      const dotColor = subj?.color || (isCheckpoint ? "var(--color-primary)" : meta.color);
-                      const formattedTitle = isCheckpoint ? normalizeCheckpointTitle(task.title) : task.title;
-                      const isDone = task.status === "done";
-                      const canExpand = !!topic || (isCheckpoint && !!task.detail);
-                      const isOpen = canExpand && expanded === task.id;
-
                       return (
-                        <div key={task.id} className="transition-colors">
-                          <div
-                            className={cn(
-                              "flex flex-wrap items-center gap-3 px-4 py-3.5 sm:px-5",
-                              activeTaskId === task.id && "bg-[color-mix(in_oklab,var(--accent,#6366f1)_8%,transparent)]"
-                            )}
-                          >
-                            <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: dotColor }} />
-                            <KindIcon kind={task.kind} color={dotColor} />
-                            <div className="min-w-0 flex-1 basis-56">
-                              <p className={cn("truncate text-[14px] font-bold", isDone && "line-through opacity-50")} style={{ color: "var(--text-main, #211a3a)" }}>
-                                {formattedTitle}
-                              </p>
-                              <p className="mt-0.5 flex flex-wrap items-center gap-2 text-[11.5px] font-semibold" style={{ color: "var(--text-dim, #5f5a7a)" }}>
-                                <KindChip kind={task.kind} color={dotColor} />
-                                <span className="mono">
-                                  {task.plannedMinutes} min
-                                  {topic?.unit && ` · ${topic.unit}`}
-                                  {topic?.difficulty && ` · ${topic.difficulty}`}
-                                </span>
-                                {taskLogged(task.id) > 0 && (
-                                  <span className="mono font-bold text-[var(--success-accent,#2e9e6d)]">
-                                    {fmtMin(taskLogged(task.id))} logged
-                                  </span>
-                                )}
-                                {activeTaskId === task.id && (
-                                  <TaskLiveBadge seconds={activeClockSeconds} running={clockRunning} />
-                                )}
-                              </p>
-                            </div>
-
-                            <div className="flex items-center gap-2">
-                              {canExpand && (
-                                <button
-                                  type="button"
-                                  className="btn btn-xs btn-ghost"
-                                  onClick={() => setExpanded(isOpen ? null : task.id)}
-                                >
-                                  {isOpen ? "Hide brief" : "Lesson brief"}
-                                </button>
-                              )}
-                              <TaskActions
-                                task={task}
-                                subject={subj}
-                                activeTaskId={activeTaskId}
-                                clockSessionActive={clockSessionActive}
-                                onTaskStatus={onTaskStatus}
-                                onFocusTask={onFocusTask}
-                                onClockOut={onClockOut}
-                                onEdit={setEditingTaskId}
-                                onSkipSubject={onSkipSubject}
-                              />
-                            </div>
-                          </div>
-
-                          {/* Expandable lesson brief */}
-                          {isOpen && (
-                            <div ref={briefRef} className="border-t border-[var(--border-subtle,#e4e0f1)] bg-[var(--surface-2,#f4f2fc)] p-4 sm:p-5 slide-in">
-                              {topic && (
-                                <div className="space-y-3">
-                                  <p className="text-[13.5px] font-medium leading-relaxed" style={{ color: "var(--text-main, #211a3a)" }}>
-                                    {topic.summary}
-                                  </p>
-                                  {topic.prerequisites?.length > 0 && (
-                                    <div className="text-[12px]">
-                                      <strong className="block mb-1 text-[var(--text-dim,#5f5a7a)]">Prerequisites:</strong>
-                                      <ul className="list-disc pl-4 space-y-0.5" style={{ color: "var(--text-main, #211a3a)" }}>
-                                        {topic.prerequisites.map((pr, pi) => <li key={pi}>{pr}</li>)}
-                                      </ul>
-                                    </div>
-                                  )}
-                                  {topic.keyConcepts?.length > 0 && (
-                                    <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                                      {topic.keyConcepts.map((kc, ki) => (
-                                        <span key={ki} className="chip chip-kind chip-tight">{kc}</span>
-                                      ))}
-                                    </div>
-                                  )}
-                                  <div className="flex justify-end pt-2">
-                                    <button
-                                      type="button"
-                                      className="btn btn-xs btn-primary"
-                                      onClick={() => onAskTutor(`Teach me "${topic.title}" from ${subj?.name || "the syllabus"}. Explain key concepts and give a worked example.`)}
-                                    >
-                                      <IconSpark size={13} /> Ask Tutor to Teach This
-                                    </button>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
+                        <TaskCard
+                          key={task.id}
+                          task={task}
+                          subject={subjFor(task)}
+                          topic={topic}
+                          loggedMinutes={taskLogged(task.id)}
+                          live={activeTaskId === task.id}
+                          liveSeconds={activeClockSeconds}
+                          liveRunning={clockRunning}
+                          briefOpen={expanded === task.id}
+                          onToggleBrief={
+                            topic || task.detail
+                              ? () =>
+                                  setExpanded(
+                                    expanded === task.id ? null : task.id,
+                                  )
+                              : undefined
+                          }
+                          onAskTutor={onAskTutor}
+                          activeTaskId={activeTaskId}
+                          clockSessionActive={clockSessionActive}
+                          onTaskStatus={onTaskStatus}
+                          onFocusTask={onFocusTask}
+                          onClockOut={onClockOut}
+                          onEdit={setEditingTaskId}
+                          onSkipSubject={onSkipSubject}
+                        />
                       );
                     })}
                   </div>
-                </div>
+                </section>
               </Reveal>
             );
           })}
         </div>
       )}
 
-      {/* ── 2. CALENDAR VIEW ── */}
-      {view === "calendar" && (
-        <Reveal>
-          <div className="glass-panel tilt-card section-card overflow-hidden">
-            <div className="flex items-center justify-between border-b border-[var(--border-subtle,#e4e0f1)] bg-[var(--surface-2,#f4f2fc)] px-5 py-3.5">
-              <button
-                type="button"
-                className="btn btn-xs btn-ghost btn-icon"
-                aria-label="Previous month"
-                onClick={() => setMonthOff((m) => m - 1)}
-              >
-                <IconChevron size={14} style={{ transform: "rotate(90deg)" }} />
-              </button>
-              <h3 className="text-[16px] font-extrabold tracking-tight" style={{ color: "var(--text-main, #211a3a)" }}>
-                {mDate.toLocaleDateString(undefined, { month: "long", year: "numeric" })}
-              </h3>
-              <button
-                type="button"
-                className="btn btn-xs btn-ghost btn-icon"
-                aria-label="Next month"
-                onClick={() => setMonthOff((m) => m + 1)}
-              >
-                <IconChevron size={14} style={{ transform: "rotate(-90deg)" }} />
-              </button>
-            </div>
-
-            <div className="grid grid-cols-7 border-b border-[var(--border-subtle,#e4e0f1)] bg-[var(--surface-2,#f4f2fc)]">
-              {["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"].map((d) => (
-                <span key={d} className="mono py-2 text-center text-[11px] font-extrabold tracking-wider" style={{ color: "var(--text-dim, #5f5a7a)" }}>
-                  {d}
-                </span>
-              ))}
-            </div>
-
-            <div className="grid grid-cols-7">
-              {Array.from({ length: firstDow }, (_, i) => (
-                <div key={`empty-${i}`} className="min-h-20 border-b border-r border-[var(--border-subtle,#e4e0f1)] bg-[var(--surface-2,#f4f2fc)]/40 sm:min-h-24" />
-              ))}
-
-              {Array.from({ length: daysInMonth }, (_, i) => {
-                const dateKey = fmtDate(new Date(mDate.getFullYear(), mDate.getMonth(), i + 1));
-                const dayTasks = filtered.filter((tk) => tk.date === dateKey);
-                const isToday = dateKey === t;
-
-                return (
-                  <button
-                    key={dateKey}
-                    type="button"
-                    onClick={() => dayTasks.length > 0 && setOpenDay(dateKey)}
-                    className={cn(
-                      "min-h-20 border-b border-r border-[var(--border-subtle,#e4e0f1)] p-2 text-left align-top transition-colors hover:bg-[var(--surface-2,#f4f2fc)] sm:min-h-24",
-                      dayTasks.length === 0 && "cursor-default"
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        "mono mb-1 grid h-6 w-6 place-items-center rounded-full text-[11px] font-bold",
-                        isToday ? "bg-[var(--accent,#6366f1)] text-[var(--accent-ink,#ffffff)]" : "text-[var(--text-main,#211a3a)]"
-                      )}
-                    >
-                      {i + 1}
-                    </span>
-                    <div className="hidden sm:flex flex-col gap-1">
-                      {dayTasks.slice(0, 3).map((tk) => {
-                        const sb = subjFor(tk);
-                        const isDone = tk.status === "done";
-                        return (
-                          <span
-                            key={tk.id}
-                            className={cn(
-                              "truncate rounded px-1.5 py-0.5 text-[10px] font-bold",
-                              isDone && "line-through opacity-45"
-                            )}
-                            style={{
-                              background: `color-mix(in oklab, ${sb?.color || "var(--accent,#6366f1)"} 16%, transparent)`,
-                              color: sb?.color || "var(--accent,#6366f1)",
-                            }}
-                          >
-                            {tk.title}
-                          </span>
-                        );
-                      })}
-                      {dayTasks.length > 3 && (
-                        <span className="mono text-[10px] font-bold text-[var(--text-dim,#5f5a7a)]">
-                          +{dayTasks.length - 3} more
-                        </span>
-                      )}
-                    </div>
-                    <span className="mono text-[10.5px] font-bold text-[var(--accent,#6366f1)] sm:hidden">
-                      {dayTasks.length > 0 && `${dayTasks.length} tasks`}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </Reveal>
-      )}
-
-      {/* Task Editor Modal */}
+      {/* Task editor */}
       {editingTaskId !== null && (
         <TaskEditor
-          task={state.tasks.find((t) => t.id === editingTaskId) || null}
+          task={state.tasks.find((x) => x.id === editingTaskId) || null}
           state={state}
           onClose={() => setEditingTaskId(null)}
           onSave={onTaskUpdate}
@@ -454,75 +608,90 @@ export default function PlannerView({
         />
       )}
 
-      {/* Calendar Day Inspection Sheet / Modal */}
+      {/* Day sheet (calendar → tap a day) */}
       {openDay && (
         <div className="modal-overlay" onClick={() => setOpenDay(null)}>
           <div
-            className="glass-panel modal-box max-w-xl max-h-[85vh] overflow-y-auto"
+            className="glass-panel modal-box day-sheet"
             onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label={`${prettyLong(openDay)} plan`}
           >
-            <div className="flex items-center justify-between border-b border-[var(--border-subtle,#e4e0f1)] pb-3 mb-4">
+            <header className="day-sheet-head">
               <div>
-                <h3 className="text-[17px] font-extrabold" style={{ color: "var(--text-main, #211a3a)" }}>
-                  {prettyLong(openDay)}
-                </h3>
-                <span className="text-[12px] font-medium" style={{ color: "var(--text-dim, #5f5a7a)" }}>
-                  {filtered.filter((tk) => tk.date === openDay).length} tasks scheduled
-                </span>
+                <h3 className="day-sheet-title">{prettyLong(openDay)}</h3>
+                <p className="day-sheet-sub mono">
+                  {(tasksByDate.get(openDay) || []).length} tasks scheduled
+                </p>
               </div>
               <button
                 type="button"
                 className="btn btn-ghost btn-icon"
                 onClick={() => setOpenDay(null)}
-                aria-label="Close"
+                aria-label="Close day plan"
+                title="Close"
               >
                 <IconClose size={16} />
               </button>
-            </div>
-
-            <div className="space-y-2.5">
-              {filtered.filter((tk) => tk.date === openDay).map((tk) => {
+            </header>
+            <div className="day-sheet-list">
+              {(tasksByDate.get(openDay) || []).map((tk) => {
                 const sb = subjFor(tk);
                 return (
-                  <div
+                  <TaskCard
                     key={tk.id}
-                    className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--border-subtle,#e4e0f1)] bg-[var(--surface-2,#f4f2fc)] p-3"
-                  >
-                    <div className="min-w-0 flex-1 basis-48">
-                      <p className="flex items-center gap-2 truncate text-[13.5px] font-bold" style={{ color: "var(--text-main, #211a3a)" }}>
-                        <KindIcon kind={tk.kind} color={sb?.color || "var(--accent,#6366f1)"} />
-                        <span className="truncate">{tk.title}</span>
-                      </p>
-                      <p className="text-[11.5px] font-semibold" style={{ color: "var(--text-dim, #5f5a7a)" }}>
-                        {sb?.name} · {tk.plannedMinutes} min · <StatusChip status={tk.status} />
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        className="btn btn-xs btn-secondary"
-                        onClick={() => {
-                          setOpenDay(null);
-                          setEditingTaskId(tk.id);
-                        }}
-                      >
-                        <IconEdit size={12} /> Edit
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-xs btn-primary"
-                        onClick={() => {
-                          setOpenDay(null);
-                          onFocusTask(tk.id);
-                        }}
-                      >
-                        Clock In
-                      </button>
-                    </div>
-                  </div>
+                    className="in-sheet"
+                    task={tk}
+                    subject={sb}
+                    topic={topicFor(tk)}
+                    loggedMinutes={taskLogged(tk.id)}
+                    live={activeTaskId === tk.id}
+                    liveSeconds={activeClockSeconds}
+                    liveRunning={clockRunning}
+                    activeTaskId={activeTaskId}
+                    clockSessionActive={clockSessionActive}
+                    onTaskStatus={(id, status, rating) => {
+                      onTaskStatus(id, status, rating);
+                    }}
+                    onFocusTask={(id) => {
+                      setOpenDay(null);
+                      onFocusTask(id);
+                    }}
+                    onClockOut={onClockOut}
+                    onEdit={(id) => {
+                      setOpenDay(null);
+                      setEditingTaskId(id);
+                    }}
+                    onSkipSubject={onSkipSubject}
+                  />
                 );
               })}
+              {(tasksByDate.get(openDay) || []).length === 0 && (
+                <p className="day-sheet-empty">
+                  Nothing scheduled — a quiet day is allowed.
+                </p>
+              )}
             </div>
+            <footer className="day-sheet-foot">
+              <span className="day-sheet-legend">
+                {["learn", "revise", "practice", "mock"].map((k) => (
+                  <span key={k} className="day-sheet-legend-item">
+                    <KindIcon kind={k} />
+                    {KIND_META[k]?.label ?? k}
+                  </span>
+                ))}
+              </span>
+              <StatusChip
+                status={
+                  (tasksByDate.get(openDay) || []).every(
+                    (x) => x.status === "done",
+                  )
+                    ? "done"
+                    : "pending"
+                }
+              />
+            </footer>
           </div>
         </div>
       )}

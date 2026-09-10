@@ -7,7 +7,9 @@ Everything the app actually runs lives in `src/`:
 
   src/app/page.tsx            app shell: sidebar, tracker bar, toasts
   src/app/layout.tsx          viewport / safe-area config
-  src/app/globals.css         ALL styling (themes, responsive, sheets)
+  src/app/globals.css         tokens, base type, themes, shell
+  src/app/ui-system.css       the ONE refinement layer (component
+                              contracts; loaded after globals)
   src/components/*.tsx        Dashboard, Planner, Focus, Subjects,
                               Settings, Onboarding, ChatPanel, etc.
   src/lib/voice.ts            mic listening + spoken replies
@@ -105,6 +107,62 @@ start promptly, the answer continues in the closest available device voice
 instead of stopping on a “voice model unavailable” error; the chat shows a
 clear non-error notice. One failed long-answer part switches the remaining
 parts to that local voice, so every later part keeps flowing.
+
+v25 CSS + RESPONSIVE UI SYSTEM (this build)
+--------------------------------------------
+ - ONE PAIR OF STYLESHEETS: the ten patch sheets that had accumulated
+   (study-planner-refresh, pastel-ui-system, study-planner-redesign,
+   practical-enhancements, ui-polish, ui-polish-pass, ui-polish-landing,
+   final-ui-fixes, task-actions-final, v24-theme-alignment) are merged into
+   `src/app/ui-system.css`, imported once after `globals.css`. Every visual
+   question now has one documented owner instead of "whoever wrote the last
+   file", and the cascade result is preserved.
+ - DEAD CSS GONE: 738 rules (441 fewer rules, ~82 KB) whose classes no
+   longer existed in any component — old `.task-row` lists, `.planner-days`,
+   kanban, voice panels, mini-timer stages and five superseded generations of
+   the ⋮ popover — plus the empty `@media` shells they left behind.
+ - ONE TYPE SCALE, NO OVERRIDE WAR: `.page-title` carried 13 font-size
+   declarations and `.section-title` 6 across the sheets, four of them
+   `!important`. Headings now read from the fluid `--fs-*` ramp
+   (`--fs-h1/h2/h3`, `--fs-kpi`, `--fs-micro`), so no breakpoint needs a
+   correction and the mobile-only clamps are deleted. Tracking is optical
+   (-.022em) with `word-spacing` and `text-wrap:balance` rather than a
+   blanket squeeze; the young/focused reading modes scale off the same token.
+ - ONE SPACING SCALE: `--gap-page` for page stacks, `--pad-card` for card
+   padding, `--pad-tight` inside heads, `--gap-cluster` for control groups.
+   `.section-card` also declares `container: card / inline-size`, so a card
+   responds to the width it actually got instead of the viewport.
+ - THE CALENDAR IS DELIBERATELY RESPONSIVE, not a squeezed desktop grid:
+   one month component (`.planner-cal`) shows a full month with subject-tinted
+   chips on a wide card and a dots-only strip inside a narrow one
+   (`@container card`), and phones get the month list with a tap-to-open day
+   sheet. 320 / 375 / 390 / 414 / 480 / 768 / 1024 / 1280 / 1440 / 1920 all
+   have a defined layout; 71 of the media queries use the shared breakpoints.
+ - MOBILE TASK CARDS: height comes from content (no `min-height`), the lesson
+   brief is visible and expandable instead of hidden, long titles wrap, and
+   the kind rail, chip and dot all read `--task-lesson|recall|review|checkpoint`
+   so a card cannot disagree with itself.
+ - ONE ICON SET, ONE ACTION ROW: icon buttons carry `aria-label` + `title`;
+   `[Clock in] [Done]` live in one labelled group outside the ⋮ popover, which
+   keeps only Edit / Skip / restore — the primary verbs are no longer buried.
+ - ZEN FOLLOWS THE THEME: the room, desk, lamp and ring are painted from
+   `--zen-*` tokens derived from each theme's `--illustration-*` bridge, so
+   light themes get a lit-paper room and dark themes a night one; the controls
+   shrank to medium and use the same tokens. The daily quote rotates by date
+   and is attributed.
+ - DE-BLUR, PROPERLY: blur is now a material for FLOATING layers only (dock,
+   top bar, modals, ⌘K, day sheet) — no in-flow surface that carries body
+   text is frosted, half-pixel hover transforms were snapped to whole pixels,
+   and stacked opacity layers were removed. That, not a contrast bump, is
+   what cleared the smeared type.
+ - FUNCTIONALITY PRESERVED: the real seconds-accurate Study Clock, calendar
+   interactivity, working task buttons and theme switching all still run; the
+   onboarding Back/Continue buttons are centred on their own labels with the
+   step titles and `aria-busy` on the async action.
+ - `!important` fell from 1107 to 803 declarations. The suite grew a v25
+   contract block (242 checks total) that fails if a second `.page-title`
+   size, a `var(--x, #hex)` fallback, a frosted text surface, a half-pixel
+   transform or an undefined `--token` reference comes back.
 
 v20 PRACTICAL REAL-WORLD ENHANCEMENT (this build)
 --------------------------------------------------

@@ -100,10 +100,10 @@ export default function SubjectsView({
                   <div>
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <h3 className="truncate text-[17px] font-extrabold tracking-tight" style={{ color: "var(--text-main, #211a3a)" }}>
+                        <h3 className="truncate text-[17px] font-extrabold tracking-tight" style={{ color: "var(--text-main)" }}>
                           {s.name}
                         </h3>
-                        <p className="mono mt-1 text-[12px] font-semibold" style={{ color: "var(--text-dim, #5f5a7a)" }}>
+                        <p className="mono mt-1 text-[12px] font-semibold" style={{ color: "var(--text-dim)" }}>
                           {list.length || s.units} lessons · {s.difficulty}
                         </p>
                       </div>
@@ -112,16 +112,16 @@ export default function SubjectsView({
                       </span>
                     </div>
 
-                    <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-[var(--surface-2,#f4f2fc)]">
+                    <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-[var(--surface-2)]">
                       <div
                         className="h-full rounded-full transition-all duration-1000"
                         style={{ width: `${pct}%`, background: s.color }}
                       />
                     </div>
 
-                    <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-[12px] font-semibold" style={{ color: "var(--text-dim, #5f5a7a)" }}>
+                    <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-[12px] font-semibold" style={{ color: "var(--text-dim)" }}>
                       <span className="flex items-center gap-1.5">
-                        <IconCheck size={14} className="text-[var(--success-accent,#2e9e6d)]" />
+                        <IconCheck size={14} className="text-[var(--success-accent)]" />
                         {done}/{list.length || s.units} completed
                       </span>
                       <span className="flex items-center gap-1.5">
@@ -135,7 +135,7 @@ export default function SubjectsView({
                     </div>
                   </div>
 
-                  <div className="mt-5 flex items-center justify-between border-t border-[var(--border-subtle,#e4e0f1)] pt-3">
+                  <div className="mt-5 flex items-center justify-between border-t border-[var(--border-subtle)] pt-3">
                     <button
                       type="button"
                       className="btn btn-xs btn-secondary"
@@ -154,7 +154,7 @@ export default function SubjectsView({
                       </button>
                       <button
                         type="button"
-                        className="btn btn-xs btn-ghost btn-icon hover:text-[var(--danger-accent,#ef4444)]"
+                        className="btn btn-xs btn-ghost btn-icon hover:text-[var(--danger-accent)]"
                         title="Delete subject"
                         onClick={() => {
                           if (confirm(`Remove "${s.name}" and all its lessons?`)) {
@@ -170,10 +170,10 @@ export default function SubjectsView({
 
                 {/* ── EXPANDABLE LESSONS LIST ── */}
                 {open && (
-                  <div className="border-t border-[var(--border-subtle,#e4e0f1)] bg-[var(--surface-2,#f4f2fc)] p-4 sm:p-5 slide-in">
+                  <div className="border-t border-[var(--border-subtle)] bg-[var(--surface-2)] p-4 sm:p-5 slide-in">
                     <div className="space-y-3">
                       {list.length === 0 && (
-                        <p className="text-[13px] font-medium text-center py-4" style={{ color: "var(--text-dim, #5f5a7a)" }}>
+                        <p className="text-[13px] font-medium text-center py-4" style={{ color: "var(--text-dim)" }}>
                           No lessons generated yet.
                         </p>
                       )}
@@ -183,18 +183,18 @@ export default function SubjectsView({
                         return (
                           <div
                             key={tp.id}
-                            className="rounded-xl border border-[var(--border-subtle,#e4e0f1)] bg-[var(--surface-card,#fcfbff)] p-3.5 transition-all"
+                            className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-card)] p-3.5 transition-all"
                           >
                             <div className="flex flex-wrap items-center justify-between gap-2.5">
                               <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                                <span className="mono grid h-6 w-6 shrink-0 place-items-center rounded-md bg-[var(--surface-2,#f4f2fc)] text-[11px] font-bold" style={{ color: s.color }}>
+                                <span className="mono grid h-6 w-6 shrink-0 place-items-center rounded-md bg-[var(--surface-2)] text-[11px] font-bold" style={{ color: s.color }}>
                                   {li + 1}
                                 </span>
                                 <div className="min-w-0 flex-1">
-                                  <p className={cn("truncate text-[13.5px] font-bold", isDone && "line-through opacity-50")} style={{ color: "var(--text-main, #211a3a)" }}>
+                                  <p className={cn("truncate text-[13.5px] font-bold", isDone && "line-through opacity-50")} style={{ color: "var(--text-main)" }}>
                                     {tp.title}
                                   </p>
-                                  <p className="mono text-[11px] font-semibold" style={{ color: "var(--text-dim, #5f5a7a)" }}>
+                                  <p className="mono text-[11px] font-semibold" style={{ color: "var(--text-dim)" }}>
                                     {tp.unit} · {tp.estMinutes} min · {tp.difficulty} · mastery {tp.mastery}%
                                   </p>
                                 </div>
@@ -218,11 +218,11 @@ export default function SubjectsView({
                             </div>
 
                             {isBriefOpen && (
-                              <div className="mt-3 border-t border-[var(--border-subtle,#e4e0f1)] pt-3 text-[12.5px] space-y-2.5 slide-in">
-                                <p className="font-medium" style={{ color: "var(--text-main, #211a3a)" }}>{tp.summary}</p>
+                              <div className="mt-3 border-t border-[var(--border-subtle)] pt-3 text-[12.5px] space-y-2.5 slide-in">
+                                <p className="font-medium" style={{ color: "var(--text-main)" }}>{tp.summary}</p>
                                 {tp.prerequisites?.length > 0 && (
                                   <div>
-                                    <strong className="block text-[11.5px] uppercase tracking-wider text-[var(--text-dim,#5f5a7a)] mb-1">Prerequisites</strong>
+                                    <strong className="block text-[11.5px] uppercase tracking-wider text-[var(--text-dim)] mb-1">Prerequisites</strong>
                                     <ul className="list-disc pl-4 space-y-0.5">
                                       {tp.prerequisites.map((item, j) => <li key={j}>{item}</li>)}
                                     </ul>
@@ -230,7 +230,7 @@ export default function SubjectsView({
                                 )}
                                 {tp.keyConcepts?.length > 0 && (
                                   <div>
-                                    <strong className="block text-[11.5px] uppercase tracking-wider text-[var(--text-dim,#5f5a7a)] mb-1">Key Concepts</strong>
+                                    <strong className="block text-[11.5px] uppercase tracking-wider text-[var(--text-dim)] mb-1">Key Concepts</strong>
                                     <div className="flex flex-wrap gap-1.5">
                                       {tp.keyConcepts.map((item, j) => <span key={j} className="chip chip-kind chip-tight">{item}</span>)}
                                     </div>
@@ -238,8 +238,8 @@ export default function SubjectsView({
                                 )}
                                 {tp.practice && (
                                   <div>
-                                    <strong className="block text-[11.5px] uppercase tracking-wider text-[var(--text-dim,#5f5a7a)] mb-0.5">Applied Practice</strong>
-                                    <p style={{ color: "var(--text-main, #211a3a)" }}>{tp.practice}</p>
+                                    <strong className="block text-[11.5px] uppercase tracking-wider text-[var(--text-dim)] mb-0.5">Applied Practice</strong>
+                                    <p style={{ color: "var(--text-main)" }}>{tp.practice}</p>
                                   </div>
                                 )}
                               </div>
@@ -260,8 +260,8 @@ export default function SubjectsView({
       {addModalOpen && (
         <div className="modal-overlay" onClick={() => setAddModalOpen(false)}>
           <div className="glass-panel modal-box max-w-md" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between border-b border-[var(--border-subtle,#e4e0f1)] pb-3 mb-4">
-              <h3 className="text-[17px] font-extrabold" style={{ color: "var(--text-main, #211a3a)" }}>
+            <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-3 mb-4">
+              <h3 className="text-[17px] font-extrabold" style={{ color: "var(--text-main)" }}>
                 Add New Subject
               </h3>
               <button
@@ -298,7 +298,7 @@ export default function SubjectsView({
                       onClick={() => setColor(c)}
                       className={cn(
                         "h-8 w-8 rounded-xl transition-transform",
-                        color === c && "scale-110 ring-2 ring-offset-2 ring-[var(--accent,#6366f1)]"
+                        color === c && "scale-110 ring-2 ring-offset-2 ring-[var(--accent)]"
                       )}
                       style={{ background: c }}
                     />
@@ -359,8 +359,8 @@ export default function SubjectsView({
       {editing && (
         <div className="modal-overlay" onClick={() => setEditing(null)}>
           <div className="glass-panel modal-box max-w-md" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between border-b border-[var(--border-subtle,#e4e0f1)] pb-3 mb-4">
-              <h3 className="text-[17px] font-extrabold" style={{ color: "var(--text-main, #211a3a)" }}>
+            <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-3 mb-4">
+              <h3 className="text-[17px] font-extrabold" style={{ color: "var(--text-main)" }}>
                 Edit Subject
               </h3>
               <button
@@ -395,7 +395,7 @@ export default function SubjectsView({
                       onClick={() => setEditing({ ...editing, color: c })}
                       className={cn(
                         "h-8 w-8 rounded-xl transition-transform",
-                        editing.color === c && "scale-110 ring-2 ring-offset-2 ring-[var(--accent,#6366f1)]"
+                        editing.color === c && "scale-110 ring-2 ring-offset-2 ring-[var(--accent)]"
                       )}
                       style={{ background: c }}
                     />

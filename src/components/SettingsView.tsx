@@ -98,7 +98,7 @@ export default function SettingsView({
         {/* ── 1. PROFILE & TARGET CARD ── */}
         <Reveal>
           <Spot className="glass-panel tilt-card section-card p-5 sm:p-6 space-y-4">
-            <h3 className="flex items-center gap-2 text-[16px] font-extrabold tracking-tight" style={{ color: "var(--text-main, #211a3a)" }}>
+            <h3 className="flex items-center gap-2 text-[16px] font-extrabold tracking-tight" style={{ color: "var(--text-main)" }}>
               <IconUser size={18} /> Profile &amp; Exam Target
             </h3>
 
@@ -172,7 +172,7 @@ export default function SettingsView({
               <IconCheck size={15} /> Save &amp; Rebalance Plan
             </button>
             {savedToast && (
-              <p className="text-center text-[12px] font-bold text-[var(--success-accent,#2e9e6d)] animate-fade-in">
+              <p className="text-center text-[12px] font-bold text-[var(--success-accent)] animate-fade-in">
                 Profile and targets saved!
               </p>
             )}
@@ -182,7 +182,7 @@ export default function SettingsView({
         {/* ── 2. APPEARANCE & THEMES CARD ── */}
         <Reveal delay={60}>
           <Spot className="glass-panel tilt-card section-card p-5 sm:p-6 space-y-4">
-            <h3 className="flex items-center gap-2 text-[16px] font-extrabold tracking-tight" style={{ color: "var(--text-main, #211a3a)" }}>
+            <h3 className="flex items-center gap-2 text-[16px] font-extrabold tracking-tight" style={{ color: "var(--text-main)" }}>
               <IconPalette size={18} /> Studio Appearance
             </h3>
 
@@ -198,8 +198,8 @@ export default function SettingsView({
                     className={cn(
                       "rounded-2xl border p-3 text-left transition-all",
                       isCurrent
-                        ? "border-[var(--accent,#6366f1)] ring-2 ring-[var(--accent,#6366f1)]/20 shadow-md"
-                        : "border-[var(--border-subtle,#e4e0f1)] bg-[var(--surface-2,#f4f2fc)] opacity-75 hover:opacity-100"
+                        ? "border-[var(--accent)] ring-2 ring-[var(--accent)]/20 shadow-md"
+                        : "border-[var(--border-subtle)] bg-[var(--surface-2)] opacity-75 hover:opacity-100"
                     )}
                   >
                     <div className="flex items-center gap-2 mb-2">
@@ -207,12 +207,12 @@ export default function SettingsView({
                       <span className="h-4 w-4 rounded-full border border-black/10" style={{ background: info.bg }} />
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-[13px] font-extrabold" style={{ color: "var(--text-main, #211a3a)" }}>
+                      <span className="text-[13px] font-extrabold" style={{ color: "var(--text-main)" }}>
                         {th.label}
                       </span>
-                      {isCurrent && <IconCheck size={14} className="text-[var(--accent,#6366f1)]" />}
+                      {isCurrent && <IconCheck size={14} className="text-[var(--accent)]" />}
                     </div>
-                    <span className="block text-[11px] font-medium" style={{ color: "var(--text-dim, #5f5a7a)" }}>
+                    <span className="block text-[11px] font-medium" style={{ color: "var(--text-dim)" }}>
                       {info.sub}
                     </span>
                   </button>
@@ -226,7 +226,7 @@ export default function SettingsView({
       {/* ── 3. PACE & SCHEDULE RHYTHM ── */}
       <Reveal delay={80}>
         <Spot className="glass-panel tilt-card section-card p-5 sm:p-6 space-y-4">
-          <h3 className="flex items-center gap-2 text-[16px] font-extrabold tracking-tight" style={{ color: "var(--text-main, #211a3a)" }}>
+          <h3 className="flex items-center gap-2 text-[16px] font-extrabold tracking-tight" style={{ color: "var(--text-main)" }}>
             <IconTarget size={18} /> Schedule Engine &amp; Rhythm
           </h3>
 
@@ -320,10 +320,10 @@ export default function SettingsView({
       {/* ── 4. DATA & SYSTEM CONTROLS ── */}
       <Reveal delay={100}>
         <Spot className="glass-panel tilt-card section-card p-5 sm:p-6 space-y-3">
-          <h3 className="flex items-center gap-2 text-[16px] font-extrabold tracking-tight" style={{ color: "var(--text-main, #211a3a)" }}>
+          <h3 className="flex items-center gap-2 text-[16px] font-extrabold tracking-tight" style={{ color: "var(--text-main)" }}>
             <IconGear size={18} /> Data, Export &amp; Setup
           </h3>
-          <p className="text-[13px] font-medium" style={{ color: "var(--text-dim, #5f5a7a)" }}>
+          <p className="text-[13px] font-medium" style={{ color: "var(--text-dim)" }}>
             Your syllabus, schedule, logged study minutes, and preferences reside securely on this device.
           </p>
           <div className="flex flex-wrap gap-2.5 pt-2">
@@ -343,7 +343,7 @@ export default function SettingsView({
             </button>
             <button
               type="button"
-              className="btn btn-secondary hover:text-[var(--danger-accent,#ef4444)]"
+              className="btn btn-secondary hover:text-[var(--danger-accent)]"
               onClick={() => setConfirmWipeModal(true)}
             >
               <IconTrash size={14} /> Reset Everything
@@ -357,10 +357,10 @@ export default function SettingsView({
         <div className="modal-overlay" onClick={() => setConfirmWipeModal(false)}>
           <div className="glass-panel modal-box max-w-md" onClick={(e) => e.stopPropagation()}>
             <div className="confirm-icon mb-3"><IconWarn size={22} /></div>
-            <h3 className="text-[17px] font-extrabold" style={{ color: "var(--text-main, #211a3a)" }}>
+            <h3 className="text-[17px] font-extrabold" style={{ color: "var(--text-main)" }}>
               Reset everything and restart?
             </h3>
-            <p className="mt-2 text-[13.5px] font-medium leading-relaxed" style={{ color: "var(--text-dim, #5f5a7a)" }}>
+            <p className="mt-2 text-[13.5px] font-medium leading-relaxed" style={{ color: "var(--text-dim)" }}>
               This will clear your current subjects, generated lessons, scheduled tasks, and session history,
               and relaunch the Setup Wizard.
             </p>

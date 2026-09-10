@@ -2,12 +2,27 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  api, addDays, dayDiff, fmtDate, prettyDate, prettyLong, today, type AppState,
+  api,
+  addDays,
+  dayDiff,
+  fmtDate,
+  prettyDate,
+  prettyLong,
+  today,
+  type AppState,
 } from "@/lib/client";
 import { CountUp, Marquee, Reveal, Spot } from "@/lib/fx";
 import {
-  IconBook, IconCalendar, IconChart, IconCheck, IconClock, IconFlame,
-  IconLeaf, IconSpark, IconTarget, IconTrend,
+  IconBook,
+  IconCalendar,
+  IconChart,
+  IconCheck,
+  IconClock,
+  IconFlame,
+  IconLeaf,
+  IconSpark,
+  IconTarget,
+  IconTrend,
 } from "./icons";
 import { PageHead, WeekBars } from "./bits";
 import Heatmap from "./Heatmap";
@@ -23,12 +38,28 @@ export default function AnalyticsView({
   onStartFocus?: () => void;
 }) {
   const [intel, setIntel] = useState<{
-    pace: { global: number; samples: number; bySubject: { id: number; name: string; color: string; pace: number }[] } | null;
+    pace: {
+      global: number;
+      samples: number;
+      bySubject: { id: number; name: string; color: string; pace: number }[];
+    } | null;
     weekdays: number[] | null;
     peakHour: number | null;
     tomorrowRisk: number;
-    readiness: { onTrack: boolean; loadPct: number; likelyDays: number; optimisticDays: number; pessimisticDays: number; samples: number; effectiveDailyMinutes?: number };
-    effectiveDailyMinutes?: { minutes: number; activeDays: number; samples: number };
+    readiness: {
+      onTrack: boolean;
+      loadPct: number;
+      likelyDays: number;
+      optimisticDays: number;
+      pessimisticDays: number;
+      samples: number;
+      effectiveDailyMinutes?: number;
+    };
+    effectiveDailyMinutes?: {
+      minutes: number;
+      activeDays: number;
+      samples: number;
+    };
     memory: { strong: number; fading: number; atRisk: number; tracked: number };
   } | null>(null);
   const [insights, setInsights] = useState<string>("");
@@ -40,31 +71,44 @@ export default function AnalyticsView({
   useEffect(() => {
     let cancelled = false;
     api<typeof intel>("/api/analytics")
-      .then((data) => { if (!cancelled) setIntel(data); })
+      .then((data) => {
+        if (!cancelled) setIntel(data);
+      })
       .catch(() => undefined);
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [state.sessions.length, state.tasks.length]);
 
   useEffect(() => {
     let cancelled = false;
     api<{ insights: string }>("/api/insights")
-      .then((data) => { if (!cancelled) setInsights(data.insights); })
-      .catch(() => { if (!cancelled) setInsights(""); })
-      .finally(() => { if (!cancelled) setLoadingIns(false); });
-    return () => { cancelled = true; };
+      .then((data) => {
+        if (!cancelled) setInsights(data.insights);
+      })
+      .catch(() => {
+        if (!cancelled) setInsights("");
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingIns(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [state.tasks.length]);
 
   const totalMin = useMemo(
     () => state.sessions.reduce((a, b) => a + b.minutes, 0),
-    [state.sessions]
+    [state.sessions],
   );
   const doneTasks = useMemo(
     () => state.tasks.filter((x) => x.status === "done").length,
-    [state.tasks]
+    [state.tasks],
   );
   const overdueTasks = useMemo(
-    () => state.tasks.filter((x) => x.status === "pending" && x.date < t).length,
-    [state.tasks, t]
+    () =>
+      state.tasks.filter((x) => x.status === "pending" && x.date < t).length,
+    [state.tasks, t],
   );
 
   // Active days in last 14 days
@@ -90,14 +134,19 @@ export default function AnalyticsView({
         .reduce((a, s) => a + s.minutes, 0);
       arr.push({
         key: d,
-        label: new Date(d).toLocaleDateString(undefined, { weekday: "short" }).slice(0, 3),
+        label: new Date(d)
+          .toLocaleDateString(undefined, { weekday: "short" })
+          .slice(0, 3),
         minutes: mins,
       });
     }
     return arr;
   }, [state.sessions, t]);
 
-  const weekMin = useMemo(() => week.reduce((a, b) => a + b.minutes, 0), [week]);
+  const weekMin = useMemo(
+    () => week.reduce((a, b) => a + b.minutes, 0),
+    [week],
+  );
   const dailyGoalMin = (state.settings.dailyHours || 2) * 60;
 
   // Subject completion stats
@@ -107,9 +156,15 @@ export default function AnalyticsView({
       const doneTopics = topics.filter((tp) => tp.status === "done").length;
       const tasks = state.tasks.filter((tk) => tk.subjectId === sb.id);
       const doneTasks = tasks.filter((tk) => tk.status === "done").length;
-      const pendingMins = tasks.filter((tk) => tk.status === "pending").reduce((a, b) => a + b.plannedMinutes, 0);
-      const loggedMins = state.sessions.filter((sn) => sn.subjectId === sb.id).reduce((a, b) => a + b.minutes, 0);
-      const pct = topics.length ? Math.round((doneTopics / topics.length) * 100) : 0;
+      const pendingMins = tasks
+        .filter((tk) => tk.status === "pending")
+        .reduce((a, b) => a + b.plannedMinutes, 0);
+      const loggedMins = state.sessions
+        .filter((sn) => sn.subjectId === sb.id)
+        .reduce((a, b) => a + b.minutes, 0);
+      const pct = topics.length
+        ? Math.round((doneTopics / topics.length) * 100)
+        : 0;
       return {
         ...sb,
         totalTopics: topics.length,
@@ -126,38 +181,90 @@ export default function AnalyticsView({
   const productivity = useMemo(() => {
     const focusSessions = state.sessions.filter((s) => s.mode !== "break");
     const breakSessions = state.sessions.filter((s) => s.mode === "break");
-    const avgLen = focusSessions.length ? Math.round(totalMin / focusSessions.length) : 0;
+    const avgLen = focusSessions.length
+      ? Math.round(totalMin / focusSessions.length)
+      : 0;
     const breakMin = breakSessions.reduce((a, b) => a + b.minutes, 0);
     const focusMin = totalMin;
-    const ratio = totalMin + breakMin > 0 ? Math.round((focusMin / (totalMin + breakMin)) * 100) : 100;
+    const ratio =
+      totalMin + breakMin > 0
+        ? Math.round((focusMin / (totalMin + breakMin)) * 100)
+        : 100;
 
     const weekdayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     let bestDay = "Flexible";
     if (intel?.weekdays && intel.weekdays.length === 7) {
       const maxIdx = intel.weekdays.indexOf(Math.max(...intel.weekdays));
-      if (maxIdx >= 0 && intel.weekdays[maxIdx] > 0) bestDay = weekdayNames[maxIdx];
+      if (maxIdx >= 0 && intel.weekdays[maxIdx] > 0)
+        bestDay = weekdayNames[maxIdx];
     }
 
     let peakHourStr = "Morning";
     if (intel?.peakHour != null) {
       const h = intel.peakHour;
-      peakHourStr = h === 0 ? "12 AM" : h < 12 ? `${h} AM` : h === 12 ? "12 PM" : `${h - 12} PM`;
+      peakHourStr =
+        h === 0
+          ? "12 AM"
+          : h < 12
+            ? `${h} AM`
+            : h === 12
+              ? "12 PM"
+              : `${h - 12} PM`;
     }
 
-    return { avgLen, ratio, bestDay, peakHourStr, totalSessions: state.sessions.length };
+    return {
+      avgLen,
+      ratio,
+      bestDay,
+      peakHourStr,
+      totalSessions: state.sessions.length,
+    };
   }, [state.sessions, totalMin, intel]);
 
   // Ticker — a clean single-row pill strip: icon + label + aligned value.
   // Every value sits in the same tabular mono face so the strip reads like
   // one instrument panel instead of a wall of uppercase text.
   const tickerItems = useMemo(() => {
-    const items: { icon: React.ReactNode; label: string; value: string; tone?: string }[] = [
-      { icon: <IconFlame size={13} />, label: "Streak", value: `${state.user.streak}d` },
-      { icon: <IconClock size={13} />, label: "This week", value: `${Math.round((weekMin / 60) * 10) / 10}h`, tone: "is-accent" },
-      { icon: <IconChart size={13} />, label: "Total logged", value: `${Math.round(totalMin / 60)}h` },
-      { icon: <IconCheck size={13} />, label: "Tasks done", value: String(doneTasks), tone: "is-good" },
-      { icon: <IconTarget size={13} />, label: "Backlog", value: String(overdueTasks), tone: overdueTasks > 0 ? "is-warn" : "is-good" },
-      { icon: <IconSpark size={13} />, label: "Consistency", value: `${consistency}%`, tone: consistency >= 70 ? "is-good" : "is-accent" },
+    const items: {
+      icon: React.ReactNode;
+      label: string;
+      value: string;
+      tone?: string;
+    }[] = [
+      {
+        icon: <IconFlame size={13} />,
+        label: "Streak",
+        value: `${state.user.streak}d`,
+      },
+      {
+        icon: <IconClock size={13} />,
+        label: "This week",
+        value: `${Math.round((weekMin / 60) * 10) / 10}h`,
+        tone: "is-accent",
+      },
+      {
+        icon: <IconChart size={13} />,
+        label: "Total logged",
+        value: `${Math.round(totalMin / 60)}h`,
+      },
+      {
+        icon: <IconCheck size={13} />,
+        label: "Tasks done",
+        value: String(doneTasks),
+        tone: "is-good",
+      },
+      {
+        icon: <IconTarget size={13} />,
+        label: "Backlog",
+        value: String(overdueTasks),
+        tone: overdueTasks > 0 ? "is-warn" : "is-good",
+      },
+      {
+        icon: <IconSpark size={13} />,
+        label: "Consistency",
+        value: `${consistency}%`,
+        tone: consistency >= 70 ? "is-good" : "is-accent",
+      },
     ];
     for (const sb of subjectStats) {
       items.push({
@@ -167,7 +274,15 @@ export default function AnalyticsView({
       });
     }
     return items;
-  }, [state.user.streak, weekMin, totalMin, doneTasks, overdueTasks, consistency, subjectStats]);
+  }, [
+    state.user.streak,
+    weekMin,
+    totalMin,
+    doneTasks,
+    overdueTasks,
+    consistency,
+    subjectStats,
+  ]);
 
   const fmtMin = (m: number) => {
     const r = Math.round(m * 10) / 10;
@@ -175,7 +290,7 @@ export default function AnalyticsView({
   };
 
   return (
-    <div className="space-y-6 fade-in">
+    <div className="page-stack fade-in">
       <PageHead
         eyebrow="ANALYTICS DASHBOARD"
         title="Where the hours went"
@@ -190,7 +305,9 @@ export default function AnalyticsView({
               <span key={i} className="tick-pill">
                 <span className="tick-pill-icon">{item.icon}</span>
                 <span className="tick-pill-label">{item.label}</span>
-                <span className={cn("tick-pill-value", item.tone)}>{item.value}</span>
+                <span className={cn("tick-pill-value", item.tone)}>
+                  {item.value}
+                </span>
               </span>
             ))}
           </Marquee>
@@ -198,19 +315,20 @@ export default function AnalyticsView({
       </Reveal>
 
       {/* Top row: Weekly Volume + Consistency Ring */}
-      <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr]">
+      <div className="split-2 split-2--wide">
         <Reveal>
-          <Spot className="glass-panel tilt-card section-card h-full p-5 sm:p-6">
-            <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+          <Spot className="glass-panel tilt-card section-card ana-card">
+            <div className="card-head">
               <div>
-                <h3 className="flex items-center gap-2 text-[16px] font-extrabold tracking-tight" style={{ color: "var(--text-main, #211a3a)" }}>
+                <h3 className="card-title section-title">
                   <IconChart size={17} /> Weekly Study Volume
                 </h3>
-                <p className="mt-1 text-[12.5px] font-medium" style={{ color: "var(--text-dim, #5f5a7a)" }}>
-                  Daily minutes vs your target goal ({state.settings.dailyHours}h/day)
+                <p className="card-sub">
+                  Daily minutes vs your target goal ({state.settings.dailyHours}
+                  h/day)
                 </p>
               </div>
-              <span className="mono rounded-xl border border-[var(--border-subtle,#e4e0f1)] bg-[var(--surface-2,#f4f2fc)] px-3 py-1.5 text-[12px] font-bold" style={{ color: "var(--text-main, #211a3a)" }}>
+              <span className="cycle-chip mono">
                 <CountUp to={weekMin / 60} decimals={1} /> h this week
               </span>
             </div>
@@ -219,24 +337,24 @@ export default function AnalyticsView({
         </Reveal>
 
         <Reveal delay={60}>
-          <Spot className="glass-panel tilt-card section-card flex h-full flex-col items-center justify-center gap-4 p-6">
-            <div className="flex w-full items-center justify-between">
-              <h3 className="text-[16px] font-extrabold tracking-tight" style={{ color: "var(--text-main, #211a3a)" }}>
-                Consistency Ring
-              </h3>
-              <span className="mono text-[12px] font-bold" style={{ color: "var(--accent, #6366f1)" }}>
-                14-Day Window
-              </span>
+          <Spot className="glass-panel tilt-card section-card ana-ring-card">
+            <div className="card-head card-head--tight">
+              <h3 className="card-title section-title">Consistency Ring</h3>
+              <span className="cycle-chip mono">14-Day Window</span>
             </div>
-            <div className="relative grid place-items-center my-2">
-              <svg viewBox="0 0 80 80" className="h-40 w-40 -rotate-90">
+            <div className="ring-figure">
+              <svg
+                viewBox="0 0 80 80"
+                className="ring-svg ana-ring"
+                aria-hidden="true"
+              >
                 <circle
                   className="ring-track"
                   cx="40"
                   cy="40"
                   r="34"
                   fill="none"
-                  stroke="var(--track, #e4e0f1)"
+                  stroke="var(--track)"
                   strokeWidth="7"
                 />
                 <circle
@@ -244,24 +362,27 @@ export default function AnalyticsView({
                   cy="40"
                   r="34"
                   fill="none"
-                  stroke="var(--accent, var(--color-primary, #6366f1))"
+                  stroke="var(--accent)"
                   strokeWidth="7"
                   strokeLinecap="round"
                   strokeDasharray={ringCircumference}
-                  strokeDashoffset={ringCircumference - (ringCircumference * consistency) / 100}
-                  style={{ transition: "stroke-dashoffset 1.2s cubic-bezier(.22,1,.36,1)" }}
+                  strokeDashoffset={
+                    ringCircumference - (ringCircumference * consistency) / 100
+                  }
+                  style={{
+                    transition:
+                      "stroke-dashoffset 1.2s cubic-bezier(.22,1,.36,1)",
+                  }}
                 />
               </svg>
               <div className="absolute text-center">
-                <span className="mono text-[30px] font-extrabold tracking-tight" style={{ color: "var(--text-main, #211a3a)" }}>
+                <span className="ring-digits mono">
                   <CountUp to={consistency} suffix="%" />
                 </span>
-                <span className="block text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--text-dim, #5f5a7a)" }}>
-                  Active
-                </span>
+                <span className="ring-state">Active</span>
               </div>
             </div>
-            <p className="text-center text-[13px] font-semibold" style={{ color: "var(--text-dim, #5f5a7a)" }}>
+            <p className="timer-note">
               {active14} of last 14 days active · {state.user.streak} day streak
             </p>
           </Spot>
@@ -274,37 +395,41 @@ export default function AnalyticsView({
       </Reveal>
 
       {/* Subject Mastery & Productivity Analytics */}
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="split-2 split-2--even">
         {/* Subject Mastery Progress */}
         <Reveal delay={100}>
-          <Spot className="glass-panel tilt-card section-card p-5 sm:p-6">
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="flex items-center gap-2 text-[16px] font-extrabold tracking-tight" style={{ color: "var(--text-main, #211a3a)" }}>
+          <Spot className="glass-panel tilt-card section-card ana-card">
+            <div className="card-head card-head--tight">
+              <h3 className="card-title section-title">
                 <IconBook size={17} /> Subject Mastery &amp; Progress
               </h3>
-              <span className="mono text-[12px] font-bold" style={{ color: "var(--text-dim, #5f5a7a)" }}>
+              <span className="cycle-chip mono">
                 {subjectStats.length} subjects
               </span>
             </div>
-            <div className="space-y-4">
+            <div className="subj-rows">
               {subjectStats.map((sb) => (
-                <div key={sb.id} className="space-y-1.5">
-                  <div className="flex items-baseline justify-between gap-2">
-                    <span className="truncate text-[13.5px] font-bold" style={{ color: "var(--text-main, #211a3a)" }}>
-                      {sb.name}
-                    </span>
-                    <span className="mono text-[12px] font-bold" style={{ color: sb.color }}>
-                      {sb.doneTopics}/{sb.totalTopics || sb.units} lessons ({sb.pct}%)
+                <div key={sb.id} className="subj-row">
+                  <div className="subj-row-top">
+                    <span className="subj-name">{sb.name}</span>
+                    <span
+                      className="subj-count mono"
+                      style={{ color: sb.color }}
+                    >
+                      {sb.doneTopics}/{sb.totalTopics || sb.units} lessons (
+                      {sb.pct}%)
                     </span>
                   </div>
-                  <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--surface-2,#f4f2fc)]">
+                  <div className="bar-track">
                     <div
-                      className="h-full rounded-full transition-all duration-1000"
+                      className="bar-fill"
                       style={{ width: `${sb.pct}%`, background: sb.color }}
                     />
                   </div>
-                  <div className="flex items-center justify-between text-[11px] font-semibold" style={{ color: "var(--text-dim, #5f5a7a)" }}>
-                    <span>{Math.round(sb.loggedMins / 60 * 10) / 10}h logged</span>
+                  <div className="subj-foot">
+                    <span>
+                      {Math.round((sb.loggedMins / 60) * 10) / 10}h logged
+                    </span>
                     <span>{sb.pendingMins}m pending</span>
                   </div>
                 </div>
@@ -315,91 +440,101 @@ export default function AnalyticsView({
 
         {/* Productivity & Focus Patterns */}
         <Reveal delay={120}>
-          <Spot className="glass-panel tilt-card section-card p-5 sm:p-6">
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="flex items-center gap-2 text-[16px] font-extrabold tracking-tight" style={{ color: "var(--text-main, #211a3a)" }}>
+          <Spot className="glass-panel tilt-card section-card ana-card">
+            <div className="card-head card-head--tight">
+              <h3 className="card-title section-title">
                 <IconTrend size={17} /> Productivity Patterns
               </h3>
               <span className="chip chip-kind">Live AI telemetry</span>
             </div>
-            <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-2">
-              <div className="rounded-xl border border-[var(--border-subtle,#e4e0f1)] bg-[var(--surface-2,#f4f2fc)] p-3.5">
-                <span className="text-[11.5px] font-bold uppercase tracking-wider" style={{ color: "var(--text-dim, #5f5a7a)" }}>
-                  Peak Focus Hour
-                </span>
-                <p className="mono mt-1 text-[20px] font-extrabold" style={{ color: "var(--accent, #6366f1)" }}>
+            <div className="inset-panel-row">
+              <div className="inset-panel">
+                <span className="inset-label">Peak Focus Hour</span>
+                <p
+                  className="inset-value mono"
+                  style={{ color: "var(--accent)" }}
+                >
                   {productivity.peakHourStr}
                 </p>
-                <p className="mt-1 text-[11.5px] font-medium" style={{ color: "var(--text-dim, #5f5a7a)" }}>
-                  Most study time logged
-                </p>
+                <p className="inset-note">Most study time logged</p>
               </div>
 
-              <div className="rounded-xl border border-[var(--border-subtle,#e4e0f1)] bg-[var(--surface-2,#f4f2fc)] p-3.5">
-                <span className="text-[11.5px] font-bold uppercase tracking-wider" style={{ color: "var(--text-dim, #5f5a7a)" }}>
-                  Best Study Day
-                </span>
-                <p className="mono mt-1 text-[20px] font-extrabold" style={{ color: "var(--success-accent, #2e9e6d)" }}>
+              <div className="inset-panel">
+                <span className="inset-label">Best Study Day</span>
+                <p
+                  className="inset-value mono"
+                  style={{ color: "var(--good)" }}
+                >
                   {productivity.bestDay}
                 </p>
-                <p className="mt-1 text-[11.5px] font-medium" style={{ color: "var(--text-dim, #5f5a7a)" }}>
-                  Highest completion rate
-                </p>
+                <p className="inset-note">Highest completion rate</p>
               </div>
 
-              <div className="rounded-xl border border-[var(--border-subtle,#e4e0f1)] bg-[var(--surface-2,#f4f2fc)] p-3.5">
-                <span className="text-[11.5px] font-bold uppercase tracking-wider" style={{ color: "var(--text-dim, #5f5a7a)" }}>
-                  Avg Session Block
-                </span>
-                <p className="mono mt-1 text-[20px] font-extrabold" style={{ color: "var(--text-main, #211a3a)" }}>
-                  {productivity.avgLen} min
-                </p>
-                <p className="mt-1 text-[11.5px] font-medium" style={{ color: "var(--text-dim, #5f5a7a)" }}>
-                  Protected deep work
-                </p>
+              <div className="inset-panel">
+                <span className="inset-label">Avg Session Block</span>
+                <p className="inset-value mono">{productivity.avgLen} min</p>
+                <p className="inset-note">Protected deep work</p>
               </div>
 
-              <div className="rounded-xl border border-[var(--border-subtle,#e4e0f1)] bg-[var(--surface-2,#f4f2fc)] p-3.5">
-                <span className="text-[11.5px] font-bold uppercase tracking-wider" style={{ color: "var(--text-dim, #5f5a7a)" }}>
-                  Focus vs Break
-                </span>
-                <p className="mono mt-1 text-[20px] font-extrabold" style={{ color: "var(--accent, #6366f1)" }}>
+              <div className="inset-panel">
+                <span className="inset-label">Focus vs Break</span>
+                <p
+                  className="inset-value mono"
+                  style={{ color: "var(--accent)" }}
+                >
                   {productivity.ratio}%
                 </p>
-                <p className="mt-1 text-[11.5px] font-medium" style={{ color: "var(--text-dim, #5f5a7a)" }}>
-                  Active on-the-clock ratio
-                </p>
+                <p className="inset-note">Active on-the-clock ratio</p>
               </div>
             </div>
 
             {/* Memory health snapshot if available */}
             {intel?.memory && (
-              <div className="mt-4 rounded-xl border border-[var(--border-subtle,#e4e0f1)] bg-[var(--surface-2,#f4f2fc)] p-3.5">
-                <div className="flex items-center justify-between text-[12px] font-bold mb-2">
-                  <span style={{ color: "var(--text-main, #211a3a)" }}>Spaced Recall &amp; Memory Health</span>
-                  <span className="mono" style={{ color: "var(--accent, #6366f1)" }}>{intel.memory.tracked} lessons tracked</span>
+              <div className="inset-panel">
+                <div className="stack-head">
+                  <span className="stack-title">
+                    Spaced Recall &amp; Memory Health
+                  </span>
+                  <span className="stack-count mono">
+                    {intel.memory.tracked} lessons tracked
+                  </span>
                 </div>
-                <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-[var(--border-subtle,#e4e0f1)]">
+                <div className="stack-bar">
                   <div
                     title={`${intel.memory.strong} strong`}
-                    className="h-full bg-[var(--success-accent,#2e9e6d)]"
-                    style={{ width: `${(intel.memory.strong / Math.max(1, intel.memory.tracked)) * 100}%` }}
+                    className="stack-seg is-good"
+                    style={{
+                      width: `${(intel.memory.strong / Math.max(1, intel.memory.tracked)) * 100}%`,
+                    }}
                   />
                   <div
                     title={`${intel.memory.fading} fading`}
-                    className="h-full bg-[var(--warning-accent,#c07a10)]"
-                    style={{ width: `${(intel.memory.fading / Math.max(1, intel.memory.tracked)) * 100}%` }}
+                    className="stack-seg is-warn"
+                    style={{
+                      width: `${(intel.memory.fading / Math.max(1, intel.memory.tracked)) * 100}%`,
+                    }}
                   />
                   <div
                     title={`${intel.memory.atRisk} at risk`}
-                    className="h-full bg-[var(--danger-accent,#ef4444)]"
-                    style={{ width: `${(intel.memory.atRisk / Math.max(1, intel.memory.tracked)) * 100}%` }}
+                    className="stack-seg is-bad"
+                    style={{
+                      width: `${(intel.memory.atRisk / Math.max(1, intel.memory.tracked)) * 100}%`,
+                    }}
                   />
                 </div>
-                <div className="mt-2 flex items-center justify-between text-[11px] font-semibold" style={{ color: "var(--text-dim, #5f5a7a)" }}>
-                  <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[var(--success-accent,#2e9e6d)]" /> {intel.memory.strong} strong</span>
-                  <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[var(--warning-accent,#c07a10)]" /> {intel.memory.fading} fading</span>
-                  <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[var(--danger-accent,#ef4444)]" /> {intel.memory.atRisk} at risk</span>
+                <div className="stack-legend">
+                  <span className="stack-key">
+                    <span className="stack-key-dot is-good" />{" "}
+                    {intel.memory.strong} strong
+                  </span>
+                  <span className="stack-key">
+                    <span className="stack-key-dot is-warn" />{" "}
+                    {intel.memory.fading} fading
+                  </span>
+                  <span className="stack-key">
+                    <span className="stack-key-dot is-bad" />{" "}
+                    {intel.memory.atRisk} at risk
+                  </span>
                 </div>
               </div>
             )}
@@ -410,24 +545,25 @@ export default function AnalyticsView({
       {/* Recent Study Session Log */}
       <Reveal delay={140}>
         <Spot className="glass-panel tilt-card section-card overflow-hidden">
-          <div className="flex items-center justify-between border-b border-[var(--border-subtle,#e4e0f1)] p-5">
+          <div className="card-head log-head">
             <div>
-              <h3 className="flex items-center gap-2 text-[16px] font-extrabold tracking-tight" style={{ color: "var(--text-main, #211a3a)" }}>
+              <h3 className="card-title section-title">
                 <IconClock size={17} /> Recent Study Sessions Log
               </h3>
-              <p className="mt-1 text-[12px] font-medium" style={{ color: "var(--text-dim, #5f5a7a)" }}>
+              <p className="card-sub">
                 Recorded study events and real clocked minutes
               </p>
             </div>
-            <span className="mono text-[12px] font-bold" style={{ color: "var(--text-dim, #5f5a7a)" }}>
+            <span className="cycle-chip mono">
               {state.sessions.length} sessions total
             </span>
           </div>
 
-          <div className="divide-y divide-[var(--border-subtle,#e4e0f1)]">
+          <div className="log-list">
             {state.sessions.length === 0 ? (
-              <p className="p-8 text-center text-[13.5px] font-medium" style={{ color: "var(--text-dim, #5f5a7a)" }}>
-                No study sessions logged yet. Clock into a task to start recording!
+              <p className="log-empty">
+                No study sessions logged yet. Clock into a task to start
+                recording!
               </p>
             ) : (
               state.sessions
@@ -438,30 +574,32 @@ export default function AnalyticsView({
                   const tk = state.tasks.find((t) => t.id === sn.taskId);
                   const maxSessionBar = Math.max(60, dailyGoalMin);
                   return (
-                    <div key={sn.id || idx} className="flex flex-wrap items-center gap-3 px-5 py-3">
-                      <span className="mono w-24 text-[12px] font-bold" style={{ color: "var(--text-dim, #5f5a7a)" }}>
+                    <div key={sn.id || idx} className="log-row">
+                      <span className="log-date mono">
                         {prettyDate(sn.date)}
                       </span>
-                      <div className="min-w-0 flex-1 basis-48">
-                        <p className="truncate text-[13.5px] font-bold" style={{ color: "var(--text-main, #211a3a)" }}>
+                      <div className="log-body">
+                        <p className="log-title">
                           {tk ? tk.title : sb ? sb.name : "Open Focus Session"}
                         </p>
-                        <p className="text-[11.5px] font-medium" style={{ color: "var(--text-dim, #5f5a7a)" }}>
-                          {sn.mode === "break" ? "Rest Break" : "Deep Study Block"}
+                        <p className="log-sub">
+                          {sn.mode === "break"
+                            ? "Rest Break"
+                            : "Deep Study Block"}
                           {sb && ` · ${sb.name}`}
                         </p>
                       </div>
-                      <div className="hidden sm:block w-32">
-                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--surface-2,#f4f2fc)]">
+                      <div className="log-bar">
+                        <div className="bar-track">
                           <div
-                            className="h-full rounded-full bg-[var(--accent,#6366f1)]"
-                            style={{ width: `${Math.min(100, (sn.minutes / maxSessionBar) * 100)}%` }}
+                            className="bar-fill"
+                            style={{
+                              width: `${Math.min(100, (sn.minutes / maxSessionBar) * 100)}%`,
+                            }}
                           />
                         </div>
                       </div>
-                      <span className="mono text-right text-[13px] font-extrabold" style={{ color: "var(--accent, #6366f1)" }}>
-                        {fmtMin(sn.minutes)}
-                      </span>
+                      <span className="log-min mono">{fmtMin(sn.minutes)}</span>
                     </div>
                   );
                 })
