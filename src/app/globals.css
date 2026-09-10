@@ -1204,7 +1204,7 @@ img,svg,video,canvas{max-width:100%;height:auto}
   .ai-fab{bottom:calc(88px + env(safe-area-inset-bottom))}
   .rating-btns{gap:5px}
   .heat-cell{width:9px;height:9px}
-  .streak-badge{font-size:.66rem;padding:4px 9px}
+  .streak-badge{padding:4px 9px}
 }
 
 /* 5. Small phones (<=360px): SE, older Androids */
@@ -1913,7 +1913,7 @@ body.mode-focused::before{opacity:.4}
   .tracker-bar .mono{font-size:.95rem}
   .page-header{margin-bottom:12px}
   .day-head{margin-bottom:8px}
-  .streak-badge{font-size:.62rem;padding:3px 8px}
+  .streak-badge{padding:3px 8px}
   /* Section rhythm: less vertical air overall */
   .main-workspace > *{margin-bottom:0}
 }
@@ -2773,7 +2773,7 @@ svg{flex-shrink:0;vertical-align:middle}
 .mobile-header .streak-badge{flex-shrink:0;display:inline-flex;align-items:center}
 @media(max-width:430px){
   .mobile-header{padding-left:10px;padding-right:10px}
-  .mobile-header .streak-badge{font-size:.62rem;padding:3px 8px;gap:5px}
+  .mobile-header .streak-badge{padding:3px 8px;gap:5px}
 }
 
 /* ── 4. Tracker bar: icon buttons stay centred, never off-grid ───── */

@@ -60,7 +60,7 @@ const BUDGET = {
   conflicts: 372,
   overflowMasks: 1,
   fixedWidths: 0,
-  typeLiterals: 458,
+  typeLiterals: 455,
   important: 769,
 };
 
