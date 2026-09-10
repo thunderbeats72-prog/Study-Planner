@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { today, type AppState, type TaskRow } from "@/lib/client";
 import { IconClose } from "./icons";
+import { Select } from "./bits";
 import { useBackClose } from "@/lib/useBackClose";
 
 export type TaskPatch = {
@@ -74,18 +75,28 @@ export default function TaskEditor({
             </div>
             <div>
               <label className="lbl">Subject</label>
-              <select className="input-field" value={subjectId} onChange={(e) => setSubjectId(e.target.value)}>
-                <option value="">No subject / general</option>
-                {state.subjects.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
+              <Select
+                ariaLabel="Subject"
+                value={subjectId}
+                onChange={setSubjectId}
+                options={[
+                  { value: "", label: "No subject / general" },
+                  ...state.subjects.map((s) => ({ value: String(s.id), label: s.name })),
+                ]}
+              />
             </div>
             <div>
               <label className="lbl">Status</label>
-              <select className="input-field" value={status} onChange={(e) => setStatus(e.target.value)}>
-                <option value="pending">Pending</option>
-                <option value="done">Done</option>
-                <option value="skipped">Skipped</option>
-              </select>
+              <Select
+                ariaLabel="Status"
+                value={status}
+                onChange={setStatus}
+                options={[
+                  { value: "pending", label: "Pending" },
+                  { value: "done", label: "Done" },
+                  { value: "skipped", label: "Skipped" },
+                ]}
+              />
             </div>
           </div>
 

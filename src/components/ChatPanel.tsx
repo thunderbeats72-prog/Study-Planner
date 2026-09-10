@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { api, mdToHtml, escapeHtml, type MessageRow } from "@/lib/client";
+import { mdToHtml, escapeHtml, type MessageRow } from "@/lib/client";
 import { IconChat, IconCheck, IconClose, IconCopy, IconSend, IconSpark } from "./icons";
 
 const QUICKS = [
@@ -34,11 +34,19 @@ export default function ChatPanel({
   useEffect(() => { if (!thinking) submitLock.current = false; }, [thinking]);
 
   // Fetch health once per open — only to know if cloud is up; never display provider names.
+  // Read with a raw fetch: /api/health answers 503 when the DATABASE is
+  // unavailable, and `api()` turns any non-2xx into a thrown ApiError — that
+  // used to discard the body, which still carries `ai.configuredProviders`,
+  // so a deployment with working AI keys but a DB hiccup showed "Local mode".
   useEffect(() => {
     if (!open || health) return;
     let alive = true;
-    api<HealthSnapshot>("/api/health", { timeoutMs: 8_000 })
-      .then((snapshot) => { if (alive) setHealth(snapshot); })
+    fetch("/api/health", { cache: "no-store" })
+      .then((res) => res.json().catch(() => ({})))
+      .then((snapshot: HealthSnapshot) => {
+        if (alive && snapshot && typeof snapshot === "object")
+          setHealth(snapshot);
+      })
       .catch(() => { /* fall back to provider prop */ });
     return () => { alive = false; };
   }, [open, health]);
@@ -111,7 +119,15 @@ export default function ChatPanel({
               </div>
               <div className="ai-identity">
                 <div className="ai-title">Shigun</div>
-                <div className={`ai-status${isCloudActive ? "" : " off"}`} aria-live="polite">
+                <div
+                  className={`ai-status${isCloudActive ? "" : " off"}`}
+                  aria-live="polite"
+                  title={
+                    isCloudActive
+                      ? "Shigun is connected to its cloud AI provider."
+                      : "No cloud AI key is configured, so Shigun answers with the on-device study engine (still plan-aware). Add CEREBRAS_API_KEY, MISTRAL_API_KEY, SAMBANOVA_API_KEY, COHERE_API_KEY or GEMINI_API_KEY in the deployment to unlock cloud tutoring."
+                  }
+                >
                   {statusText}
                 </div>
               </div>

@@ -1,6 +1,14 @@
 "use client";
 
-import React, { useCallback, useEffect, useId, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
+import { createPortal } from "react-dom";
 import TaskClockButton from "./TaskClockButton";
 import { IconCheck, IconUndo } from "./icons";
 import type { SubjectRow, TaskRow } from "@/lib/client";
@@ -17,6 +25,22 @@ function releaseMenu(id: string) {
   activeMenuId = null;
   activeMenuClose = null;
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   The ⋯ menu renders in a PORTAL pinned with position:fixed.
+
+   Why: the old in-flow absolute dropdown was silently clipped to nothing —
+   `.day-block` carries `overflow: hidden` (for its rounded corners) and the
+   day sheet's list is a scroll container, so opening the menu on the last
+   task of a day painted it outside the visible box. A portal anchored to
+   the trigger's live bounding rect can never be clipped by an ancestor.
+
+   Placement rules: right-aligned under the trigger, flipped ABOVE when the
+   viewport bottom is too close, clamped to a 10px margin on both sides
+   (320px screens included), and re-anchored on every scroll/resize while
+   open (capture-phase scroll catches the day sheet's own scroll container).
+   ══════════════════════════════════════════════════════════════════════ */
+type MenuPlacement = { top: number; left: number; above: boolean };
 
 export default function TaskActions({
   task,
@@ -45,14 +69,53 @@ export default function TaskActions({
 }) {
   const menuId = useId();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [menuPos, setMenuPos] = useState<MenuPlacement | null>(null);
   const [ratingOpen, setRatingOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
   const closeMenu = useCallback(() => {
     releaseMenu(menuId);
     setMenuOpen(false);
   }, [menuId]);
   useEffect(() => () => releaseMenu(menuId), [menuId]);
+
+  /** Anchor the portal menu to the trigger's current rect, viewport-aware. */
+  const placeMenu = useCallback(() => {
+    const trigger = triggerRef.current;
+    if (!trigger) return;
+    const rect = trigger.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const width = menuRef.current?.offsetWidth || 210;
+    const height = menuRef.current?.offsetHeight || 180;
+    const margin = 10;
+    const left = Math.max(
+      margin,
+      Math.min(rect.right - width, vw - width - margin),
+    );
+    const spaceBelow = vh - rect.bottom;
+    // Flip above only when below genuinely doesn't fit AND above fits better.
+    const above = spaceBelow < height + 12 && rect.top > spaceBelow;
+    const top = above
+      ? Math.max(margin, rect.top - height - 6)
+      : Math.min(rect.bottom + 6, vh - height - margin);
+    setMenuPos({ top: Math.round(top), left: Math.round(left), above });
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!menuOpen) return;
+    placeMenu();
+    // Capture phase: also catches scrolling inside .day-sheet-list & co.
+    const reanchor = () => placeMenu();
+    window.addEventListener("resize", reanchor);
+    window.addEventListener("scroll", reanchor, true);
+    return () => {
+      window.removeEventListener("resize", reanchor);
+      window.removeEventListener("scroll", reanchor, true);
+    };
+  }, [menuOpen, placeMenu]);
+
   useEffect(() => {
     if (!menuOpen) return;
     const onKey = (event: KeyboardEvent) => {
@@ -62,7 +125,11 @@ export default function TaskActions({
       triggerRef.current?.focus();
     };
     const onClick = (event: MouseEvent) => {
-      if (wrapRef.current?.contains(event.target as Node)) return;
+      const target = event.target as Node | null;
+      if (wrapRef.current?.contains(target)) return;
+      // Clicks inside the portalled menu are "inside" too — their own
+      // handlers decide whether the menu closes.
+      if (menuRef.current?.contains(target)) return;
       closeMenu();
     };
     window.addEventListener("click", onClick);
@@ -76,9 +143,9 @@ export default function TaskActions({
     if (!menuOpen) return;
     const id = window.setTimeout(
       () =>
-        wrapRef.current
+        menuRef.current
           ?.querySelector<HTMLButtonElement>("[role=menuitem]")
-          ?.focus(),
+          ?.focus({ preventScroll: true }),
       0,
     );
     return () => window.clearTimeout(id);
@@ -96,7 +163,7 @@ export default function TaskActions({
     if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
     event.preventDefault();
     const items = Array.from(
-      wrapRef.current?.querySelectorAll<HTMLButtonElement>("[role=menuitem]") ||
+      menuRef.current?.querySelectorAll<HTMLButtonElement>("[role=menuitem]") ||
         [],
     );
     const index = items.indexOf(document.activeElement as HTMLButtonElement);
@@ -108,11 +175,12 @@ export default function TaskActions({
           : event.key === "ArrowDown"
             ? (index + 1 + items.length) % items.length
             : (index - 1 + items.length) % items.length;
-    items[next]?.focus();
+    items[next]?.focus({ preventScroll: true });
   };
 
   const done = task.status === "done";
   const skipped = task.status === "skipped";
+
   const handleDone = () => {
     if (done) {
       onTaskStatus(task.id, "pending");
@@ -124,6 +192,81 @@ export default function TaskActions({
     }
     onTaskStatus(task.id, "done");
   };
+
+  /* The menu node. In a real browser it is portalled to document.body so no
+     ancestor (`overflow: hidden` day blocks, scrollable day sheets) can clip
+     it; where there is no DOM (the react-test-renderer suite) it renders
+     inline so the same logic stays fully testable. */
+  const portalTarget =
+    typeof document !== "undefined" && document.body ? document.body : null;
+  const menuNode = (
+    <div
+      ref={menuRef}
+      id={`${menuId}-menu`}
+      className="task-menu glass-panel"
+      role="menu"
+      aria-label="More task actions"
+      onKeyDown={onMenuKeyDown}
+      style={
+        portalTarget
+          ? ({
+              position: "fixed",
+              top: menuPos ? `${menuPos.top}px` : "-9999px",
+              left: menuPos ? `${menuPos.left}px` : "-9999px",
+              right: "auto",
+              transformOrigin: menuPos?.above ? "bottom right" : "top right",
+            } as React.CSSProperties)
+          : undefined
+      }
+    >
+      <button
+        type="button"
+        role="menuitem"
+        onClick={() => {
+          closeMenu();
+          onEdit(task.id);
+        }}
+      >
+        Edit task
+      </button>
+      {skipped && (
+        <button
+          type="button"
+          role="menuitem"
+          onClick={() => {
+            closeMenu();
+            onTaskStatus(task.id, "pending");
+          }}
+        >
+          Reopen
+        </button>
+      )}
+      {!done && !skipped && (
+        <button
+          type="button"
+          role="menuitem"
+          onClick={() => {
+            closeMenu();
+            onTaskStatus(task.id, "skipped");
+          }}
+        >
+          Skip task
+        </button>
+      )}
+      {subject && !skipped && onSkipSubject && (
+        <button
+          type="button"
+          role="menuitem"
+          onClick={() => {
+            closeMenu();
+            onSkipSubject(subject.id, task.date);
+          }}
+        >
+          Skip {subject.name} today
+        </button>
+      )}
+    </div>
+  );
 
   return (
     <>
@@ -170,64 +313,9 @@ export default function TaskActions({
               <i />
             </span>
           </button>
-          {menuOpen && (
-            <div
-              id={`${menuId}-menu`}
-              className="task-menu glass-panel"
-              role="menu"
-              aria-label="More task actions"
-              onKeyDown={onMenuKeyDown}
-            >
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  closeMenu();
-                  onEdit(task.id);
-                }}
-              >
-                Edit task
-              </button>
-              {skipped && (
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    closeMenu();
-                    onTaskStatus(task.id, "pending");
-                  }}
-                >
-                  Reopen
-                </button>
-              )}
-              {!done && !skipped && (
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    closeMenu();
-                    onTaskStatus(task.id, "skipped");
-                  }}
-                >
-                  Skip task
-                </button>
-              )}
-              {subject && !skipped && onSkipSubject && (
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    closeMenu();
-                    onSkipSubject(subject.id, task.date);
-                  }}
-                >
-                  Skip {subject.name} today
-                </button>
-              )}
-            </div>
-          )}
         </div>
       </div>
+      {menuOpen && menuNode}
       {ratingOpen && !done && (
         <div
           className="rating-strip glass-panel slide-in"
