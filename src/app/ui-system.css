@@ -5057,8 +5057,17 @@ select:not([multiple]) option {
   background-size: 4px 4px, 4px 4px;
 }
 
-/* Calendar: blank cells are quiet, not a field of dotted outlines. The cells
-   with a date remain selectable; only the visual dashes are removed. */
+/* Calendar: keep the month as one vertical grid. The legacy base layer also
+   declared seven columns on `.cal-grid`; without resetting that parent, each
+   week row became a tiny grid item in its own column and the dates stacked on
+   top of one another on tablet/mobile widths. */
+.cal-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+.cal-grid > .cal-row {
+  grid-column: 1;
+  width: 100%;
+}
 .cal-cell.is-empty,
 .cal-cell.is-empty:hover { border-style: solid; }
 /* A date with no work is still a useful, selectable calendar cell; only the
@@ -5302,4 +5311,17 @@ span.cal-cell.is-empty:hover {
   .mh-more,
   .task-brief-btn,
   .task-card-brief-panel { transition: none; }
+}
+
+/* Small screens already have a compact tracker and the bottom dock. Keep the
+   decorative page scene out of that narrow vertical stack so it never peeks
+   through the tracker or creates a misleading empty gap above the calendar. */
+@media (max-width: 860px) {
+  .page-header-scene {
+    display: none !important;
+  }
+  .page-header {
+    min-height: 0 !important;
+    padding-right: 0 !important;
+  }
 }
