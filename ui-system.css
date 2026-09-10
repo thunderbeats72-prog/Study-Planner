@@ -6575,3 +6575,436 @@ body.focus-live .tracker-bar {
   .zen-primary { font-weight: 800; }
   .zen .zen-digits { font-size: clamp(2.6rem, 11vw, 4rem) !important; }
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   v30 · MOBILE PLANNER + SESSION BAR POLISH
+   ──────────────────────────────────────────────────────────────────────
+   Appended last on purpose — this is the final word on the phone/tablet
+   Planner. Everything here is geometry and presentation: no view, route,
+   state or behaviour is added or removed.
+
+   • ONE variable owns the top-bar footprint, so the app bar, the sticky
+     session bar and the content padding can no longer disagree (the old
+     `padding-top: header + 64px` left a dead band under the header and let
+     the session bar float over the Planner heading).
+   • The bottom dock is four destinations — Settings moved to the app bar.
+   • The subject filter is one compact row that takes only the height it
+     needs, and its listbox opens inside the viewport, above the dock and
+     the chat button.
+   • Task cards are a two-column grid (rail · body) with a wrapping meta
+     row and an action row that can never overlap the copy.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* ── 1 · TOP BAR GEOMETRY — one variable, no dead band ───────────────── */
+@media (max-width: 860px) {
+  :root {
+    --header-h: 56px;
+    /* The app bar's true footprint: its height plus the device's top inset.
+       The session bar's sticky offset and the workspace's top padding both
+       read this, so the two can never drift apart again. */
+    --topbar-h: calc(var(--header-h) + env(safe-area-inset-top, 0px));
+  }
+
+  .mobile-header {
+    height: var(--topbar-h) !important;
+    min-height: var(--topbar-h) !important;
+    /* Safe area lives INSIDE the bar, not as extra padding below it. */
+    padding: env(safe-area-inset-top, 0px) 12px 0 !important;
+    gap: 8px;
+  }
+  .mh-brand { gap: 8px; }
+  .mh-wordmark { font-size: .58rem; }
+  .mh-page { font-size: .8rem; }
+  .mh-actions { gap: 6px; }
+
+  /* Content starts 10px under the app bar — nothing else. */
+  .main-workspace {
+    padding-top: calc(var(--topbar-h) + 10px) !important;
+    /* Dock (≈68px) + breathing room, so the last task card and its actions
+       are always reachable above the navigation. */
+    padding-bottom: calc(96px + env(safe-area-inset-bottom)) !important;
+  }
+
+  /* Session bar: sticky directly beneath the app bar, in normal flow. */
+  .tracker-bar.session-bar {
+    position: sticky !important;
+    top: calc(var(--topbar-h) + 6px) !important;
+    margin: 0 0 12px !important;
+    padding: 10px 12px;
+    border-radius: 16px;
+  }
+
+  /* Header popovers (notifications · theme) drop as a sheet pinned under
+     the app bar: never clipped, always inside the viewport. */
+  .mobile-header .quick-popover {
+    position: fixed;
+    top: calc(var(--topbar-h) + 6px);
+    right: 10px;
+    left: 10px;
+    width: auto;
+    max-width: 420px;
+    margin-left: auto;
+    z-index: 260;
+  }
+
+  /* The app bar is the only home for notifications/theme on phones and
+     tablets, so its trio is always shown — the tracker bar keeps its
+     Re-plan spark and drops the duplicated bell/palette instead. */
+  .mh-quick { display: inline-flex; align-items: center; gap: 6px; }
+  .tracker-quick-controls .icon-quick-btn[aria-label^="Notifications"],
+  .tracker-quick-controls .icon-quick-btn[aria-label^="Change theme"] {
+    display: none;
+  }
+  .tracker-quick-controls { padding-left: 0; border-left: 0; }
+
+  /* Square, comfortable icon targets: the same visual treatment for the bell
+     (notifications), the palette (theme) and the gear (settings). */
+  .mh-qbtn,
+  .mobile-header .icon-quick-btn {
+    width: 40px;
+    height: 40px;
+    min-height: 40px;
+    border-radius: 12px;
+  }
+  /* Anything that scrolls into view (a picked day, an opened lesson brief)
+     must land BELOW the app bar and the sticky session bar, not under them. */
+  html { scroll-padding-top: calc(var(--topbar-h) + 84px); }
+  .planner-day { scroll-margin-top: calc(var(--topbar-h) + 78px); }
+}
+
+@media (max-width: 400px) {
+  .mobile-header { padding-inline: 10px !important; }
+  .mh-brand .brand-logo-icon { width: 28px !important; height: 28px !important; }
+  .mh-qbtn,
+  .mobile-header .icon-quick-btn {
+    width: 36px;
+    height: 36px;
+    min-height: 36px;
+  }
+}
+@media (max-width: 340px) {
+  .mh-wordmark { display: none; }
+}
+
+/* ── 2 · SESSION BAR — clock · state · elapsed · verbs ───────────────── */
+.tracker-bar.session-bar {
+  /* One row on desktop: state · clock · verbs, gap-tolerant. */
+  align-items: center;
+}
+.tracker-state {
+  font-size: .6rem;
+  font-weight: 800;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+.tracker-bar.session-bar.is-running .tracker-state { color: var(--good); }
+.tracker-bar.session-bar.is-active:not(.is-running) .tracker-state { color: var(--warn); }
+.tracker-bar.session-bar.is-break .tracker-state { color: var(--accent); }
+/* Idle dot: quiet grey · paused: amber · recording: green pulse. */
+.tracker-bar.session-bar.is-active:not(.is-running) .pulse-dot {
+  background: var(--warn);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--warn) 18%, transparent);
+}
+.tracker-bar.session-bar.is-break .pulse-dot {
+  background: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.tracker-task {
+  font-size: .78rem !important;
+  font-weight: 700;
+}
+@media (max-width: 860px) {
+  .tracker-bar.session-bar .tracker-clock.is-live { gap: 7px; }
+  .tracker-bar.session-bar .tracker-time { font-size: 1.18rem; }
+  /* Nothing in the session bar wraps mid-glyph on a 320px screen. */
+  .tracker-bar.session-bar .tracker-actions .btn { white-space: nowrap; }
+}
+@media (max-width: 360px) {
+  .tracker-bar.session-bar { padding: 9px 10px; }
+  .tracker-bar.session-bar .tracker-clock-icon { display: none; }
+  .tracker-bar.session-bar .tracker-actions .btn { font-size: .7rem; padding-inline: 8px; }
+}
+
+/* ── 3 · BOTTOM DOCK — four destinations, safe-area aware ────────────── */
+@media (max-width: 860px) {
+  .mobile-bottom-nav {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 2px;
+    padding:
+      6px
+      max(8px, env(safe-area-inset-right))
+      calc(8px + env(safe-area-inset-bottom))
+      max(8px, env(safe-area-inset-left));
+  }
+  .mbn-item { min-height: 54px; }
+  .mbn-label { max-width: 100%; }
+
+  /* The chat button clears the dock and the safe area; it never covers a
+     task button, a dropdown or a menu. */
+  .ai-fab {
+    bottom: calc(84px + env(safe-area-inset-bottom)) !important;
+    right: 14px;
+    width: 52px;
+    height: 52px;
+  }
+}
+@media (max-width: 360px) {
+  .ai-fab { right: 10px; width: 48px; height: 48px; }
+}
+
+/* ── 4 · PLANNER TOOLBAR + SUBJECT FILTER — compact, one row ─────────── */
+@media (max-width: 860px) {
+  .planner-toolbar {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    width: 100%;
+    /* The toolbar is as tall as its two rows — no stretch, no min-height,
+       no phantom space above the date section. */
+    min-height: 0;
+  }
+  .planner-toolbar .seg { display: flex; width: 100%; }
+  .planner-toolbar .seg-btn { flex: 1 1 0; justify-content: center; min-height: 40px; }
+
+  .planner-filter {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    max-width: none;
+    min-height: 0;
+    padding: 6px 8px;
+    border-radius: 12px;
+    background: var(--surface-2);
+    border: 1px solid var(--border-subtle);
+  }
+  .planner-filter-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin: 0;
+    font-size: .62rem;
+    white-space: nowrap;
+  }
+  .planner-filter-label > svg { flex: 0 0 auto; opacity: .8; }
+  .planner-filter .sp-select { width: 100%; min-width: 0; }
+  .planner-filter .sp-select-btn { min-height: 38px; padding: 7px 10px; }
+  /* The listbox is bounded by the viewport, opens over the dock and the
+     chat button, and scrolls internally instead of running off-screen. */
+  .planner-filter .sp-select-pop {
+    left: 0;
+    right: 0;
+    width: auto;
+    max-width: calc(100vw - 24px);
+    max-height: min(46vh, 320px);
+    z-index: 220;
+  }
+  .planner-filter .sp-option-label { white-space: normal; overflow-wrap: anywhere; }
+}
+
+/* A revealed block keeps `transform: translateY(0)`, and a transformed
+   ancestor is a stacking context — which trapped the subject listbox below
+   the fixed dock however high its own z-index. `none` is visually identical
+   (identity matrix) and restores normal painting order. */
+.reveal.in { transform: none; }
+
+/* ── 5 · DAY / DATE HEADER ───────────────────────────────────────────── */
+/* Scoped to the day header: `Heatmap` and `TaskEditor` reuse `.day-meta`
+   for a plain sentence, which must stay a normal text line. */
+.day-id .day-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 9px;
+  margin: 2px 0 0 !important;
+  font-size: .72rem;
+  font-weight: 650;
+  color: var(--text-muted);
+  min-width: 0;
+}
+.day-meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+.day-meta-item > svg { flex: 0 0 auto; opacity: .75; }
+.day-meta-item .mono { font-variant-numeric: tabular-nums; color: var(--text-main); }
+.day-meta-item.is-done { color: var(--good); font-weight: 750; }
+.day-meta-sep {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  opacity: .55;
+  flex: 0 0 auto;
+}
+@media (max-width: 860px) {
+  .day-head {
+    gap: 8px 10px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  /* The first card gets real breathing room under the date header. */
+  .planner-day-list { gap: 10px; padding-top: 2px; }
+  .day-id .day-date { font-size: .95rem; line-height: 1.25; }
+  .day-id .day-meta { font-size: .7rem; }
+}
+
+/* ── 6 · TASK CARD — rail · body, wrapping meta, own action row ───────── */
+.task-card {
+  /* Two columns: the colour rail and the copy. The old three-column
+     template reserved an empty `auto` track that did nothing but add a
+     gap on narrow screens. */
+  grid-template-columns: 3px minmax(0, 1fr);
+  padding-left: 0;
+}
+.task-card-body { grid-column: 2; }
+.task-card-rail { grid-row: 1 / -1; }
+.task-card-meta { margin-top: 2px; }
+.task-card-actions { align-items: center; }
+
+@media (max-width: 860px) {
+  .task-card {
+    padding: 11px 12px 12px 0;
+    gap: 6px 10px;
+    border-radius: 14px;
+  }
+  .task-card-top { gap: 6px 8px; }
+  .task-card-title {
+    font-size: .92rem;
+    line-height: 1.38;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+  .task-card-brief { font-size: .78rem; line-height: 1.55; }
+  .task-card-meta { gap: 5px 11px; }
+  /* Actions are their own band: separated from the copy, never above it. */
+  .task-card-actions {
+    margin-top: 9px;
+    padding-top: 9px;
+    border-top: 1px solid color-mix(in srgb, var(--text-dim) 20%, transparent);
+    gap: 8px;
+  }
+  .task-btns {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .task-btns .btn {
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 40px;
+    justify-content: center;
+  }
+  .task-brief-btn {
+    min-height: 40px;
+    flex: 1 1 100%;
+    justify-content: center;
+  }
+  /* The ⋮ keeps its own square: it must not stretch like a verb button. */
+  .task-card .task-more,
+  .task-row .task-more {
+    flex: 0 0 auto;
+    width: 40px;
+    min-width: 40px;
+    min-height: 40px;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+@media (pointer: coarse) {
+  .task-card .task-more,
+  .task-row .task-more,
+  .task-brief-btn,
+  .task-btns .btn {
+    min-height: 44px;
+  }
+}
+@media (max-width: 360px) {
+  .task-card { padding: 10px 10px 11px 0; }
+  .task-card-actions { gap: 7px; }
+  .task-btns { gap: 7px; }
+}
+
+/* The portalled ⋮ menu: above the dock (150), the chat sheet (201) and
+   modal overlays (300); bounded by the viewport on every side. */
+body > .task-menu {
+  z-index: 400;
+  max-width: min(260px, calc(100vw - 20px));
+  max-height: calc(100vh - 20px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-radius: 14px;
+  box-shadow: 0 14px 34px rgba(16, 14, 34, .18), 0 3px 10px rgba(16, 14, 34, .10);
+}
+body > .task-menu button { min-height: 40px; }
+@media (pointer: coarse) {
+  body > .task-menu button { min-height: 44px; }
+}
+
+/* ── 7 · PLANNER HERO + ACTIONS ──────────────────────────────────────── */
+.page-head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+@media (max-width: 860px) {
+  /* The header scene becomes a 130px-tall static block under the hero copy
+     on phones (it is absolutely positioned beside the title on desktop).
+     Between the hero and the List/Calendar toolbar that read as a wall of
+     empty space above the subject filter — exactly the room the heading,
+     Add Task and Rebalance need. It is pure decoration (aria-hidden), so it
+     returns as soon as the viewport has space for it. */
+  .page-header-scene { display: none !important; }
+  .page-header { gap: 10px !important; margin-bottom: 12px !important; }
+
+  .page-head-actions { width: 100%; gap: 8px; margin-top: 10px; }
+  /* Add Task and Rebalance share the row when there is room and stack
+     when the phone is narrow — both stay full-width touch targets. */
+  .page-head-actions > * { flex: 1 1 150px; min-width: 0; }
+  .page-head-actions .btn { width: 100%; min-height: 42px; justify-content: center; }
+  .page-title { overflow-wrap: anywhere; text-wrap: balance; }
+  .page-subtitle { overflow-wrap: anywhere; text-wrap: pretty; line-height: 1.5; }
+}
+
+/* ── 8 · CALENDAR — responsive, never overflowing ────────────────────── */
+.planner-cal,
+.cal-grid,
+.cal-row,
+.cal-cell {
+  max-width: 100%;
+  min-width: 0;
+}
+.cal-cell { overflow: hidden; }
+.cal-dots { flex-wrap: wrap; }
+@media (max-width: 860px) {
+  .cal-bar { gap: 8px 10px; }
+  .cal-summary { flex-wrap: wrap; }
+  .cal-cell { padding: 5px; }
+}
+
+/* ── 9 · LAST RESORT GUARDS — no h-scroll, nothing clipped ───────────── */
+@media (max-width: 860px) {
+  .planner-view,
+  .planner-list,
+  .planner-day,
+  .planner-cal,
+  .task-card,
+  .task-card-body,
+  .task-card-meta,
+  .task-card-actions {
+    max-width: 100%;
+    min-width: 0;
+  }
+  .planner-day { overflow: visible; }
+}

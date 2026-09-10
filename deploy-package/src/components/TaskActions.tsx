@@ -80,7 +80,11 @@ export default function TaskActions({
   }, [menuId]);
   useEffect(() => () => releaseMenu(menuId), [menuId]);
 
-  /** Anchor the portal menu to the trigger's current rect, viewport-aware. */
+  /** Anchor the portal menu to the trigger's current rect, viewport-aware.
+   *  The result is always fully inside the viewport: clamped to a 10px
+   *  margin on every side, flipped above the trigger when there is not
+   *  enough room below, and never taller than the screen (it scrolls
+   *  internally instead of running off the top or under the dock). */
   const placeMenu = useCallback(() => {
     const trigger = triggerRef.current;
     if (!trigger) return;
@@ -88,8 +92,9 @@ export default function TaskActions({
     const vw = window.innerWidth;
     const vh = window.innerHeight;
     const width = menuRef.current?.offsetWidth || 210;
-    const height = menuRef.current?.offsetHeight || 180;
+    const rawHeight = menuRef.current?.offsetHeight || 0;
     const margin = 10;
+    const height = Math.min(rawHeight || 180, vh - margin * 2);
     const left = Math.max(
       margin,
       Math.min(rect.right - width, vw - width - margin),
@@ -100,17 +105,31 @@ export default function TaskActions({
     const top = above
       ? Math.max(margin, rect.top - height - 6)
       : Math.min(rect.bottom + 6, vh - height - margin);
-    setMenuPos({ top: Math.round(top), left: Math.round(left), above });
+    setMenuPos({
+      top: Math.round(Math.max(margin, top)),
+      left: Math.round(Math.max(margin, left)),
+      above,
+    });
   }, []);
 
   useLayoutEffect(() => {
     if (!menuOpen) return;
     placeMenu();
+    /* One more pass on the next frame: the first measurement can happen
+       before the portal's entry animation and fonts have settled, which
+       used to leave the menu anchored a few pixels off — or, on a cold
+       open, still parked off-screen. */
+    /* Guarded: react-test-renderer (the suite) has no rAF on `window`. */
+    const raf =
+      typeof window.requestAnimationFrame === "function"
+        ? window.requestAnimationFrame(placeMenu)
+        : null;
     // Capture phase: also catches scrolling inside .day-sheet-list & co.
     const reanchor = () => placeMenu();
     window.addEventListener("resize", reanchor);
     window.addEventListener("scroll", reanchor, true);
     return () => {
+      if (raf != null) window.cancelAnimationFrame(raf);
       window.removeEventListener("resize", reanchor);
       window.removeEventListener("scroll", reanchor, true);
     };
@@ -151,7 +170,13 @@ export default function TaskActions({
     return () => window.clearTimeout(id);
   }, [menuOpen]);
 
-  const toggleMenu = () => {
+  /* `stopPropagation` matters: the window click listener that closes the menu
+     is registered on the very same click in some browsers, and without it the
+     open tap could be read as an outside tap and close the menu again in the
+     same tick — the "⋮ does nothing" symptom. */
+  const toggleMenu = (event?: React.MouseEvent<HTMLButtonElement>) => {
+    event?.preventDefault();
+    event?.stopPropagation();
     if (menuOpen) {
       closeMenu();
       return;
@@ -211,9 +236,15 @@ export default function TaskActions({
         portalTarget
           ? ({
               position: "fixed",
-              top: menuPos ? `${menuPos.top}px` : "-9999px",
-              left: menuPos ? `${menuPos.left}px` : "-9999px",
+              top: menuPos ? `${menuPos.top}px` : "0px",
+              left: menuPos ? `${menuPos.left}px` : "0px",
               right: "auto",
+              /* Parked off-screen until the first measurement lands, so the
+                 menu never flashes at the top-left corner of the viewport. */
+              visibility: menuPos ? "visible" : "hidden",
+              /* Above the dock (150), the chat sheet (201) and modals (300);
+                 only toasts (400+) and the day sheet sit over it. */
+              zIndex: 400,
               transformOrigin: menuPos?.above ? "bottom right" : "top right",
             } as React.CSSProperties)
           : undefined

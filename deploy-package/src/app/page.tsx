@@ -34,6 +34,7 @@ import CommandPalette, { type Command } from "@/components/CommandPalette";
 import { onSoundChange, stopSound } from "@/lib/sound";
 import { haptic } from "@/lib/haptics";
 import { useBackClose } from "@/lib/useBackClose";
+import { cn } from "@/lib/cn";
 import type { TaskPatch } from "@/components/TaskEditor";
 import {
   IconBolt,
@@ -55,6 +56,7 @@ import {
   IconPause,
   IconPlay,
   IconSpark,
+  IconStop,
   IconWarn,
 } from "@/components/icons";
 import ZenScene from "@/components/ZenScene";
@@ -89,9 +91,12 @@ function zenGuidance(timer: TimerApi): string {
     : "Begin when you are ready";
 }
 
-/* `dock` marks the primary destinations in the mobile bottom navigation.
-   Analytics rides the dock too: the app-bar "More" hamburger it used to live
-   behind was removed on phones, so the dock is its one obvious door. */
+/* `dock` marks the primary destinations in the mobile bottom navigation:
+   Overview · Planner · Focus · Subjects — four evenly distributed targets.
+   Settings is deliberately NOT docked: on phones it lives in the top app bar
+   as a compact gear beside the bell and the palette, so the dock keeps four
+   comfortable, uncluttered columns. Analytics keeps its route (reachable from
+   the desktop rail and the drawer) without claiming a dock slot. */
 const NAV: {
   id: Page;
   label: string;
@@ -103,7 +108,7 @@ const NAV: {
   { id: "focus", label: "Focus", icon: <IconClock />, dock: true },
   { id: "subjects", label: "Subjects", icon: <IconBook />, dock: true },
   { id: "analytics", label: "Analytics", icon: <IconChart />, dock: false },
-  { id: "settings", label: "Settings", icon: <IconGear />, dock: true },
+  { id: "settings", label: "Settings", icon: <IconGear />, dock: false },
 ];
 
 type ToastTone = "success" | "info" | "error";
@@ -1510,6 +1515,19 @@ export default function Home() {
             </span>
           </span>
 
+          {/* Settings — the dock no longer carries it on phones, so the app
+              bar is its one door. It shares the `icon-quick-btn` treatment
+              with the bell and the palette, and the three stay distinct:
+              Bell = notifications, Palette = theme, Gear = settings. */}
+          <button
+            type="button"
+            className="icon-quick-btn mh-qbtn mh-settings"
+            aria-label="Settings"
+            title="Settings"
+            onClick={() => goPage("settings")}
+          >
+            <IconGear size={15} />
+          </button>
         </div>
       </header>
 
@@ -1663,7 +1681,23 @@ export default function Home() {
         </aside>
 
         <main className="main-workspace" data-nav-dir={navDir}>
-          <div className="tracker-bar" role="status" aria-live="off">
+          {/* ── Top session bar ───────────────────────────────────────────
+              One compact row that always answers three questions — am I
+              clocked in, on what, and for how long — with the verbs beside
+              them. Same state (useStudyClock) as before; only the
+              presentation changed. Idle reads "NOT CLOCKED IN · Free
+              session", live reads "CURRENT SESSION · <subject/task>" with a
+              running elapsed clock, Pause and Clock out. */}
+          <div
+            className={cn(
+              "tracker-bar session-bar",
+              clock.sessionActive && "is-active",
+              clock.running && "is-running",
+              clock.onBreak && "is-break",
+            )}
+            role="status"
+            aria-live="off"
+          >
             <div className="tracker-status">
               <span
                 className={`pulse-dot${clock.running ? " live" : ""}`}
@@ -1672,7 +1706,7 @@ export default function Home() {
               <div className="tracker-labels">
                 <span className="tracker-state">
                   {clock.running
-                    ? "Clocked in"
+                    ? "Current session"
                     : clock.onBreak
                       ? "On break"
                       : clock.sessionActive
@@ -1761,7 +1795,7 @@ export default function Home() {
                     title="Stop the clock and save your minutes"
                     aria-label="Clock out and save minutes"
                   >
-                    <IconCheck size={12} /> <span>Save &amp; exit</span>
+                    <IconStop size={12} /> <span>Clock out</span>
                   </button>
                 </>
               )}

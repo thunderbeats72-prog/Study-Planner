@@ -16,7 +16,9 @@ import {
   IconArrowRight,
   IconCalendar,
   IconCheck,
+  IconClock,
   IconClose,
+  IconFilter,
   IconList,
   IconRefresh,
   IconTarget,
@@ -332,7 +334,10 @@ export default function PlannerView({
             ]}
           />
           <label className="planner-filter">
-            <span className="planner-filter-label">Subject</span>
+            <span className="planner-filter-label">
+              <IconFilter size={11} aria-hidden="true" />
+              Subject
+            </span>
             <Select
               ariaLabel="Filter tasks by subject"
               value={filter}
@@ -605,9 +610,29 @@ export default function PlannerView({
                           </span>
                         )}
                       </h2>
-                      <p className="day-meta mono">
-                        {dayTasks.length} tasks · {dayMins} min · {doneCount}{" "}
-                        done
+                      {/* Same three numbers as before — now each carries the
+                          icon that says what it is, so the row is scannable
+                          at a glance instead of a run of bare digits. */}
+                      <p className="day-meta">
+                        <span className="day-meta-item">
+                          <IconList size={11} aria-hidden="true" />
+                          {dayTasks.length} task{dayTasks.length === 1 ? "" : "s"}
+                        </span>
+                        <span className="day-meta-sep" aria-hidden="true" />
+                        <span className="day-meta-item">
+                          <IconClock size={11} aria-hidden="true" />
+                          <span className="mono">{dayMins}</span> min
+                        </span>
+                        <span className="day-meta-sep" aria-hidden="true" />
+                        <span
+                          className={cn(
+                            "day-meta-item",
+                            allDone && "is-done",
+                          )}
+                        >
+                          <IconCheck size={11} aria-hidden="true" />
+                          <span className="mono">{doneCount}</span> done
+                        </span>
                       </p>
                     </div>
                     {allDone && (

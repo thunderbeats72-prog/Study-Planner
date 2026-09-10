@@ -1102,7 +1102,26 @@ async function runTests() {
       "Blank month cells stay inert on every screen size");
     check(/\.mobile-bottom-nav\s*\{\s*display: *none/.test(sheets) &&
           /\.mobile-bottom-nav\s*\{\s*display: *grid/.test(sheets) && /\.mbn-item/.test(sheets),
-      "Bottom nav is off by default and a five-slot grid on phones");
+      "Bottom nav is off by default and a multi-slot grid on phones");
+
+    /* (v30) Mobile chrome. The dock is four destinations — Overview · Planner
+       · Focus · Subjects — and Settings moved up into the app bar as a gear,
+       so the remaining cells get real width and no route becomes unreachable.
+       The top-bar footprint is owned by ONE variable, because the old
+       `header + 64px` content padding left a dead band under the app bar and
+       let the sticky session bar float over the Planner heading. */
+    const pageSource = strip(readFileSync(join(process.cwd(), "src/app/page.tsx"), "utf8"));
+    check((pageSource.match(/dock: *true/g) ?? []).length === 4,
+      "The mobile dock carries exactly four destinations");
+    check(/id: *"settings"[^}]*dock: *false/.test(pageSource),
+      "Settings is not docked — it lives in the top app bar");
+    check(/aria-label="Settings"/.test(pageSource) && /mh-settings/.test(pageSource),
+      "A labelled Settings gear sits in the mobile app bar");
+    check(/repeat\(4, *minmax\(0, *1fr\)\)/.test(sheets),
+      "The dock is a four-column grid on phones");
+    check(/--topbar-h: *calc\(var\(--header-h\)/.test(sheets) &&
+          /padding-top: *calc\(var\(--topbar-h\)/.test(sheets),
+      "One variable owns the top-bar footprint (header + safe area)");
     check(/\.sidebar\s*\{/.test(sheets) && /@media *\(max-width: *1024px\)/.test(sheets),
       "The desktop rail is real and collapses at a documented breakpoint");
 

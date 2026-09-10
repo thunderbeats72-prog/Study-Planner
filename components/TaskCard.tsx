@@ -12,7 +12,15 @@ import {
   type TaskRow,
   type TopicRow,
 } from "@/lib/client";
-import { IconBook, IconBookOpen, IconCalendar, IconClock, IconSpark } from "./icons";
+import {
+  IconBook,
+  IconBookOpen,
+  IconCalendar,
+  IconCheck,
+  IconClock,
+  IconSpark,
+  IconTarget,
+} from "./icons";
 import { KindChip } from "./bits";
 import TaskActions from "./TaskActions";
 import { TaskLiveBadge } from "./TaskClockButton";
@@ -172,18 +180,20 @@ export default function TaskCard({
             <span>{task.plannedMinutes} min</span>
           </li>
           {topic?.unit && (
-            <li className="task-meta-item">
+            <li className="task-meta-item" title="Curriculum unit">
+              <IconBookOpen size={11} aria-hidden="true" />
               <span>{topic.unit}</span>
             </li>
           )}
           {topic?.difficulty && (
             <li className="task-meta-item" title="Curriculum difficulty">
+              <IconTarget size={11} aria-hidden="true" />
               <span>{topic.difficulty}</span>
             </li>
           )}
           {loggedMinutes > 0 && (
-            <li className="task-meta-item is-logged">
-              <IconCheckInline />
+            <li className="task-meta-item is-logged" title="Minutes logged on this task">
+              <IconCheck size={11} aria-hidden="true" />
               <span>{Math.round(loggedMinutes)}m logged</span>
             </li>
           )}
@@ -306,20 +316,3 @@ export default function TaskCard({
   );
 }
 
-function IconCheckInline() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      width="11"
-      height="11"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M20 6 9 17l-5-5" />
-    </svg>
-  );
-}
