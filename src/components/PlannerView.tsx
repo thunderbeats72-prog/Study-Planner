@@ -218,16 +218,22 @@ export default function PlannerView({
     setSelDay(today());
   };
 
-  /** Bring the picked day's block into view. The commit that mounts the list
-   *  may not have flushed yet when the first attempt runs, so a handful of
-   *  short retries cover the switch instead of one brittle 40ms timeout.
-   *  (A hoisted function declaration: the retry callback legally refers to
-   *  the function itself.) */
+  /** Bring the picked day's block into view. Uses rAF + retries to survive
+   *  the React commit that mounts the list after a view switch. */
   function scrollToDayBlock(dateKey: string, attempt = 0) {
     const node = dayRefs.current[dateKey];
     if (!node) {
-      if (attempt < 8)
-        window.setTimeout(() => scrollToDayBlock(dateKey, attempt + 1), 50);
+      if (attempt < 14) {
+        if (attempt === 0) {
+          window.requestAnimationFrame(() =>
+            window.requestAnimationFrame(() =>
+              scrollToDayBlock(dateKey, attempt + 1),
+            ),
+          );
+        } else {
+          window.setTimeout(() => scrollToDayBlock(dateKey, attempt + 1), 60);
+        }
+      }
       return;
     }
     const reduce = window.matchMedia?.(
@@ -239,14 +245,31 @@ export default function PlannerView({
     });
   }
 
+  useEffect(() => {
+    if (!pickedDay) return;
+    if (view !== "list") return;
+    const id = window.setTimeout(() => scrollToDayBlock(pickedDay), 80);
+    return () => window.clearTimeout(id);
+  }, [pickedDay, view, grouped]);
+
   const pickDay = (dateKey: string) => {
     setSelDay(dateKey);
-    if (view !== "calendar") return;
+    if (view !== "calendar") {
+      const exists = grouped.some(([k]) => k === dateKey);
+      if (!exists) {
+        setOpenDay(dateKey);
+        return;
+      }
+      setPickedDay(dateKey);
+      if (pickedTimer.current) clearTimeout(pickedTimer.current);
+      pickedTimer.current = window.setTimeout(
+        () => setPickedDay(null),
+        2400,
+      ) as unknown as ReturnType<typeof setTimeout>;
+      window.setTimeout(() => scrollToDayBlock(dateKey), 60);
+      return;
+    }
     const dayTasks = tasksByDate.get(dateKey) || [];
-    // Narrow screens have no room for a second column, so the day opens as
-    // a sheet; EMPTY days also open the sheet on every width, so a tap is
-    // always answered ("Nothing scheduled — a quiet day is allowed.")
-    // instead of the calendar silently swallowing the click.
     if (
       window.matchMedia?.("(max-width: 900px)").matches ||
       dayTasks.length === 0
@@ -257,8 +280,10 @@ export default function PlannerView({
     setView("list");
     setPickedDay(dateKey);
     if (pickedTimer.current) clearTimeout(pickedTimer.current);
-    pickedTimer.current = setTimeout(() => setPickedDay(null), 2400);
-    window.setTimeout(() => scrollToDayBlock(dateKey), 40);
+    pickedTimer.current = window.setTimeout(
+      () => setPickedDay(null),
+      2400,
+    ) as unknown as ReturnType<typeof setTimeout>;
   };
 
   return (
