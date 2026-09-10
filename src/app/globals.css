@@ -64,6 +64,42 @@
   --radius-xs:6px; --radius-tile:10px; --radius-pill:999px;
   --dock-h:clamp(60px,11vw,70px);
 
+  /* ══ ONE control metric ═══════════════════════════════════════════════
+     Every button, chip and nav row in the product shares these four numbers.
+     Icons are sized from the same ramp as the text beside them, so an icon
+     can never be "a bit big" or "a bit high" relative to its label — the
+     gap and the box come from the token, not from the component. */
+  --btn-h:40px;          /* default control height */
+  --btn-h-sm:34px;       /* .btn-sm  */
+  --btn-h-xs:30px;       /* .btn-xs / dense rows */
+  --icon-gap:8px;        /* space between an icon and the word beside it */
+  --icon-xs:11px; --icon-sm:13px; --icon-md:15px; --icon-lg:18px;
+  /* The phone dock puts the icon ABOVE its label, so it is deliberately one
+     step larger than an inline icon — but it is still one token, not the same
+     number restated in three media queries. */
+  --icon-dock:22px;
+  /* Icon boxes are square and centred so glyphs of different optical weight
+     (the Settings gear is the densest in the set) still share one baseline. */
+  --icon-box:1.35em;
+
+  /* ══ ONE rail metric ═══════════════════════════════════════════════════
+     The sidebar's brand mark, its collapse toggle and its nav rows used to
+     carry three independent sizes each (the mark was declared at 36px, 40px
+     and 42px in three layers, the nav row at 44px, 46px and 42px). They are
+     four numbers now, and every rule reads them. */
+  --brand-mark:40px;
+  --sb-toggle:40px;
+  --nav-h:44px;
+  --nav-gap:12px;
+
+  /* ══ ONE coach metric ══════════════════════════════════════════════════
+     The AI coach floats at the right edge. This is the width it actually
+     resolves to on a desktop viewport (the `min(400px, 100vw - 40px)` rule
+     late in globals.css wins above 641px), and the workspace reads the same
+     token when it reserves the column — so the two can never disagree. */
+  --ai-panel-w:400px;
+  --ai-panel-gap:32px;
+
   /* ══ ONE focus ring ══ */
   --focus-ring:0 0 0 3px color-mix(in srgb,var(--accent) 30%,transparent);
 
@@ -112,7 +148,7 @@ body{
      looked soft/jittery while scrolling. The canvas scrolls with the content
      now; the aurora layer already keeps the top of the page feeling lit. */
   background:var(--app-bg);background-image:var(--bg-gradient);background-repeat:no-repeat;
-  color:var(--text-main);min-height:100vh;overflow-x:hidden;
+  color:var(--text-main);min-height:100vh;
   transition:background-color .4s ease,color .4s ease;
 }
 /* `.mono` = tabular numerals, not a second font family. */
@@ -131,19 +167,25 @@ body{
   transition:box-shadow var(--anim-dur) ease,border-color var(--anim-dur) ease;
 }
 .tilt-card:hover{box-shadow:var(--glass-shadow-hover);border-color:var(--glass-border-hover)}
-.brand-header{display:flex;align-items:center;gap:11px;padding:0 46px 16px 8px;margin-bottom:6px;border-bottom:1px solid var(--glass-border);position:relative}
+.brand-header{display:flex;align-items:center;gap:var(--nav-gap);padding:0;margin-bottom:var(--sp-1);border-bottom:1px solid var(--glass-border);position:relative}
 .brand-text{flex:1;min-width:0}
-.brand-logo-icon{width:36px;height:36px;border-radius:12px;background:var(--accent-gradient);color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 2px 8px rgba(93,77,224,.35),inset 0 1px 0 rgba(255,255,255,.25)}
-.brand-title{font-family:var(--font-display);font-size:.95rem;font-weight:750;letter-spacing:-.3px;line-height:1.1}
+.brand-logo-icon{width:var(--brand-mark);height:var(--brand-mark);border-radius:12px;background:var(--accent-gradient);color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 2px 8px rgba(93,77,224,.35),inset 0 1px 0 rgba(255,255,255,.25)}
+.brand-title{font-family:var(--font-display);font-size:var(--fs-md);font-weight:780;letter-spacing:-.02em;line-height:var(--lh-heading)}
 /* Full course name ALWAYS visible — wraps to as many lines as needed
    ("B.Com (Honours) (Marketing and Banking)" never gets chopped). */
-.brand-course{font-size:.7rem;color:var(--text-muted);font-weight:600;margin-top:3px;white-space:normal;overflow-wrap:anywhere;line-height:1.35}
+.brand-course{font-size:var(--fs-meta);color:var(--text-muted);font-weight:600;margin-top:2px;white-space:normal;overflow-wrap:anywhere;line-height:var(--lh-meta)}
 .nav-list{display:flex;flex-direction:column;gap:5px;margin-top:14px}
-.nav-item{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:12px;font-size:.85rem;font-weight:550;color:var(--text-muted);cursor:pointer;border:1px solid transparent;transition:background .15s ease,color .15s ease,box-shadow .15s ease;user-select:none}
+.nav-item{display:flex;align-items:center;gap:var(--nav-gap);padding:0 12px;min-height:var(--nav-h);border-radius:12px;font-size:var(--fs-sm);font-weight:550;color:var(--text-muted);cursor:pointer;border:1px solid transparent;transition:background .15s ease,color .15s ease,box-shadow .15s ease;user-select:none}
 .nav-item:hover{background:var(--row-hover);color:var(--text-main)}
 .nav-item.active{background:var(--nav-active-bg);color:var(--nav-active-text);border-color:var(--nav-active-border);font-weight:650;box-shadow:inset 0 0 0 1px var(--nav-active-border)}
-.streak-badge{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:99px;background:var(--accent-glow);color:var(--accent);font-size:.72rem;font-weight:800}
-.page-header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:22px;flex-wrap:wrap}
+.streak-badge{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:99px;background:var(--accent-glow);color:var(--accent);font-size:var(--fs-meta);font-weight:800;line-height:1}
+.page-header{
+  display:flex;align-items:flex-start;justify-content:space-between;
+  gap:var(--gap-cluster) var(--gap-page);margin:0 0 var(--sp-3);flex-wrap:wrap;
+  /* The header is the first thing on the page: it starts on the container's
+     left edge, so the eyebrow lines up with the cards below it. */
+  padding:0;position:relative;
+}
 /* (v25) ONE owner for heading type: the `--fs-*` ramp further down. Every
    other `.page-title` size in this file and in `ui-system.css` was a later
    redesign re-tuning the same H1 — six of them, four with `!important`, which
@@ -164,10 +206,14 @@ body{
   30%{transform:rotate(14deg)}40%{transform:rotate(-6deg)}
   50%{transform:rotate(10deg)}60%{transform:rotate(0)}
 }
-.page-subtitle{font-size:.85rem;color:var(--text-muted);font-weight:550;margin:4px 0 0}
+.page-subtitle{
+  font-size:var(--fs-sm);color:var(--text-muted);font-weight:550;
+  line-height:var(--lh-body);margin:var(--sp-1) 0 0;max-width:62ch;
+  text-wrap:pretty;
+}
 
 /* ============ CONTROLS ============ */
-.btn{display:inline-flex;align-items:center;justify-content:center;text-align:center;line-height:1.25;vertical-align:middle;box-sizing:border-box;gap:8px;min-height:40px;padding:8px 16px;border-radius:var(--radius-md);font-size:.85rem;font-weight:600;cursor:pointer;border:1px solid transparent;transition:transform .14s var(--spring-soft),box-shadow .16s ease,background .14s ease,border-color .14s ease,color .14s ease;font-family:inherit;white-space:nowrap;letter-spacing:-.1px}
+.btn{display:inline-flex;align-items:center;justify-content:center;text-align:center;line-height:1.2;vertical-align:middle;box-sizing:border-box;gap:var(--icon-gap);min-height:var(--btn-h);padding:8px 16px;border-radius:var(--radius-md);font-size:.85rem;font-weight:600;cursor:pointer;border:1px solid transparent;transition:transform .14s var(--spring-soft),box-shadow .16s ease,background .14s ease,border-color .14s ease,color .14s ease;font-family:inherit;white-space:nowrap;letter-spacing:-.1px}
 .btn:active{transform:scale(.975);transition-duration:.05s}
 .btn-primary{
   background:var(--accent-gradient);color:#fff;
@@ -1098,8 +1144,19 @@ body.mode-young .day-complete{font-size:.95rem;padding:15px 18px}
    notched phones and high-DPI screens.
 ═══════════════════════════════════════════════════════════════ */
 
-/* 1. Overflow guards — horizontal scroll becomes impossible */
-html,body{max-width:100vw;overflow-x:hidden}
+/* 1. Overflow guards — horizontal scroll becomes impossible.
+   `overflow-x:clip` (not `hidden`) is deliberate: `hidden` turns <body> into a
+   scroll container, and every `position:sticky` descendant then sticks to
+   that never-scrolling box instead of the viewport — which is exactly why the
+   sidebar rail and the session bar stopped pinning on desktop. `clip` cuts
+   the same overflow without creating a scroller, so sticky keeps working.
+   It is also a *safety net*, not the fix: components are fitted to their
+   container (`min-width:0` below, fluid tracks in the grids), so nothing
+   should ever reach this edge. `max-width:100vw` is gone on purpose — `100vw`
+   includes the gutter reserved by `scrollbar-gutter:stable`, so it let the
+   document box sit one scrollbar wider than the space actually available and
+   was the direct cause of content being shaved off the right edge. */
+body{overflow-x:clip}
 *{min-width:0}                       /* flex/grid children may always shrink */
 img,svg,video,canvas{max-width:100%;height:auto}
 .glass-panel,.day-block,.modal-box,.task-row{overflow-wrap:break-word}
@@ -1406,7 +1463,6 @@ body,.glass-panel,.tracker-bar,.sidebar,.task-row,.btn-secondary,.input-field,.a
 html{scrollbar-gutter:stable}
 .main-workspace{display:flex;flex-direction:column}
 .main-workspace > *{width:100%}
-.page-header{align-items:center}
 .day-head{align-items:center}
 .kpi-grid{align-items:stretch}
 .kpi-card{display:flex;flex-direction:column;justify-content:space-between;min-height:112px}
@@ -1716,7 +1772,7 @@ body.mode-focused::before{opacity:.4}
 /* Icon-first mobile nav: bigger icons, labels stay for 5-year-olds
    but icons lead (44px+ targets already enforced) */
 @media(max-width:860px){
-  .nav-item svg{width:22px;height:22px}
+  .nav-item svg{width:var(--icon-dock);height:var(--icon-dock)}
   .nav-item{min-height:48px}
 }
 
@@ -2079,7 +2135,9 @@ button,a,.nav-item,.vtab,.cal-cell,.chip,.task-row,.rate-btn,input,select{touch-
 /* Toggle: 40px round button, pinned top-right of the brand header.
    Big enough to hit confidently on tablets and touch laptops. */
 .sb-toggle{
-  position:absolute;top:2px;right:0;width:40px;height:40px;border-radius:var(--radius-md);
+  /* Same square as the brand mark, on the brand row's own line: the toggle is
+     a peer of the mark, not a sticker floating over the course name. */
+  position:absolute;top:0;right:0;width:var(--sb-toggle);height:var(--sb-toggle);border-radius:var(--radius-md);
   display:flex;align-items:center;justify-content:center;cursor:pointer;
   background:transparent;border:1px solid transparent;color:var(--text-muted);
   transition:background .15s ease,color .15s ease,transform .15s var(--spring);
@@ -2683,7 +2741,7 @@ svg{flex-shrink:0;vertical-align:middle}
     flex-direction:column;justify-content:center;align-items:center;
     text-align:center;gap:4px;padding:6px 4px;min-width:0;
   }
-  .sidebar .nav-item svg{width:22px;height:22px;margin:0 auto}
+  .sidebar .nav-item svg{width:var(--icon-dock);height:var(--icon-dock);margin:0 auto}
   .sidebar .nav-item span{
     display:block;width:100%;line-height:1.25;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
@@ -2735,7 +2793,7 @@ svg{flex-shrink:0;vertical-align:middle}
 /* ── 7. Small-phone dock breathing room ──────────────────────────── */
 @media(max-width:360px){
   .sidebar .nav-item{gap:3px;padding:5px 2px}
-  .sidebar .nav-item svg{width:20px;height:20px}
+  .sidebar .nav-item svg{width:var(--icon-lg);height:var(--icon-lg)}
 }
 
 /* ── 8. Ultra-wide safe areas: dock + header never touch the notch ─ */
@@ -2838,7 +2896,32 @@ svg{flex-shrink:0;vertical-align:middle}
   --fs-h2:clamp(1.06rem,.96rem + .48vw,1.4rem);
   --fs-h3:clamp(.92rem,.86rem + .28vw,1.1rem);
   --fs-kpi:clamp(1.5rem,1.25rem + 1.1vw,2.3rem);
+  /* A number that lives INSIDE a card (a subject's %, a hero clock) — louder
+     than body, quieter than a page KPI. Subjects/Dashboard/Settings were each
+     hardcoding this as 26px / 22px / 17px, which is how the same idea ended up
+     three different sizes on three pages. */
+  --fs-stat:clamp(1.25rem,1.05rem + 1vw,1.7rem);
   --fs-timer:clamp(2.1rem,1.55rem + 2.5vw,3.1rem);
+  /* (v26) The ramp above owned sizes but not the two roles every page kept
+     re-inventing by hand: the eyebrow above a title and the metadata under a
+     value. They are tokens now, so "small caps label" means the same thing on
+     the Planner, the Subjects grid and the Analytics ring. */
+  --fs-eyebrow:clamp(.62rem,.6rem + .1vw,.68rem);
+  --fs-meta:clamp(.68rem,.65rem + .16vw,.76rem);
+  /* Tracking belongs with the role that needs it, never on the page. */
+  --tracking-eyebrow:.16em;
+  --tracking-label:.12em;
+  /* One leading scale. Headings are tight, body is readable, metadata sits
+     between so a caption never reads as a second paragraph. */
+  --lh-display:1.08;
+  --lh-heading:1.2;
+  --lh-body:1.55;
+  --lh-meta:1.45;
+  /* Optical centre for tracked uppercase: `letter-spacing` also adds a space
+     AFTER the last glyph, so a centred tracked label always looks pushed left
+     by half a step. Anything that centres one cancels it with this. */
+  --tracking-fix-eyebrow:calc(-1 * var(--tracking-eyebrow));
+  --tracking-fix-label:calc(-1 * var(--tracking-label));
 
   --sp-1:clamp(6px,.4vw + 4px,10px);
   --sp-2:clamp(12px,.8vw + 8px,18px);
@@ -5041,7 +5124,7 @@ body.mode-young .section-title::after{width:46px;height:3px;bottom:-8px}
   /* Toggle, brand, and route glyphs use the same optical size and x-axis. */
   .app-wrapper.sb-collapsed .sb-toggle svg,
   .app-wrapper.sb-collapsed .brand-logo-icon svg,
-  .app-wrapper.sb-collapsed .sidebar .nav-item svg{width:18px;height:18px}
+  .app-wrapper.sb-collapsed .sidebar .nav-item svg{width:var(--icon-lg);height:var(--icon-lg)}
 }
 
 /* ── 2 · TRACKER BAR — compact pill on phones ──────────────────── */
@@ -5267,16 +5350,16 @@ svg{overflow:visible;flex-shrink:0;max-width:none}
 .streak-badge svg{
   width:1em;height:1em;max-width:none;flex:0 0 auto;display:block;
 }
-.brand-logo-icon svg{width:18px;height:18px}
-.nav-item svg{width:18px;height:18px}
+.brand-logo-icon svg{width:var(--icon-lg);height:var(--icon-lg)}
+.nav-item svg{width:var(--icon-lg);height:var(--icon-lg)}
 @media(max-width:860px){
-  .nav-item svg{width:22px;height:22px}
+  .nav-item svg{width:var(--icon-dock);height:var(--icon-dock)}
   .mobile-header .brand-logo-icon svg{width:14px;height:14px}
 }
 @media(min-width:861px){
   .app-wrapper.sb-collapsed .sb-toggle svg,
   .app-wrapper.sb-collapsed .brand-logo-icon svg,
-  .app-wrapper.sb-collapsed .sidebar .nav-item svg{width:18px;height:18px}
+  .app-wrapper.sb-collapsed .sidebar .nav-item svg{width:var(--icon-lg);height:var(--icon-lg)}
 }
 
 /* ════════════════════════════════════════════════════════════════════
@@ -5489,4 +5572,77 @@ body.theme-nebula .spot::before {
   .reveal { opacity: 1 !important; transform: none !important; transition: none !important; }
   .mw i { transform: none !important; transition: none !important; }
   .marquee-track { animation: none !important; }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   (v26) SUBJECT CARD + MOBILE TASK ROW — one hierarchy, tokenised
+   ──────────────────────────────────────────────────────────────────────
+   Two of the reported defects were the same defect: a component choosing its
+   own font size instead of a role from the ramp.
+
+   • The Subjects grid sized its title, its percentage and its metadata with
+     arbitrary Tailwind values, and nothing stopped a long name
+     ("Micro Economics & Macro Economics") from shoving the percentage out of
+     the card. The name now clamps to two lines inside a `min-width:0` column
+     and the percentage is `shrink-0`, so the card's width is decided by the
+     grid, never by its longest string.
+   • The Planner list on a phone rendered the subject at body scale next to
+     quieter metadata, so it read as the row's heading. The ladder is now
+     explicit and comes from the ramp: title → subject → metadata → actions.
+   ══════════════════════════════════════════════════════════════════════ */
+.subject-card-name{
+  line-height:var(--lh-heading);
+  max-width:100%;
+  overflow-wrap:anywhere;
+  display:-webkit-box;-webkit-box-orient:vertical;
+  -webkit-line-clamp:2;line-clamp:2;overflow:hidden;
+}
+.subject-card-meta{line-height:var(--lh-meta);overflow-wrap:anywhere}
+
+/* Mobile list row. Only the *scale* changes here — nothing is removed, and
+   the desktop rules are untouched. */
+@media(max-width:860px){
+  .task-card-title{font-size:var(--fs-md);line-height:var(--lh-heading)}
+  .task-card-subject{
+    font-size:var(--fs-meta);font-weight:650;line-height:var(--lh-meta);
+    min-width:0;max-width:100%;color:var(--text-muted);
+  }
+  .task-subject-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .task-meta-item{font-size:var(--fs-meta);font-weight:600;color:var(--text-dim)}
+  .task-card-brief{font-size:var(--fs-sm);line-height:var(--lh-body)}
+  /* The filter's current value is chrome, not content. */
+  .planner-filter .sp-select-btn{font-size:var(--fs-sm)}
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   (v26) AI COACH — it may float, but it may not hide the page
+   ──────────────────────────────────────────────────────────────────────
+   The coach is a fixed card at the right edge, which meant it sat directly on
+   top of the Planner's header actions and the top of the list. `body.ai-open`
+   (set by ChatPanel) reserves its column on desktop so the content reflows
+   clear of it; below the desktop breakpoint the coach is a bottom sheet with
+   a scrim, where reserving side space would be wrong, so nothing shifts.
+   The transition is the same spring the sidebar collapse uses. */
+/* Only applied where the page can afford to give up the column: below 1280px
+   reserving 432px would leave the Planner too narrow to read, and there the
+   coach already behaves as a card the user can dismiss. */
+@media(min-width:1280px){
+  body.ai-open .main-workspace{
+    padding-right:calc(var(--ai-panel-w) + var(--ai-panel-gap));
+    transition:padding-right var(--dur-complex) var(--spring-soft);
+  }
+}
+
+/* Phone: a bottom sheet, capped so the page behind it stays reachable and the
+   input never lands under the dock. */
+@media(max-width:640px){
+  .ai-panel{height:min(72dvh,560px)}
+}
+
+/* A toast that offers a recovery verb: the button sits on the message's
+   optical line and never wraps onto its own row on a phone. */
+.toast-action{flex:0 0 auto;margin-inline-start:2px}
+@media(max-width:480px){
+  .toast{flex-wrap:wrap}
+  .toast-action{margin-inline-start:0}
 }

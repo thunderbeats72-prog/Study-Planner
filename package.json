@@ -8,9 +8,10 @@
     "build:db": "drizzle-kit push && next build",
     "start": "next start",
     "test": "tsx scripts/test-suite.ts",
+    "ui-audit": "tsx scripts/ui-audit.ts",
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
-    "check": "npm run typecheck && npm run lint && npm test",
+    "check": "npm run typecheck && npm run lint && npm test && tsx scripts/ui-audit.ts --budget",
     "db:push": "drizzle-kit push"
   },
   "dependencies": {

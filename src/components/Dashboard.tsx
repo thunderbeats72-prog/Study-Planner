@@ -384,7 +384,7 @@ export default function Dashboard({
                 {heroLive ? (
                   <>
                     <span
-                      className="mono text-[22px] font-extrabold mr-2"
+                      className="mono text-[length:var(--fs-stat)] font-extrabold mr-2"
                       style={{ color: "var(--accent)" }}
                     >
                       {mmss(activeClockSeconds ?? 0)}
