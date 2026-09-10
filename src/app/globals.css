@@ -1,4 +1,12 @@
-@import "tailwindcss";
+/* Tailwind scans for utility classes from the whole project by default. This
+   repo carries two stale mirror trees (`/components`, `/lib`, `/api` at the
+   root and `/deploy-package`) that README.txt explicitly says are NOT the
+   source of truth — `src/` is. They were still being scanned, so utilities
+   for markup nothing renders (`.text-[17px]`, and the rest of the hardcoded
+   sizes this pass removed) kept shipping in the bundle. Scope the scan to the
+   tree that actually runs. */
+@import "tailwindcss" source(none);
+@source "../";
 
 /* ==================================================
    DESIGN TOKENS & THEMES
