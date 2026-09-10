@@ -6,7 +6,7 @@ import {
   IconCheck, IconClose, IconDownload, IconGear, IconMoon, IconPalette,
   IconRefresh, IconSpark, IconTarget, IconTrash, IconUser, IconVolume, IconWarn,
 } from "./icons";
-import { PageHead } from "./bits";
+import { PageHead, Select } from "./bits";
 import { Reveal, Spot } from "@/lib/fx";
 import { cn } from "@/lib/cn";
 
@@ -150,16 +150,16 @@ export default function SettingsView({
               </div>
               <div>
                 <label className="lbl" htmlFor="set-subjects">Subjects / Day</label>
-                <select
+                <Select
                   id="set-subjects"
-                  className="input-field font-bold"
-                  value={local.subjectsPerDay}
-                  onChange={(e) => set("subjectsPerDay", Number(e.target.value))}
-                >
-                  {[1, 2, 3, 4, 5, 6].map((n) => (
-                    <option key={n} value={n}>{n}/day</option>
-                  ))}
-                </select>
+                  ariaLabel="Subjects per day"
+                  value={String(local.subjectsPerDay)}
+                  onChange={(v) => set("subjectsPerDay", Number(v))}
+                  options={[1, 2, 3, 4, 5, 6].map((n) => ({
+                    value: String(n),
+                    label: `${n}/day`,
+                  }))}
+                />
               </div>
             </div>
 
@@ -233,16 +233,17 @@ export default function SettingsView({
           <div className="grid gap-4 sm:grid-cols-3">
             <div>
               <label className="lbl" htmlFor="set-days">Study Days Mode</label>
-              <select
+              <Select
                 id="set-days"
-                className="input-field"
+                ariaLabel="Study days mode"
                 value={local.studyDays}
-                onChange={(e) => set("studyDays", e.target.value)}
-              >
-                <option value="all">All 7 days</option>
-                <option value="6days">6 days (Sun off)</option>
-                <option value="weekdays">Weekdays only</option>
-              </select>
+                onChange={(v) => set("studyDays", v)}
+                options={[
+                  { value: "all", label: "All 7 days" },
+                  { value: "6days", label: "6 days (Sun off)" },
+                  { value: "weekdays", label: "Weekdays only" },
+                ]}
+              />
             </div>
 
             <div>
@@ -260,45 +261,49 @@ export default function SettingsView({
 
             <div>
               <label className="lbl" htmlFor="set-mode">Plan Generation Mode</label>
-              <select
+              <Select
                 id="set-mode"
-                className="input-field"
+                ariaLabel="Plan generation mode"
                 value={local.planMode}
-                onChange={(e) => set("planMode", e.target.value)}
-              >
-                <option value="syllabus">Syllabus</option>
-                <option value="revision">Revision</option>
-                <option value="mock">Mock-heavy</option>
-              </select>
+                onChange={(v) => set("planMode", v)}
+                options={[
+                  { value: "syllabus", label: "Syllabus" },
+                  { value: "revision", label: "Revision" },
+                  { value: "mock", label: "Mock-heavy" },
+                ]}
+              />
             </div>
 
             <div>
               <label className="lbl" htmlFor="set-style">Learning Style</label>
-              <select
+              <Select
                 id="set-style"
-                className="input-field"
+                ariaLabel="Learning style"
                 value={local.studyStyle}
-                onChange={(e) => set("studyStyle", e.target.value)}
-              >
-                <option value="balanced">Balanced</option>
-                <option value="theory">Theory heavy</option>
-                <option value="practice">Practice heavy</option>
-              </select>
+                onChange={(v) => set("studyStyle", v)}
+                options={[
+                  { value: "balanced", label: "Balanced" },
+                  { value: "theory", label: "Theory heavy" },
+                  { value: "practice", label: "Practice heavy" },
+                ]}
+              />
             </div>
 
             <div>
               <label className="lbl" htmlFor="set-weak">Weakest Subject Focus</label>
-              <select
+              <Select
                 id="set-weak"
-                className="input-field"
+                ariaLabel="Weakest subject focus"
                 value={local.weakSubject}
-                onChange={(e) => set("weakSubject", e.target.value)}
-              >
-                <option value="none">None</option>
-                {state.subjects.map((x) => (
-                  <option key={x.id} value={String(x.id)}>{x.name}</option>
-                ))}
-              </select>
+                onChange={(v) => set("weakSubject", v)}
+                options={[
+                  { value: "none", label: "None" },
+                  ...state.subjects.map((x) => ({
+                    value: String(x.id),
+                    label: x.name,
+                  })),
+                ]}
+              />
             </div>
 
             <div>

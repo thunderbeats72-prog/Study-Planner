@@ -24,7 +24,7 @@ import {
 import TaskEditor, { type TaskPatch } from "./TaskEditor";
 import QuickAdd from "./QuickAdd";
 import { CalendarScene } from "./Illustrations";
-import { PageHead, Seg, StatusChip, KindIcon } from "./bits";
+import { PageHead, Seg, Select, StatusChip, KindIcon } from "./bits";
 import TaskCard from "./TaskCard";
 import { Reveal } from "@/lib/fx";
 import { useBackClose } from "@/lib/useBackClose";
@@ -270,21 +270,18 @@ export default function PlannerView({
           />
           <label className="planner-filter">
             <span className="planner-filter-label">Subject</span>
-            <select
-              className="input-field"
+            <Select
+              ariaLabel="Filter tasks by subject"
               value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              aria-label="Filter tasks by subject"
-            >
-              <option value="all">
-                All subjects ({state.subjects.length})
-              </option>
-              {state.subjects.map((sb) => (
-                <option key={sb.id} value={String(sb.id)}>
-                  {sb.name}
-                </option>
-              ))}
-            </select>
+              onChange={setFilter}
+              options={[
+                { value: "all", label: `All subjects (${state.subjects.length})` },
+                ...state.subjects.map((sb) => ({
+                  value: String(sb.id),
+                  label: sb.name,
+                })),
+              ]}
+            />
           </label>
         </div>
       </Reveal>

@@ -19,7 +19,7 @@ import {
   IconFlame,
 } from "./icons";
 import { ClockScene } from "./Illustrations";
-import { PageHead } from "./bits";
+import { PageHead, Select } from "./bits";
 import { Reveal, Spot } from "@/lib/fx";
 import { cn } from "@/lib/cn";
 
@@ -232,23 +232,19 @@ export default function FocusView({
                   </label>
                   <span className="field-hint">Optional</span>
                 </div>
-                <select
+                <Select
                   id="clock-subject"
-                  className="input-field"
-                  value={clock.subjectId ?? ""}
-                  onChange={(e) =>
-                    clock.setSubjectId(
-                      e.target.value ? Number(e.target.value) : null,
-                    )
-                  }
-                >
-                  <option value="">— none —</option>
-                  {state.subjects.map((x) => (
-                    <option key={x.id} value={x.id}>
-                      {x.name}
-                    </option>
-                  ))}
-                </select>
+                  ariaLabel="Studying subject"
+                  value={clock.subjectId ? String(clock.subjectId) : ""}
+                  onChange={(v) => clock.setSubjectId(v ? Number(v) : null)}
+                  options={[
+                    { value: "", label: "— none —" },
+                    ...state.subjects.map((x) => ({
+                      value: String(x.id),
+                      label: x.name,
+                    })),
+                  ]}
+                />
               </div>
 
               <div className="field">
@@ -258,24 +254,24 @@ export default function FocusView({
                   </label>
                   <span className="field-hint">Optional</span>
                 </div>
-                <select
+                <Select
                   id="clock-task"
-                  className="input-field"
-                  value={clock.taskId ?? ""}
-                  onChange={(e) => {
-                    const v = e.target.value ? Number(e.target.value) : null;
-                    clock.setTaskId(v);
-                    const task = state.tasks.find((x) => x.id === v);
+                  ariaLabel="Attach to today's task"
+                  value={clock.taskId ? String(clock.taskId) : ""}
+                  onChange={(v) => {
+                    const n = v ? Number(v) : null;
+                    clock.setTaskId(n);
+                    const task = state.tasks.find((x) => x.id === n);
                     if (task?.subjectId) clock.setSubjectId(task.subjectId);
                   }}
-                >
-                  <option value="">— free session —</option>
-                  {todayTasks.map((x) => (
-                    <option key={x.id} value={x.id}>
-                      {x.title}
-                    </option>
-                  ))}
-                </select>
+                  options={[
+                    { value: "", label: "— free session —" },
+                    ...todayTasks.map((x) => ({
+                      value: String(x.id),
+                      label: x.title,
+                    })),
+                  ]}
+                />
               </div>
             </div>
           </div>

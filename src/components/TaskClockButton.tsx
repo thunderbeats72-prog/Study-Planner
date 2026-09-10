@@ -2,7 +2,7 @@
 
 import React from "react";
 import { mmss } from "@/lib/useTimer";
-import { IconCheck, IconStopwatch, IconSwap } from "./icons";
+import { IconStop, IconStopwatch, IconSwap } from "./icons";
 
 /**
  * The ONE clock button every task row shares — on the Overview, the
@@ -45,7 +45,7 @@ export default function TaskClockButton({
         aria-label="Clock out of this task"
       >
         <span className="clock-live-dot" aria-hidden="true" />
-        <IconCheck size={13} />
+        <IconStop size={13} />
         <span>End session</span>
       </button>
     );

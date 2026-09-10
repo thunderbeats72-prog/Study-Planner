@@ -864,6 +864,24 @@ async function runTests() {
   check(isBreakMode("short") && isBreakMode("long") && !isBreakMode("pomodoro") && !isBreakMode("stopwatch"),
     "Only the short and long modes count as breaks");
 
+  /* A clock the learner started by hand (Planner "Clock in", a task row) is a
+     first-class session too: Pause must stop it, Resume must restart it and
+     Break must take it off the bill — none of which may spin up the focus
+     countdown or grab ownership. This used to be the missing half: manual
+     sessions ignored Pause and Break entirely. */
+  const manual = snap({ clockSessionActive: true, clockRunning: true });
+  effects = planEffects({ type: "pause" }, manual);
+  check(effects.includes("clock.pause") && !effects.includes("timer.pause"),
+    "Pause rests a hand-started clock without touching the focus timer");
+  effects = planEffects({ type: "start" }, snap({ clockSessionActive: true }));
+  check(effects.includes("clock.resume") && !effects.includes("timer.start") && !effects.includes("own.focus"),
+    "Resume restarts a paused manual clock without starting a pomodoro or grabbing ownership");
+  effects = planEffects({ type: "break" }, manual);
+  check(effects.includes("clock.break") && !effects.includes("timer.pause"),
+    "Take a break works for manual sessions too");
+  check(planEffects({ type: "toggle" }, manual).includes("clock.pause"),
+    "The single toggle pauses a running manual session");
+
   // The invariant: the two timers of a focus-owned session may never drift.
   check(planEffects({ type: "reconcile" }, live).length === 0, "A session already in step needs no repair");
   check(planEffects({ type: "reconcile" },
@@ -1037,8 +1055,27 @@ async function runTests() {
     check(/--pad-card:/.test(sheets) && /--pad-tight:/.test(sheets) && /--gap-page:/.test(sheets),
       "Spacing comes from the shared pad/gap tokens, not per-card numbers");
 
+    /* The month is rows of seven cells; the grid only stacks the rows. A
+       seven-column template on `.cal-grid` would lay the header + week rows
+       side by side as seven crushed strips — exactly the broken month that
+       shipped on phones. */
+    const calGridCols = [...sheets.matchAll(/\.cal-grid\s*\{([^}]*)\}/g)]
+      .some(([, body]) => /grid-template-columns\s*:/.test(body));
+    check(!calGridCols, "The calendar grid stacks week rows (rows own their seven columns)");
+
     check(!/var\(--[a-z0-9-]+,\s*#/.test(componentFiles),
       "No hardcoded hex fallbacks are left inside var() in the components");
+
+    /* Native <select> hands the open popup to the OS — the blue-row Android
+       spinner that fought every theme. Every dropdown is now the shared
+       themed listbox from bits.tsx. */
+    const allComponents = componentFiles +
+      ["Onboarding.tsx", "SettingsView.tsx", "SubjectsView.tsx", "FocusView.tsx", "QuickAdd.tsx", "TaskEditor.tsx"]
+        .map((f) => readFileSync(join(process.cwd(), `src/components/${f}`), "utf8"))
+        .map(strip)
+        .join("\n");
+    check(!/<select/.test(allComponents),
+      "No native <select> remains in the views — dropdowns use the themed listbox");
     check(!/JetBrains\s*Mono/.test(sheets),
       "No second font-family name for the numerals — --font-num is the alias");
     check(/--font-num:/.test(sheets), "--font-num (tabular numerals) is defined once");

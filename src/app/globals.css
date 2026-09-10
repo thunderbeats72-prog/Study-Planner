@@ -218,7 +218,10 @@ select.input-field{appearance:none;background-image:linear-gradient(45deg,transp
 .vtab.active{background:var(--surface-solid);color:var(--accent);box-shadow:0 2px 8px rgba(0,0,0,.06)}
 
 /* calendar */
-.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}
+/* The month is ROWS of seven cells (`.cal-row`), not 35 direct children —
+   a 7-column template here would lay the header + week rows side by side as
+   seven crushed strips. Rows own their own columns; the grid only stacks. */
+.cal-grid{display:grid;gap:8px}
 .cal-dow{font-size:.68rem;font-weight:800;text-transform:uppercase;color:var(--text-muted);text-align:center;padding:4px 0}
 .cal-cell{min-height:88px;border-radius:var(--radius-md);background:var(--row-bg);border:1px solid transparent;padding:8px;cursor:pointer;transition:all .2s ease}
 .cal-cell:hover{border-color:var(--accent);background:var(--row-hover)}

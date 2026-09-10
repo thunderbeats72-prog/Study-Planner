@@ -7,6 +7,7 @@ import {
   validateQuickAdd, type QuickAddErrors, type QuickAddKind, type QuickAddPayload,
 } from "@/lib/quickAdd";
 import { IconClose, IconPlus } from "./icons";
+import { Select } from "./bits";
 
 const MINUTE_CHOICES = [15, 25, 30, 45, 60];
 
@@ -134,12 +135,18 @@ export default function QuickAdd({
             </label>
             <label className="qa-field">
               <span className="lbl">Subject <span className="lbl-opt">(optional)</span></span>
-              <select className="input-field" value={subjectId} onChange={(event) => setSubjectId(event.target.value)}>
-                <option value="">No subject</option>
-                {state.subjects.map((subject) => (
-                  <option key={subject.id} value={subject.id}>{subject.name}</option>
-                ))}
-              </select>
+              <Select
+                ariaLabel="Subject"
+                value={subjectId}
+                onChange={setSubjectId}
+                options={[
+                  { value: "", label: "No subject" },
+                  ...state.subjects.map((subject) => ({
+                    value: String(subject.id),
+                    label: subject.name,
+                  })),
+                ]}
+              />
             </label>
             <label className="qa-field">
               <span className="lbl">When</span>
@@ -159,11 +166,15 @@ export default function QuickAdd({
             </label>
             <label className="qa-field">
               <span className="lbl">Type</span>
-              <select className="input-field" value={kind} onChange={(event) => setKind(event.target.value as QuickAddKind)}>
-                {QUICK_ADD_KINDS.map((option) => (
-                  <option key={option} value={option}>{QUICK_ADD_KIND_LABELS[option]}</option>
-                ))}
-              </select>
+              <Select
+                ariaLabel="Type"
+                value={kind}
+                onChange={(v) => setKind(v as QuickAddKind)}
+                options={QUICK_ADD_KINDS.map((option) => ({
+                  value: option,
+                  label: QUICK_ADD_KIND_LABELS[option],
+                }))}
+              />
             </label>
           </div>
           <div className="quick-add-actions">

@@ -1163,7 +1163,7 @@ body {
      always win. */
   .mobile-bottom-nav {
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
     gap: 2px;
     /* z stays under the chat sheet (201), modals (300), drawer (350) and
        toasts (400) so every overlay can cover the bar when it needs to. */
@@ -3896,10 +3896,10 @@ h1, h2, h3, .page-title, .mw i { font-style: normal; }
   .ob-card { padding: 22px 18px; }
 }
 
-/* ── 5 · MOBILE DOCK — five items, reference pill behind the icon ──── */
+/* ── 5 · MOBILE DOCK — six items, reference pill behind the icon ───── */
 @media (max-width: 860px) {
   .mobile-bottom-nav {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
   }
   .mbn-item {
     gap: 4px;
@@ -3928,20 +3928,10 @@ h1, h2, h3, .page-title, .mw i { font-style: normal; }
   .ai-fab { bottom: calc(80px + env(safe-area-inset-bottom)); }
 }
 
-/* ── 6 · MOBILE APP BAR — “More” trigger opens the full drawer ──────── */
-.mh-more {
-  flex: 0 0 auto;
-  width: 34px; height: 34px;
-  display: inline-flex; align-items: center; justify-content: center;
-  border-radius: 11px;
-  border: 1px solid var(--glass-border);
-  background: var(--surface);
-  color: var(--text-muted);
-  cursor: pointer;
-  transition: color .15s ease, border-color .15s ease, background .15s ease;
-}
-.mh-more:hover, .mh-more:active { color: var(--accent); border-color: var(--nav-active-border); }
-.mh-more svg { width: 18px; height: 18px; display: block; }
+/* ── 6 · MOBILE APP BAR ────────────────────────────────────────────────
+   The three-line "More" trigger is gone: Analytics rides the bottom dock
+   and every drawer tool has a home elsewhere, so the hamburger was just a
+   second, vaguer door. The app bar now carries brand + streak only. */
 
 /* Bell + theme in the app bar — only on phones, where the tracker bar
    hides its own quick trio below 640px. Between 640 and 860px the
@@ -4976,4 +4966,69 @@ body.theme-sunset {
 }
 @media (prefers-reduced-motion: reduce) {
   .planner-day { transition: none; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   SELECT — one styled listbox everywhere.
+   Native <select> popups are the OS's, not ours: the blue-row Android
+   spinner fought every theme. This is a real listbox — button trigger,
+   popover list, full keyboard support — painted from the same semantic
+   tokens as the rest of the chrome, so it follows all seven themes.
+   ═══════════════════════════════════════════════════════════════════ */
+.sp-select { position: relative; min-width: 0; }
+.sp-select-btn {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  width: 100%; min-height: 42px; padding: 9px 13px;
+  border: 1px solid var(--glass-border); border-radius: var(--radius-md);
+  background: var(--surface); color: var(--text-main);
+  font-family: inherit; font-size: .84rem; font-weight: 600; line-height: 1.3;
+  text-align: left; cursor: pointer;
+  transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
+}
+.sp-select-btn:hover { border-color: var(--nav-active-border); }
+.sp-select-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.sp-select-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sp-select-caret { flex: 0 0 auto; color: var(--text-dim); transition: transform .18s ease; }
+.sp-select.is-open .sp-select-caret { transform: rotate(180deg); }
+.sp-select-pop {
+  position: absolute; z-index: 90; top: calc(100% + 6px); left: 0; right: 0;
+  max-height: min(300px, 42vh); overflow-y: auto; padding: 5px;
+  background: var(--surface-elevated);
+  border: 1px solid var(--glass-border); border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg); outline: none;
+  animation: sp-pop .16s ease backwards;
+  overscroll-behavior: contain;
+}
+@keyframes sp-pop { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+.sp-option {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  width: 100%; padding: 9px 10px; border: none; border-radius: 9px;
+  background: transparent; color: var(--text-main);
+  font-family: inherit; font-size: .82rem; font-weight: 550; line-height: 1.35;
+  text-align: left; cursor: pointer;
+}
+.sp-option + .sp-option { margin-top: 1px; }
+.sp-option.is-active { background: var(--row-hover); }
+.sp-option.is-selected { color: var(--accent); font-weight: 750; }
+.sp-option-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sp-option > svg { flex: 0 0 auto; color: var(--accent); }
+.sp-select-pop .sp-option:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+@media (max-width: 480px) {
+  .sp-select-btn { min-height: 44px; font-size: .82rem; }
+  .sp-option { padding: 10px 10px; font-size: .82rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sp-select-pop { animation: none; }
+  .sp-select-caret { transition: none; }
+}
+
+/* ── chrome alignment: one visual row-height in the tracker bar ─────── */
+.tracker-quick-controls .icon-quick-btn { width: 32px; height: 32px; border-radius: 10px; }
+.tracker-quick-controls .icon-quick-btn svg { width: 15px; height: 15px; }
+.planner-filter .sp-select { flex: 1 1 auto; min-width: 0; }
+
+/* Six dock tabs on the narrowest phones: keep labels legible, not clipped */
+@media (max-width: 400px) {
+  .mbn-item { font-size: .58rem; letter-spacing: 0; }
+  .mbn-item svg { width: 19px; height: 19px; }
 }

@@ -12,7 +12,7 @@ import {
   type TaskRow,
   type TopicRow,
 } from "@/lib/client";
-import { IconBook, IconCalendar, IconClock, IconSpark } from "./icons";
+import { IconBook, IconBookOpen, IconCalendar, IconClock, IconSpark } from "./icons";
 import { KindChip } from "./bits";
 import TaskActions from "./TaskActions";
 import { TaskLiveBadge } from "./TaskClockButton";
@@ -194,7 +194,7 @@ export default function TaskCard({
                   : "Read the lesson brief, prerequisites and key concepts"
               }
             >
-              <IconSpark size={13} />
+              <IconBookOpen size={13} />
               <span>{briefOpen ? "Hide brief" : "Lesson brief"}</span>
             </button>
           )}

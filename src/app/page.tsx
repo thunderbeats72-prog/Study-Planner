@@ -51,7 +51,6 @@ import {
   IconHome,
   IconLeaf,
   IconLogo,
-  IconMenu,
   IconPalette,
   IconPanelLeft,
   IconPause,
@@ -91,9 +90,9 @@ function zenGuidance(timer: TimerApi): string {
     : "Begin when you are ready";
 }
 
-/* `dock` marks the five primary destinations that fit the mobile bottom
-   navigation. Analytics stays reachable on phones through the drawer
-   ("More" in the app bar) and through the dashboard's deep-links. */
+/* `dock` marks the primary destinations in the mobile bottom navigation.
+   Analytics rides the dock too: the app-bar "More" hamburger it used to live
+   behind was removed on phones, so the dock is its one obvious door. */
 const NAV: {
   id: Page;
   label: string;
@@ -104,7 +103,7 @@ const NAV: {
   { id: "planner", label: "Planner", icon: <IconCalendar />, dock: true },
   { id: "focus", label: "Focus", icon: <IconClock />, dock: true },
   { id: "subjects", label: "Subjects", icon: <IconBook />, dock: true },
-  { id: "analytics", label: "Analytics", icon: <IconChart /> },
+  { id: "analytics", label: "Analytics", icon: <IconChart />, dock: true },
   { id: "settings", label: "Settings", icon: <IconGear />, dock: true },
 ];
 
@@ -923,7 +922,11 @@ export default function Home() {
       session.pause();
     } else if (clock.sessionActive) {
       session.start();
-      notify("Resumed — focus timer and study clock are running together.");
+      notify(
+        session.focusOwnsClock
+          ? "Resumed — focus timer and study clock are running together."
+          : "Resumed — the study clock is running.",
+      );
     } else {
       startSmartClock();
     }
@@ -1504,15 +1507,6 @@ export default function Home() {
               )}
             </span>
           </span>
-          <button
-            type="button"
-            className="mh-more"
-            aria-label="Open menu"
-            aria-expanded={drawerOpen}
-            onClick={() => setDrawerOpen(true)}
-          >
-            <IconMenu size={18} />
-          </button>
         </div>
       </header>
 
