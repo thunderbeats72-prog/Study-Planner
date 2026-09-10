@@ -5296,6 +5296,11 @@ span.cal-cell.is-empty:hover {
   font-weight: 650;
 }
 .task-card-actions { align-items: center; }
+/* A task can be auto-completed at the planned minute while the learner is
+   still closing out the current clock segment. Live recording wins visually:
+   never cross out the lesson that is currently being studied. */
+.task-card.is-live.is-done .task-card-title { text-decoration: none; }
+.task-card.is-live.is-done .task-card-brief { opacity: 1; }
 
 @media (max-width: 640px) {
   .task-card-actions .btn-xs { min-height: 38px; }
