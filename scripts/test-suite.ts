@@ -28,6 +28,7 @@ import {
   spreadAcrossDays, suggestedRecovery, todayOverload, GENTLE_EXTRA_PER_DAY,
 } from "../src/lib/recovery";
 import { validateQuickAdd, QUICK_ADD_KINDS } from "../src/lib/quickAdd";
+import { summarizeAttempts, userFacingAiNotice } from "../src/app/api/chat/route";
 import type { TaskRow } from "../src/lib/client";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -1385,6 +1386,95 @@ async function runTests() {
       "The onboarding button row never claims full width beside the privacy note (full-width is phone-only)");
     const privacyFlex = /\.ob-privacy\{[^}]*flex\s*:\s*1/.test(globalsCss);
     check(privacyFlex, "The onboarding privacy note gets the flexible space in the footer row");
+
+    /* ── The tutor's failure wording ─────────────────────────────────────
+       `summarizeAttempts` is an operator diagnosis: it names providers,
+       model IDs and *_API_KEY variables, and it used to be pushed straight
+       into a toast. The learner-facing string is a different function with a
+       different contract, and these assert that contract for every failure
+       category the cloud chain can report. */
+    const attemptSets: { label: string; attempts: { provider: string; model: string; status: number | null; error?: string }[] }[] = [
+      { label: "no provider configured", attempts: [] },
+      { label: "rejected key",  attempts: [{ provider: "cerebras", model: "llama-3.3-70b", status: 401, error: "auth" }] },
+      { label: "retired model", attempts: [{ provider: "mistral", model: "old-model", status: 400, error: "model" }] },
+      { label: "rate limited",  attempts: [{ provider: "groq", model: "llama", status: 429, error: "rate_limit" }] },
+      { label: "timed out",     attempts: [{ provider: "cohere", model: "command", status: null, error: "timeout" }] },
+      { label: "network block", attempts: [{ provider: "gemini", model: "flash", status: null, error: "network" }] },
+      { label: "unknown",       attempts: [{ provider: "openrouter", model: "x", status: 500 }] },
+    ];
+    const FORBIDDEN = /CEREBRAS|MISTRAL|SAMBANOVA|COHERE|GEMINI|GROQ|OPENROUTER|API_KEY|api\/ai-status|llama|flash|command-r|model ID|egress rules/i;
+    let noticeLeaks = 0;
+    let unclassified = 0;
+    for (const set of attemptSets) {
+      const n = userFacingAiNotice(set.attempts);
+      if (FORBIDDEN.test(n.notice) || FORBIDDEN.test(n.code)) noticeLeaks++;
+      if (!n.notice.trim() || !n.code.trim()) unclassified++;
+    }
+    check(noticeLeaks === 0,
+      "No learner-facing AI notice names a provider, model ID or environment variable");
+    check(unclassified === 0,
+      "Every cloud failure category maps to a notice and a stable code");
+    check(userFacingAiNotice(attemptSets[3].attempts).retryable === true &&
+          userFacingAiNotice(attemptSets[0].attempts).retryable === false,
+      "A transient failure offers Retry; local-only mode does not offer a pointless one");
+    /* The operator string must still be diagnostic — the fix is about routing,
+       not about hiding the truth from whoever can act on it. */
+    check(/CEREBRAS_API_KEY/.test(summarizeAttempts(attemptSets[1].attempts)),
+      "The operator-facing diagnosis still names the keys an operator can fix");
+    /* And the route must not put either string on the wire as `message`. */
+    const chatRoute = readFileSync(join(process.cwd(), "src/app/api/chat/route.ts"), "utf8");
+    check(!/message:\s*summarizeAttempts/.test(chatRoute) &&
+          !/attempts:\s*result\.attempts\.map/.test(chatRoute),
+      "The chat route no longer sends the raw attempt chain to the browser");
+
+    /* ── v26 regressions ─────────────────────────────────────────────────
+       Each of these was a real defect found by reading the cascade, and each
+       one is the kind of thing a later patch sheet can silently reintroduce.
+       They assert the *mechanism*, not the visual result, so they stay true
+       across themes and breakpoints. */
+
+    /* `overflow-x:hidden` on the document clips content at the right edge
+       instead of fitting it, and because it turns <body> into a scroll
+       container it also stops `position:sticky` from working on the sidebar
+       rail and the session bar. `clip` cuts the same overflow without
+       creating a scroller, which is why exactly one `clip` is allowed. */
+    check(!/^(html|body|html\s*,\s*body)\s*\{[^}]*overflow-x:\s*hidden/m.test(sheets),
+      "The document is never clipped with overflow-x:hidden (sticky keeps working)");
+    check(/body\s*\{\s*overflow-x:\s*clip/.test(sheets),
+      "One overflow-x:clip safety net remains on body");
+    check(!/^(html|body|html\s*,\s*body)\s*\{[^}]*max-width:\s*100vw/m.test(sheets),
+      "No max-width:100vw on the document (100vw counts the reserved scrollbar gutter)");
+
+    /* The header used to reserve room for an absolutely-positioned
+       illustration with padding-right, in four different amounts, and inset
+       its own copy 4px from the container edge. It is a grid now. */
+    check(!/\.page-header\s*\{[^}]*padding-right:\s*(min\(29vw|220px|245px)/.test(sheets) &&
+          !/padding:\s*20px 315px/.test(sheets),
+      "The page header reserves no padding for the illustration");
+    check(/\.page-header\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s+auto/.test(sheets),
+      "The desktop page header is a two-column grid with a shrinkable copy track");
+    check(!/\.page-header\s*\{[^}]*margin:\s*0 2px/.test(sheets),
+      "The page header starts on the container's left edge (no 2px inset)");
+
+    /* A literal floor on a non-shrinking flex item overflows any row narrower
+       than the floor plus its siblings. */
+    check(!/min-width:\s*350px/.test(sheets),
+      "No literal min-width floor on the task-row action column");
+
+    /* Per-page type is how six headers ended up with six different sizes. */
+    const hardcodedType = ["SubjectsView.tsx", "SettingsView.tsx", "Dashboard.tsx", "AnalyticsView.tsx"]
+      .map((f) => readFileSync(join(process.cwd(), `src/components/${f}`), "utf8"))
+      .join("\n")
+      .match(/text-\[\d+(?:\.\d+)?px\]/g) ?? [];
+    check(hardcodedType.length === 0,
+      "No component hardcodes a font size outside the --fs-* ramp");
+
+    /* The ring readout must be centred by geometry, not by a nudge that was
+       tuned against one percentage. */
+    check(/\.ring-center\s*\{[^}]*place-content:\s*center/.test(sheets),
+      "The ring readout centres its content box, not an offset");
+    check(!/\.ring-state\s*\{[^}]*margin-right:\s*-\.18em/.test(sheets),
+      "The ring label carries no hardcoded tracking nudge");
 
     const importantCount = (sheets.match(/!important/g) ?? []).length;
     check(importantCount <= 900, `The !important count keeps falling (${importantCount} vs 1107 at the merge baseline)`);

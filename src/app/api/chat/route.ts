@@ -154,7 +154,7 @@ type AiAttempt = { provider: string; model: string; status: number | null; error
  * environment-variable names, and a learner cannot act on any of it. The
  * user-facing wording lives in `userFacingAiNotice` below.
  */
-function summarizeAttempts(attempts: AiAttempt[]): string {
+export function summarizeAttempts(attempts: AiAttempt[]): string {
   if (!attempts.length) {
     return "No cloud provider is configured — the local ML engine answered. Add a CEREBRAS_API_KEY, MISTRAL_API_KEY, SAMBANOVA_API_KEY, COHERE_API_KEY, or GEMINI_API_KEY to enable cloud tutoring.";
   }
@@ -192,7 +192,7 @@ function summarizeAttempts(attempts: AiAttempt[]): string {
  *   • one short sentence plus, where it helps, what to do next;
  *   • a stable machine `code` so the UI can offer Retry without parsing prose.
  */
-function userFacingAiNotice(attempts: AiAttempt[]): { code: string; notice: string; retryable: boolean } {
+export function userFacingAiNotice(attempts: AiAttempt[]): { code: string; notice: string; retryable: boolean } {
   if (!attempts.length) {
     return {
       code: "AI_LOCAL_ONLY",
