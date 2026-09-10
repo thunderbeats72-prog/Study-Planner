@@ -308,7 +308,7 @@ export const IconFilter = ({ size = 16, className, style }: P) => (
 export const IconUndo = ({ size = 16, className, style }: P) => (
   <svg {...base(size)} className={className} style={style}>
     <path d="M9 14 4 9l5-5" />
-    <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />
+    <path d="M4 9h10a6 6 0 0 1 0 12h-1" />
   </svg>
 );
 export const IconStop = ({ size = 16, className, style }: P) => (
@@ -332,9 +332,9 @@ export const IconSwap = ({ size = 16, className, style }: P) => (
    three parts — crown, dial, hand — with nothing touching the rim. */
 export const IconStopwatch = ({ size = 16, className, style }: P) => (
   <svg {...base(size)} className={className} style={style}>
-    <path d="M10 2h4" />
-    <path d="M12 2v4" />
-    <circle cx="12" cy="14" r="8" />
-    <path d="M12 14l3-2" />
+    <circle cx="12" cy="13" r="8" />
+    <path d="M12 9v4l2.5 1.5" />
+    <path d="M9 2h6M12 2v3" />
+    <path d="m17 5 2-2" />
   </svg>
 );

@@ -23,6 +23,8 @@ export default function TaskActions({
   subject,
   activeTaskId,
   clockSessionActive,
+  clockRunning,
+  onPauseOrResume,
   onTaskStatus,
   onFocusTask,
   onClockOut,
@@ -33,6 +35,8 @@ export default function TaskActions({
   subject?: SubjectRow | null;
   activeTaskId?: number | null;
   clockSessionActive?: boolean;
+  clockRunning?: boolean;
+  onPauseOrResume?: () => void;
   onTaskStatus: (id: number, status: string, rating?: number) => void;
   onFocusTask: (taskId: number) => void;
   onClockOut: () => void;
@@ -128,8 +132,10 @@ export default function TaskActions({
           taskId={task.id}
           activeTaskId={activeTaskId}
           sessionActive={clockSessionActive}
+          clockRunning={clockRunning}
           onFocusTask={onFocusTask}
           onClockOut={onClockOut}
+          onPauseOrResume={onPauseOrResume}
         />
 
         <button

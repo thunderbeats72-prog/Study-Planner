@@ -69,6 +69,7 @@ export default function PlannerView({
   activeClockSeconds,
   clockRunning,
   clockSessionActive,
+  onPauseOrResume,
   onClockOut,
   onAskTutor,
   replanning,
@@ -84,6 +85,7 @@ export default function PlannerView({
   activeClockSeconds?: number;
   clockRunning?: boolean;
   clockSessionActive?: boolean;
+  onPauseOrResume?: () => void;
   onClockOut: () => void;
   onAskTutor: (q: string) => void;
   replanning: boolean;
@@ -566,6 +568,7 @@ export default function PlannerView({
                           live={activeTaskId === task.id}
                           liveSeconds={activeClockSeconds}
                           liveRunning={clockRunning}
+                          briefRef={expanded === task.id ? briefRef : undefined}
                           briefOpen={expanded === task.id}
                           onToggleBrief={
                             topic || task.detail
@@ -578,6 +581,8 @@ export default function PlannerView({
                           onAskTutor={onAskTutor}
                           activeTaskId={activeTaskId}
                           clockSessionActive={clockSessionActive}
+                          clockRunning={clockRunning}
+                          onPauseOrResume={onPauseOrResume}
                           onTaskStatus={onTaskStatus}
                           onFocusTask={onFocusTask}
                           onClockOut={onClockOut}
@@ -646,8 +651,18 @@ export default function PlannerView({
                     live={activeTaskId === tk.id}
                     liveSeconds={activeClockSeconds}
                     liveRunning={clockRunning}
+                    briefOpen={expanded === tk.id}
+                    onToggleBrief={
+                      topicFor(tk) || tk.detail
+                        ? () =>
+                            setExpanded(expanded === tk.id ? null : tk.id)
+                        : undefined
+                    }
+                    onAskTutor={onAskTutor}
                     activeTaskId={activeTaskId}
                     clockSessionActive={clockSessionActive}
+                    clockRunning={clockRunning}
+                    onPauseOrResume={onPauseOrResume}
                     onTaskStatus={(id, status, rating) => {
                       onTaskStatus(id, status, rating);
                     }}
