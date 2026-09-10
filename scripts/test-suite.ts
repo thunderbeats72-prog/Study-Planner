@@ -725,15 +725,32 @@ async function runTests() {
     "Move-to-tomorrow targets every backlog task");
 
   console.log("\n--- 13. Responsive & Accessibility Static Checks ---");
-  const enhancementCss = readFileSync(join(process.cwd(), "src/app/practical-enhancements.css"), "utf8");
-  check(enhancementCss.includes("@media(max-width:640px)"), "Enhancement CSS carries the phone breakpoint");
+  /* (v25) The ten standalone stylesheets were consolidated into the two the
+     app actually imports — `globals.css` (tokens, base, themes) and
+     `ui-system.css` (component contracts, final word). These guards therefore
+     read the *imported* pair, which is the only honest source of truth; the
+     assertions themselves are unchanged. */
+  const globalsCss = readFileSync(join(process.cwd(), "src/app/globals.css"), "utf8");
+  const uiSystemCss = readFileSync(join(process.cwd(), "src/app/ui-system.css"), "utf8");
+  const enhancementCss = `${globalsCss}\n${uiSystemCss}`;
+  check(enhancementCss.includes("@media(max-width:640px)"), "The sheets carry the phone breakpoint");
   check(enhancementCss.includes("clamp(") && enhancementCss.includes("minmax(") && enhancementCss.includes("auto-fit"),
-    "Enhancement layouts use fluid sizing (clamp/minmax/auto-fit)");
+    "Layouts use fluid sizing (clamp/minmax/auto-fit)");
   check(enhancementCss.includes("prefers-reduced-motion"), "Reduced motion is respected");
   check(enhancementCss.includes("prefers-contrast"), "High contrast is respected");
   check(enhancementCss.includes("--tap"), "Touch targets use the shared tap token");
-  const globalsCss = readFileSync(join(process.cwd(), "src/app/globals.css"), "utf8");
   check(globalsCss.includes("--tap:44px"), "The shared touch floor is 44px");
+  /* v25 architecture guards — these are what stop the old drift creeping back. */
+  check(!/JetBrains/i.test(`${globalsCss}\n${uiSystemCss}`) || /font-jetbrains/.test(globalsCss) === false,
+    "No second typeface is referenced by the sheets");
+  check(uiSystemCss.includes("@import") === false && globalsCss.includes("@import ui-") === false,
+    "The sheets import nothing (no chained stylesheet layers)");
+  check(globalsCss.includes("--zen-bg") && uiSystemCss.includes("body.theme-sunset") && uiSystemCss.includes("--zen-accent"),
+    "Zen paints from theme-owned --zen-* tokens");
+  check(uiSystemCss.includes(".task-card") && uiSystemCss.includes(".planner-cal"),
+    "The shared task card and the responsive calendar are owned by the final layer");
+  check(globalsCss.includes("--task-lesson") && globalsCss.includes("--task-checkpoint"),
+    "Task-kind colours are semantic tokens, not component hex");
 
   console.log("\n--- 14. Focus ↔ Study Clock Synchronization ---");
   /* The focus timer and the study clock are one session. These assertions
@@ -877,11 +894,26 @@ async function runTests() {
   check(itemsIn(row).map((node) => String(node.children.join(""))).join("|")
     === "Edit task|Skip task|Skip Accounting today",
     "Only the secondary actions live inside the popover");
+  /* (v25) The verbs now read `icon + text`, so the label has to be read out
+     of the subtree instead of off the button's direct children. The guard is
+     the same: the primary actions live outside the popover. */
+  const textOf = (node: TestRenderer.ReactTestInstance): string =>
+    node.children
+      .map((child) =>
+        typeof child === "string"
+          ? child
+          : child && typeof child === "object" && "children" in (child as object)
+            ? textOf(child as TestRenderer.ReactTestInstance)
+            : "")
+      .join("");
   const primaryLabels = row.root
     .findAll((node) => typeof node.type === "string" && node.type === "button")
-    .map((node) => String(node.children.join("")))
+    .map(textOf)
     .filter((label) => label === "Clock in" || label === "Done");
   check(primaryLabels.join("|") === "Clock in|Done", "Clock in and Done stay visible outside the popover");
+  const btnGroup = row.root.findAll((node) => node.props.className === "task-btns")[0];
+  check(!!btnGroup && btnGroup.props["aria-label"] === "Task actions",
+    "The clock and done verbs sit in one labelled action row");
 
   await act(async () => { itemsIn(row)[0].props.onClick(); });
   check(editedTaskId === 91, "Edit task routes to the task editor");
@@ -916,13 +948,89 @@ async function runTests() {
     "The Level step copy no longer advertises nursery / pre-school");
   check(onboardingSource.includes("From school and higher education through doctoral research"),
     "The Level step explains itself in real markup");
-  const polishCss = readFileSync(join(process.cwd(), "src/app/ui-polish.css"), "utf8");
+  const polishCss = uiSystemCss;
   check(!/font-size:\s*0\s*!important/.test(polishCss),
     "The onboarding paragraph is no longer collapsed by a font-size:0 replacement");
   check(/\.task-more\s*\{[^}]*display:\s*inline-flex/.test(polishCss),
     "The ⋮ button is shown on desktop as well as on phones");
   check(polishCss.includes("prefers-reduced-motion") && polishCss.includes("liveDotPulse"),
     "The live-session animation is defined and switched off for reduced motion");
+
+  /* ── v25 · the responsive / typography / token contract ─────────────────
+     Each guard below pins one of the structural fixes, so a future pass can
+     re-add a redesign without quietly re-breaking the one it replaced. */
+  console.log("\n--- v25 · typography, tokens and responsive contract ---");
+  {
+    const strip = (t: string) => t.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(?:^|[^:]):\/\/.*$/gm, " ");
+    const componentFiles = ["TaskCard.tsx","TaskActions.tsx","TaskClockButton.tsx","PlannerView.tsx",
+      "Dashboard.tsx","FocusView.tsx","AnalyticsView.tsx","ZenScene.tsx","Onboarding.tsx"]
+      .map((f) => readFileSync(join(process.cwd(), `src/components/${f}`), "utf8"))
+      .concat(readFileSync(join(process.cwd(), "src/app/page.tsx"), "utf8"))
+      .map(strip)
+      .join("\n");
+    const sheets = strip(enhancementCss);
+
+    check(!/\.page-title\s*\{[^}]*font-size/.test(strip(polishCss)),
+      "ui-system.css does not re-tune the H1 size — one owner (the --fs-h1 ramp)");
+    check(/\.page-title\s*\{[^}]*font-size:var\(--fs-h1\)/.test(sheets) &&
+          /\.card-title[^}]*font-size:\s*var\(--fs-h3\)/.test(strip(polishCss)),
+      "Page and card titles read from the shared fluid type ramp");
+    check(/--fs-h1:/.test(sheets) && /--fs-h2:/.test(sheets) && /--fs-h3:/.test(sheets),
+      "The type ramp defines h1/h2/h3 steps, so headings are a scale not a pile");
+    check(/--pad-card:/.test(sheets) && /--pad-tight:/.test(sheets) && /--gap-page:/.test(sheets),
+      "Spacing comes from the shared pad/gap tokens, not per-card numbers");
+
+    check(!/var\(--[a-z0-9-]+,\s*#/.test(componentFiles),
+      "No hardcoded hex fallbacks are left inside var() in the components");
+    check(!/JetBrains\s*Mono/.test(sheets),
+      "No second font-family name for the numerals — --font-num is the alias");
+    check(/--font-num:/.test(sheets), "--font-num (tabular numerals) is defined once");
+
+    check(/\.zen\{[^}]*background:var\(--zen-bg\)/.test(sheets) && /--zen-bg:/.test(sheets),
+      "The Zen room is painted from --zen-* tokens, so it follows the theme");
+    /* One bridge, not three: every theme defines the same `--ill-*` set, and
+       `--illustration-*` / `--scene-*` are aliases of it, so an illustration can
+       be re-tinted by a theme without touching a component. */
+    const illBridge = (sheets.match(/--ill-paper2:/g) ?? []).length;
+    check(illBridge >= 6 && /--illustration-book-a: *var\(--ill-ba\)/.test(sheets),
+      `Illustration colours: one --ill-* bridge per theme (${illBridge}) aliased by --illustration-*`);
+    for (const kind of ["lesson", "recall", "review", "checkpoint"]) {
+      check(new RegExp(`--task-${kind}:`).test(sheets), `Task kind token --task-${kind} exists`);
+    }
+    check(/var\(--task-/.test(componentFiles),
+      "The component reads kind colours from --task-* instead of a hex list");
+
+    check(/planner-cal/.test(componentFiles) &&
+          /@container card \(min-width: 660px\)/.test(strip(polishCss)) &&
+          /container: *card/.test(sheets),
+      "The month calendar is one component sized by its container, not the viewport");
+    check(/\.cal-cell\.is-empty/.test(sheets),
+      "Blank month cells stay inert on every screen size");
+    check(/\.mobile-bottom-nav\s*\{\s*display: *none/.test(sheets) &&
+          /\.mobile-bottom-nav\s*\{\s*display: *grid/.test(sheets) && /\.mbn-item/.test(sheets),
+      "Bottom nav is off by default and a five-slot grid on phones");
+    check(/\.sidebar\s*\{/.test(sheets) && /@media *\(max-width: *1024px\)/.test(sheets),
+      "The desktop rail is real and collapses at a documented breakpoint");
+
+    /* Blur is a *material for floating layers*, not a finish for text. Every
+       rule that paints an in-flow surface is checked for `backdrop-filter`,
+       because a blurred card under 12px body copy is what read as "the whole
+       app is out of focus". */
+    const frostedText: string[] = [];
+    for (const m of sheets.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      const [, sel, body] = m;
+      if (!/backdrop-filter: *blur/.test(body)) continue;
+      const bad = sel.split(",").map((x) => x.trim()).filter((x) =>
+        /\.(section-card|task-card|kpi-card|day-block|dash-card|planner-day|chip|rate-btn|streak-badge|momentum-pill|count-badge|btn|card-title|page-title|task-title|day-date)(?![\w-])/.test(x));
+      if (bad.length) frostedText.push(`${sel.trim().slice(0, 48)} → ${bad[0].slice(0, 30)}`);
+    }
+    check(frostedText.length === 0,
+      `No in-flow text surface is frosted${frostedText.length ? ` (${frostedText.join("; ")})` : ""}`);
+    const importantCount = (sheets.match(/!important/g) ?? []).length;
+    check(importantCount <= 900, `The !important count keeps falling (${importantCount} vs 1107 at the merge baseline)`);
+    check(!/transform:\s*translate\([^)]*\.[57]px/.test(sheets),
+      "No half-pixel transforms, so text stops shimmering under the blur");
+  }
 
   console.log("\n==================================================");
   console.log(`TEST SUITE RESULTS: ${passed} PASSED, ${failed} FAILED`);

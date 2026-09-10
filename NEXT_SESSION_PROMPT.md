@@ -3,6 +3,98 @@
 
 ---
 
+## v25 — CSS CONSOLIDATION · ONE TYPE SCALE · RESPONSIVE CALENDAR · DE-BLUR (this session)
+
+Read this block first: it changes the rules for every later UI pass.
+
+**Twelve sheets became two.** `src/app/globals.css` (tokens, base type, themes,
+shell) and `src/app/ui-system.css` — the ten patch sheets concatenated in their
+original import order, then re-authored into numbered sections; `§25.x` is this
+pass. `layout.tsx` imports exactly those two, and `§25` is the last word in the
+last file. **Never add another stylesheet, and never restate a component in
+`globals.css`** — extend the owning `§25` section instead, and delete the copy
+you are replacing.
+
+**One fluid ramp owns type.** `--fs-micro/xs/sm/md/lg/h1/h2/h3/kpi/timer` are
+`clamp()` ranges in `:root`; `.page-title`, `.card-title`, `.section-title`,
+`.kpi-value` read from them. This pass deleted 13 competing `.page-title`
+font-size declarations (4 `!important`) and 6 for `.section-title`, so:
+no `font-size` on a heading inside any `@media`, no second clamp, no blanket
+negative tracking (H1 is `-.022em` + `word-spacing:.012em` + `text-wrap:balance`),
+and one numeral family (`--font-num`, tabular) — `JetBrains Mono` and the
+`--font-ibm-plex-mono` alias are gone.
+
+**Four tokens own space.** `--gap-page` (page stacks) · `--pad-card` (cards) ·
+`--pad-tight` (inside heads) · `--gap-cluster` (control groups). Sibling
+margins between cards were deleted; a container gap is one owner, an `* + *`
+margin is N. `.section-card` carries `container: card / inline-size` — that is
+what makes the calendar and card heads responsive *to the card*.
+
+**Colour comes from tokens, never from a fallback.** `var(--x, #hex)` is banned:
+0 left in components. Task kinds use `--task-lesson|recall|review|checkpoint`
+(rail, chip and dot all read `KIND_META`); Zen and the illustrations read
+`--zen-*`, which derives from each theme's `--ill-*` bridge (`--illustration-*`
+is the alias layer). A light-theme hex fallback inside `var()` *is* a dark-theme
+bug — the theme owns the token.
+
+**Blur is a material for floating layers only**: `.mobile-bottom-nav`,
+`.mobile-header`, `.tracker-bar`, `.sidebar`, `.modal-*`, `.cmdk`, `.toast`,
+`.ai-panel`, scrims, `.day-sheet`. No in-flow text surface is frosted; hover
+lifts use `translate3d(0, var(--reveal-y), 0)` with whole-pixel values (a
+`.5px` translate under a blur is what made type look smeared — do not fix
+legibility by raising contrast).
+
+**Files changed:**
+```
+src/app/globals.css      ← type ramp + `--fs-h2/h3`, spacing tokens, `--task-*`,
+                           `--zen-*`, `@property --mask-reveal` first, 625+60 dead
+                           rules deleted, 35 competing `.page-title`/`backdrop-filter`
+                           patches removed, empty `@media` shells removed
+src/app/ui-system.css    ← the merged sheet: 10 old files concatenated, §25.1-25.12
+                           authored (page rhythm, card head, planner calendar,
+                           task card, focus studio, zen, analytics insets + support
+                           classes), 141+53 dead rules deleted, `!important` 1107→803
+src/components/*.tsx     ← TaskCard, TaskActions, TaskClockButton, PlannerView,
+                           Dashboard, FocusView, AnalyticsView, ZenScene,
+                           Illustrations, Onboarding, SettingsView, SubjectsView:
+                           semantic classes instead of inline styles, `aria-label`
+                           + `title` on every icon button, zero hex fallbacks
+src/lib/fx.tsx           ← MaskWords: overlay-only animation, never font changes
+scripts/test-suite.ts    ← retargeted at the two sheets + a v25 contract block
+                           (242 checks; fails on a 2nd size owner, a hex fallback,
+                           a frosted text surface, a half-pixel transform, an
+                           undefined `--token`, or `!important` climbing back)
+docs/design/v25-responsive-ui-system.md   ← NEW design note (cause → fix, tables)
+README.txt               ← “v25 CSS + RESPONSIVE UI SYSTEM (this build)”
+deploy-package/**        ← byte-exact re-sync from src/ (rule below)
+```
+
+**Verification tricks that replaced a browser here — keep using them:**
+1. Winner of the cascade: `grep -o '\.page-title{[^}]*}' .next/static/chunks/*.css`
+   after `npm run build:app` — the last line wins, and after v25 there is exactly
+   one with a `font-size` (plus the two `body.mode-*` variants).
+2. Undefined tokens (the silent kind — `var()` falls back to inherit): diff every
+   `var(--x` used in `src/**` against every `--x:` defined in the two sheets. This
+   caught `--surface-1`, `--success`, `--gap-row`, `--dur-2` invented by a design
+   system that was never this repo's.
+3. Dead-rule audit: for each top-level rule, if *every* class in its selectors is
+   absent from **comment-stripped** `src/**`, delete it — and re-run the audit
+   after deleting, since ghosts reference other ghosts. Strip `/* */` first or a
+   prose mention of `.task-row` will keep 125 dead rules alive.
+4. Render smoke without a browser: a temp `scripts/_smoke.tsx` + `react-test-renderer`
+   (it must live in the repo to get `node_modules` and the `@/*` paths) — render each
+   view, `act()` a tab click, then count nodes by `className.startsWith('cal-grid')`
+   etc. Delete the script afterwards.
+5. Batch regex edits on JSX must be followed immediately by `npx tsc --noEmit`
+   **and** `npx prettier --write`; a `rep()` helper that prints `MISS` when
+   `count != expected` saved this pass twice (one stray `<span>`, one swallowed
+   `<TaskClockButton/>` that only the suite caught).
+
+All checks green at hand-off: `npm run typecheck`, `npm run lint` (0 warnings),
+`npm test` (242/242), `npm run build:app` (18 routes, both sheets compile).
+
+---
+
 ## v19 — COLLAPSED RAIL: ONE HIGHLIGHT · SIDEBAR-SIZED ⌘K HINT · MOBILE APP BAR CONTRACT (this session)
 
 Three visual bugs, all styling/structure (no behaviour, data or routing changes):

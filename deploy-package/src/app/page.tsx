@@ -1,8 +1,23 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { api, ApiError, prettyDate, prettyLong, today, type AppState, type MessageRow } from "@/lib/client";
-import { mmss, useFocusTimer, useStudyClock, type ClockApi, type TimerApi, type TimerMode } from "@/lib/useTimer";
+import {
+  api,
+  ApiError,
+  prettyDate,
+  prettyLong,
+  today,
+  type AppState,
+  type MessageRow,
+} from "@/lib/client";
+import {
+  mmss,
+  useFocusTimer,
+  useStudyClock,
+  type ClockApi,
+  type TimerApi,
+  type TimerMode,
+} from "@/lib/useTimer";
 import { useStudySession, type StudySessionApi } from "@/lib/studySession";
 import { nextPendingTask, type CompletedTaskInfo } from "@/lib/completion";
 import { nextAction } from "@/lib/prioritization";
@@ -21,19 +36,42 @@ import { haptic } from "@/lib/haptics";
 import { useBackClose } from "@/lib/useBackClose";
 import type { TaskPatch } from "@/components/TaskEditor";
 import {
-  IconBolt, IconBell, IconChart, IconBook, IconCalendar, IconCheck, IconClock, IconExpand2, IconFlame,
-  IconFocus2, IconGear, IconHome, IconLeaf, IconLogo, IconMenu, IconPalette, IconPanelLeft,
-  IconSpark, IconWarn,
+  IconBolt,
+  IconBell,
+  IconChart,
+  IconBook,
+  IconCalendar,
+  IconCheck,
+  IconClock,
+  IconExpand2,
+  IconFlame,
+  IconClose,
+  IconFocus2,
+  IconGear,
+  IconHome,
+  IconLeaf,
+  IconLogo,
+  IconMenu,
+  IconPalette,
+  IconPanelLeft,
+  IconPause,
+  IconPlay,
+  IconSpark,
+  IconWarn,
 } from "@/components/icons";
 import ZenScene from "@/components/ZenScene";
 import { THEMES } from "@/lib/client";
 
 import {
-  parseCommand, languageCapabilityReply, instantTutorReply, commandReply,
+  parseCommand,
+  languageCapabilityReply,
+  instantTutorReply,
+  commandReply,
 } from "@/lib/ai";
 import { appendChatTurn, isFallbackUser } from "@/lib/chatTurn";
 
-type Page = "dashboard" | "planner" | "focus" | "subjects" | "analytics" | "settings";
+type Page =
+  "dashboard" | "planner" | "focus" | "subjects" | "analytics" | "settings";
 
 /** Zen header label for the current focus-timer mode. Display only. */
 const ZEN_MODE_LABEL: Record<TimerMode, string> = {
@@ -46,14 +84,22 @@ const ZEN_MODE_LABEL: Record<TimerMode, string> = {
 
 /** One calm line for the bottom guidance panel, matched to the timer state. */
 function zenGuidance(timer: TimerApi): string {
-  if (timer.mode === "short" || timer.mode === "long") return "Rest your eyes — the break is part of the work";
-  return timer.running ? "Stay with this block — one lesson at a time" : "Begin when you are ready";
+  if (timer.mode === "short" || timer.mode === "long")
+    return "Rest your eyes — the break is part of the work";
+  return timer.running
+    ? "Stay with this block — one lesson at a time"
+    : "Begin when you are ready";
 }
 
 /* `dock` marks the five primary destinations that fit the mobile bottom
    navigation. Analytics stays reachable on phones through the drawer
    ("More" in the app bar) and through the dashboard's deep-links. */
-const NAV: { id: Page; label: string; icon: React.ReactNode; dock?: boolean }[] = [
+const NAV: {
+  id: Page;
+  label: string;
+  icon: React.ReactNode;
+  dock?: boolean;
+}[] = [
   { id: "dashboard", label: "Overview", icon: <IconHome />, dock: true },
   { id: "planner", label: "Planner", icon: <IconCalendar />, dock: true },
   { id: "focus", label: "Focus", icon: <IconClock />, dock: true },
@@ -75,7 +121,9 @@ type PendingSessionLog = {
 
 /** POST /api/sessions response — same full state, plus which task (if any)
  *  the server auto-completed because its logged minutes met the plan. */
-type SessionLogResponse = AppState & { completedTask?: CompletedTaskInfo | null };
+type SessionLogResponse = AppState & {
+  completedTask?: CompletedTaskInfo | null;
+};
 
 const SIDEBAR_KEY = "spp-sidebar-collapsed";
 const SESSION_QUEUE_KEY = "spp-pending-session-logs";
@@ -88,14 +136,23 @@ function savedSessionQueue(raw: string | null): PendingSessionLog[] {
   try {
     const parsed = JSON.parse(raw || "[]") as unknown;
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter((entry): entry is PendingSessionLog => {
-      if (!entry || typeof entry !== "object") return false;
-      const value = entry as Partial<PendingSessionLog>;
-      return typeof value.eventId === "string"
-        && typeof value.minutes === "number" && Number.isFinite(value.minutes) && value.minutes > 0
-        && typeof value.mode === "string" && typeof value.date === "string";
-    }).slice(-200);
-  } catch { return []; }
+    return parsed
+      .filter((entry): entry is PendingSessionLog => {
+        if (!entry || typeof entry !== "object") return false;
+        const value = entry as Partial<PendingSessionLog>;
+        return (
+          typeof value.eventId === "string" &&
+          typeof value.minutes === "number" &&
+          Number.isFinite(value.minutes) &&
+          value.minutes > 0 &&
+          typeof value.mode === "string" &&
+          typeof value.date === "string"
+        );
+      })
+      .slice(-200);
+  } catch {
+    return [];
+  }
 }
 
 export default function Home() {
@@ -105,7 +162,10 @@ export default function Home() {
      state, written together by the nav action. The first painted frame of a
      new view therefore already knows which way to slide in, and the state
      updater stays pure. */
-  const [nav, setNav] = useState<{ page: Page; dir: "fwd" | "back" }>({ page: "dashboard", dir: "fwd" });
+  const [nav, setNav] = useState<{ page: Page; dir: "fwd" | "back" }>({
+    page: "dashboard",
+    dir: "fwd",
+  });
   const page = nav.page;
   const navDir = nav.dir;
   const [busy, setBusy] = useState(false);
@@ -121,7 +181,9 @@ export default function Home() {
     if (!zen) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = prev; };
+    return () => {
+      document.body.style.overflow = prev;
+    };
   }, [zen]);
   useBackClose(chatOpen, () => setChatOpen(false));
   const [toast, setToast] = useState<Toast | null>(null);
@@ -133,7 +195,9 @@ export default function Home() {
   const sessionDrainRef = useRef(false);
   const lastSessionErrorRef = useRef(0);
   const clockApiRef = useRef<ClockApi | null>(null);
-  const autoCompleteRef = useRef<(fresh: AppState, completed: CompletedTaskInfo, date: string) => void>(() => {});
+  const autoCompleteRef = useRef<
+    (fresh: AppState, completed: CompletedTaskInfo, date: string) => void
+  >(() => {});
   const [forceWizard, setForceWizard] = useState(false);
   const [confirmWipe, setConfirmWipe] = useState(false);
   useBackClose(confirmWipe, () => setConfirmWipe(false));
@@ -148,17 +212,28 @@ export default function Home() {
   const zenRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     if (!notifOpen && !themeOpen) return;
-    const close = () => { setNotifOpen(false); setThemeOpen(false); };
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") close(); };
+    const close = () => {
+      setNotifOpen(false);
+      setThemeOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") close();
+    };
     window.addEventListener("click", close);
     window.addEventListener("keydown", onKey);
-    return () => { window.removeEventListener("click", close); window.removeEventListener("keydown", onKey); };
+    return () => {
+      window.removeEventListener("click", close);
+      window.removeEventListener("keydown", onKey);
+    };
   }, [notifOpen, themeOpen]);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     // restore the user's sidebar preference (desktop only; harmless on mobile)
     try {
-      if (typeof window !== "undefined") return localStorage.getItem(SIDEBAR_KEY) === "1";
-    } catch { /* private mode */ }
+      if (typeof window !== "undefined")
+        return localStorage.getItem(SIDEBAR_KEY) === "1";
+    } catch {
+      /* private mode */
+    }
     return false;
   });
   /* While the rail is travelling, the whole sidebar carries `sb-anim`: the
@@ -167,13 +242,22 @@ export default function Home() {
      ahead of it, which is what made the old collapse look broken. */
   const [railAnimating, setRailAnimating] = useState(false);
   const railTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => () => { if (railTimer.current) clearTimeout(railTimer.current); }, []);
+  useEffect(
+    () => () => {
+      if (railTimer.current) clearTimeout(railTimer.current);
+    },
+    [],
+  );
   const toggleSidebar = () => {
     setRailAnimating(true);
     if (railTimer.current) clearTimeout(railTimer.current);
     railTimer.current = setTimeout(() => setRailAnimating(false), 520);
     setSidebarCollapsed((v) => {
-      try { localStorage.setItem(SIDEBAR_KEY, v ? "0" : "1"); } catch { /* noop */ }
+      try {
+        localStorage.setItem(SIDEBAR_KEY, v ? "0" : "1");
+      } catch {
+        /* noop */
+      }
       return !v;
     });
   };
@@ -185,7 +269,12 @@ export default function Home() {
     if (toastTimer.current) clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToast(null), 3400);
   }, []);
-  useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current); }, []);
+  useEffect(
+    () => () => {
+      if (toastTimer.current) clearTimeout(toastTimer.current);
+    },
+    [],
+  );
 
   useEffect(() => {
     // Auto-completion handler: the server just marked a task done because the
@@ -194,24 +283,31 @@ export default function Home() {
     // pending task so the minutes they keep studying land on the right lesson.
     autoCompleteRef.current = (fresh, completed, date) => {
       const clockApi = clockApiRef.current;
-      const stillRecording = !!clockApi && clockApi.sessionActive && clockApi.running && clockApi.taskId === completed.id;
+      const stillRecording =
+        !!clockApi &&
+        clockApi.sessionActive &&
+        clockApi.running &&
+        clockApi.taskId === completed.id;
       const next = nextPendingTask(fresh.tasks || [], date, completed.id);
       haptic([10, 30, 18]);
       if (stillRecording && next) {
-        clockApi.clockIn({ taskId: next.id, subjectId: next.subjectId ?? null });
+        clockApi.clockIn({
+          taskId: next.id,
+          subjectId: next.subjectId ?? null,
+        });
         notify(
           `“${completed.title}” complete — ${completed.actualMinutes}m logged (≥ ${completed.plannedMinutes}m planned). Clocked into next: ${next.title.slice(0, 42)}`,
-          "success"
+          "success",
         );
       } else if (next) {
         notify(
           `“${completed.title}” complete — ${completed.actualMinutes}m logged (≥ ${completed.plannedMinutes}m planned). Next up: ${next.title.slice(0, 42)}`,
-          "success"
+          "success",
         );
       } else {
         notify(
           `“${completed.title}” complete — ${completed.actualMinutes}m logged (≥ ${completed.plannedMinutes}m planned). All of today's tasks done!`,
-          "success"
+          "success",
         );
       }
     };
@@ -221,7 +317,14 @@ export default function Home() {
     setLoading(true);
     api<AppState>("/api/state", { timeoutMs: 20_000 })
       .then(setState)
-      .catch((error) => notify(error instanceof ApiError ? error.message : "Could not reach the server.", "error"))
+      .catch((error) =>
+        notify(
+          error instanceof ApiError
+            ? error.message
+            : "Could not reach the server.",
+          "error",
+        ),
+      )
       .finally(() => setLoading(false));
   }, [notify]);
 
@@ -250,12 +353,17 @@ export default function Home() {
     // (e.g. `focus-live` while the clock runs) are never wiped out.
     const apply = () => {
       for (const cls of Array.from(body.classList)) {
-        if (/^(theme-|mode-)/.test(cls) && !wanted.includes(cls)) body.classList.remove(cls);
+        if (/^(theme-|mode-)/.test(cls) && !wanted.includes(cls))
+          body.classList.remove(cls);
       }
       for (const cls of wanted) body.classList.add(cls);
     };
-    const current = Array.from(body.classList).filter((c) => /^(theme-|mode-)/.test(c));
-    const unchanged = current.length === wanted.length && wanted.every((c) => current.includes(c));
+    const current = Array.from(body.classList).filter((c) =>
+      /^(theme-|mode-)/.test(c),
+    );
+    const unchanged =
+      current.length === wanted.length &&
+      wanted.every((c) => current.includes(c));
     const firstPaint = !body.dataset.themeReady;
     body.dataset.themeReady = "1";
     if (unchanged) return;
@@ -267,9 +375,15 @@ export default function Home() {
     // otherwise the two fades stack and the flip looks like a weird
     // double-morph instead of one clean dissolve.
     const doc = document as Document & {
-      startViewTransition?: (cb: () => void) => { finished?: Promise<unknown> } | undefined;
+      startViewTransition?: (
+        cb: () => void,
+      ) => { finished?: Promise<unknown> } | undefined;
     };
-    if (!firstPaint && doc.startViewTransition && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    if (
+      !firstPaint &&
+      doc.startViewTransition &&
+      !window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    ) {
       const root = document.documentElement;
       root.classList.add("theme-switching");
       const vt = doc.startViewTransition(apply);
@@ -311,7 +425,10 @@ export default function Home() {
               opacity: 0,
             },
           ],
-          { duration: 520 + Math.random() * 180, easing: "cubic-bezier(.22,1,.36,1)" },
+          {
+            duration: 520 + Math.random() * 180,
+            easing: "cubic-bezier(.22,1,.36,1)",
+          },
         );
         anim.onfinish = () => p.remove();
         anim.oncancel = () => p.remove();
@@ -327,7 +444,8 @@ export default function Home() {
       const label = (el.textContent || "").trim();
       if (label === "Done" || el.matches(".rate-btn")) {
         const rect = el.getBoundingClientRect();
-        const fromKeyboard = e.detail === 0 || (e.clientX === 0 && e.clientY === 0);
+        const fromKeyboard =
+          e.detail === 0 || (e.clientX === 0 && e.clientY === 0);
         const px = fromKeyboard ? rect.left + rect.width / 2 : e.clientX;
         const py = fromKeyboard ? rect.top + rect.height / 2 : e.clientY;
         burst(px, py);
@@ -356,19 +474,32 @@ export default function Home() {
     try {
       if (document.fullscreenElement) void document.exitFullscreen();
       else void el.requestFullscreen?.();
-    } catch { /* fullscreen may be blocked — Zen still works */ }
+    } catch {
+      /* fullscreen may be blocked — Zen still works */
+    }
   }, []);
 
   const persistSessionQueue = useCallback(() => {
-    try { localStorage.setItem(SESSION_QUEUE_KEY, JSON.stringify(sessionQueueRef.current || [])); }
-    catch { /* in-memory queue still protects this page session */ }
+    try {
+      localStorage.setItem(
+        SESSION_QUEUE_KEY,
+        JSON.stringify(sessionQueueRef.current || []),
+      );
+    } catch {
+      /* in-memory queue still protects this page session */
+    }
   }, []);
 
   const drainSessionQueue = useCallback(async () => {
     if (sessionDrainRef.current) return;
     if (sessionQueueRef.current == null) {
-      try { sessionQueueRef.current = savedSessionQueue(localStorage.getItem(SESSION_QUEUE_KEY)); }
-      catch { sessionQueueRef.current = []; }
+      try {
+        sessionQueueRef.current = savedSessionQueue(
+          localStorage.getItem(SESSION_QUEUE_KEY),
+        );
+      } catch {
+        sessionQueueRef.current = [];
+      }
     }
     if (!sessionQueueRef.current.length) return;
 
@@ -392,7 +523,10 @@ export default function Home() {
           const now = Date.now();
           if (now - lastSessionErrorRef.current > 60_000) {
             lastSessionErrorRef.current = now;
-            notify("Study time is saved on this device and will sync when the connection returns.", "error");
+            notify(
+              "Study time is saved on this device and will sync when the connection returns.",
+              "error",
+            );
           }
           break;
         }
@@ -403,15 +537,26 @@ export default function Home() {
   }, [notify, persistSessionQueue]);
 
   const logSession = useCallback(
-    (minutes: number, subjectId: number | null, taskId: number | null, mode: string) => {
+    (
+      minutes: number,
+      subjectId: number | null,
+      taskId: number | null,
+      mode: string,
+    ) => {
       if (!Number.isFinite(minutes) || minutes <= 0) return;
       if (sessionQueueRef.current == null) {
-        try { sessionQueueRef.current = savedSessionQueue(localStorage.getItem(SESSION_QUEUE_KEY)); }
-        catch { sessionQueueRef.current = []; }
+        try {
+          sessionQueueRef.current = savedSessionQueue(
+            localStorage.getItem(SESSION_QUEUE_KEY),
+          );
+        } catch {
+          sessionQueueRef.current = [];
+        }
       }
-      const random = typeof crypto.randomUUID === "function"
-        ? crypto.randomUUID()
-        : `${Date.now()}_${Math.random().toString(36).slice(2)}`;
+      const random =
+        typeof crypto.randomUUID === "function"
+          ? crypto.randomUUID()
+          : `${Date.now()}_${Math.random().toString(36).slice(2)}`;
       sessionQueueRef.current.push({
         eventId: `session_${random}`,
         minutes,
@@ -423,11 +568,12 @@ export default function Home() {
         date: today(),
       });
       // Keep a hard bound if a device stays offline for a very long time.
-      if (sessionQueueRef.current.length > 200) sessionQueueRef.current.splice(0, sessionQueueRef.current.length - 200);
+      if (sessionQueueRef.current.length > 200)
+        sessionQueueRef.current.splice(0, sessionQueueRef.current.length - 200);
       persistSessionQueue();
       void drainSessionQueue();
     },
-    [drainSessionQueue, persistSessionQueue]
+    [drainSessionQueue, persistSessionQueue],
   );
 
   useEffect(() => {
@@ -457,16 +603,31 @@ export default function Home() {
       state?.tasks.find((x) => x.id === clockTaskId)?.title ||
       state?.subjects.find((x) => x.id === clockSubjectId)?.name ||
       "Session";
-    if (clock.running) document.title = `⏱ ${mmss(clock.elapsed)} · ${title.slice(0, 30)} — ${base}`;
-    else if (clock.sessionActive) document.title = `⏸ ${mmss(clock.elapsed)} · paused — ${base}`;
+    if (clock.running)
+      document.title = `⏱ ${mmss(clock.elapsed)} · ${title.slice(0, 30)} — ${base}`;
+    else if (clock.sessionActive)
+      document.title = `⏸ ${mmss(clock.elapsed)} · paused — ${base}`;
     else document.title = base;
-  }, [state, clock.running, clock.sessionActive, clock.elapsed, clockTaskId, clockSubjectId]);
+  }, [
+    state,
+    clock.running,
+    clock.sessionActive,
+    clock.elapsed,
+    clockTaskId,
+    clockSubjectId,
+  ]);
 
   // 2) Focus timer — pomodoro ritual
-  const onBlockComplete = useCallback((mode: TimerMode, minutes: number) => {
-    if (mode === "short" || mode === "long") { notify("Break complete — back to studying."); return; }
-    notify(`Focus block completed (${minutes} min). Great job!`, "success");
-  }, [notify]);
+  const onBlockComplete = useCallback(
+    (mode: TimerMode, minutes: number) => {
+      if (mode === "short" || mode === "long") {
+        notify("Break complete — back to studying.");
+        return;
+      }
+      notify(`Focus block completed (${minutes} min). Great job!`, "success");
+    },
+    [notify],
+  );
 
   const timer = useFocusTimer(
     {
@@ -474,7 +635,7 @@ export default function Home() {
       shortBreak: state?.settings.shortBreak ?? 5,
       longBreak: state?.settings.longBreak ?? 15,
     },
-    onBlockComplete
+    onBlockComplete,
   );
 
   /* 3) ONE study session. The focus timer and the study clock are bound
@@ -483,9 +644,12 @@ export default function Home() {
      Clock Out, and breaks never billed as study time. */
   const pickSessionTask = useCallback(() => {
     const currentDay = today();
-    const task = state?.tasks.find((item) => item.date === currentDay && item.status === "pending")
-      || state?.tasks.find((item) => item.date === currentDay)
-      || null;
+    const task =
+      state?.tasks.find(
+        (item) => item.date === currentDay && item.status === "pending",
+      ) ||
+      state?.tasks.find((item) => item.date === currentDay) ||
+      null;
     return {
       taskId: task?.id ?? null,
       subjectId: task?.subjectId ?? state?.subjects[0]?.id ?? null,
@@ -500,7 +664,10 @@ export default function Home() {
 
   const setTaskStatus = async (id: number, status: string, rating?: number) => {
     try {
-      const s = await api<AppState>("/api/tasks", { method: "PATCH", body: JSON.stringify({ id, status, rating }) });
+      const s = await api<AppState>("/api/tasks", {
+        method: "PATCH",
+        body: JSON.stringify({ id, status, rating }),
+      });
       setState(s);
       if (status === "done") {
         haptic([10, 40, 18]);
@@ -510,18 +677,25 @@ export default function Home() {
               ? "Logged — this topic will come back sooner for another pass."
               : "Logged — the memory model scheduled your next review."
             : "Lesson marked done — mastery updated.",
-          "success"
+          "success",
         );
       }
-    } catch (error) { notify(apiFailureMessage(error, "Update failed."), "error"); }
+    } catch (error) {
+      notify(apiFailureMessage(error, "Update failed."), "error");
+    }
   };
 
   const updateTask = async (id: number, patch: TaskPatch) => {
     try {
-      const s = await api<AppState>("/api/tasks", { method: "PATCH", body: JSON.stringify({ id, ...patch }) });
+      const s = await api<AppState>("/api/tasks", {
+        method: "PATCH",
+        body: JSON.stringify({ id, ...patch }),
+      });
       setState(s);
       notify("Task updated successfully.", "success");
-    } catch (error) { notify(apiFailureMessage(error, "Could not update task."), "error"); }
+    } catch (error) {
+      notify(apiFailureMessage(error, "Could not update task."), "error");
+    }
   };
 
   const skipSubjectForDay = async (subjectId: number, date: string) => {
@@ -531,9 +705,12 @@ export default function Home() {
         body: JSON.stringify({ skipSubjectId: subjectId, skipDate: date }),
       });
       setState(s);
-      const name = s.subjects.find((x) => x.id === subjectId)?.name || "subject";
+      const name =
+        s.subjects.find((x) => x.id === subjectId)?.name || "subject";
       notify(`Skipped ${name} for that day.`);
-    } catch (error) { notify(apiFailureMessage(error, "Could not skip subject."), "error"); }
+    } catch (error) {
+      notify(apiFailureMessage(error, "Could not skip subject."), "error");
+    }
   };
 
   const replan = async () => {
@@ -543,95 +720,176 @@ export default function Home() {
     replanInFlightRef.current = true;
     setBusy(true);
     try {
-      const s = await api<AppState>("/api/replan", { method: "POST", timeoutMs: 90_000 });
+      const s = await api<AppState>("/api/replan", {
+        method: "POST",
+        timeoutMs: 90_000,
+      });
       setState(s);
       const scheduled = s.stats?.scheduledTopics;
       notify(
         scheduled
           ? `Rebalanced from today · ${scheduled} lessons scheduled.`
           : "Schedule rebalanced from today — overdue work moved forward.",
-        "success"
+        "success",
       );
     } catch (error) {
-      notify(apiFailureMessage(error, "Re-plan failed — your existing schedule was left unchanged."), "error");
+      notify(
+        apiFailureMessage(
+          error,
+          "Re-plan failed — your existing schedule was left unchanged.",
+        ),
+        "error",
+      );
     } finally {
       replanInFlightRef.current = false;
       setBusy(false);
     }
   };
 
-  const patchSettings = useCallback(async (patch: Record<string, unknown>, replanIt = false) => {
-    setBusy(true);
-    try {
-      const s = await api<AppState>("/api/settings", {
-        method: "PATCH",
-        body: JSON.stringify({ ...patch, _replan: replanIt }),
-        timeoutMs: replanIt ? 90_000 : 30_000,
-      });
-      setState(s);
-      notify(replanIt ? "Settings saved — schedule regenerated." : "Saved.", "success");
-    } catch (error) { notify(apiFailureMessage(error, "Save failed."), "error"); } finally { setBusy(false); }
-  }, [notify]);
+  const patchSettings = useCallback(
+    async (patch: Record<string, unknown>, replanIt = false) => {
+      setBusy(true);
+      try {
+        const s = await api<AppState>("/api/settings", {
+          method: "PATCH",
+          body: JSON.stringify({ ...patch, _replan: replanIt }),
+          timeoutMs: replanIt ? 90_000 : 30_000,
+        });
+        setState(s);
+        notify(
+          replanIt ? "Settings saved — schedule regenerated." : "Saved.",
+          "success",
+        );
+      } catch (error) {
+        notify(apiFailureMessage(error, "Save failed."), "error");
+      } finally {
+        setBusy(false);
+      }
+    },
+    [notify],
+  );
 
-  const addSubject = async (payload: { name: string; units: number; difficulty: string; color: string }) => {
+  const addSubject = async (payload: {
+    name: string;
+    units: number;
+    difficulty: string;
+    color: string;
+  }) => {
     setBusy(true);
     try {
-      setState(await api<AppState>("/api/subjects", { method: "POST", body: JSON.stringify(payload), timeoutMs: 90_000 }));
+      setState(
+        await api<AppState>("/api/subjects", {
+          method: "POST",
+          body: JSON.stringify(payload),
+          timeoutMs: 90_000,
+        }),
+      );
       notify("Subject added and lessons generated.", "success");
-    } catch (error) { notify(apiFailureMessage(error, "Could not add subject."), "error"); } finally { setBusy(false); }
+    } catch (error) {
+      notify(apiFailureMessage(error, "Could not add subject."), "error");
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const editSubject = async (payload: { id: number; name: string; units: number; difficulty: string; color: string }) => {
+  const editSubject = async (payload: {
+    id: number;
+    name: string;
+    units: number;
+    difficulty: string;
+    color: string;
+  }) => {
     setBusy(true);
     try {
-      setState(await api<AppState>("/api/subjects", { method: "PATCH", body: JSON.stringify(payload), timeoutMs: 90_000 }));
+      setState(
+        await api<AppState>("/api/subjects", {
+          method: "PATCH",
+          body: JSON.stringify(payload),
+          timeoutMs: 90_000,
+        }),
+      );
       notify("Subject updated, schedule rebalanced.", "success");
-    } catch (error) { notify(apiFailureMessage(error, "Could not update."), "error"); } finally { setBusy(false); }
+    } catch (error) {
+      notify(apiFailureMessage(error, "Could not update."), "error");
+    } finally {
+      setBusy(false);
+    }
   };
 
   const deleteSubject = async (id: number) => {
     setBusy(true);
     try {
-      setState(await api<AppState>(`/api/subjects?id=${id}`, { method: "DELETE" }));
+      setState(
+        await api<AppState>(`/api/subjects?id=${id}`, { method: "DELETE" }),
+      );
       notify("Subject removed.");
-    } catch (error) { notify(apiFailureMessage(error, "Could not delete."), "error"); } finally { setBusy(false); }
+    } catch (error) {
+      notify(apiFailureMessage(error, "Could not delete."), "error");
+    } finally {
+      setBusy(false);
+    }
   };
 
   /** Quick Add: capture a task and drop it straight into the plan. */
   const addTask = async (input: QuickAddPayload) => {
     try {
-      const s = await api<AppState>("/api/tasks", { method: "POST", body: JSON.stringify(input) });
+      const s = await api<AppState>("/api/tasks", {
+        method: "POST",
+        body: JSON.stringify(input),
+      });
       setState(s);
       notify(
         input.date === today()
           ? `Added "${input.title.slice(0, 40)}" to today's plan.`
           : `Added "${input.title.slice(0, 40)}" for ${prettyDate(input.date)}.`,
-        "success"
+        "success",
       );
-    } catch (error) { notify(apiFailureMessage(error, "Could not add the task."), "error"); }
+    } catch (error) {
+      notify(apiFailureMessage(error, "Could not add the task."), "error");
+    }
   };
 
   /** Backlog recovery: re-date overdue tasks in one bulk move. */
-  const moveTasks = async (moves: { id: number; date: string }[], message: string) => {
+  const moveTasks = async (
+    moves: { id: number; date: string }[],
+    message: string,
+  ) => {
     if (!moves.length) return;
     try {
-      const s = await api<AppState>("/api/tasks", { method: "PATCH", body: JSON.stringify({ moves }) });
+      const s = await api<AppState>("/api/tasks", {
+        method: "PATCH",
+        body: JSON.stringify({ moves }),
+      });
       setState(s);
       notify(message, "success");
-    } catch (error) { notify(apiFailureMessage(error, "Could not update the schedule — nothing was lost."), "error"); }
+    } catch (error) {
+      notify(
+        apiFailureMessage(
+          error,
+          "Could not update the schedule — nothing was lost.",
+        ),
+        "error",
+      );
+    }
   };
 
   const startSmartClock = useCallback(() => {
     const currentDay = today();
-    const task = state?.tasks.find((item) => item.date === currentDay && item.status === "pending") ||
-      state?.tasks.find((item) => item.date === currentDay);
+    const task =
+      state?.tasks.find(
+        (item) => item.date === currentDay && item.status === "pending",
+      ) || state?.tasks.find((item) => item.date === currentDay);
     if (task) {
       clock.clockIn({ taskId: task.id, subjectId: task.subjectId ?? null });
       notify(`Clocked in: ${task.title.slice(0, 48)}`);
     } else {
       const subject = state?.subjects[0];
       clock.clockIn({ subjectId: subject?.id ?? null, taskId: null });
-      notify(subject ? `Clocked in to ${subject.name}.` : "Clocked in — free session.");
+      notify(
+        subject
+          ? `Clocked in to ${subject.name}.`
+          : "Clocked in — free session.",
+      );
     }
   }, [clock, notify, state]);
 
@@ -654,7 +912,7 @@ export default function Home() {
       task
         ? `Clocked out of “${task.title.slice(0, 40)}” — minutes saved.`
         : `Clocked out — ${minutes > 0 ? `${minutes} min saved.` : "minutes saved."}`,
-      "success"
+      "success",
     );
   }, [clock.elapsed, clock.taskId, notify, session, state]);
 
@@ -681,16 +939,23 @@ export default function Home() {
     }
     if (clock.sessionActive) {
       clock.clockIn({ taskId, subjectId: task?.subjectId ?? null });
-      notify(`Switched to: ${task ? task.title.slice(0, 42) : "session"} — earlier minutes saved.`);
+      notify(
+        `Switched to: ${task ? task.title.slice(0, 42) : "session"} — earlier minutes saved.`,
+      );
       return;
     }
     clock.clockIn({ taskId, subjectId: task?.subjectId ?? null });
-    notify(`Clocked in: ${task ? task.title.slice(0, 42) : "session"} — timer recording.`);
+    notify(
+      `Clocked in: ${task ? task.title.slice(0, 42) : "session"} — timer recording.`,
+    );
   };
 
   /** Entry point for every "Re-run Setup" button — always confirm first. */
   const requestWizardRestart = () => {
-    if (state?.user.onboarded && (state.subjects.length || state.sessions.length || state.tasks.length)) {
+    if (
+      state?.user.onboarded &&
+      (state.subjects.length || state.sessions.length || state.tasks.length)
+    ) {
       setConfirmWipe(true);
     } else {
       startWizard();
@@ -706,35 +971,46 @@ export default function Home() {
 
   /** AI-tutor clock intents, routed through the ONE study session so a chat
    *  command can never leave the focus timer and the study clock out of step. */
-  const applyClockIntent = useCallback((type: string) => {
-    switch (type) {
-      case "startTimer":
-        if (session.active) return;
-        if (clock.sessionActive) session.start();
-        else startSmartClock();
-        break;
-      case "stopTimer":
-        if (clock.sessionActive) clockOutNow();
-        break;
-      case "pause":
-        if (session.active) session.pause();
-        else notify("No session running to pause.");
-        break;
-      case "resume":
-        if (clock.sessionActive || clock.elapsed > 0) session.start();
-        else startSmartClock();
-        break;
-      case "break":
-        if (clock.sessionActive && !clock.onBreak) session.takeBreak();
-        else notify("Start a session first, then take a break.");
-        break;
-      case "zen":
-        setZen(true);
-        break;
-      default:
-        break;
-    }
-  }, [clock.elapsed, clock.onBreak, clock.sessionActive, clockOutNow, notify, session, startSmartClock]);
+  const applyClockIntent = useCallback(
+    (type: string) => {
+      switch (type) {
+        case "startTimer":
+          if (session.active) return;
+          if (clock.sessionActive) session.start();
+          else startSmartClock();
+          break;
+        case "stopTimer":
+          if (clock.sessionActive) clockOutNow();
+          break;
+        case "pause":
+          if (session.active) session.pause();
+          else notify("No session running to pause.");
+          break;
+        case "resume":
+          if (clock.sessionActive || clock.elapsed > 0) session.start();
+          else startSmartClock();
+          break;
+        case "break":
+          if (clock.sessionActive && !clock.onBreak) session.takeBreak();
+          else notify("Start a session first, then take a break.");
+          break;
+        case "zen":
+          setZen(true);
+          break;
+        default:
+          break;
+      }
+    },
+    [
+      clock.elapsed,
+      clock.onBreak,
+      clock.sessionActive,
+      clockOutNow,
+      notify,
+      session,
+      startSmartClock,
+    ],
+  );
 
   const askTutor = useCallback(
     async (q: string) => {
@@ -746,7 +1022,11 @@ export default function Home() {
       chatInFlightRef.current = true;
       setThinking(true);
       const optimistic: MessageRow = {
-        id: -Date.now(), userId: 0, role: "user", content: message, createdAt: new Date().toISOString(),
+        id: -Date.now(),
+        userId: 0,
+        role: "user",
+        content: message,
+        createdAt: new Date().toISOString(),
       };
       setPendingMsgs((p) => [...p, optimistic]);
       try {
@@ -754,30 +1034,44 @@ export default function Home() {
           reply: string;
           action: { type: string; payload?: unknown } | null;
           state: AppState;
-          ai?: { source: string; model: string | null; degraded: boolean; message?: string };
-        }>(
-          "/api/chat",
-          {
-            method: "POST",
-            body: JSON.stringify({ message, source: "text" }),
-            timeoutMs: 35_000,
-          }
-        );
-        const reply = (r.reply || "").trim()
-          || "I'm here — try asking again about your plan or a topic from your subjects.";
+          ai?: {
+            source: string;
+            model: string | null;
+            degraded: boolean;
+            message?: string;
+          };
+        }>("/api/chat", {
+          method: "POST",
+          body: JSON.stringify({ message, source: "text" }),
+          timeoutMs: 35_000,
+        });
+        const reply =
+          (r.reply || "").trim() ||
+          "I'm here — try asking again about your plan or a topic from your subjects.";
         setState((prev) => {
           const incoming = r.state;
           // Never replace a real onboarded plan with the empty DB-less
           // fallback. That used to wipe the chat (and the syllabus) after
           // a perfectly good tutor reply.
-          const keepPrev = !!prev && isFallbackUser(incoming?.user) && !isFallbackUser(prev.user);
+          const keepPrev =
+            !!prev &&
+            isFallbackUser(incoming?.user) &&
+            !isFallbackUser(prev.user);
           const base = (keepPrev ? prev : incoming) || prev;
           if (!base) return prev;
           const history = (base.messages || []).filter((row) => row.id > 0);
           return {
             ...base,
-            messages: appendChatTurn(history, message, reply, base.user?.id || 0),
-            context: keepPrev && prev ? prev.context : (incoming.context || base.context),
+            messages: appendChatTurn(
+              history,
+              message,
+              reply,
+              base.user?.id || 0,
+            ),
+            context:
+              keepPrev && prev
+                ? prev.context
+                : incoming.context || base.context,
             aiProvider: incoming.aiProvider ?? base.aiProvider,
           };
         });
@@ -789,30 +1083,45 @@ export default function Home() {
           applyClockIntent(a.type);
           // The chat API already performs and returns a fresh replan. Calling
           // /api/replan again here caused a second rebuild and race.
-          if (a.type === "theme") { void patchSettings({ theme: String(a.payload) }); }
+          if (a.type === "theme") {
+            void patchSettings({ theme: String(a.payload) });
+          }
         }
       } catch (error) {
-        console.warn("API call failed, using client-side local tutor fallback:", error);
+        console.warn(
+          "API call failed, using client-side local tutor fallback:",
+          error,
+        );
         const action = parseCommand(message);
         const langReply = languageCapabilityReply(message);
         const currentCtx = state?.context;
-        const instant = (action || !currentCtx) ? null : instantTutorReply(message, currentCtx);
+        const instant =
+          action || !currentCtx ? null : instantTutorReply(message, currentCtx);
 
         let fallbackText = "";
         if (langReply) {
           fallbackText = langReply;
         } else if (action) {
-          fallbackText = commandReply(action, message, currentCtx?.daysLeft ?? 90);
-          if (action.type === "navigate") goPage(String(action.payload) as Page);
+          fallbackText = commandReply(
+            action,
+            message,
+            currentCtx?.daysLeft ?? 90,
+          );
+          if (action.type === "navigate")
+            goPage(String(action.payload) as Page);
           applyClockIntent(action.type);
-          if (action.type === "theme") { void patchSettings({ theme: String(action.payload) }); }
+          if (action.type === "theme") {
+            void patchSettings({ theme: String(action.payload) });
+          }
         } else if (instant) {
           fallbackText = instant.text;
         } else {
-          const pending = (currentCtx?.today || []).filter((task) => task.status === "pending").slice(0, 3);
+          const pending = (currentCtx?.today || [])
+            .filter((task) => task.status === "pending")
+            .slice(0, 3);
           fallbackText = pending.length
             ? `I couldn't reach the cloud tutor just now. From your plan, start with **${pending[0].title}**. Ask me to explain it, or say *"what should I study today?"*.`
-            : "I couldn't reach the cloud tutor just now. Ask again in a moment, or say *\"what should I study today?\"* / *\"explain [a topic from your subjects]\"*.";
+            : 'I couldn\'t reach the cloud tutor just now. Ask again in a moment, or say *"what should I study today?"* / *"explain [a topic from your subjects]"*.';
         }
 
         const botMsg: MessageRow = {
@@ -835,14 +1144,16 @@ export default function Home() {
         setThinking(false);
       }
     },
-    [applyClockIntent, goPage, notify, patchSettings, state]
+    [applyClockIntent, goPage, notify, patchSettings, state],
   );
 
   if (loading) {
     return (
       <div className="loader-screen">
         <div className="loader-stack">
-          <div className="loader-ring"><IconLogo size={28} /></div>
+          <div className="loader-ring">
+            <IconLogo size={28} />
+          </div>
           <div className="loader-title">Study Planner Pro</div>
           <div className="loader-sub">Loading your study plan…</div>
           <div className="loader-skeletons">
@@ -860,32 +1171,52 @@ export default function Home() {
     return (
       <div className="loader-screen">
         <div className="loader-title">Connection problem</div>
-        <div className="loader-sub">Your data is still safe. Check the connection and try again.</div>
-        <button className="btn btn-primary retry-btn" onClick={loadInitialState}>Retry</button>
+        <div className="loader-sub">
+          Your data is still safe. Check the connection and try again.
+        </div>
+        <button
+          className="btn btn-primary retry-btn"
+          onClick={loadInitialState}
+        >
+          Retry
+        </button>
       </div>
     );
   }
 
   if (!state.user.onboarded || forceWizard) {
-    return <Onboarding
-      onDone={(s) => { setState(s); setForceWizard(false); goPage("dashboard"); }}
-      isRerun={state.user.onboarded}
-      initialName={state.user.onboarded ? state.user.name : ""}
-      onCancel={state.user.onboarded ? () => setForceWizard(false) : undefined}
-    />;
+    return (
+      <Onboarding
+        onDone={(s) => {
+          setState(s);
+          setForceWizard(false);
+          goPage("dashboard");
+        }}
+        isRerun={state.user.onboarded}
+        initialName={state.user.onboarded ? state.user.name : ""}
+        onCancel={
+          state.user.onboarded ? () => setForceWizard(false) : undefined
+        }
+      />
+    );
   }
 
   const ctx = state.context;
   const t = today();
-  const todayDone = state.tasks.filter((x) => x.date === t && x.status === "done").length;
+  const todayDone = state.tasks.filter(
+    (x) => x.date === t && x.status === "done",
+  ).length;
   const todayTotal = state.tasks.filter((x) => x.date === t).length;
   const allMsgs = [...state.messages, ...pendingMsgs];
 
   // Zen ring progress: countdown modes deplete over the block (start full,
   // drain to zero); stopwatch eases a full sweep once an hour. 0..1, NaN-safe.
-  const zenRingPct = timer.mode === "stopwatch"
-    ? (timer.seconds % 3600) / 3600
-    : timer.total ? Math.min(1, Math.max(0, timer.seconds / timer.total)) : 0;
+  const zenRingPct =
+    timer.mode === "stopwatch"
+      ? (timer.seconds % 3600) / 3600
+      : timer.total
+        ? Math.min(1, Math.max(0, timer.seconds / timer.total))
+        : 0;
 
   // The full task title, untruncated — CSS wraps it cleanly instead of
   // slicing it in JS (fixes "Principles of Marketing: Introduction…").
@@ -895,21 +1226,145 @@ export default function Home() {
     "Free session";
 
   const commands: Command[] = [
-    { id: "nav-dash", group: "Navigate", label: "Go to Overview", hint: "Dashboard", keywords: "home stats", run: () => goPage("dashboard") },
-    { id: "nav-plan", group: "Navigate", label: "Go to Planner", hint: "Schedule", keywords: "tasks lessons", run: () => goPage("planner") },
-    { id: "nav-focus", group: "Navigate", label: "Go to Focus", hint: "Pomodoro", keywords: "timer deep work", run: () => goPage("focus") },
-    { id: "nav-subj", group: "Navigate", label: "Go to Subjects", hint: "Syllabus", keywords: "units topics", run: () => goPage("subjects") },
-    { id: "nav-analytics", group: "Navigate", label: "Go to Analytics & Trends", hint: "Metrics", keywords: "charts reports trends mastery velocity", run: () => goPage("analytics") },
-    { id: "nav-set", group: "Navigate", label: "Go to Settings", keywords: "theme preferences", run: () => goPage("settings") },
-    { id: "clock-in", group: "Study Clock", label: session.active ? "Pause Session" : clock.sessionActive ? "Resume Session" : "Clock In", hint: session.active ? "Freeze both timers" : "Start recording", keywords: "timer record attendance pause", run: () => (session.active ? session.pause() : clock.sessionActive ? session.start() : startSmartClock()) },
-    { id: "clock-out", group: "Study Clock", label: "Clock Out", hint: clock.sessionActive ? "Stop & save minutes" : "no open session", keywords: "stop end finish timer", run: () => (clock.sessionActive ? clockOutNow() : notify("No open session to close.")) },
-    { id: "clock-break", group: "Study Clock", label: clock.onBreak ? "Resume from break" : "Take a break", keywords: "pause rest", run: () => (clock.onBreak ? session.start() : session.takeBreak()) },
-    { id: "next-lesson", group: "Study Clock", label: "Start next pending lesson", hint: "Clock in + switch", keywords: "begin study start task", run: () => { const t = today(); const next = nextAction(state.tasks.filter((x) => x.id !== clock.taskId), t).now; if (next) focusTask(next.id); else notify("Nothing pending — enjoy the rest day."); } },
-    { id: "zen", group: "Focus", label: "Enter Zen mode", hint: "Distraction-free", keywords: "fullscreen minimal", run: () => setZen(true) },
-    { id: "ai", group: "AI Tutor", label: "Ask AI Tutor", hint: "Open chat", keywords: "help question doubt", run: () => setChatOpen(true) },
-    { id: "ai-today", group: "AI Tutor", label: "What should I study today?", keywords: "plan today", run: () => askTutor("What should I study today and in what order?") },
-    { id: "replan", group: "Plan", label: "Re-plan Mathematically", hint: "Rebalance", keywords: "regenerate schedule", run: () => { goPage("planner"); replan(); } },
-    { id: "setup", group: "Plan", label: "Re-run Setup Wizard", keywords: "onboarding restart course", run: () => requestWizardRestart() },
+    {
+      id: "nav-dash",
+      group: "Navigate",
+      label: "Go to Overview",
+      hint: "Dashboard",
+      keywords: "home stats",
+      run: () => goPage("dashboard"),
+    },
+    {
+      id: "nav-plan",
+      group: "Navigate",
+      label: "Go to Planner",
+      hint: "Schedule",
+      keywords: "tasks lessons",
+      run: () => goPage("planner"),
+    },
+    {
+      id: "nav-focus",
+      group: "Navigate",
+      label: "Go to Focus",
+      hint: "Pomodoro",
+      keywords: "timer deep work",
+      run: () => goPage("focus"),
+    },
+    {
+      id: "nav-subj",
+      group: "Navigate",
+      label: "Go to Subjects",
+      hint: "Syllabus",
+      keywords: "units topics",
+      run: () => goPage("subjects"),
+    },
+    {
+      id: "nav-analytics",
+      group: "Navigate",
+      label: "Go to Analytics & Trends",
+      hint: "Metrics",
+      keywords: "charts reports trends mastery velocity",
+      run: () => goPage("analytics"),
+    },
+    {
+      id: "nav-set",
+      group: "Navigate",
+      label: "Go to Settings",
+      keywords: "theme preferences",
+      run: () => goPage("settings"),
+    },
+    {
+      id: "clock-in",
+      group: "Study Clock",
+      label: session.active
+        ? "Pause Session"
+        : clock.sessionActive
+          ? "Resume Session"
+          : "Clock In",
+      hint: session.active ? "Freeze both timers" : "Start recording",
+      keywords: "timer record attendance pause",
+      run: () =>
+        session.active
+          ? session.pause()
+          : clock.sessionActive
+            ? session.start()
+            : startSmartClock(),
+    },
+    {
+      id: "clock-out",
+      group: "Study Clock",
+      label: "Clock Out",
+      hint: clock.sessionActive ? "Stop & save minutes" : "no open session",
+      keywords: "stop end finish timer",
+      run: () =>
+        clock.sessionActive
+          ? clockOutNow()
+          : notify("No open session to close."),
+    },
+    {
+      id: "clock-break",
+      group: "Study Clock",
+      label: clock.onBreak ? "Resume from break" : "Take a break",
+      keywords: "pause rest",
+      run: () => (clock.onBreak ? session.start() : session.takeBreak()),
+    },
+    {
+      id: "next-lesson",
+      group: "Study Clock",
+      label: "Start next pending lesson",
+      hint: "Clock in + switch",
+      keywords: "begin study start task",
+      run: () => {
+        const t = today();
+        const next = nextAction(
+          state.tasks.filter((x) => x.id !== clock.taskId),
+          t,
+        ).now;
+        if (next) focusTask(next.id);
+        else notify("Nothing pending — enjoy the rest day.");
+      },
+    },
+    {
+      id: "zen",
+      group: "Focus",
+      label: "Enter Zen mode",
+      hint: "Distraction-free",
+      keywords: "fullscreen minimal",
+      run: () => setZen(true),
+    },
+    {
+      id: "ai",
+      group: "AI Tutor",
+      label: "Ask AI Tutor",
+      hint: "Open chat",
+      keywords: "help question doubt",
+      run: () => setChatOpen(true),
+    },
+    {
+      id: "ai-today",
+      group: "AI Tutor",
+      label: "What should I study today?",
+      keywords: "plan today",
+      run: () => askTutor("What should I study today and in what order?"),
+    },
+    {
+      id: "replan",
+      group: "Plan",
+      label: "Re-plan Mathematically",
+      hint: "Rebalance",
+      keywords: "regenerate schedule",
+      run: () => {
+        goPage("planner");
+        replan();
+      },
+    },
+    {
+      id: "setup",
+      group: "Plan",
+      label: "Re-run Setup Wizard",
+      keywords: "onboarding restart course",
+      run: () => requestWizardRestart(),
+    },
   ];
 
   return (
@@ -920,14 +1375,20 @@ export default function Home() {
           Analytics and the tools stay one tap away on phones. */}
       <header className="mobile-header">
         <div className="mh-brand">
-          <div className="brand-logo-icon brand-logo-sm" aria-hidden="true"><IconLogo size={14} /></div>
+          <div className="brand-logo-icon brand-logo-sm" aria-hidden="true">
+            <IconLogo size={14} />
+          </div>
           <div className="mh-titles">
             <span className="mh-wordmark">Study Planner Pro</span>
-            <span className="mh-page">{NAV.find((n) => n.id === page)?.label ?? "Study Planner Pro"}</span>
+            <span className="mh-page">
+              {NAV.find((n) => n.id === page)?.label ?? "Study Planner Pro"}
+            </span>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <span className="streak-badge mh-streak"><IconFlame /> {state.user.streak}d</span>
+          <span className="streak-badge mh-streak">
+            <IconFlame /> {state.user.streak}d
+          </span>
           {/* Quick controls mirror the tracker bar's trio for phones, where
               the tracker hides them below 640px — same popovers, same state. */}
           <span className="mh-quick">
@@ -937,7 +1398,11 @@ export default function Home() {
                 className="icon-quick-btn mh-qbtn"
                 aria-label="Notifications"
                 aria-expanded={notifOpen}
-                onClick={(e) => { e.stopPropagation(); setThemeOpen(false); setNotifOpen((v) => !v); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setThemeOpen(false);
+                  setNotifOpen((v) => !v);
+                }}
               >
                 <IconBell size={15} />
                 <span className="icon-quick-dot" aria-hidden="true" />
@@ -948,28 +1413,49 @@ export default function Home() {
                   <div className="notif-row">
                     <span className="notif-dot notif-dot--orange" />
                     <div>
-                      <strong>{ctx.overdue > 0 ? `${ctx.overdue} unfinished task${ctx.overdue > 1 ? "s" : ""}` : "Nothing unfinished"}</strong>
-                      <span>{ctx.overdue > 0 ? "Let's recover them — spread them out or re-plan." : "You're up to date."}</span>
+                      <strong>
+                        {ctx.overdue > 0
+                          ? `${ctx.overdue} unfinished task${ctx.overdue > 1 ? "s" : ""}`
+                          : "Nothing unfinished"}
+                      </strong>
+                      <span>
+                        {ctx.overdue > 0
+                          ? "Let's recover them — spread them out or re-plan."
+                          : "You're up to date."}
+                      </span>
                     </div>
                   </div>
                   <div className="notif-row">
                     <span className="notif-dot notif-dot--green" />
                     <div>
-                      <strong>{todayDone}/{todayTotal} lessons done today</strong>
-                      <span>{todayTotal ? `${Math.round((todayDone / Math.max(1, todayTotal)) * 100)}% of today's plan` : "Rest day or no plan yet"}</span>
+                      <strong>
+                        {todayDone}/{todayTotal} lessons done today
+                      </strong>
+                      <span>
+                        {todayTotal
+                          ? `${Math.round((todayDone / Math.max(1, todayTotal)) * 100)}% of today's plan`
+                          : "Rest day or no plan yet"}
+                      </span>
                     </div>
                   </div>
                   <div className="notif-row">
                     <span className="notif-dot notif-dot--violet" />
                     <div>
                       <strong>{state.user.streak} day streak</strong>
-                      <span>{state.user.streak > 0 ? "Your progress is still here, even on days you miss." : "Start today and it will build itself."}</span>
+                      <span>
+                        {state.user.streak > 0
+                          ? "Your progress is still here, even on days you miss."
+                          : "Start today and it will build itself."}
+                      </span>
                     </div>
                   </div>
                   <div className="notif-row">
                     <span className="notif-dot notif-dot--blue" />
                     <div>
-                      <strong>{ctx.daysLeft} days to {prettyLong(state.settings.examDate)}</strong>
+                      <strong>
+                        {ctx.daysLeft} days to{" "}
+                        {prettyLong(state.settings.examDate)}
+                      </strong>
                       <span>{ctx.progressPct}% of the syllabus complete.</span>
                     </div>
                   </div>
@@ -982,7 +1468,11 @@ export default function Home() {
                 className="icon-quick-btn mh-qbtn"
                 aria-label="Change theme"
                 aria-expanded={themeOpen}
-                onClick={(e) => { e.stopPropagation(); setNotifOpen(false); setThemeOpen((v) => !v); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setNotifOpen(false);
+                  setThemeOpen((v) => !v);
+                }}
               >
                 <IconPalette size={15} />
               </button>
@@ -994,11 +1484,20 @@ export default function Home() {
                       key={th.id}
                       type="button"
                       className={`theme-pop-item${state.settings.theme === th.id ? " active" : ""}`}
-                      onClick={(e) => { e.stopPropagation(); void patchSettings({ theme: th.id }); setThemeOpen(false); }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void patchSettings({ theme: th.id });
+                        setThemeOpen(false);
+                      }}
                     >
-                      <span className={`theme-pop-swatch theme-swatch--${th.id}`} aria-hidden="true" />
+                      <span
+                        className={`theme-pop-swatch theme-swatch--${th.id}`}
+                        aria-hidden="true"
+                      />
                       <span>{th.label}</span>
-                      {state.settings.theme === th.id && <IconCheck size={13} />}
+                      {state.settings.theme === th.id && (
+                        <IconCheck size={13} />
+                      )}
                     </button>
                   ))}
                 </div>
@@ -1018,23 +1517,49 @@ export default function Home() {
       </header>
 
       {/* Mobile/tablet navigation drawer + scrim */}
-      {drawerOpen && <div className="drawer-scrim" onClick={() => setDrawerOpen(false)} aria-hidden="true" />}
-      <aside className={`mobile-drawer${drawerOpen ? " open" : ""}`} aria-hidden={!drawerOpen}>
+      {drawerOpen && (
+        <div
+          className="drawer-scrim"
+          onClick={() => setDrawerOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+      <aside
+        className={`mobile-drawer${drawerOpen ? " open" : ""}`}
+        aria-hidden={!drawerOpen}
+      >
         <div className="drawer-head">
           <div className="brand-header">
-            <div className="brand-logo-icon" aria-hidden="true"><IconLogo /></div>
+            <div className="brand-logo-icon" aria-hidden="true">
+              <IconLogo />
+            </div>
             <div className="brand-text">
               <div className="brand-title">Study Planner Pro</div>
               <div className="brand-course">{state.user.courseName}</div>
             </div>
           </div>
-          <button className="drawer-close" aria-label="Close navigation menu" onClick={() => setDrawerOpen(false)}>×</button>
+          <button
+            className="drawer-close"
+            aria-label="Close navigation menu"
+            onClick={() => setDrawerOpen(false)}
+          >
+            ×
+          </button>
         </div>
         <div className="drawer-tools">
-          <button className="drawer-tool" type="button"
-            onClick={() => { setDrawerOpen(false); void replan(); }}
-            disabled={busy} title="Re-plan schedule with AI">
-            <span className={busy ? "replanning-spark" : ""}><IconSpark size={15} /></span>
+          <button
+            className="drawer-tool"
+            type="button"
+            onClick={() => {
+              setDrawerOpen(false);
+              void replan();
+            }}
+            disabled={busy}
+            title="Re-plan schedule with AI"
+          >
+            <span className={busy ? "replanning-spark" : ""}>
+              <IconSpark size={15} />
+            </span>
             <span>Re-plan{busy ? "ning…" : ""}</span>
           </button>
         </div>
@@ -1046,7 +1571,8 @@ export default function Home() {
               className={`drawer-item${page === n.id ? " active" : ""}`}
               onClick={() => goPage(n.id)}
             >
-              {n.icon}<span>{n.label}</span>
+              {n.icon}
+              <span>{n.label}</span>
             </button>
           ))}
         </nav>
@@ -1060,18 +1586,28 @@ export default function Home() {
           <p className="foot-sub">
             {ctx.daysLeft} days left · {ctx.progressPct}% syllabus completed.
           </p>
-          <button className="btn btn-secondary btn-sm w-full" onClick={() => { setDrawerOpen(false); requestWizardRestart(); }}>
+          <button
+            className="btn btn-secondary btn-sm w-full"
+            onClick={() => {
+              setDrawerOpen(false);
+              requestWizardRestart();
+            }}
+          >
             Re-run Setup
           </button>
         </div>
       </aside>
 
-      <div className={`app-wrapper${sidebarCollapsed ? " sb-collapsed" : ""}${railAnimating ? " sb-anim" : ""}`}>
+      <div
+        className={`app-wrapper${sidebarCollapsed ? " sb-collapsed" : ""}${railAnimating ? " sb-anim" : ""}`}
+      >
         <aside className="sidebar">
           <button
             className="sb-toggle"
             onClick={toggleSidebar}
-            aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-label={
+              sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"
+            }
             title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
             <IconPanelLeft size={16} />
@@ -1079,7 +1615,9 @@ export default function Home() {
           <div className="brand-header">
             {/* Presentational mark: it never carries a nav state, so the only
                 highlighted thing in the rail is the active route's pill. */}
-            <div className="brand-logo-icon" aria-hidden="true"><IconLogo /></div>
+            <div className="brand-logo-icon" aria-hidden="true">
+              <IconLogo />
+            </div>
             <div className="brand-text">
               <div className="brand-title">Study Planner Pro</div>
               <div className="brand-course">{state.user.courseName}</div>
@@ -1095,9 +1633,15 @@ export default function Home() {
                 aria-label={n.label}
                 role="button"
                 tabIndex={0}
-                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); goPage(n.id); } }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    goPage(n.id);
+                  }
+                }}
               >
-                {n.icon}<span>{n.label}</span>
+                {n.icon}
+                <span>{n.label}</span>
               </div>
             ))}
           </nav>
@@ -1108,9 +1652,13 @@ export default function Home() {
               </div>
               <h4 className="foot-title">Keep Moving</h4>
               <p className="foot-sub">
-                {ctx.daysLeft} days left · {ctx.progressPct}% syllabus completed.
+                {ctx.daysLeft} days left · {ctx.progressPct}% syllabus
+                completed.
               </p>
-              <button className="btn btn-secondary btn-sm w-full" onClick={requestWizardRestart}>
+              <button
+                className="btn btn-secondary btn-sm w-full"
+                onClick={requestWizardRestart}
+              >
                 Re-run Setup
               </button>
             </div>
@@ -1119,26 +1667,55 @@ export default function Home() {
 
         <main className="main-workspace" data-nav-dir={navDir}>
           <div className="tracker-bar" role="status" aria-live="off">
-            <div className="flex-row gap-md tracker-status">
-              <div className={`pulse-dot${clock.running ? " live" : ""}`} />
+            <div className="tracker-status">
+              <span
+                className={`pulse-dot${clock.running ? " live" : ""}`}
+                aria-hidden="true"
+              />
               <div className="tracker-labels">
-                <div className="tracker-state">
-                  {clock.running ? "Clocked in" : clock.onBreak ? "On break" : clock.sessionActive ? "Paused" : "Not clocked in"}
-                </div>
-                <div className="tracker-task">{clockTaskTitle}</div>
-              </div>
-              <div className="mono tracker-time">
-                {mmss(clock.elapsed)}
+                <span className="tracker-state">
+                  {clock.running
+                    ? "Clocked in"
+                    : clock.onBreak
+                      ? "On break"
+                      : clock.sessionActive
+                        ? "Paused"
+                        : "Not clocked in"}
+                </span>
+                {/* `tracker-title` is the flexible region: it takes whatever
+                    width the verbs leave and clips with an ellipsis, so a long
+                    lesson name can never push the controls off-screen. */}
+                <span className="tracker-task" title={clockTaskTitle}>
+                  {clockTaskTitle}
+                </span>
               </div>
             </div>
-            <div className="flex-row gap-sm tracker-actions">
-              <span className="chip chip-kind">{todayDone}/{todayTotal} today</span>
+            <div className="tracker-clock">
+              <span
+                className="mono tracker-time"
+                aria-label={`Study clock ${mmss(clock.elapsed)}`}
+              >
+                {mmss(clock.elapsed)}
+              </span>
+            </div>
+            <div className="tracker-actions">
+              <span className="chip chip-kind">
+                {todayDone}/{todayTotal} today
+              </span>
               <span className="chip chip-pending tracker-exam-chip">
-                <span className="exam-chip-full">{ctx.daysLeft}d to {prettyLong(state.settings.examDate)}</span>
+                <span className="exam-chip-full">
+                  {ctx.daysLeft}d to {prettyLong(state.settings.examDate)}
+                </span>
                 <span className="exam-chip-short">{ctx.daysLeft}d to exam</span>
               </span>
               {!clock.sessionActive && (
-                <button className="btn btn-xs btn-primary act-in" onClick={startSmartClock}>Clock In</button>
+                <button
+                  className="btn btn-xs btn-primary act-in"
+                  onClick={startSmartClock}
+                  title="Start recording study time on the next pending task"
+                >
+                  <IconPlay size={12} /> <span>Clock in</span>
+                </button>
               )}
               {clock.sessionActive && (
                 <>
@@ -1147,8 +1724,23 @@ export default function Home() {
                   <button
                     className={`btn btn-xs ${session.active ? "btn-secondary" : "btn-primary"} act-toggle`}
                     onClick={pauseOrResume}
+                    title={
+                      session.active
+                        ? "Pause the study clock"
+                        : "Resume the study clock"
+                    }
+                    aria-label={
+                      session.active
+                        ? "Pause the study clock"
+                        : "Resume the study clock"
+                    }
                   >
-                    {session.active ? "Pause" : "Resume"}
+                    {session.active ? (
+                      <IconPause size={12} />
+                    ) : (
+                      <IconPlay size={12} />
+                    )}
+                    <span>{session.active ? "Pause" : "Resume"}</span>
                   </button>
                   {/* Always rendered while a session is open, so the row keeps
                       exactly the same geometry while clocked in and paused. */}
@@ -1156,34 +1748,71 @@ export default function Home() {
                     className="btn btn-xs btn-secondary act-break"
                     onClick={session.takeBreak}
                     disabled={!clock.running}
+                    title="Start a break — break time is not logged as study time"
+                    aria-label="Start a break"
                   >
-                    Break
+                    <IconLeaf size={12} /> <span>Break</span>
                   </button>
-                  <button className="btn btn-xs btn-danger act-out" onClick={clockOutNow}>Clock Out</button>
+                  <button
+                    className="btn btn-xs btn-danger act-out"
+                    onClick={clockOutNow}
+                    title="Stop the clock and save your minutes"
+                    aria-label="Clock out and save minutes"
+                  >
+                    <IconCheck size={12} /> <span>Save &amp; exit</span>
+                  </button>
                 </>
               )}
               {ambient !== "none" && (
-                <button className="btn btn-xs btn-secondary ambient-pill" onClick={() => stopSound()} title="Stop ambient sound">
-                  <span className="ambient-bars"><i /><i /><i /></span> Stop sound
+                <button
+                  className="btn btn-xs btn-secondary ambient-pill"
+                  onClick={() => stopSound()}
+                  title="Stop ambient sound"
+                >
+                  <span className="ambient-bars">
+                    <i />
+                    <i />
+                    <i />
+                  </span>{" "}
+                  Stop sound
                 </button>
               )}
-              <button className="btn btn-xs btn-secondary tracker-zen" aria-label="Enter Zen focus mode" onClick={() => setZen(true)}><IconBolt size={12} /> Zen</button>
+              <button
+                className="btn btn-xs btn-secondary tracker-zen"
+                aria-label="Enter Zen focus mode"
+                title="Enter Zen focus mode"
+                onClick={() => setZen(true)}
+              >
+                <IconBolt size={12} /> <span>Zen</span>
+              </button>
               <span className="tracker-quick-controls">
                 <button
                   className="icon-quick-btn"
                   aria-label={`Re-plan schedule${busy ? " (in progress)" : ""}`}
                   title="AI re-plan"
                   disabled={busy}
-                  onClick={(e) => { e.stopPropagation(); void replan(); }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void replan();
+                  }}
                 >
-                  <span className={busy ? "replanning-spark" : ""}><IconSpark size={15} /></span>
+                  <span className={busy ? "replanning-spark" : ""}>
+                    <IconSpark size={15} />
+                  </span>
                 </button>
-                <div className="quick-popover-wrap" onClick={(e) => e.stopPropagation()}>
+                <div
+                  className="quick-popover-wrap"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <button
                     className="icon-quick-btn"
                     aria-label="Notifications"
                     aria-expanded={notifOpen}
-                    onClick={(e) => { e.stopPropagation(); setThemeOpen(false); setNotifOpen((v) => !v); }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setThemeOpen(false);
+                      setNotifOpen((v) => !v);
+                    }}
                   >
                     <IconBell size={15} />
                     <span className="icon-quick-dot" aria-hidden="true" />
@@ -1194,40 +1823,70 @@ export default function Home() {
                       <div className="notif-row">
                         <span className="notif-dot notif-dot--orange" />
                         <div>
-                          <strong>{ctx.overdue > 0 ? `${ctx.overdue} unfinished task${ctx.overdue > 1 ? "s" : ""}` : "Nothing unfinished"}</strong>
-                          <span>{ctx.overdue > 0 ? "Let's recover them — spread them out or re-plan." : "You're up to date."}</span>
+                          <strong>
+                            {ctx.overdue > 0
+                              ? `${ctx.overdue} unfinished task${ctx.overdue > 1 ? "s" : ""}`
+                              : "Nothing unfinished"}
+                          </strong>
+                          <span>
+                            {ctx.overdue > 0
+                              ? "Let's recover them — spread them out or re-plan."
+                              : "You're up to date."}
+                          </span>
                         </div>
                       </div>
                       <div className="notif-row">
                         <span className="notif-dot notif-dot--green" />
                         <div>
-                          <strong>{todayDone}/{todayTotal} lessons done today</strong>
-                          <span>{todayTotal ? `${Math.round((todayDone / Math.max(1, todayTotal)) * 100)}% of today's plan` : "Rest day or no plan yet"}</span>
+                          <strong>
+                            {todayDone}/{todayTotal} lessons done today
+                          </strong>
+                          <span>
+                            {todayTotal
+                              ? `${Math.round((todayDone / Math.max(1, todayTotal)) * 100)}% of today's plan`
+                              : "Rest day or no plan yet"}
+                          </span>
                         </div>
                       </div>
                       <div className="notif-row">
                         <span className="notif-dot notif-dot--violet" />
                         <div>
                           <strong>{state.user.streak} day streak</strong>
-                          <span>{state.user.streak > 0 ? "Your progress is still here, even on days you miss." : "Start today and it will build itself."}</span>
+                          <span>
+                            {state.user.streak > 0
+                              ? "Your progress is still here, even on days you miss."
+                              : "Start today and it will build itself."}
+                          </span>
                         </div>
                       </div>
                       <div className="notif-row">
                         <span className="notif-dot notif-dot--blue" />
                         <div>
-                          <strong>{ctx.daysLeft} days to {prettyLong(state.settings.examDate)}</strong>
-                          <span>{ctx.progressPct}% of the syllabus complete.</span>
+                          <strong>
+                            {ctx.daysLeft} days to{" "}
+                            {prettyLong(state.settings.examDate)}
+                          </strong>
+                          <span>
+                            {ctx.progressPct}% of the syllabus complete.
+                          </span>
                         </div>
                       </div>
                     </div>
                   )}
                 </div>
-                <div className="quick-popover-wrap" onClick={(e) => e.stopPropagation()}>
+                <div
+                  className="quick-popover-wrap"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <button
                     className="icon-quick-btn"
                     aria-label="Change theme"
                     aria-expanded={themeOpen}
-                    onClick={(e) => { e.stopPropagation(); setNotifOpen(false); setThemeOpen((v) => !v); }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setNotifOpen(false);
+                      setThemeOpen((v) => !v);
+                    }}
                   >
                     <IconPalette size={15} />
                   </button>
@@ -1239,11 +1898,20 @@ export default function Home() {
                           key={th.id}
                           type="button"
                           className={`theme-pop-item${state.settings.theme === th.id ? " active" : ""}`}
-                          onClick={(e) => { e.stopPropagation(); void patchSettings({ theme: th.id }); setThemeOpen(false); }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void patchSettings({ theme: th.id });
+                            setThemeOpen(false);
+                          }}
                         >
-                          <span className={`theme-pop-swatch theme-swatch--${th.id}`} aria-hidden="true" />
+                          <span
+                            className={`theme-pop-swatch theme-swatch--${th.id}`}
+                            aria-hidden="true"
+                          />
                           <span>{th.label}</span>
-                          {state.settings.theme === th.id && <IconCheck size={13} />}
+                          {state.settings.theme === th.id && (
+                            <IconCheck size={13} />
+                          )}
                         </button>
                       ))}
                     </div>
@@ -1254,35 +1922,79 @@ export default function Home() {
           </div>
 
           {page === "dashboard" && (
-            <Dashboard state={state} onTaskStatus={setTaskStatus} onTaskUpdate={updateTask}
-              onSkipSubject={skipSubjectForDay} onFocusTask={focusTask}
-              activeTaskId={clock.taskId} activeClockSeconds={clock.elapsed}
-              clockRunning={clock.running} clockSessionActive={clock.sessionActive} clockOnBreak={clock.onBreak}
-              onClockOut={clockOutNow} onPauseOrResume={pauseOrResume}
-              replanning={busy} onReplan={replan} onStartFocus={startFocusSession}
-              onAddTask={addTask} onMoveTasks={moveTasks} onNavigate={(p) => goPage(p as Page)} />
+            <Dashboard
+              state={state}
+              onTaskStatus={setTaskStatus}
+              onTaskUpdate={updateTask}
+              onSkipSubject={skipSubjectForDay}
+              onFocusTask={focusTask}
+              activeTaskId={clock.taskId}
+              activeClockSeconds={clock.elapsed}
+              clockRunning={clock.running}
+              clockSessionActive={clock.sessionActive}
+              clockOnBreak={clock.onBreak}
+              onClockOut={clockOutNow}
+              onPauseOrResume={pauseOrResume}
+              replanning={busy}
+              onReplan={replan}
+              onStartFocus={startFocusSession}
+              onAddTask={addTask}
+              onMoveTasks={moveTasks}
+              onNavigate={(p) => goPage(p as Page)}
+              onAskTutor={askTutor}
+            />
           )}
           {page === "planner" && (
-            <PlannerView state={state} onTaskStatus={setTaskStatus} onTaskUpdate={updateTask}
-              onSkipSubject={skipSubjectForDay} onFocusTask={focusTask}
-              activeTaskId={clock.taskId} activeClockSeconds={clock.elapsed}
-              clockRunning={clock.running} clockSessionActive={clock.sessionActive}
+            <PlannerView
+              state={state}
+              onTaskStatus={setTaskStatus}
+              onTaskUpdate={updateTask}
+              onSkipSubject={skipSubjectForDay}
+              onFocusTask={focusTask}
+              activeTaskId={clock.taskId}
+              activeClockSeconds={clock.elapsed}
+              clockRunning={clock.running}
+              clockSessionActive={clock.sessionActive}
               onClockOut={clockOutNow}
-              onAskTutor={askTutor} replanning={busy} onReplan={replan}
-              onAddTask={addTask} />
+              onAskTutor={askTutor}
+              replanning={busy}
+              onReplan={replan}
+              onAddTask={addTask}
+            />
           )}
           {page === "focus" && (
-            <FocusView state={state} session={session} onCompleteTask={(id) => setTaskStatus(id, "done")}
-              onZen={() => setZen(true)} />
+            <FocusView
+              state={state}
+              session={session}
+              onCompleteTask={(id) => setTaskStatus(id, "done")}
+              onZen={() => setZen(true)}
+            />
           )}
           {page === "subjects" && (
-            <SubjectsView state={state} onAdd={addSubject} onEdit={editSubject} onDelete={deleteSubject} busy={busy} onAskTutor={askTutor} onNavigate={(p) => goPage(p as Page)} />
+            <SubjectsView
+              state={state}
+              onAdd={addSubject}
+              onEdit={editSubject}
+              onDelete={deleteSubject}
+              busy={busy}
+              onAskTutor={askTutor}
+              onNavigate={(p) => goPage(p as Page)}
+            />
           )}
           {page === "analytics" && (
-            <AnalyticsView state={state} onAskTutor={askTutor} onStartFocus={startFocusSession} />
+            <AnalyticsView
+              state={state}
+              onAskTutor={askTutor}
+              onStartFocus={startFocusSession}
+            />
           )}
           {page === "settings" && (
-            <SettingsView state={state} onPatch={patchSettings} onRestart={requestWizardRestart} busy={busy} />
+            <SettingsView
+              state={state}
+              onPatch={patchSettings}
+              onRestart={requestWizardRestart}
+              busy={busy}
+            />
           )}
         </main>
       </div>
@@ -1300,15 +2012,30 @@ export default function Home() {
             aria-current={page === n.id ? "page" : undefined}
             onClick={() => goPage(n.id)}
           >
-            <span className="mbn-icon" aria-hidden="true">{n.icon}</span>
+            <span className="mbn-icon" aria-hidden="true">
+              {n.icon}
+            </span>
             <span className="mbn-label">{n.label}</span>
           </button>
         ))}
       </nav>
 
-      <ChatPanel open={chatOpen} setOpen={setChatOpen} messages={allMsgs} onSend={askTutor}
-        thinking={thinking} provider={state.aiProvider}
-        learner={{ name: state.user.name, daysLeft: ctx.daysLeft, progressPct: ctx.progressPct, streak: state.user.streak, todayDone, todayTotal }} />
+      <ChatPanel
+        open={chatOpen}
+        setOpen={setChatOpen}
+        messages={allMsgs}
+        onSend={askTutor}
+        thinking={thinking}
+        provider={state.aiProvider}
+        learner={{
+          name: state.user.name,
+          daysLeft: ctx.daysLeft,
+          progressPct: ctx.progressPct,
+          streak: state.user.streak,
+          todayDone,
+          todayTotal,
+        }}
+      />
 
       <CommandPalette commands={commands} />
 
@@ -1319,14 +2046,35 @@ export default function Home() {
 
           {/* TOP — one quiet control row, in normal flow (nothing to collide with). */}
           <div className="zen-topbar">
-            <button className="zen-ghost" onClick={() => setZenMinimal((v) => !v)} aria-pressed={zenMinimal}>
-              <IconFocus2 size={14} /> <span>Focus Mode</span>
+            <button
+              className="zen-ghost"
+              onClick={() => setZenMinimal((v) => !v)}
+              aria-pressed={zenMinimal}
+              title={
+                zenMinimal
+                  ? "Show the timer detail and guidance"
+                  : "Hide everything but the timer"
+              }
+            >
+              <IconFocus2 size={14} />{" "}
+              <span>{zenMinimal ? "Detail view" : "Focus mode"}</span>
             </button>
             <div className="zen-topbar-right">
-              <button className="zen-ghost" onClick={toggleZenFullscreen}>
-                <IconExpand2 size={14} /> <span>Full Screen</span>
+              <button
+                className="zen-ghost"
+                onClick={toggleZenFullscreen}
+                title="Toggle full screen"
+                aria-label="Toggle full screen"
+              >
+                <IconExpand2 size={14} /> <span>Full screen</span>
               </button>
-              <button className="zen-ghost zen-exit" onClick={() => setZen(false)}>Exit Zen</button>
+              <button
+                className="zen-ghost zen-exit"
+                onClick={() => setZen(false)}
+                title="Leave Zen mode"
+              >
+                <IconClose size={14} /> <span>Exit Zen</span>
+              </button>
             </div>
           </div>
 
@@ -1334,29 +2082,64 @@ export default function Home() {
               with generous gaps; the timer is always the visual priority. */}
           <div className="zen-stage">
             <div className="zen-headline">
-              <span className="zen-emblem" aria-hidden="true"><IconFocus2 size={15} /></span>
+              <span className="zen-emblem" aria-hidden="true">
+                <IconFocus2 size={15} />
+              </span>
               <div className="zen-eyebrow">Deep Focus Session</div>
               {!zenMinimal && (
                 <div className="zen-kicker">
-                  {clock.sessionActive ? clockTaskTitle : "Protect this time for what matters"}
+                  {clock.sessionActive
+                    ? clockTaskTitle
+                    : "Protect this time for what matters"}
                 </div>
               )}
             </div>
 
             <div className="zen-ring-wrap">
-              <svg className="zen-ring" viewBox="0 0 320 320" aria-hidden="true">
+              <svg
+                className="zen-ring"
+                viewBox="0 0 320 320"
+                aria-hidden="true"
+              >
                 <defs>
                   {/* The component owns its gradient: the ring is the one
                       element in Zen allowed a little colour. */}
-                  <linearGradient id="zenRingGradient" x1="0" y1="0" x2="1" y2="1">
-                    <stop offset="0" stopColor="#b6aaff" />
-                    <stop offset="0.55" stopColor="#9b8bf7" />
-                    <stop offset="1" stopColor="#7d6cf0" />
+                  {/* (v25) The ring is still the one element in Zen allowed a
+                      little colour — but the colour is the theme's accent, not
+                      a fixed violet, so the room and the ring agree. */}
+                  <linearGradient
+                    id="zenRingGradient"
+                    x1="0"
+                    y1="0"
+                    x2="1"
+                    y2="1"
+                  >
+                    <stop
+                      offset="0"
+                      style={{
+                        stopColor:
+                          "color-mix(in srgb, var(--zen-accent) 62%, #ffffff)",
+                      }}
+                    />
+                    <stop
+                      offset="0.55"
+                      style={{ stopColor: "var(--zen-accent)" }}
+                    />
+                    <stop
+                      offset="1"
+                      style={{
+                        stopColor:
+                          "color-mix(in srgb, var(--zen-accent) 84%, #000000)",
+                      }}
+                    />
                   </linearGradient>
                 </defs>
                 <circle cx="160" cy="160" r="140" className="zen-ring-track" />
                 <circle
-                  cx="160" cy="160" r="140" className="zen-ring-progress"
+                  cx="160"
+                  cy="160"
+                  r="140"
+                  className="zen-ring-progress"
                   style={{
                     strokeDashoffset: 2 * Math.PI * 140 * (1 - zenRingPct),
                   }}
@@ -1371,8 +2154,15 @@ export default function Home() {
                     data-live={session.active ? "true" : "false"}
                     aria-hidden="true"
                   />
-                  {session.active ? "Recording" : clock.onBreak ? "On break" : clock.sessionActive ? "Paused" : "Ready"}
-                  {" · "}{mmss(clock.elapsed)}
+                  {session.active
+                    ? "Recording"
+                    : clock.onBreak
+                      ? "On break"
+                      : clock.sessionActive
+                        ? "Paused"
+                        : "Ready"}
+                  {" · "}
+                  {mmss(clock.elapsed)}
                 </div>
               </div>
             </div>
@@ -1380,14 +2170,45 @@ export default function Home() {
             {/* ONE control for the whole session. There is deliberately no
                 separate "Pause Clock": focus and the study clock are the same
                 session, so they pause, resume and end together. */}
-            <div className="flex-row gap-md zen-actions">
-              <button className="btn btn-primary zen-primary" onClick={session.toggle}>
-                {session.active ? "Pause" : clock.sessionActive ? "Resume" : "Start Focus"}
+            <div className="zen-actions">
+              <button
+                className="btn btn-primary zen-primary"
+                onClick={session.toggle}
+                title={
+                  session.active
+                    ? "Pause the session"
+                    : "Start the timer and the study clock together"
+                }
+              >
+                {session.active ? (
+                  <IconPause size={14} />
+                ) : (
+                  <IconPlay size={14} />
+                )}
+                <span>
+                  {session.active
+                    ? "Pause"
+                    : clock.sessionActive
+                      ? "Resume"
+                      : "Start focus"}
+                </span>
               </button>
               {clock.sessionActive && (
-                <button className="btn zen-secondary zen-clock-out" onClick={clockOutNow}>Clock Out</button>
+                <button
+                  className="btn zen-secondary zen-clock-out"
+                  onClick={clockOutNow}
+                  title="Save the minutes and stop the session"
+                >
+                  <IconCheck size={14} /> <span>Save &amp; exit</span>
+                </button>
               )}
-              <button className="btn zen-secondary zen-exit-btn" onClick={() => setZen(false)}>Exit Zen</button>
+              <button
+                className="btn zen-secondary zen-exit-btn"
+                onClick={() => setZen(false)}
+                title="Back to the planner, session still running"
+              >
+                <IconClose size={14} /> <span>Exit Zen</span>
+              </button>
             </div>
             <p className="zen-hint">
               {session.active
@@ -1401,11 +2222,20 @@ export default function Home() {
           {/* BOTTOM — the 3-part focus guidance bar, the last flow row. */}
           {!zenMinimal && (
             <div className="zen-guidance">
-              <div className="zen-guidance-item"><IconLeaf size={15} /><span>{zenGuidance(timer)}</span></div>
+              <div className="zen-guidance-item">
+                <IconLeaf size={15} />
+                <span>{zenGuidance(timer)}</span>
+              </div>
               <div className="zen-guidance-sep" aria-hidden="true" />
-              <div className="zen-guidance-item"><IconFocus2 size={15} /><span>Protect your focus</span></div>
+              <div className="zen-guidance-item">
+                <IconFocus2 size={15} />
+                <span>Protect your focus</span>
+              </div>
               <div className="zen-guidance-sep" aria-hidden="true" />
-              <div className="zen-guidance-item"><IconSpark size={15} /><span>You&apos;ve got this</span></div>
+              <div className="zen-guidance-item">
+                <IconSpark size={15} />
+                <span>You&apos;ve got this</span>
+              </div>
             </div>
           )}
         </div>
@@ -1414,31 +2244,61 @@ export default function Home() {
       {/* ── Re-run Setup confirmation (data-wipe warning) ── */}
       {confirmWipe && (
         <div className="modal-overlay" onClick={() => setConfirmWipe(false)}>
-          <div className="glass-panel modal-box confirm-box" onClick={(e) => e.stopPropagation()}>
-            <div className="confirm-icon"><IconWarn size={22} /></div>
+          <div
+            className="glass-panel modal-box confirm-box"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="confirm-icon">
+              <IconWarn size={22} />
+            </div>
             <h3 className="modal-title">Start fresh with the Setup Wizard?</h3>
             <p className="modal-lead">
-              Re-running setup <strong>completely wipes</strong> your current course data — subjects, lessons,
-              schedule, logged study minutes and AI chat history — and rebuilds everything from scratch.
+              Re-running setup <strong>completely wipes</strong> your current
+              course data — subjects, lessons, schedule, logged study minutes
+              and AI chat history — and rebuilds everything from scratch.
             </p>
             <p className="modal-note">
               Your name and app preferences (theme, timer lengths) are kept.
             </p>
             <div className="flex-row gap-sm modal-actions-wrap">
-              <button className="btn btn-primary" onClick={startWizard}>Wipe &amp; restart</button>
-              <button className="btn btn-secondary" onClick={() => setConfirmWipe(false)}>Keep my plan</button>
+              <button className="btn btn-primary" onClick={startWizard}>
+                Wipe &amp; restart
+              </button>
+              <button
+                className="btn btn-secondary"
+                onClick={() => setConfirmWipe(false)}
+              >
+                Keep my plan
+              </button>
             </div>
           </div>
         </div>
       )}
 
       {toast && (
-        <div className={`toast toast-${toast.tone}`} role="status" aria-live="polite" key={toast.id}>
+        <div
+          className={`toast toast-${toast.tone}`}
+          role="status"
+          aria-live="polite"
+          key={toast.id}
+        >
           <span className="toast-icon">
-            {toast.tone === "success" ? <IconCheck size={13} /> : toast.tone === "error" ? <IconWarn size={13} /> : <IconSpark size={13} />}
+            {toast.tone === "success" ? (
+              <IconCheck size={13} />
+            ) : toast.tone === "error" ? (
+              <IconWarn size={13} />
+            ) : (
+              <IconSpark size={13} />
+            )}
           </span>
           <span className="toast-msg">{toast.msg}</span>
-          <button className="toast-close" aria-label="Dismiss notification" onClick={() => setToast(null)}>×</button>
+          <button
+            className="toast-close"
+            aria-label="Dismiss notification"
+            onClick={() => setToast(null)}
+          >
+            ×
+          </button>
           <span className="toast-life" aria-hidden="true" />
         </div>
       )}

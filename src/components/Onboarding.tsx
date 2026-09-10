@@ -703,7 +703,7 @@ export default function Onboarding({
                 onChange={(e) => setNewSub(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && addSubject()}
               />
-              <button className="ob-btn ob-btn-primary" style={{ padding: "10px 18px" }} onClick={addSubject}>
+              <button className="ob-btn ob-btn-primary" onClick={addSubject}>
                 Add
               </button>
             </div>
@@ -865,8 +865,9 @@ export default function Onboarding({
                 type="button"
                 onClick={back}
                 disabled={busy || suggesting}
+                title="One step back — nothing you typed is lost"
               >
-                <IconArrowLeft size={14} /> Back
+                <IconArrowLeft size={14} /> <span>Back</span>
               </button>
             )}
             {step < total ? (
@@ -875,8 +876,9 @@ export default function Onboarding({
                 type="button"
                 onClick={next}
                 disabled={busy || suggesting}
+                aria-busy={suggesting || undefined}
               >
-                {suggesting ? "Assessing…" : step === 4 ? "Assess & Continue" : "Continue"} <IconArrowRight size={14} />
+                <span>{suggesting ? "Assessing…" : step === 4 ? "Assess & continue" : "Continue"}</span> <IconArrowRight size={14} />
               </button>
             ) : (
               <button
@@ -885,7 +887,7 @@ export default function Onboarding({
                 onClick={launch}
                 disabled={busy}
               >
-                {busy ? "Generating…" : isRerun ? "Wipe old plan & Generate New" : "Generate My AI Plan"} <IconSpark size={14} />
+                <span>{busy ? "Generating…" : isRerun ? "Wipe old plan & generate new" : "Generate my AI plan"}</span> <IconSpark size={14} />
               </button>
             )}
           </div>

@@ -6,7 +6,11 @@ import { cn } from "./cn";
 /* in-view hook */
 export function useInView<T extends HTMLElement>(threshold = 0.15) {
   const ref = useRef<T | null>(null);
-  const [inView, setInView] = useState(() => typeof window === "undefined" || typeof IntersectionObserver === "undefined");
+  const [inView, setInView] = useState(
+    () =>
+      typeof window === "undefined" ||
+      typeof IntersectionObserver === "undefined",
+  );
   useEffect(() => {
     const el = ref.current;
     if (!el || typeof IntersectionObserver === "undefined") return;
@@ -17,7 +21,7 @@ export function useInView<T extends HTMLElement>(threshold = 0.15) {
           io.disconnect();
         }
       },
-      { threshold, rootMargin: "0px 0px -4% 0px" }
+      { threshold, rootMargin: "0px 0px -4% 0px" },
     );
     io.observe(el);
     return () => io.disconnect();
@@ -58,13 +62,23 @@ export function MaskWords({
   step?: number;
 }) {
   const { ref, inView } = useInView<HTMLSpanElement>(0.2);
+  const words = text.split(" ").filter((w) => w.length > 0);
   return (
-    <span ref={ref} className={cn(inView && "in", className)}>
-      {text.split(" ").map((w, i) => (
-        <span key={i} className="mw" style={{ ["--d" as string]: `${i * step}ms` }}>
-          <i>{w}</i>
-          {i < text.split(" ").length - 1 ? <> </> : null}
-        </span>
+    <span ref={ref} className={cn("mask-words", inView && "in", className)}>
+      {words.map((w, i) => (
+        <React.Fragment key={i}>
+          {/* Each word rides its own mask box. The separating space must be a
+              sibling of the boxes, never their last child: whitespace at the
+              end of an inline-block is stripped by CSS text processing, which
+              is what glued the words together ("Acalmerwaytostudy"). */}
+          <span className="mw" style={{ ["--d" as string]: `${i * step}ms` }}>
+            <i>{w}</i>
+          </span>
+          {/* deliberately not aria-hidden: the accessible name is computed from
+              the text, so hiding the spaces would hand a screen reader
+              "Acalmerwaytostudy" right back. */}
+          {i < words.length - 1 ? <span className="mw-gap"> </span> : null}
+        </React.Fragment>
       ))}
     </span>
   );
@@ -98,9 +112,9 @@ export function Scramble({
               ? " "
               : i < settled
                 ? c
-                : GLYPHS[Math.floor(Math.random() * GLYPHS.length)]
+                : GLYPHS[Math.floor(Math.random() * GLYPHS.length)],
           )
-          .join("")
+          .join(""),
       );
       if (settled >= text.length) {
         setOut(text);
@@ -193,7 +207,7 @@ export function Magnetic({
       onMouseLeave={onLeave}
       className={cn(
         "transition-transform duration-300 ease-[cubic-bezier(.22,1,.36,1)] will-change-transform",
-        className
+        className,
       )}
     >
       {children}
@@ -246,7 +260,10 @@ export function Marquee({
 }) {
   return (
     <div className={cn("marquee overflow-hidden", className)}>
-      <div className="marquee-track" style={{ ["--spd" as string]: `${speed}s` }}>
+      <div
+        className="marquee-track"
+        style={{ ["--spd" as string]: `${speed}s` }}
+      >
         <div className="flex shrink-0 items-center">{children}</div>
         <div className="flex shrink-0 items-center" aria-hidden="true">
           {children}
