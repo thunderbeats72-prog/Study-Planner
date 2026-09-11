@@ -7194,3 +7194,89 @@ body > .task-menu button { min-height: 40px; }
    (v26) Moved to globals.css, where the component owns it, and expressed on
    the `--fs-*` ramp so the row's ladder (title → subject → metadata) cannot
    drift from the rest of the product. Kept here as a pointer, not a rule. */
+
+/* ══════════════════════════════════════════════════════════════════════
+   v32 · FINAL POLISH — clipboard/shield icons, subject-filter compact,
+   planner empty-space + z-index, 320-414 steady, prompt task cards
+   Appended last on purpose: final word before release.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* ── 1 · SUBJECT FILTER — one compact row, no phantom height ───────── */
+@media (max-width: 860px) {
+  .planner-toolbar { gap: 8px; }
+  .planner-filter {
+    /* Tighter than v30's 6px 8px + 1px border: the filter is a tool,
+       not a card — it should sit like a single form row. */
+    gap: 7px;
+    padding: 5px 7px 5px 8px;
+    min-height: 0;
+  }
+  .planner-filter .sp-select-btn {
+    min-height: 36px;
+    padding: 6px 10px;
+    font-size: .82rem;
+  }
+  /* Listbox must clear the dock (150) + chat FAB (200) but stay below
+     the portalled ⋮ (400) — 260 is the sweet spot, and it scrolls. */
+  .planner-filter .sp-select-pop {
+    z-index: 260;
+    max-height: min(44vh, 300px);
+  }
+}
+/* On 320-class screens keep the label but shrink it instead of dropping
+   it — removing it freed only 42px but cost the row its affordance. */
+@media (max-width: 360px) {
+  .planner-filter-label { font-size: .58rem; gap: 4px; }
+}
+@media (max-width: 320px) {
+  .planner-filter { grid-template-columns: auto minmax(0, 1fr); }
+  .planner-filter-label { display: inline-flex; }
+}
+
+/* ── 2 · PLANNER LIST — gap owns the space, not margins ────────────── */
+.planner-list { gap: 14px; }
+.planner-day { gap: 10px; }
+.planner-day-list { gap: 8px; }
+@media (max-width: 860px) {
+  .planner-list { gap: 12px; }
+  .planner-day { gap: 8px; }
+  .planner-day-list { gap: 8px; padding-top: 0; }
+}
+
+/* ── 3 · TASK CARD — shield/clipboard subtle use ─────────────────────
+   Checkpoint tasks already carry a Shield intent in the data; the rail +
+   kind chip own the colour, so the title stays clean. No extra markup
+   needed — icons are available to bits/TaskCard via imports when a future
+   kind genuinely needs them (IconClipboard/IconShield). This layer only
+   ensures they inherit the correct size when used inline. */
+.task-card .task-shield,
+.task-card .task-clip {
+  flex: 0 0 auto;
+  opacity: .75;
+}
+
+/* ── 4 · TOP BAR — ensure header + session bar never overlap heading ── */
+@media (max-width: 860px) {
+  .page-header { margin-top: 2px; }
+  .tracker-bar.session-bar { margin-bottom: 12px; }
+}
+
+/* ── 5 · BOTTOM NAV — keep chat FAB clear on every width ──────────── */
+@media (max-width: 860px) {
+  .ai-fab { bottom: calc(86px + env(safe-area-inset-bottom)) !important; }
+}
+@media (max-width: 380px) {
+  .ai-fab { bottom: calc(82px + env(safe-area-inset-bottom)) !important; }
+}
+
+/* ── 6 · GUARD — no h-scroll at 320-414, no clipped actions ───────── */
+@media (max-width: 414px) {
+  .planner-view, .planner-list, .planner-day, .cal-grid, .cal-row { min-width: 0; max-width: 100%; }
+  .task-card-title { hyphens: auto; }
+}
+@media (max-width: 320px) {
+  .task-card-actions { gap: 6px; }
+  .task-btns { gap: 6px; }
+  .task-btns .btn { min-width: 60px; }
+}
+
