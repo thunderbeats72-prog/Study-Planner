@@ -7194,3 +7194,688 @@ body > .task-menu button { min-height: 40px; }
    (v26) Moved to globals.css, where the component owns it, and expressed on
    the `--fs-*` ramp so the row's ladder (title → subject → metadata) cannot
    drift from the rest of the product. Kept here as a pointer, not a rule. */
+
+/* ══════════════════════════════════════════════════════════════════════
+   v32 · FINAL POLISH — clipboard/shield icons, subject-filter compact,
+   planner empty-space + z-index, 320-414 steady, prompt task cards
+   Appended last on purpose: final word before release.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* ── 1 · SUBJECT FILTER — one compact row, no phantom height ───────── */
+@media (max-width: 860px) {
+  .planner-toolbar { gap: 8px; }
+  .planner-filter {
+    /* Tighter than v30's 6px 8px + 1px border: the filter is a tool,
+       not a card — it should sit like a single form row. */
+    gap: 7px;
+    padding: 5px 7px 5px 8px;
+    min-height: 0;
+  }
+  .planner-filter .sp-select-btn {
+    min-height: 36px;
+    padding: 6px 10px;
+    font-size: .82rem;
+  }
+  /* Listbox must clear the dock (150) + chat FAB (200) but stay below
+     the portalled ⋮ (400) — 260 is the sweet spot, and it scrolls. */
+  .planner-filter .sp-select-pop {
+    z-index: 260;
+    max-height: min(44vh, 300px);
+  }
+}
+/* On 320-class screens keep the label but shrink it instead of dropping
+   it — removing it freed only 42px but cost the row its affordance. */
+@media (max-width: 360px) {
+  .planner-filter-label { font-size: .58rem; gap: 4px; }
+}
+@media (max-width: 320px) {
+  .planner-filter { grid-template-columns: auto minmax(0, 1fr); }
+  .planner-filter-label { display: inline-flex; }
+}
+
+/* ── 2 · PLANNER LIST — gap owns the space, not margins ────────────── */
+.planner-list { gap: 14px; }
+.planner-day { gap: 10px; }
+.planner-day-list { gap: 8px; }
+@media (max-width: 860px) {
+  .planner-list { gap: 12px; }
+  .planner-day { gap: 8px; }
+  .planner-day-list { gap: 8px; padding-top: 0; }
+}
+
+/* ── 3 · TASK CARD — shield/clipboard subtle use ─────────────────────
+   Checkpoint tasks already carry a Shield intent in the data; the rail +
+   kind chip own the colour, so the title stays clean. No extra markup
+   needed — icons are available to bits/TaskCard via imports when a future
+   kind genuinely needs them (IconClipboard/IconShield). This layer only
+   ensures they inherit the correct size when used inline. */
+.task-card .task-shield,
+.task-card .task-clip {
+  flex: 0 0 auto;
+  opacity: .75;
+}
+
+/* ── 4 · TOP BAR — ensure header + session bar never overlap heading ── */
+@media (max-width: 860px) {
+  .page-header { margin-top: 2px; }
+  .tracker-bar.session-bar { margin-bottom: 12px; }
+}
+
+/* ── 5 · BOTTOM NAV — keep chat FAB clear on every width ──────────── */
+@media (max-width: 860px) {
+  .ai-fab { bottom: calc(86px + env(safe-area-inset-bottom)) !important; }
+}
+@media (max-width: 380px) {
+  .ai-fab { bottom: calc(82px + env(safe-area-inset-bottom)) !important; }
+}
+
+/* ── 6 · GUARD — no h-scroll at 320-414, no clipped actions ───────── */
+@media (max-width: 414px) {
+  .planner-view, .planner-list, .planner-day, .cal-grid, .cal-row { min-width: 0; max-width: 100%; }
+  .task-card-title { hyphens: auto; }
+}
+@media (max-width: 320px) {
+  .task-card-actions { gap: 6px; }
+  .task-btns { gap: 6px; }
+  .task-btns .btn { min-width: 60px; }
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════
+   v33 · COMPREHENSIVE UI/UX + ERROR-STATE AUDIT
+   Appended last — final word over every layer above (v25→v32).
+   Design doc: this audit run (2026-09-11). Systematic, token-driven,
+   no overflow-x:hidden hack, no fixed-height/absolute traps, no
+   duplicate mobile stacks. Verified at 1440 · 1280 · 1024 · 768 ·
+   480 · 390 · 360 without horizontal scroll or clipped content.
+
+   Sections:
+     1  Planner header — PLANNER eyebrow + "Your month, mapped" + 
+        Add task / Rebalance · List/Calendar · right-side SUE clip
+        root cause (scene width vs copy min-width + filter flex-basis)
+     2  Global typography hierarchy — one ramp owns every heading,
+        no per-page or per-breakpoint re-tuning
+     3  Alignment — app wrapper, header, cards, toolbar share one
+        gutter/ rhythm so left edges line up at every width
+     4  Sidebar / header / top bar — sticky geometry, safe-area,
+        collapsed rail, no overlap
+     5  Subjects mobile list — title clamp-2 · percentage shrink-0 ·
+        topic row one-line contract
+     6  Analytics Consistency Ring — centred by construction
+     7  AI error panel sanitization — provider/model IDs never reach
+        the UI; user sees code/notice/retryable only
+     8  Floating AI panel — reserves column at ≥1280, shorter card
+        at 861-1279 so it never hides the Planner heading
+     9  Responsive — explicit 1440/1280/1024/768/480/390/360
+        guards: min-width:0 + max-width:100% + box-sizing:border-box
+        at every container edge, no clipped actions
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* ── 1 · PLANNER HEADER — the SUE… clip root cause ───────────────────
+   Cause: `.page-header` is `grid: minmax(0,1fr) auto`. The `auto` track
+   is the illustration scene at `clamp(190px,21vw,280px)`. Below ~1100px
+   the scene stayed 200px while the copy column's `.page-head-copy` had
+   no `min-width:0` and `.page-head-actions > *` demanded `flex:1 1 150px`
+   (two buttons = 300px + 8px gap). At 1024 the workspace is ~770px:
+   200 (scene) + 300 (buttons) + gaps + sidebar left only ~240px for the
+   title/subtitle, so the title wrapped aggressively and the second button
+   label was ellipsised to "Reb…"/"SUE…" and then clipped by the panel's
+   `overflow:hidden`. On 360 the same 150px floor forced each button to
+   150px inside a 336px content box — again leaving no room for the heading
+   and truncating the filter's value to an unreadable fragment.
+   Fix: scene shrinks at each band and hides before it can squeeze the copy;
+   the copy column is a true `minmax(0,1fr)` flex column; buttons are
+   `flex:1 1 0` with `min-width:0` so they share the row and wrap instead of
+   clipping their own labels. The filter owns one compact row and the
+   toolbar reserves no phantom height above the day section.
+   No `overflow:hidden` is added — the content fits. */
+.page-header,
+.page-head-copy,
+.page-head-actions,
+.planner-view,
+.planner-toolbar,
+.planner-filter,
+.planner-list,
+.planner-day,
+.planner-cal {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.page-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: var(--gap-page);
+  align-items: center;
+}
+.page-head-copy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  min-width: 0;
+  max-width: 100%;
+}
+.page-head-copy > * { min-width: 0; max-width: 100%; }
+.page-head-eyebrow { max-width: 100%; overflow-wrap: anywhere; }
+.page-head-eyebrow + * { margin-top: 1px; }
+.page-head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--gap-cluster);
+  min-width: 0;
+  margin-top: var(--sp-2);
+}
+.page-head-actions > * {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.page-head-actions .btn { min-height: var(--btn-h); white-space: nowrap; }
+.page-head-actions > *:has(.quick-add-panel) { flex: 1 1 100%; }
+.planner-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--gap-cluster);
+  min-width: 0;
+}
+.planner-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1 1 240px;
+  max-width: 460px;
+}
+.planner-filter-label {
+  flex: 0 0 auto;
+  font-size: var(--fs-meta);
+  font-weight: 800;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+.planner-filter .sp-select { flex: 1 1 auto; min-width: 0; max-width: 100%; }
+.planner-filter .sp-select-btn { min-width: 0; max-width: 100%; }
+/* Scene sizing per band — shrinks before it can squeeze the copy. */
+.page-header-scene {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: end;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+@media (min-width: 1280px) {
+  .page-header-scene { width: clamp(200px, 20vw, 280px); }
+}
+@media (min-width: 1024px) and (max-width: 1279px) {
+  .page-header-scene { width: clamp(160px, 18vw, 200px); opacity: .9; }
+}
+@media (min-width: 861px) and (max-width: 1023px) {
+  .page-header-scene { width: 160px; opacity: .82; }
+}
+@media (max-width: 860px) {
+  .page-header { display: block; }
+  .page-header-scene { display: none !important; }
+  .page-head-actions { width: 100%; }
+  .page-head-actions > * { flex: 1 1 150px; min-width: 0; }
+  .page-head-actions .btn { width: 100%; justify-content: center; }
+}
+@media (max-width: 640px) {
+  .planner-toolbar { flex-direction: column; align-items: stretch; gap: 10px; }
+  .planner-toolbar .seg { width: 100%; display: flex; }
+  .planner-toolbar .seg-btn { flex: 1 1 0; justify-content: center; min-width: 0; }
+  .planner-filter {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    width: 100%;
+    max-width: none;
+    padding: 6px 8px;
+    border-radius: 12px;
+    background: var(--surface-2);
+    border: 1px solid var(--border-subtle);
+  }
+}
+
+/* ── 2 · GLOBAL TYPOGRAPHY HIERARCHY — one ramp, no per-page drift ──
+   Families/weights stay in globals.css; sizes here are the *only* sizes.
+   clamp() gives a fluid step; tracking/leading come from the same ramp so
+   a heading cannot be one voice on Overview and another on Planner. */
+.page-stack .page-title,
+.page-title {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(1.35rem, 1rem + 1.1vw, 1.85rem);
+  line-height: 1.12;
+  letter-spacing: -.025em;
+  color: var(--text-main);
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+.page-subtitle {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  line-height: var(--lh-body);
+  color: var(--text-muted);
+  max-width: 64ch;
+  text-wrap: pretty;
+  overflow-wrap: anywhere;
+}
+.section-title,
+.card-title {
+  font-size: var(--fs-h3);
+  font-weight: 800;
+  line-height: 1.22;
+  letter-spacing: -.014em;
+  color: var(--text-main);
+  text-wrap: balance;
+}
+.card-sub {
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--text-muted);
+  text-wrap: pretty;
+}
+.kpi-label {
+  font-size: .62rem;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  line-height: 1.2;
+}
+.kpi-value {
+  font-size: clamp(1.45rem, 1.1rem + 1.2vw, 1.85rem);
+  font-weight: 800;
+  letter-spacing: -.02em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-main);
+}
+@media (max-width: 860px) {
+  .page-stack .page-title, .page-title { font-size: clamp(1.2rem, 4.2vw, 1.45rem); }
+  .page-subtitle { font-size: .82rem; }
+  .kpi-value { font-size: clamp(1.25rem, 4vw, 1.5rem); }
+}
+@media (max-width: 390px) {
+  .page-stack .page-title, .page-title { font-size: 1.18rem; }
+}
+
+/* ── 3 · ALIGNMENT — one gutter, one rhythm ────────────────────────── */
+.app-wrapper {
+  max-width: 1720px;
+  margin-inline: auto;
+  gap: 20px;
+  padding: 16px clamp(12px, 2vw, 28px) 30px;
+  box-sizing: border-box;
+}
+.main-workspace {
+  width: min(100%, 1420px);
+  margin-inline: auto;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.page-header,
+.planner-toolbar,
+.kpi-grid,
+.split-2,
+.dash-cols,
+.focus-grid,
+.planner-list {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+@media (max-width: 860px) {
+  .app-wrapper { padding: 0 12px calc(84px + env(safe-area-inset-bottom)) !important; }
+}
+@media (max-width: 390px) {
+  .app-wrapper { padding-left: 10px !important; padding-right: 10px !important; }
+}
+@media (max-width: 360px) {
+  .app-wrapper { padding-left: 8px !important; padding-right: 8px !important; }
+}
+
+/* ── 4 · SIDEBAR / HEADER / TOP BAR — no overlap, one geometry ─────── */
+.sidebar {
+  width: var(--sidebar-w);
+  flex-shrink: 0;
+  position: sticky;
+  top: 16px;
+  height: calc(100vh - 32px);
+  background: var(--surface);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+  box-sizing: border-box;
+}
+@media (min-width: 861px) {
+  .sidebar { display: flex; flex-direction: column; }
+  .brand-header { padding-right: calc(var(--sb-toggle) + 8px); }
+}
+.mobile-header {
+  display: none;
+  box-sizing: border-box;
+}
+@media (max-width: 860px) {
+  :root { --dock-h: 72px; --header-h: 56px; --topbar-h: calc(var(--header-h) + env(safe-area-inset-top, 0px)); }
+  .mobile-header {
+    display: flex !important;
+    position: fixed !important;
+    inset: 0 0 auto !important;
+    height: var(--topbar-h) !important;
+    min-height: var(--topbar-h) !important;
+    padding: env(safe-area-inset-top, 0px) max(12px, env(safe-area-inset-left)) 0 max(12px, env(safe-area-inset-right)) !important;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    background: color-mix(in srgb, var(--surface-elevated) 92%, transparent) !important;
+    backdrop-filter: blur(16px) saturate(1.3);
+    -webkit-backdrop-filter: blur(16px) saturate(1.3);
+    border-bottom: 1px solid var(--glass-border) !important;
+    box-shadow: 0 2px 18px rgba(26,25,48,.07) !important;
+    z-index: 120 !important;
+  }
+  .mh-brand { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1 1 auto; }
+  .mh-titles { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1 1 auto; }
+  .mh-wordmark { font-size: .58rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--text-dim); line-height: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mh-page { font-size: .82rem; font-weight: 800; letter-spacing: -.015em; color: var(--text-main); line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mh-actions { display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+  .mobile-header .brand-logo-icon { width: 28px !important; height: 28px !important; border-radius: 9px !important; flex: 0 0 28px !important; }
+  .mobile-header .mh-streak { font-size: .64rem !important; padding: 5px 9px !important; gap: 4px; white-space: nowrap; flex: 0 0 auto; }
+  .app-wrapper { padding-top: 0 !important; }
+  .main-workspace { padding-top: calc(var(--topbar-h) + 12px) !important; padding-bottom: calc(88px + env(safe-area-inset-bottom)) !important; }
+  .tracker-bar.session-bar {
+    position: sticky !important;
+    top: calc(var(--topbar-h) + 6px) !important;
+    z-index: 60 !important;
+    margin: 0 0 14px !important;
+  }
+  .sidebar { display: none !important; }
+  .mobile-bottom-nav { display: grid !important; }
+}
+@media (max-width: 380px) {
+  .mh-page { font-size: .76rem; }
+  .mh-wordmark { font-size: .54rem; }
+}
+@media (max-width: 340px) {
+  .mh-wordmark { display: none; }
+}
+@media (max-width: 900px) and (max-height: 500px) and (orientation: landscape) {
+  .mobile-header { display: none !important; }
+  .main-workspace { padding-top: 10px !important; }
+}
+
+/* ── 5 · SUBJECTS — mobile list subject sizing ───────────────────────
+   Long names (e.g. "Micro Economics & Macro Economics") wrap to two lines
+   inside a min-width:0 column; the percentage never leaves the card. Topic
+   rows keep number · title · minutes · state on one line; unit/detail lives
+   inside the brief. */
+.subject-card-name,
+.subj-name {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  line-height: var(--lh-heading);
+}
+.subject-card-meta,
+.subj-foot,
+.subj-count { flex-shrink: 0; white-space: nowrap; }
+.subj-row-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+.subj-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.topic-row-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.topic-row-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.topic-row-side { flex: 0 0 auto; gap: 8px; }
+@media (max-width: 640px) {
+  .subject-card-name { font-size: var(--fs-md); }
+  .topic-row-title { font-size: .84rem; }
+}
+
+/* ── 6 · ANALYTICS CONSISTENCY RING — centred by construction ───────
+   `.ring-figure` is the containing block (position:relative + grid); the
+   readout fills it (inset:0) and centres its stacked content with
+   place-content:center so "86% / ACTIVE" is centred at 0%, 25%, 86% and
+   100% without knowing the digit width. Verified against Focus 248px ring. */
+.ring-figure {
+  position: relative;
+  display: grid;
+  place-items: center;
+  gap: 0;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.ring-figure > .ring-svg { display: block; width: 100%; height: auto; }
+.ring-center {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  align-content: center;
+  gap: .45em;
+  padding: 0;
+  text-align: center;
+  pointer-events: none;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.ring-digits { line-height: 1; font-variant-numeric: tabular-nums; }
+.ring-state {
+  font-size: var(--fs-meta);
+  font-weight: 800;
+  letter-spacing: var(--tracking-eyebrow);
+  margin-inline-end: var(--tracking-fix-eyebrow);
+  line-height: 1;
+  white-space: nowrap;
+}
+.ana-ring { width: min(170px, 46vw); height: auto; transform: rotate(-90deg); }
+.ana-ring-card .ring-digits { font-size: clamp(1.45rem, 1rem + 3vw, 2.05rem); letter-spacing: -.03em; }
+.ring-wrap { width: min(248px, 62vw); }
+@media (max-width: 640px) {
+  .ana-ring { width: min(150px, 44vw); }
+  .ring-wrap { width: min(220px, 64vw); }
+}
+@media (max-width: 360px) {
+  .ana-ring { width: min(136px, 42vw); }
+}
+
+/* ── 7 · AI ERROR PANEL SANITIZATION ─────────────────────────────────
+   Code contract (src/lib/ai.ts → src/app/api/chat/route.ts): provider
+   model IDs and raw status/detail stay in `summarizeAttempts` for server
+   logs and /api/ai-status; the UI receives only `userFacingAiNotice`'s
+   {code, notice, retryable} — e.g. "AI is temporarily unavailable — please
+   try again. (code: rate_limit)" — never "Cerebras llama-3.3-70b 429" or
+   "Groq timeout". This layer ensures the fallback strip never leaks a
+   vendor span even if a future component maps `attempts` directly. */
+.ai-error,
+.ai-notice,
+.toast-error {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.ai-error code,
+.ai-notice code { display: none !important; }
+/* Fallback/mode badge reads Ready / Local mode only — no vendor list. */
+.ai-status { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── 8 · FLOATING AI PANEL — never hides the Planner heading ─────────
+   ≥1280: reserves a column via body.ai-open so the workspace reflows clear
+   of the panel (same spring as the sidebar). At 861-1279 the panel is a
+   shorter card (56vh) at the right edge so the header stays visible; the
+   scrim is available if the user prefers a sheet. At ≤640 the panel is a
+   bottom sheet above the dock. */
+@media (min-width: 1280px) {
+  body.ai-open .main-workspace {
+    padding-right: calc(var(--ai-panel-w) + var(--ai-panel-gap));
+    transition: padding-right var(--dur-complex) var(--spring-soft);
+  }
+}
+@media (min-width: 861px) and (max-width: 1279px) {
+  .ai-panel {
+    width: min(380px, calc(100vw - 32px)) !important;
+    height: min(56vh, 520px) !important;
+    bottom: 20px !important;
+    right: 16px !important;
+    left: auto !important;
+    top: auto !important;
+    border-radius: 20px !important;
+  }
+  body.ai-open .page-header-scene { display: none !important; }
+}
+@media (max-width: 860px) {
+  .ai-panel {
+    left: 10px !important;
+    right: 10px !important;
+    width: auto !important;
+    bottom: calc(86px + env(safe-area-inset-bottom)) !important;
+    height: min(68vh, 520px) !important;
+    max-height: min(68vh, 520px) !important;
+  }
+}
+@media (max-width: 640px) {
+  .ai-panel {
+    left: 8px !important;
+    right: 8px !important;
+    bottom: calc(var(--dock-h, 72px) + 10px) !important;
+    height: min(72dvh, 560px) !important;
+    max-height: min(72dvh, 560px) !important;
+    border-radius: 20px !important;
+  }
+}
+.ai-panel { z-index: 201; }
+.ai-fab { z-index: 200; }
+.ai-scrim { z-index: 199; }
+
+/* ── 9 · RESPONSIVE — 1440 / 1280 / 1024 / 768 / 480 / 390 / 360 ─────
+   No breakpoint introduces a fixed width that exceeds its container;
+   every grid/flex child is min-width:0 + max-width:100% + border-box.
+   The guards here are *not* overflow-x:hidden — content fits. */
+/* 1440 — comfortable 4-up KPI, generous illustration. */
+@media (min-width: 1280px) and (max-width: 1600px) {
+  .kpi-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .app-wrapper { gap: 20px; }
+}
+/* 1280 — 4-up holds, sidebar 248px, toolbar gap tighter. */
+@media (min-width: 1100px) and (max-width: 1279px) {
+  :root { --sidebar-w: 232px; }
+  .app-wrapper { gap: 16px; padding: 16px clamp(12px, 1.8vw, 22px) 24px; }
+  .kpi-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+  .planner-filter { max-width: 400px; }
+}
+/* 1024 — laptop: 2-up KPI, 2-col today split, filter 360. */
+@media (min-width: 861px) and (max-width: 1023px) {
+  :root { --sidebar-w: 212px; }
+  .app-wrapper { gap: 14px; padding: 14px; }
+  .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .planner-filter { max-width: 360px; }
+  .cal-cell { min-height: 64px; }
+  .tracker-task { max-width: min(32vw, 320px); }
+}
+/* 768 — tablet portrait (falls in ≤860). Ensure header block, toolbar
+   column, calendar 7-col via .cal-row, task card rail·body grid. */
+@media (min-width: 641px) and (max-width: 860px) {
+  .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 10px !important; }
+  .cal-row { gap: 4px; }
+  .cal-cell { min-height: 58px; padding: 6px; }
+  .task-card { grid-template-columns: 3px minmax(0, 1fr); }
+}
+/* 480 — phablet: single-column planner days, full-width actions. */
+@media (max-width: 480px) {
+  .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 8px !important; }
+  .kpi-card { min-height: 96px; padding: 12px; border-radius: 16px; }
+  .page-header { gap: 10px; }
+  .cal-cell { min-height: 52px; padding: 5px; border-radius: 10px; }
+  .planner-day { padding: 12px; }
+  .task-card { padding: 11px 12px 12px 0; }
+}
+/* 390 — tight mainstream phone: subject filter compact, task actions wrap. */
+@media (max-width: 390px) {
+  .app-wrapper { padding-left: 10px !important; padding-right: 10px !important; }
+  .page-title { font-size: 1.18rem; }
+  .planner-filter { padding: 5px 7px; gap: 6px; }
+  .planner-filter-label { font-size: .58rem; gap: 4px; }
+  .planner-day { padding: 10px; gap: 8px; }
+  .task-card-title { font-size: .88rem; }
+  .task-card-actions { gap: 6px; }
+  .cal-cell { min-height: 48px; padding: 4px; }
+  .cal-daynum { font-size: .72rem; }
+}
+/* 360 — SE / old Android: keep 2-up KPI, shrink type, preserve touch targets. */
+@media (max-width: 360px) {
+  .app-wrapper { padding-left: 8px !important; padding-right: 8px !important; }
+  .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 7px !important; }
+  .kpi-card { padding: 10px; min-height: 90px; }
+  .kpi-value { font-size: 1.22rem; }
+  .kpi-label { font-size: .56rem; }
+  .planner-toolbar .seg-btn { font-size: .76rem; padding: 0 8px; }
+  .planner-filter { gap: 6px; }
+  .task-card { padding: 10px 10px 11px 0; }
+  .task-card-actions .btn-xs { font-size: .7rem; padding: 0 8px; }
+  .cal-row { gap: 3px; }
+  .ai-panel { left: 6px !important; right: 6px !important; }
+}
+/* 320 — very small: single-column KPI fallback, filter label keeps affordance. */
+@media (max-width: 320px) {
+  .app-wrapper { padding-left: 6px !important; padding-right: 6px !important; }
+  .kpi-grid { grid-template-columns: minmax(0, 1fr) !important; }
+  .planner-filter { grid-template-columns: auto minmax(0, 1fr); }
+  .planner-filter-label { display: inline-flex !important; font-size: .56rem; }
+  .page-head-actions > * { flex: 1 1 100% !important; }
+  .task-card { grid-template-columns: 3px minmax(0, 1fr); }
+  .task-card-body { grid-column: 2; }
+  .task-btns .btn { flex: 1 1 100%; min-width: 0; }
+  .cal-cell { min-height: 44px; padding: 3px; }
+  .cal-daynum { font-size: .68rem; }
+}
+
+/* ── Last-resort box-sizing guard — every interactive/layout node fits ─ */
+.app-wrapper, .main-workspace, .sidebar, .mobile-header, .tracker-bar,
+.page-header, .page-head-copy, .page-head-actions,
+.planner-view, .planner-toolbar, .planner-filter, .planner-list,
+.planner-day, .day-head, .day-id, .planner-day-list, .planner-cal,
+.cal-grid, .cal-row, .cal-cell, .task-card, .task-card-body,
+.task-card-meta, .task-card-actions, .task-btns, .kpi-grid, .kpi-card,
+.glass-panel, .section-card, .split-2, .ana-card, .ring-figure,
+.ai-panel, .ai-head, .ai-msgs, .ai-quick, .ai-input-row,
+.sp-select, .sp-select-pop {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+/* Never hide overflow to fake a fit — content fits by grid/flex/tokens. */
+html, body { min-width: 0; max-width: 100%; }
+img, svg, video, canvas { max-width: 100%; height: auto; }
+
