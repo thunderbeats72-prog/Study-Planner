@@ -91,11 +91,20 @@ body.theme-dark,body.theme-obsidian,body.theme-nebula{
   background:color-mix(in srgb,var(--surface-elevated) 96%,transparent);
   box-shadow:var(--refresh-shadow);
 }
-.brand-header{padding:4px 44px 16px 8px;margin-bottom:4px}
-.brand-logo-icon{width:40px;height:40px;border-radius:13px}
-.brand-title{font-size:1rem}
+/* The brand block reserves exactly the toggle's width on its right, so the
+   gear/toggle can never sit on top of the course name and the name can never
+   run under it. Everything else is the shared rhythm. */
+.brand-header{
+  padding:0 calc(var(--sb-toggle) + 6px) var(--sp-2) 0;
+  margin-bottom:var(--sp-1);
+}
+.brand-logo-icon{
+  width:var(--brand-mark);height:var(--brand-mark);
+  border-radius:13px;
+}
+.brand-title{font-size:var(--fs-md)}
 .nav-list{gap:4px;margin-top:12px}
-.nav-item{min-height:44px;padding:10px 12px;border-radius:14px;font-size:.86rem}
+.nav-item{min-height:var(--nav-h);padding:0 12px;border-radius:14px;font-size:var(--fs-sm)}
 .nav-item.active{background:var(--nav-active-bg);color:var(--nav-active-text);border-color:var(--nav-active-border);box-shadow:none}
 .nav-item.active::before{left:-4px}
 .sidebar-foot{padding-top:18px}
@@ -107,8 +116,10 @@ body.theme-dark,body.theme-obsidian,body.theme-nebula{
    how the bar ended up with a grid layout fighting a flex layout. */
 
 /* ---------------- Page headers / illustration anchor ---------------- */
-.page-header{margin-bottom:18px;min-height:82px;position:relative}
-.page-subtitle{font-size:.84rem;line-height:1.55}
+/* The header owns no height of its own: it is as tall as its content, so the
+   eyebrow / title / subtitle / actions rhythm is decided by the type ramp and
+   `--sp-*`, never by a magic box that centres the copy against nothing. */
+.page-header{position:relative}
 
 /* Dynamic lamp/books/plant illustration without an external network asset.
    The inline SVG component can use this same token set when mounted; the
@@ -266,11 +277,10 @@ body { background-attachment:fixed; color:var(--text-main); }
 
 .app-wrapper { max-width:1720px; gap:20px; padding:16px clamp(12px,2vw,28px) 30px; }
 .sidebar { width:254px; padding:18px 13px; border-radius:26px; background:color-mix(in srgb,var(--surface-elevated) 96%,transparent); box-shadow:var(--pastel-shadow); border-color:var(--glass-border); }
-.brand-header { padding:6px 42px 17px 9px; }
-.brand-logo-icon { width:42px; height:42px; border-radius:14px; box-shadow:0 8px 20px var(--accent-glow),inset 0 1px 0 rgba(255,255,255,.4); }
-.brand-title { font-size:1rem; letter-spacing:-.035em; }
+.brand-logo-icon { box-shadow:0 8px 20px var(--accent-glow),inset 0 1px 0 rgba(255,255,255,.4); }
+.brand-title { letter-spacing:-.02em; }
 .nav-list { gap:5px; margin-top:15px; }
-.nav-item { min-height:46px; border-radius:14px; padding:10px 12px; font-weight:600; }
+.nav-item { font-weight:600; }
 .nav-item.active { box-shadow:none; }
 .sidebar-foot > .glass-panel { border-radius:19px; box-shadow:none; background:linear-gradient(145deg,var(--surface),color-mix(in srgb,var(--accent) 5%,var(--surface))); }
 
@@ -283,11 +293,14 @@ body { background-attachment:fixed; color:var(--text-main); }
 .input-field:focus { box-shadow:0 0 0 4px var(--accent-glow); }
 .chip { border-radius:999px; }
 
-.page-header { min-height:94px; margin:2px 0 20px; padding-right:min(29vw,310px); position:relative; align-items:center; }
-/* (v25) `.page-title` no longer re-tunes itself here — the `--fs-h1` ramp owns it. */
-.page-subtitle { max-width:620px; line-height:1.55; }
+/* (v26) This rule used to reserve `padding-right:min(29vw,310px)` — and then
+   315px, 245px and 220px in three later breakpoints — so the illustration
+   could be absolutely positioned over the right-hand side. That is what made
+   the heading read as squeezed and the copy column start 4px off the grid:
+   the reserved padding was a guess that only matched one illustration size at
+   one viewport. The header is a real two-column grid now (see §25.3 below),
+   the scene is a grid item, and nothing is reserved or overlapped. */
 .page-header::before,.page-header::after { display:none!important; }
-.page-header-scene { position:absolute; right:2px; bottom:-12px; z-index:0; }
 .page-header > :not(.page-header-scene) { position:relative; z-index:1; }
 .study-scene { width:clamp(210px,22vw,300px); filter:drop-shadow(0 13px 13px rgba(43,38,74,.1)); }
 .study-scene__lamp { animation:sceneLamp 7s ease-in-out infinite alternate; }
@@ -310,20 +323,18 @@ body { background-attachment:fixed; color:var(--text-main); }
 @media (max-width:1200px) {
   .app-wrapper { gap:14px; }
   .sidebar { width:226px; }
-  .page-header { padding-right:245px; }
   .planner-days .task-row .task-row-actions { min-width:0; }
 }
 @media (max-width:1024px) {
   .sidebar { width:210px; }
   .kpi-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
-  .page-header { padding-right:220px; }
 }
 @media (max-width:860px) {
   .app-wrapper { padding:0 10px calc(var(--dock-h,76px) + 30px); }
   .main-workspace { padding-top:calc(var(--header-h,54px) + 7px); padding-bottom:calc(var(--dock-h,76px) + 28px); }
   .sidebar { border-radius:22px; }
   .tracker-bar { top:calc(var(--header-h,54px) + 6px); min-height:58px; margin-bottom:14px; border-radius:17px; padding:9px 12px; }
-  .page-header { min-height:0; padding-right:0; margin:4px 2px 15px; }
+  .page-header { margin:0 0 var(--sp-2); }
   .page-header-scene { display:none; }
   .kpi-grid { gap:10px; }
   .kpi-card { min-height:106px; padding:14px; border-radius:17px; }
@@ -370,15 +381,27 @@ body { background-attachment:fixed; color:var(--text-main); }
   .main-workspace { padding:2px 0 64px !important; }
   .sidebar { top:16px; height:calc(100vh - 32px); overflow:hidden; }
   .sidebar-foot { margin-top:auto; }
-  .page-header { min-height:124px; padding:20px 315px 18px 4px; margin:0 0 12px; }
-  .page-header-scene { right:12px; bottom:0; }
+  /* Two real columns: the copy takes what is left (`minmax(0,1fr)` so a long
+     subject name can never widen the track), the scene takes its own
+     intrinsic width and sits on the copy's baseline. No absolute positioning,
+     so nothing can escape the header box and nothing needs reserving. */
+  .page-header {
+    display:grid;
+    grid-template-columns:minmax(0,1fr) auto;
+    align-items:center;
+    column-gap:var(--gap-page);
+    margin:0 0 var(--sp-3);
+  }
+  .page-head-copy { grid-column:1; grid-row:1; }
+  .page-header-scene { grid-column:2; grid-row:1; align-self:end; position:static; }
   /* (v25) leading comes from the ramp; no per-breakpoint patch. */
   .tracker-bar { top:16px; }
 }
 
 @media (max-width:860px) {
   :root { --dock-h:72px; --header-h:58px; }
-  html,body { min-width:0; overflow-x:clip; }
+  /* `overflow-x` is owned once, in globals.css — see the guard note there. */
+  html,body { min-width:0; }
   .app-wrapper {
     display:block !important;
     padding:0 12px calc(84px + env(safe-area-inset-bottom)) !important;
@@ -416,10 +439,10 @@ body { background-attachment:fixed; color:var(--text-main); }
   .tracker-bar .tracker-actions .chip, .tracker-bar .tracker-actions .ambient-pill { display:none }
   .tracker-bar .tracker-actions .btn { min-height:38px; padding:0 10px }
 
-  .page-header { display:block !important; min-height:0 !important; margin:0 2px 17px !important; padding:0 !important; }
-  .page-header-scene { display:none !important; }
-  .page-subtitle { margin-top:7px !important; font-size:.79rem !important; line-height:1.55 !important; }
-  .page-header > .flex-row, .planner-tools { margin-top:14px; }
+  .page-header { display:block; margin:0 0 var(--sp-2); padding:0; }
+  .page-header-scene { display:none; }
+  .page-subtitle { margin-top:var(--sp-1); font-size:var(--fs-sm); line-height:var(--lh-body); }
+  .page-header > .flex-row, .planner-tools { margin-top:var(--sp-2); }
 
   .kpi-grid { grid-template-columns:repeat(2,minmax(0,1fr)) !important; gap:10px !important; margin-bottom:14px !important; }
   .kpi-card { min-width:0 !important; min-height:112px !important; padding:15px !important; border-radius:18px !important; }
@@ -471,8 +494,11 @@ body { background-attachment:fixed; color:var(--text-main); }
 
 /* Narrow phone cleanup — content remains readable before decoration. */
 @media (max-width:480px) {
-  .page-header { margin-bottom:14px !important; }
-  .page-header .btn { width:100% !important; min-height:46px !important; margin-top:12px !important; }
+  .page-header { margin-bottom:var(--sp-2); }
+  /* Header buttons are touch targets, not slabs: full width comes from the
+     action row's own flex basis (`.page-head-actions > *`), so the two
+     buttons stay the same height and share the row when there is room. */
+  .page-header .btn { min-height:44px; }
   .up-next {
     display:grid !important; grid-template-columns:minmax(0,1fr) auto !important; align-items:center !important;
     gap:12px !important; min-height:112px !important; padding:15px !important; border-radius:18px !important;
@@ -711,7 +737,6 @@ body {
   border-radius: 13px;
   font-weight: 600;
   color: var(--text-muted);
-  padding: 11px 13px;
 }
 .nav-item:hover { color: var(--text-main); }
 /* Active navigation item = soft lavender rounded pill. The measured
@@ -832,12 +857,12 @@ body {
    dashboard → lamp+books+plant). They share one 360×200 canvas and the
    `--scene-*` tokens, so a single sizing rule fits all of them and every
    theme re-colours them for free. */
-.page-header { position: relative; }
 .page-header-scene {
   z-index: 0;
   pointer-events: none;
-  display: block !important;
+  display: block;
   width: clamp(190px, 21vw, 280px);
+  max-width: 100%;
 }
 .study-scene svg { display: block; width: 100%; height: auto; }
 @media (prefers-reduced-motion: no-preference) {
@@ -850,25 +875,17 @@ body {
 @media (max-width: 1100px) { .page-header-scene { width: 200px; opacity: .8; } }
 .page-header > :not(.page-header-scene) { position: relative; z-index: 1; }
 
-/* Below the desktop breakpoint the header stacks, so the scene stops
-   floating over the title: it becomes a centred, non-overlapping block
-   that rides underneath the copy instead of behind it. */
+/* Below the desktop breakpoint the header is a single column and the scene is
+   `aria-hidden` decoration, so it leaves the flow entirely: three later patch
+   sheets each said `display:none !important` while this one said "centred
+   block underneath", and the `!important` ones won — the centring code was
+   dead. One decision, stated once. */
 @media (max-width: 860px) {
   .page-header {
-    display: flex !important;
-    flex-direction: column !important;
-    align-items: stretch !important;
-    gap: 12px !important;
+    display: block;
+    margin: 0 0 var(--sp-2);
   }
-  .page-header-scene {
-    position: static !important;
-    order: 3;
-    display: block !important;
-    width: min(230px, 62%) !important;
-    max-width: 100%;
-    margin: 2px auto 0 !important;
-    opacity: .8;
-  }
+  .page-header-scene { display: none; }
   .page-header > :not(.page-header-scene) { position: static; }
 }
 
@@ -4143,23 +4160,33 @@ body.theme-sunset {
 }
 
 /* ── 25.3 · HEADER CONTRACT (the six page titles) ─────────────────────── */
+/* ── Header anatomy, top to bottom ─────────────────────────────────────
+   eyebrow → title → subtitle → actions. Each step's size comes from the
+   `--fs-*` ramp and each gap from `--sp-*`, so the six page headers cannot
+   drift apart. `min-width:0` on the copy column is what lets a long subject
+   name wrap instead of widening the track. */
 .page-head-copy {
   display: flex; flex-direction: column; align-items: flex-start;
-  gap: 6px; min-width: 0; flex: 1 1 auto;
+  gap: var(--sp-1); min-width: 0; flex: 1 1 auto;
 }
 .page-head-eyebrow {
-  display: flex; align-items: center; gap: 8px; margin: 0;
-  font-size: .66rem; font-weight: 800; letter-spacing: .17em; text-transform: uppercase;
-  color: var(--accent);
+  display: flex; align-items: center; gap: var(--icon-gap); margin: 0;
+  font-size: var(--fs-eyebrow); font-weight: 800;
+  letter-spacing: var(--tracking-eyebrow); line-height: 1;
+  text-transform: uppercase; color: var(--accent);
 }
 .page-head-tick {
   width: 6px; height: 6px; border-radius: 50%; flex: 0 0 auto;
-  background: var(--accent);
+  background: currentColor;
 }
 .page-head-actions {
   display: flex; flex-wrap: wrap; align-items: center; gap: var(--gap-cluster);
-  margin-top: clamp(8px, 1.4vh, 14px);
+  /* One deliberate step below the subtitle, and the same step everywhere. */
+  margin-top: var(--sp-2);
 }
+/* Two header buttons side by side must be the same height even when one
+   label wraps — the row is centre-aligned and the buttons share `--btn-h`. */
+.page-head-actions .btn { min-height: var(--btn-h); }
 /* The old rule stretched every button in the header to full width on a phone;
    that is what made Focus/Zen look like slabs. Controls keep their own width
    and wrap instead. */
@@ -4235,16 +4262,22 @@ body.theme-sunset {
 }
 
 /* Segmented control (list / calendar, week / month …). */
+/* One control height for the whole toolbar: the List/Calendar segment and the
+   subject select sit on the same line, so they have to be the same height or
+   the row reads as two different components. Both come from `--btn-h`. */
 .seg {
   display: inline-flex; align-items: center; gap: 3px; padding: 3px;
+  min-height: var(--btn-h); box-sizing: border-box;
   border-radius: var(--radius-md);
   border: 1px solid var(--border-subtle); background: var(--surface-2);
 }
 .seg-btn {
-  display: inline-flex; align-items: center; gap: 6px;
-  min-height: 32px; padding: 0 12px; border: 0; border-radius: var(--radius-sm);
+  display: inline-flex; align-items: center; gap: var(--icon-gap);
+  min-height: calc(var(--btn-h) - 8px); padding: 0 12px;
+  border: 0; border-radius: var(--radius-sm);
   background: transparent; color: var(--text-muted);
-  font-family: inherit; font-size: .8rem; font-weight: 750; cursor: pointer;
+  font-family: inherit; font-size: var(--fs-sm); font-weight: 750;
+  line-height: 1; cursor: pointer;
   transition: background var(--dur-fast) ease, color var(--dur-fast) ease;
 }
 .seg-btn > svg { flex: 0 0 auto; }
@@ -4269,10 +4302,13 @@ body.theme-sunset {
   flex: 1 1 auto; min-width: 0; overflow: hidden;
 }
 .tracker-labels { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.tracker-state { font-size: .78rem; font-weight: 800; line-height: 1.2; white-space: nowrap; }
+.tracker-state { font-size: var(--fs-xs); font-weight: 800; line-height: 1.2; white-space: nowrap; }
+/* The lesson name is the only flexible thing in the bar: it takes what the
+   verbs leave and clips with an ellipsis, so a long title can never push
+   Clock in / Zen / the utility icons off the right edge. */
 .tracker-task {
   min-width: 0; max-width: min(42vw, 460px);
-  font-size: .7rem; font-weight: 650; line-height: 1.3; color: var(--text-muted);
+  font-size: var(--fs-meta); font-weight: 650; line-height: 1.3; color: var(--text-muted);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .tracker-clock { display: flex; align-items: center; flex: 0 0 auto; }
@@ -4285,10 +4321,10 @@ body.theme-sunset {
   display: flex; align-items: center; gap: 7px;
   flex: 0 0 auto; min-width: 0;
 }
-.tracker-actions .chip { padding: 6px 10px; border-radius: var(--radius-tile); background: var(--row-bg); border-color: var(--glass-border); font-size: .66rem; }
+.tracker-actions .chip { padding: 6px 10px; border-radius: var(--radius-tile); background: var(--row-bg); border-color: var(--glass-border); font-size: var(--fs-chip); line-height: 1; }
 .tracker-actions .btn {
-  display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
-  min-height: 34px; padding: 0 12px; border-radius: var(--radius-tile); font-size: .74rem;
+  display: inline-flex; align-items: center; gap: var(--icon-gap); white-space: nowrap;
+  min-height: var(--btn-h-sm); padding: 0 12px; border-radius: var(--radius-tile); font-size: var(--fs-xs); line-height: 1;
 }
 .tracker-actions .btn > svg { flex: 0 0 auto; }
 @media (max-width: 1080px) {
@@ -4543,7 +4579,7 @@ body.theme-sunset {
   gap: var(--gap-cluster);
 }
 .planner-filter { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1 1 240px; max-width: 460px; }
-.planner-filter-label { flex: 0 0 auto; font-size: .68rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--text-dim); }
+.planner-filter-label { flex: 0 0 auto; font-size: var(--fs-meta); font-weight: 800; letter-spacing: var(--tracking-label); line-height: 1; text-transform: uppercase; color: var(--text-dim); }
 .planner-filter .input-field { min-width: 0; flex: 1 1 auto; }
 .planner-list { display: flex; flex-direction: column; gap: var(--gap-page); min-width: 0; }
 /* (v25) day-card and list rhythm moved to 25.12, where both states and both
@@ -4800,7 +4836,7 @@ body.theme-sunset {
   border-radius: var(--radius-md); background: var(--surface-2); border: 1px solid var(--border-subtle);
 }
 .inset-panel-row { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
-.inset-label { font-size: .64rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--text-dim); }
+.inset-label { font-size: var(--fs-meta); font-weight: 800; letter-spacing: var(--tracking-label); line-height: 1; text-transform: uppercase; color: var(--text-dim); }
 .inset-value { margin: 0; font-size: 1.24rem; font-weight: 800; letter-spacing: -.022em; line-height: 1.1; color: var(--text-main); font-variant-numeric: tabular-nums; }
 .inset-note { margin: 0; font-size: .72rem; font-weight: 600; line-height: 1.5; color: var(--text-muted); text-wrap: pretty; }
 .ring-figure { display: grid; place-items: center; gap: 6px; }
@@ -5375,19 +5411,6 @@ span.cal-cell.is-empty:hover {
   .task-card-brief-panel { transition: none; }
 }
 
-/* Small screens already have a compact tracker and the bottom dock. Keep the
-   decorative page scene out of that narrow vertical stack so it never peeks
-   through the tracker or creates a misleading empty gap above the calendar. */
-@media (max-width: 860px) {
-  .page-header-scene {
-    display: none !important;
-  }
-  .page-header {
-    min-height: 0 !important;
-    padding-right: 0 !important;
-  }
-
-}
 
 /* ══════════════════════════════════════════════════════════════════════
    v27 · TOP BAR PASS — one live clock cluster, calm action rhythm, and a
@@ -5679,26 +5702,6 @@ body > .task-menu {
   max-width: 100%;
   box-sizing: border-box;
 }
-.planner-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  width: 100%;
-  max-width: 100%;
-  box-sizing: border-box;
-  min-width: 0;
-}
-.planner-filter {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  flex: 1 1 240px;
-  max-width: 460px;
-  box-sizing: border-box;
-}
 .planner-filter .sp-select,
 .planner-filter .input-field,
 .planner-filter select {
@@ -5791,7 +5794,6 @@ body > .task-menu {
   html, body {
     min-width: 0;
     max-width: 100%;
-    overflow-x: clip;
   }
   .app-wrapper,
   .main-workspace,
@@ -6324,9 +6326,9 @@ body.focus-live .tracker-bar {
   color: var(--text-main);
 }
 .ring-state {
-  font-size: .7rem;
+  font-size: var(--fs-meta);
   font-weight: 800;
-  letter-spacing: .18em;
+  letter-spacing: var(--tracking-eyebrow);
   padding: 4px 12px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--accent) 10%, transparent);
@@ -6466,7 +6468,6 @@ body.focus-live .tracker-bar {
   html, body {
     min-width: 0;
     max-width: 100%;
-    overflow-x: clip;
     -webkit-text-size-adjust: 100%;
   }
   * { box-sizing: border-box; }
@@ -6489,10 +6490,8 @@ body.focus-live .tracker-bar {
   .dash-hero-title { font-size: 1.3rem; line-height: 1.25; }
 
   /* Page header never floats the scene. */
-  .page-header { margin-bottom: 14px !important; }
   .page-head-copy { gap: 4px; }
-  .page-head-actions { margin-top: 10px; gap: 8px; }
-  .page-head-actions .btn { min-height: 40px; }
+  .page-head-actions { margin-top: var(--sp-2); gap: 8px; }
 
   /* Subject rows wrap cleanly. */
   .subj-rows { gap: 10px; }
@@ -7039,10 +7038,7 @@ body > .task-menu button { min-height: 40px; }
      empty space above the subject filter — exactly the room the heading,
      Add Task and Rebalance need. It is pure decoration (aria-hidden), so it
      returns as soon as the viewport has space for it. */
-  .page-header-scene { display: none !important; }
-  .page-header { gap: 10px !important; margin-bottom: 12px !important; }
-
-  .page-head-actions { width: 100%; gap: 8px; margin-top: 10px; }
+  .page-head-actions { width: 100%; gap: 8px; margin-top: var(--sp-2); }
   /* Add Task and Rebalance share the row when there is room and stack
      when the phone is narrow — both stay full-width touch targets. */
   .page-head-actions > * { flex: 1 1 150px; min-width: 0; }
@@ -7108,27 +7104,43 @@ body > .task-menu button { min-height: 40px; }
 /* `.ring-center` is `position: absolute; inset: 0`, so the figure has to be
    the containing block. Without this the readout is positioned against the
    nearest positioned ancestor (the card, or the page) — the bug. */
+/* (v26) Centred by construction, not by offset.
+
+   The readout is centred by placing the *content box* in the middle of the
+   ring's box (`place-content: center`), so it is correct at 0%, 25%, 86% and
+   100% without knowing how wide the digits are. The previous version used
+   `padding: 12%` on the overlay plus a hard `-0.18em` nudge on the label:
+   both were tuned against one value and one viewport, and both changed the
+   geometry they were supposed to be measuring. Neither is needed. */
 .ring-figure {
   position: relative;
-  /* Sized by the ring itself (the card centres it), so `inset: 0` on the
-     readout is exactly the ring's box — the readout centres on the ring,
-     not on the card. */
-  justify-self: center;
+  /* The figure is exactly the ring's box: the SVG is its only in-flow child
+     and it is square, so `inset: 0` on the readout IS the ring's bounds and
+     the readout centres on the ring rather than on the card around it. */
+  display: grid;
+  place-items: center;
+  gap: 0;
 }
 .ring-center {
+  /* `place-content: center` centres the stacked readout on both axes no
+     matter how many lines it has or how wide the number is. */
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  align-content: center;
+  gap: .4em;
+  padding: 0;
   text-align: center;
-  /* The digits and the label share one centred column; the ring's own
-     stroke is 7/80 of the box, so a 62% inner box can never touch it. */
-  padding: 12%;
   pointer-events: none;
 }
 .ring-digits { line-height: 1; }
-/* Uppercase labels are tracked out, and `letter-spacing` adds a trailing
-   space AFTER the last glyph. Centred, that space reads as the text being
-   pushed half a step to the LEFT — cancel it so "ACTIVE" is optically
-   centred under the percentage. */
+/* Tracked uppercase carries a trailing space AFTER the last glyph, so a
+   centred label always looks pushed half a step left. The correction is
+   derived from the same tracking token the label uses — they cannot drift
+   apart, and it is not a number that only works for one percentage. */
 .ring-state {
-  margin-right: -.18em;
+  letter-spacing: var(--tracking-eyebrow);
+  margin-inline-end: var(--tracking-fix-eyebrow);
   line-height: 1;
   white-space: nowrap;
 }
@@ -7139,7 +7151,7 @@ body > .task-menu button { min-height: 40px; }
   font-size: clamp(1.45rem, 1rem + 3.1vw, 2.1rem);
   letter-spacing: -.03em;
 }
-.ana-ring-card .ring-state { font-size: .64rem; }
+.ana-ring-card .ring-state { font-size: var(--fs-meta); }
 @media (prefers-reduced-motion: reduce) {
   .ring-svg circle { transition: none !important; }
 }
@@ -7147,23 +7159,24 @@ body > .task-menu button { min-height: 40px; }
 /* ── 2 · DESKTOP NAV + STREAK — one optical line ─────────────────────── */
 @media (min-width: 861px) {
   .nav-item {
-    /* One row geometry for every destination, Settings included. */
-    min-height: 42px;
-    gap: 12px;
-    padding: 10px 12px;
+    /* One row geometry for every destination, Settings included: the height
+       is centred with flex, so padding is not doing double duty as alignment. */
+    min-height: var(--nav-h);
+    gap: var(--nav-gap);
+    padding: 0 12px;
   }
   .nav-item svg {
     /* One box and one stroke for all six icons. The gear is the densest
        glyph in the set, so at the default weight it read as a size larger
        than Home / Calendar / Clock sitting on the same rail. */
-    width: 20px;
-    height: 20px;
+    width: var(--icon-lg);
+    height: var(--icon-lg);
     flex: 0 0 auto;
     stroke-width: 1.9;
   }
-  /* The collapse toggle sits on the same 40px grid as the brand mark, and
-     clears the rail's edge instead of hanging off it. */
-  .sb-toggle { top: 0; right: 2px; }
+  /* The collapse toggle sits on the brand row's own line and clears the
+     rail's edge instead of hanging off it. */
+  .sb-toggle { top: 0; right: 0; }
 }
 /* The fire glyph is an emoji: it arrives with its own line box, which is
    what made the pill look inflated and the value sit low. Sized and lined
@@ -7177,22 +7190,7 @@ body > .task-menu button { min-height: 40px; }
   transform: translateY(-.04em);
 }
 
-/* ── 3 · MOBILE TASK CARD — subject is metadata, not a heading ────────── */
-@media (max-width: 860px) {
-  .task-card-subject {
-    font-size: .68rem;
-    font-weight: 650;
-    line-height: 1.35;
-    min-width: 0;
-    max-width: 100%;
-  }
-  .task-subject-name {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  /* The filter's value text is chrome, not content — it must not compete
-     with the day date or the task title beside it. */
-  .planner-filter .sp-select-btn { font-size: .8rem; }
-}
+/* ── 3 · MOBILE TASK CARD — subject is metadata, not a heading ──────────
+   (v26) Moved to globals.css, where the component owns it, and expressed on
+   the `--fs-*` ramp so the row's ladder (title → subject → metadata) cannot
+   drift from the rest of the product. Kept here as a pointer, not a rule. */
