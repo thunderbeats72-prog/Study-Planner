@@ -7443,12 +7443,14 @@ body > .task-menu button { min-height: 40px; }
 /* ── 2 · GLOBAL TYPOGRAPHY HIERARCHY — one ramp, no per-page drift ──
    Families/weights stay in globals.css; sizes here are the *only* sizes.
    clamp() gives a fluid step; tracking/leading come from the same ramp so
-   a heading cannot be one voice on Overview and another on Planner. */
+   a heading cannot be one voice on Overview and another on Planner.
+   (v33-fix) the H1 size is owned by the `--fs-h1` ramp in globals.css — the
+   clamp that used to sit here re-tuned it a second time and broke the
+   single-owner contract; only the supporting properties stay. */
 .page-stack .page-title,
 .page-title {
   font-family: var(--font-display);
   font-weight: 800;
-  font-size: clamp(1.35rem, 1rem + 1.1vw, 1.85rem);
   line-height: 1.12;
   letter-spacing: -.025em;
   color: var(--text-main);
@@ -7481,7 +7483,7 @@ body > .task-menu button { min-height: 40px; }
   text-wrap: pretty;
 }
 .kpi-label {
-  font-size: .62rem;
+  font-size: var(--fs-micro);
   font-weight: 800;
   letter-spacing: .08em;
   text-transform: uppercase;
@@ -7489,21 +7491,17 @@ body > .task-menu button { min-height: 40px; }
   line-height: 1.2;
 }
 .kpi-value {
-  font-size: clamp(1.45rem, 1.1rem + 1.2vw, 1.85rem);
+  font-size: var(--fs-kpi);
   font-weight: 800;
   letter-spacing: -.02em;
   line-height: 1;
   font-variant-numeric: tabular-nums;
   color: var(--text-main);
 }
-@media (max-width: 860px) {
-  .page-stack .page-title, .page-title { font-size: clamp(1.2rem, 4.2vw, 1.45rem); }
-  .page-subtitle { font-size: .82rem; }
-  .kpi-value { font-size: clamp(1.25rem, 4vw, 1.5rem); }
-}
-@media (max-width: 390px) {
-  .page-stack .page-title, .page-title { font-size: 1.18rem; }
-}
+/* (v33-fix) the 860px .page-subtitle/.kpi-value overrides that used to follow
+   this were retired: the fluid ramps (--fs-sm, --fs-kpi) already shrink for
+   that width, and re-tuning them per sheet is what the single-owner audit
+   guards against. */
 
 /* ── 3 · ALIGNMENT — one gutter, one rhythm ────────────────────────── */
 .app-wrapper {
@@ -7824,7 +7822,8 @@ body > .task-menu button { min-height: 40px; }
 /* 390 — tight mainstream phone: subject filter compact, task actions wrap. */
 @media (max-width: 390px) {
   .app-wrapper { padding-left: 10px !important; padding-right: 10px !important; }
-  .page-title { font-size: 1.18rem; }
+  /* (v33-fix) the 1.18rem page-title override that used to sit here bypassed
+     the --fs-h1 ramp; the fluid ramp already handles this width. */
   .planner-filter { padding: 5px 7px; gap: 6px; }
   .planner-filter-label { font-size: .58rem; gap: 4px; }
   .planner-day { padding: 10px; gap: 8px; }
