@@ -1520,6 +1520,14 @@ async function runTests() {
           readFileSync(join(process.cwd(), "deploy-package/tsconfig.json"), "utf8"),
       "deploy-package/tsconfig.json matches the root tsconfig.json it ships with");
 
+    /* The guide inside the mirror has to say what the root guide says. A stale
+       copy still recommends the drag-and-drop upload that broke Production
+       twice, so anyone who opens deploy-package/ first would be told to repeat
+       the mistake the root README now forbids. */
+    check(readFileSync(join(process.cwd(), "README.txt"), "utf8") ===
+          readFileSync(join(process.cwd(), "deploy-package/README.txt"), "utf8"),
+      "deploy-package/README.txt matches the root README.txt it ships with");
+
     const rootStrays = ["api", "app", "components", "db", "fonts", "lib",
       "globals.css", "ui-system.css", "layout.tsx", "page.tsx", "icon.svg"]
       .filter((name) => existsSync(join(process.cwd(), name)));
