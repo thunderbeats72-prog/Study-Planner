@@ -6,6 +6,16 @@
    sizes this pass removed) kept shipping in the bundle. Scope the scan to the
    tree that actually runs. */
 
+/* Restore the Tailwind engine entry point. The `@tailwindcss/postcss` plugin
+   is wired up in postcss.config.mjs, but without this import no utility class
+   is ever emitted — every `flex`, `grid`, `gap-4`, `space-y-6`, `p-5`,
+   `max-w-md`, `text-[length:var(--fs-lg)]` … in the components was a dead
+   class, which is what broke the Subjects, Settings and onboarding layouts.
+   `@source` keeps the scan on `src/**` so the deploy-package mirror never
+   re-inflates the bundle with utilities for markup that never renders. */
+@import "tailwindcss";
+@source "../**/*.{ts,tsx}";
+
 /* ==================================================
    DESIGN TOKENS & THEMES
 ================================================== */
@@ -136,6 +146,16 @@ body.theme-obsidian{--color-ai:#4CC5F9;--color-ai-soft:rgba(76,197,249,.12);--ai
 body.theme-nebula{--color-ai:#BF7DFA;--color-ai-soft:rgba(191,125,250,.13);--ai-rgb:191,125,250;--color-ai-bright:#D8B4FE;--surface-elevated:#221940;--app-bg:#100B20;--bg-gradient:radial-gradient(1000px 420px at 50% -12%,rgba(168,85,247,.07),transparent 70%);--surface:#191230;--surface-solid:#191230;--surface-hover:#221940;--glass-border:#32264F;--glass-border-hover:#453567;--glass-shadow:0 1px 3px rgba(0,0,0,.4);--glass-shadow-hover:0 6px 20px rgba(0,0,0,.5);--text-main:#F5F3FA;--text-muted:#B3A6D4;--text-dim:#6A5C90;--accent:#A855F7;--accent-hover:#B672F9;--accent-light:#C495FA;--accent-glow:rgba(168,85,247,.15);--accent-gradient:linear-gradient(180deg,#B168F8,#9333EA);--nav-active-bg:rgba(168,85,247,.28);--nav-active-text:#FFFFFF;--nav-active-border:rgba(168,85,247,.52);--row-bg:rgba(255,255,255,.03);--row-hover:rgba(255,255,255,.06);--status-pending-bg:rgba(229,154,36,.14);--status-pending-text:#E0B35C;--status-done-bg:rgba(22,163,122,.14);--status-done-text:#4BC59E;--status-skipped-bg:rgba(224,82,82,.14);--status-skipped-text:#E58080;--chart-bar:rgba(168,85,247,.6);--input-bg:#221940}
 body.theme-mint{--color-ai:#10B389;--color-ai-soft:#E3F6F0;--ai-rgb:16,179,137;--color-ai-bright:#2DD4A8;--app-bg:#F4FAF7;--bg-gradient:radial-gradient(1100px 460px at 50% -12%,rgba(16,163,127,.06),transparent 70%);--surface:#FFFFFF;--surface-solid:#FFFFFF;--surface-hover:#F8FCFA;--glass-border:#E2EDE7;--glass-border-hover:#CFE2D8;--glass-shadow:0 1px 3px rgba(6,78,59,.05);--glass-shadow-hover:0 4px 16px rgba(6,78,59,.08);--text-main:#0E2A20;--text-muted:#5B7268;--text-dim:#93A8A0;--accent:#0FA37F;--accent-hover:#0C8A6B;--accent-light:#34D399;--accent-glow:rgba(15,163,127,.13);--accent-gradient:linear-gradient(180deg,#16B08A,#0FA37F);--nav-active-bg:#E5F5EF;--nav-active-text:#0C7A60;--nav-active-border:rgba(15,163,127,.22);--row-bg:#F4FAF7;--row-hover:#EAF5F0;--chart-bar:rgba(15,163,127,.55);--input-bg:#FFFFFF}
 body.theme-sunset{--color-ai:#EE7118;--color-ai-soft:#FBEFE2;--ai-rgb:238,113,24;--color-ai-bright:#FB923C;--app-bg:#FBF6F1;--bg-gradient:radial-gradient(1100px 460px at 50% -12%,rgba(234,88,12,.05),transparent 70%);--surface:#FFFFFF;--surface-solid:#FFFFFF;--surface-hover:#FDF9F5;--glass-border:#F0E5DC;--glass-border-hover:#E4D2C4;--glass-shadow:0 1px 3px rgba(67,20,7,.05);--glass-shadow-hover:0 4px 16px rgba(67,20,7,.08);--text-main:#2D1A10;--text-muted:#77604F;--text-dim:#AE9C8D;--accent:#E1620F;--accent-hover:#C4540C;--accent-light:#FB923C;--accent-glow:rgba(225,98,15,.13);--accent-gradient:linear-gradient(180deg,#EE6F1B,#DC5E0C);--nav-active-bg:#FBEDE0;--nav-active-text:#B34E0A;--nav-active-border:rgba(225,98,15,.22);--row-bg:#FBF6F1;--row-hover:#F6EDE3;--chart-bar:rgba(225,98,15,.55);--input-bg:#FFFFFF}
+
+/* Native controls — the calendar that opens from a `<input type="date">`
+   (onboarding Start/Exam dates), select dropdowns and scrollbars — are drawn
+   by the OS, not by our tokens. Without `color-scheme` a dark page still gets
+   a blinding white calendar whose own glyph is drawn dark-on-dark (invisible
+   against a dark input), which is exactly the "I can pick the month and date
+   but the step feels stuck" report. Match the scheme to each theme so the OS
+   control always agrees with the page it pops over. */
+:root,body.theme-default,body.theme-silver-lavender,body.theme-mint,body.theme-sunset{color-scheme:light}
+body.theme-dark,body.theme-obsidian,body.theme-nebula{color-scheme:dark}
 
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{padding:0;margin:0}
