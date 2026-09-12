@@ -931,6 +931,31 @@ export default function Home() {
     );
   }, [clock.elapsed, clock.taskId, notify, session, state]);
 
+  /** Delete a task for real — the destructive verb behind the row's ⋯ menu.
+   *  The API removes it and returns the whole fresh state, so the calendar,
+   *  the day sheets, the tracker and analytics all re-render from one source
+   *  instead of a local splice that could drift. If the study clock was
+   *  sitting on that task its minutes are banked first, never thrown away. */
+  const deleteTask = useCallback(
+    async (id: number) => {
+      const task = state?.tasks.find((item) => item.id === id);
+      if (clock.sessionActive && clock.taskId === id) clockOutNow();
+      try {
+        const s = await api<AppState>(`/api/tasks?id=${id}`, {
+          method: "DELETE",
+        });
+        setState(s);
+        notify(
+          task ? `Deleted “${task.title.slice(0, 40)}”.` : "Task deleted.",
+          "success",
+        );
+      } catch (error) {
+        notify(apiFailureMessage(error, "Could not delete the task."), "error");
+      }
+    },
+    [clock.sessionActive, clock.taskId, clockOutNow, notify, state?.tasks],
+  );
+
   // One control for both timers: pause the session while it moves, start
   // (or resume) it when it does not.
   const pauseOrResume = useCallback(() => {
@@ -2016,6 +2041,7 @@ export default function Home() {
               onStartFocus={startFocusSession}
               onAddTask={addTask}
               onMoveTasks={moveTasks}
+              onDeleteTask={deleteTask}
               onNavigate={(p) => goPage(p as Page)}
               onAskTutor={askTutor}
             />
@@ -2037,6 +2063,7 @@ export default function Home() {
               replanning={busy}
               onReplan={replan}
               onAddTask={addTask}
+              onDeleteTask={deleteTask}
             />
           )}
           {page === "focus" && (

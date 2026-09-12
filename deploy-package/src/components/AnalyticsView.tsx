@@ -25,6 +25,7 @@ import {
   IconTrend,
 } from "./icons";
 import { PageHead, WeekBars } from "./bits";
+import { InsightsScene } from "./Illustrations";
 import Heatmap from "./Heatmap";
 import { cn } from "@/lib/cn";
 
@@ -295,6 +296,20 @@ export default function AnalyticsView({
         eyebrow="ANALYTICS DASHBOARD"
         title="Where the hours went"
         sub="Deep data, consistency trends, subject mastery, and focus metrics — all mapped from your study sessions."
+        artLive
+        art={
+          /* The monitor is wired to the very numbers this page reports: the
+             last seven days of logged minutes, the daily goal line, the
+             consistency ring, total hours and the streak. It re-renders with
+             every session that lands, and its clock is the real one. */
+          <InsightsScene
+            week={week.map((d) => d.minutes)}
+            goal={dailyGoalMin}
+            consistency={consistency}
+            streak={state.user.streak}
+            totalHours={totalMin / 60}
+          />
+        }
       />
 
       {/* Ticker — single-row pill badge strip */}

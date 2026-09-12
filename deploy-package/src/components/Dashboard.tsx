@@ -121,6 +121,7 @@ export default function Dashboard({
   onStartFocus,
   onAddTask,
   onMoveTasks,
+  onDeleteTask,
   onNavigate,
   onAskTutor,
 }: {
@@ -141,6 +142,7 @@ export default function Dashboard({
   onStartFocus: () => void;
   onAddTask: (input: QuickAddPayload) => void;
   onMoveTasks: (moves: { id: number; date: string }[], message: string) => void;
+  onDeleteTask?: (id: number) => void;
   onNavigate?: (page: string) => void;
   onAskTutor?: (question: string) => void;
 }) {
@@ -630,6 +632,14 @@ export default function Dashboard({
                         onFocusTask={onFocusTask}
                         onClockOut={onClockOut}
                         onEdit={setEditingTaskId}
+                        onDelete={
+                          onDeleteTask
+                            ? (id) => {
+                                if (editingTaskId === id) setEditingTaskId(null);
+                                onDeleteTask(id);
+                              }
+                            : undefined
+                        }
                         onSkipSubject={onSkipSubject}
                         onAskTutor={onAskTutor}
                       />

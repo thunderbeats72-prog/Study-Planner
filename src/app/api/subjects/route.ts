@@ -20,6 +20,16 @@ export const maxDuration = 120;
 const DIFFICULTIES = ["Easy", "Medium", "Hard"] as const;
 const COLOR_RE = /^#[0-9a-f]{6}$/i;
 
+/* Difficulty is stored capitalised ("Easy"), but rows seeded before the enum
+   was frozen — the preview curriculum, early databases, hand-written clients
+   — carry "easy". An Edit must never fail (or, worse, look like a curriculum
+   change and re-generate every lesson) because of casing alone, so the
+   boundary titles the value before validating it. */
+const titledDifficulty = (value: unknown): unknown =>
+  typeof value === "string" && value.length
+    ? value.charAt(0).toUpperCase() + value.slice(1).toLowerCase()
+    : value;
+
 function topicValues(userId: number, subjectId: number, generated: GeneratedTopic[]) {
   return generated.map((topic, position) => ({
     userId, subjectId, unit: topic.unit, title: topic.title, summary: topic.summary,
@@ -62,7 +72,7 @@ async function postSubjects(req: Request) {
   try {
     name = textValue(body.name, "name", { required: true, max: 160 });
     units = finiteNumber(body.units, "units", { min: 1, max: 40, integer: true, fallback: 6 });
-    difficulty = enumValue(body.difficulty, "difficulty", DIFFICULTIES, "Medium");
+    difficulty = enumValue(titledDifficulty(body.difficulty), "difficulty", DIFFICULTIES, "Medium");
     color = typeof body.color === "string" && COLOR_RE.test(body.color) ? body.color : "#6366f1";
   } catch (error) {
     const payload = validationPayload(error);
@@ -159,13 +169,16 @@ async function patchSubjects(req: Request) {
   let name: string;
   let units: number;
   let difficulty: typeof DIFFICULTIES[number];
+  let previousDifficulty: typeof DIFFICULTIES[number];
   let color: string;
   try {
     name = body.name == null ? previous.name : textValue(body.name, "name", { required: true, max: 160 });
     units = body.units == null ? previous.units : finiteNumber(body.units, "units", { min: 1, max: 40, integer: true });
+    previousDifficulty = enumValue(
+      titledDifficulty(previous.difficulty), "difficulty", DIFFICULTIES, "Medium");
     difficulty = body.difficulty == null
-      ? previous.difficulty as typeof DIFFICULTIES[number]
-      : enumValue(body.difficulty, "difficulty", DIFFICULTIES);
+      ? previousDifficulty
+      : enumValue(titledDifficulty(body.difficulty), "difficulty", DIFFICULTIES);
     color = body.color == null ? previous.color : typeof body.color === "string" && COLOR_RE.test(body.color)
       ? body.color
       : (() => { throw new Error("INVALID_COLOR"); })();
@@ -192,7 +205,7 @@ async function patchSubjects(req: Request) {
   }
   // ── End of preview branch ────────────────────────────────────────────────
 
-  const curriculumChanged = name !== previous.name || units !== previous.units || difficulty !== previous.difficulty;
+  const curriculumChanged = name !== previous.name || units !== previous.units || difficulty !== previousDifficulty;
   const generated = curriculumChanged
     ? await aiGenerateTopics(name, units, difficulty, user.level, user.courseName)
     : null;

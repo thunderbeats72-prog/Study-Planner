@@ -7,6 +7,7 @@ import {
   IconRefresh, IconSpark, IconTarget, IconTrash, IconUser, IconVolume, IconWarn,
 } from "./icons";
 import { PageHead, Select } from "./bits";
+import { StudioScene } from "./Illustrations";
 import { Reveal, Spot } from "@/lib/fx";
 import { cn } from "@/lib/cn";
 
@@ -92,6 +93,22 @@ export default function SettingsView({
         eyebrow="SETTINGS"
         title="Tune the studio"
         sub="Personalise your pace, theme, learning style, and study rhythm — everything persists locally on this device."
+        artLive
+        art={
+          /* A console that mirrors the state this page writes: the active
+             theme lifts its swatch, the sound and confetti switches sit where
+             the real toggles sit, the dial reads the configured focus block,
+             and the gears turn faster while a save or re-plan is running. */
+          <StudioScene
+            theme={s.theme}
+            sounds={s.sounds}
+            confetti={s.confetti}
+            pomodoro={s.pomodoro || 25}
+            dailyHours={s.dailyHours || 2}
+            daysLeft={state.context.daysLeft}
+            busy={busy}
+          />
+        }
       />
 
       <div className="grid gap-6 lg:grid-cols-2">
