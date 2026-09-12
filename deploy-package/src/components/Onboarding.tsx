@@ -307,18 +307,22 @@ export default function Onboarding({
         priorPrep,
         goal: goalText.trim(),
         subjects: subs,
-        settings: {
-          startDate: start,
-          examDate: exam,
-          dailyHours: Number(hrs) || 2,
-          subjectsPerDay: Number(spd) || 2,
-          studyDays: sdays,
-          bufferDays: Number(buffer) || 5,
-          planMode,
-          studyStyle: style,
-          weakSubject: weak === "-1" ? "none" : String(subs[Number(weak)]?.name || "none"),
-          revisionWeeks: Number(revision) || 1,
-        },
+        // `/api/onboard` reads the schedule settings FLAT (body.startDate,
+        // body.dailyHours, …), not nested under a `settings` key. Sending them
+        // nested left body.startDate undefined, so the wizard failed with
+        // "startDate must be a valid date in YYYY-MM-DD format." even though
+        // the dates on screen were correct.
+        startDate: start,
+        examDate: exam,
+        dailyHours: Number(hrs) || 2,
+        subjectsPerDay: Number(spd) || 2,
+        studyDays: sdays,
+        bufferDays: Number(buffer) || 5,
+        planMode,
+        studyStyle: style,
+        // The API expects the weak subject's INDEX (-1 = none), not its name.
+        weakSubject: weak === "-1" ? -1 : Number(weak),
+        revisionWeeks: Number(revision) || 1,
       };
       const res = await api<AppState>("/api/onboard", { method: "POST", body: JSON.stringify(payload) });
       onDone(res);
