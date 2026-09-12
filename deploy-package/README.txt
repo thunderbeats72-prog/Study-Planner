@@ -28,12 +28,30 @@ used by the build.
 
 DEPLOYMENT
 ----------
-The easiest deploy path is drag-and-drop through the GitHub website:
+Vercel auto-deploys `main` straight from this repository. The deploy path is
+therefore just: land the change on `main` (merge the pull request).
 
-  1. Open the repo on GitHub → "Add file" → "Upload files".
-  2. Drag in `tsconfig.json` and the `src` folder from
-     `deploy-package/` (it mirrors this repo's fixed source).
-  3. Commit to main → Vercel auto-deploys.
+  npm run check      # typecheck + zero-warning lint + tests + ui-audit budget
+  npm run build      # production Next.js build
+  → merge to main    # Vercel builds it and deploys Production
+
+DO NOT drag-and-drop files onto the repository through the GitHub website.
+`deploy-package/` is a byte-exact mirror of `src/` kept only so that a manual
+upload stays possible; it is never the thing that gets deployed. Uploading it
+has broken production twice:
+
+  * Dropping the CONTENTS of `deploy-package/src/` at the repository root
+    (commit 93d2780, 73 files) put an `api/` folder at the root. Root `api/`
+    is Vercel's zero-config Serverless Functions directory, so it collided
+    with the Next.js routes the build emits under
+    `.vercel/output/functions/api/*`. The build stayed green and every
+    deployment then died at "Deploying outputs..." for two days.
+  * A stale mirror silently ships old behaviour, because `src/` keeps moving
+    while the copy does not.
+
+`npm test` fails if `deploy-package/src` is not a byte-exact mirror of `src/`,
+if `deploy-package/tsconfig.json` differs from the root one, or if any copy of
+the app tree reappears at the repository root.
 
 After any deploy, hard-refresh (Ctrl+Shift+R; on phones close and
 reopen the tab) so the new CSS/JS is picked up.
