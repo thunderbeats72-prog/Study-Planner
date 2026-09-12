@@ -193,13 +193,19 @@ export default function TaskCard({
             <span>{task.plannedMinutes} min</span>
           </li>
           {topic?.unit && (
-            <li className="task-meta-item" title="Curriculum unit">
+            <li
+              className="task-meta-item task-meta-extra"
+              title="Curriculum unit"
+            >
               <IconBookOpen size={11} aria-hidden="true" />
               <span>{topic.unit}</span>
             </li>
           )}
           {topic?.difficulty && (
-            <li className="task-meta-item" title="Curriculum difficulty">
+            <li
+              className="task-meta-item task-meta-extra"
+              title="Curriculum difficulty"
+            >
               <IconTarget size={11} aria-hidden="true" />
               <span>{topic.difficulty}</span>
             </li>
