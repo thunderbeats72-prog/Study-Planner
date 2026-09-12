@@ -77,6 +77,7 @@ export default function PlannerView({
   replanning,
   onReplan,
   onAddTask,
+  onDeleteTask,
 }: {
   state: AppState;
   onTaskStatus: (id: number, status: string, rating?: number) => void;
@@ -93,6 +94,7 @@ export default function PlannerView({
   replanning: boolean;
   onReplan: () => void;
   onAddTask: (input: QuickAddPayload) => void;
+  onDeleteTask?: (id: number) => void;
 }) {
   const [view, setView] = useState<View>("list");
   const [filter, setFilter] = useState("all");
@@ -102,6 +104,14 @@ export default function PlannerView({
   const [pickedDay, setPickedDay] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<number | null>(null);
   const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
+  /* Delete closes an editor that is still open on the same task before the
+     row disappears, so the modal can never be left pointing at nothing. */
+  const deleteTask = onDeleteTask
+    ? (id: number) => {
+        setEditingTaskId((current) => (current === id ? null : current));
+        onDeleteTask(id);
+      }
+    : undefined;
   const [monthOff, setMonthOff] = useState(0);
   const [selDay, setSelDay] = useState<string>(today());
   const pickedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -674,6 +684,7 @@ export default function PlannerView({
                           onFocusTask={onFocusTask}
                           onClockOut={onClockOut}
                           onEdit={setEditingTaskId}
+                          onDelete={deleteTask}
                           onSkipSubject={onSkipSubject}
                         />
                       );
@@ -762,6 +773,7 @@ export default function PlannerView({
                       setOpenDay(null);
                       setEditingTaskId(id);
                     }}
+                    onDelete={deleteTask}
                     onSkipSubject={onSkipSubject}
                   />
                 );

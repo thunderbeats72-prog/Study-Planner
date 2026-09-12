@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { type AppState, type SubjectRow } from "@/lib/client";
 import {
   IconBook, IconCheck, IconClose, IconEdit, IconPlus, IconSpark, IconTrash,
   IconClock, IconTarget, IconChevron,
 } from "./icons";
-import { PageHead, Select } from "./bits";
+import { PageHead, Select, ConfirmDialog } from "./bits";
+import { CurriculumScene } from "./Illustrations";
 import { CountUp, Reveal, Spot } from "@/lib/fx";
 import { cn } from "@/lib/cn";
 
@@ -41,10 +42,40 @@ export default function SubjectsView({
   const [editing, setEditing] = useState<SubjectRow | null>(null);
   const [openTopics, setOpenTopics] = useState<number | null>(null);
   const [openLesson, setOpenLesson] = useState<number | null>(null);
+  /* Subject queued for removal — the delete verb opens the in-app confirm
+     instead of a bare `window.confirm()`, so the copy can say exactly what
+     goes with it (lessons, scheduled tasks, logged history). */
+  const [confirmDelete, setConfirmDelete] = useState<SubjectRow | null>(null);
 
   const doneTopicIds = new Set(
     state.topics.filter((x) => x.status === "done").map((x) => x.id)
   );
+
+  /* The same numbers the cards render, lifted once for the header scene: the
+     illustration is a second read-out of real progress, not decoration. */
+  const curriculum = useMemo(() => {
+    const rows = state.subjects.map((s) => {
+      const list = state.topics.filter((x) => x.subjectId === s.id);
+      const doneCount = list.filter((x) => x.status === "done").length;
+      const total = list.length || s.units || 0;
+      return {
+        id: s.id,
+        name: s.name,
+        color: s.color,
+        pct: total ? Math.round((doneCount / total) * 100) : 0,
+        done: doneCount,
+        total,
+      };
+    });
+    const done = rows.reduce((a, b) => a + b.done, 0);
+    const total = rows.reduce((a, b) => a + b.total, 0);
+    return {
+      rows,
+      done,
+      total,
+      progress: total ? Math.round((done / total) * 100) : 0,
+    };
+  }, [state.subjects, state.topics]);
 
   const handleAddSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -139,34 +170,39 @@ export default function SubjectsView({
                     </div>
                   </div>
 
-                  <div className="mt-5 flex items-center justify-between border-t border-[var(--border-subtle)] pt-3">
+                  <div className="subject-card-foot">
                     <button
                       type="button"
-                      className="btn btn-xs btn-secondary"
+                      className="btn btn-sm btn-secondary subject-lessons-btn"
                       onClick={() => setOpenTopics(open ? null : s.id)}
+                      aria-expanded={open}
                     >
                       {open ? "Hide lessons" : `View ${list.length} lessons`}
                     </button>
-                    <div className="flex items-center gap-2">
+                    {/* Edit and Delete are full verbs now: 15px glyph + word,
+                        a real surface and border, 40px tall (44px on touch),
+                        and they wrap as a pair instead of shrinking into the
+                        card edge. */}
+                    <div className="subj-actions">
                       <button
                         type="button"
-                        className="btn btn-xs btn-ghost btn-icon"
-                        title="Edit subject"
+                        className="btn subj-action subj-action--edit"
+                        title={`Edit ${s.name}`}
+                        aria-label={`Edit ${s.name}`}
                         onClick={() => setEditing(s)}
                       >
-                        <IconEdit size={13} />
+                        <IconEdit size={15} />
+                        <span className="subj-action-label">Edit</span>
                       </button>
                       <button
                         type="button"
-                        className="btn btn-xs btn-ghost btn-icon hover:text-[var(--danger-accent)]"
-                        title="Delete subject"
-                        onClick={() => {
-                          if (confirm(`Remove "${s.name}" and all its lessons?`)) {
-                            onDelete(s.id);
-                          }
-                        }}
+                        className="btn subj-action subj-action--delete"
+                        title={`Delete ${s.name}`}
+                        aria-label={`Delete ${s.name}`}
+                        onClick={() => setConfirmDelete(s)}
                       >
-                        <IconTrash size={13} />
+                        <IconTrash size={15} />
+                        <span className="subj-action-label">Delete</span>
                       </button>
                     </div>
                   </div>
@@ -498,6 +534,36 @@ export default function SubjectsView({
             </form>
           </div>
         </div>
+      )}
+
+      {/* ── DELETE CONFIRMATION ── */}
+      {confirmDelete && (
+        <ConfirmDialog
+          title={`Remove ${confirmDelete.name}?`}
+          message={
+            <>
+              This deletes the subject, its{" "}
+              <strong>
+                {state.topics.filter((x) => x.subjectId === confirmDelete.id)
+                  .length || confirmDelete.units}
+              </strong>{" "}
+              generated lessons and every task scheduled for it, then rebalances
+              the rest of your plan.
+            </>
+          }
+          detail="Logged study minutes stay in your analytics. This cannot be undone."
+          confirmLabel="Delete subject"
+          cancelLabel="Keep it"
+          busy={busy}
+          onCancel={() => setConfirmDelete(null)}
+          onConfirm={() => {
+            const id = confirmDelete.id;
+            setConfirmDelete(null);
+            if (openTopics === id) setOpenTopics(null);
+            setOpenLesson(null);
+            onDelete(id);
+          }}
+        />
       )}
     </div>
   );

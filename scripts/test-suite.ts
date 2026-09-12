@@ -934,12 +934,16 @@ async function runTests() {
     };
     return () => { console.error = original; };
   };
-  const mountRow = async (id: number) => {
+  const mountRow = async (id: number, onDelete?: (taskId: number) => void) => {
     let instance!: TestRenderer.ReactTestRenderer;
     const restore = quietConsoleError();
     await act(async () => {
       instance = TestRenderer.create(
-        React.createElement(TaskActions, { ...menuProps, task: mkTask({ id, title: "Financial Accounting", subjectId: 2 }) })
+        React.createElement(TaskActions, {
+          ...menuProps,
+          task: mkTask({ id, title: "Financial Accounting", subjectId: 2 }),
+          ...(onDelete ? { onDelete } : {}),
+        })
       );
     });
     restore();
@@ -967,12 +971,8 @@ async function runTests() {
   await openMenu(row);
   check(menusIn(row).length === 1 && triggerOf(row).props["aria-expanded"] === true,
     "Tapping ⋮ opens the popover");
-  check(itemsIn(row).map((node) => String(node.children.join(""))).join("|")
-    === "Edit task|Skip task|Skip Accounting today",
-    "Only the secondary actions live inside the popover");
-  /* (v25) The verbs now read `icon + text`, so the label has to be read out
-     of the subtree instead of off the button's direct children. The guard is
-     the same: the primary actions live outside the popover. */
+  /* (v25) The verbs read `icon + text`, so a label has to be collected out of
+     the subtree instead of off a node's direct children. */
   const textOf = (node: TestRenderer.ReactTestInstance): string =>
     node.children
       .map((child) =>
@@ -982,6 +982,9 @@ async function runTests() {
             ? textOf(child as TestRenderer.ReactTestInstance)
             : "")
       .join("");
+  check(itemsIn(row).map(textOf).join("|")
+    === "Edit task|Skip task|Skip Accounting today",
+    "Only the secondary actions live inside the popover");
   const primaryLabels = row.root
     .findAll((node) => typeof node.type === "string" && node.type === "button")
     .map(textOf)
@@ -1000,6 +1003,27 @@ async function runTests() {
   await act(async () => { keyHandlers[keyHandlers.length - 1]({ key: "Escape", stopPropagation: noop }); });
   check(menusIn(row).length === 0, "Escape closes the popover");
 
+  /* (v27) Delete is a real verb behind a real gate: it only appears when the
+     page can actually remove a task, it never fires on the first tap, and the
+     confirmation is an in-app alertdialog rather than `window.confirm()`. */
+  let deletedTaskId: number | null = null;
+  const deleteRow = await mountRow(95, (id: number) => { deletedTaskId = id; });
+  await openMenu(deleteRow);
+  const deleteItem = itemsIn(deleteRow).find((node) => textOf(node) === "Delete task");
+  check(!!deleteItem, "Delete task sits in the popover next to Edit task");
+  await act(async () => { deleteItem!.props.onClick(); });
+  check(deletedTaskId === null && menusIn(deleteRow).length === 0,
+    "Delete closes the popover and asks before removing anything");
+  const confirmDialog = deleteRow.root.findAll((node) => node.props.role === "alertdialog")[0];
+  check(!!confirmDialog, "The confirmation is an in-app dialog, not window.confirm");
+  const confirmVerb = confirmDialog
+    .findAll((node) => typeof node.type === "string" && node.type === "button")
+    .find((node) => textOf(node) === "Delete task");
+  await act(async () => { confirmVerb!.props.onClick(); });
+  check(deletedTaskId === 95, "Confirming deletes exactly the task that was asked about");
+  check(deleteRow.root.findAll((node) => node.props.role === "alertdialog").length === 0,
+    "The dialog closes once the delete is handed to the page");
+
   const firstRow = await mountRow(93);
   const secondRow = await mountRow(94);
   await openMenu(firstRow);
@@ -1007,7 +1031,7 @@ async function runTests() {
   check(menusIn(firstRow).length === 0 && menusIn(secondRow).length === 1,
     "Only one task menu can be open at a time");
 
-  await act(async () => { [row, firstRow, secondRow].forEach((instance) => instance.unmount()); });
+  await act(async () => { [row, deleteRow, firstRow, secondRow].forEach((instance) => instance.unmount()); });
   delete (globalThis as { addEventListener?: unknown }).addEventListener;
   delete (globalThis as { removeEventListener?: unknown }).removeEventListener;
   if (menuWindow === undefined) delete (globalThis as { window?: unknown }).window;

@@ -22,7 +22,10 @@ export function useBackClose(open: boolean, onClose: () => void) {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    if (open && !armedRef.current) {
+    /* `history` is missing outside a browser (the react-test-renderer suite
+       mounts overlays in Node), and an overlay must still open there — the
+       Back shortcut is a nicety, never a precondition. */
+    if (open && !armedRef.current && typeof window.history?.pushState === "function") {
       armedRef.current = true;
       window.history.pushState({ __overlay: true }, "");
 

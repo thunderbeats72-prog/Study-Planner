@@ -12,8 +12,10 @@ import {
   IconFlame,
   IconSpark,
   IconTarget,
+  IconWarn,
 } from "./icons";
 import { Magnetic, MaskWords, Scramble, useInView } from "@/lib/fx";
+import { useBackClose } from "@/lib/useBackClose";
 
 /* ── Page head — the editorial block that opens every view (v25).
    It used to be a private pile of inline styles while the design system
@@ -29,12 +31,16 @@ export function PageHead({
   title,
   sub,
   art,
+  artLive = false,
   actions,
 }: {
   eyebrow: string;
   title: string;
   sub: string;
   art?: React.ReactNode;
+  /** Data-driven scenes keep a compact slot on phones instead of leaving the
+   *  header; purely decorative scenes stay hidden below 860px as before. */
+  artLive?: boolean;
   actions?: React.ReactNode;
 }) {
   return (
@@ -51,11 +57,97 @@ export function PageHead({
         {actions ? <div className="page-head-actions">{actions}</div> : null}
       </div>
       {art ? (
-        <div className="page-header-scene" aria-hidden="true">
+        <div
+          className={cn("page-header-scene", artLive && "scene-live")}
+          aria-hidden="true"
+        >
           {art}
         </div>
       ) : null}
     </header>
+  );
+}
+
+/* ── ConfirmDialog — the one gate in front of a destructive action ────────
+   `window.confirm()` was doing this job on the Subjects page: an OS chrome
+   dialog that ignores every theme, cannot be styled, is suppressed in some
+   embedded browsers, and gives no room to say what will actually be lost.
+   This is the in-app equivalent, built from the same `.modal-overlay /
+   .modal-box / .confirm-icon` contract the reset dialog already uses.
+   Escape and the hardware Back button both cancel, focus lands on the safe
+   answer, and the confirm verb is the one that has to be reached for. */
+export function ConfirmDialog({
+  title,
+  message,
+  detail,
+  confirmLabel = "Delete",
+  cancelLabel = "Keep it",
+  onConfirm,
+  onCancel,
+  busy = false,
+}: {
+  title: string;
+  message: React.ReactNode;
+  detail?: React.ReactNode;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+  busy?: boolean;
+}) {
+  const cancelRef = useRef<HTMLButtonElement | null>(null);
+  useBackClose(true, onCancel);
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.stopPropagation();
+      onCancel();
+    };
+    window.addEventListener("keydown", onKey);
+    cancelRef.current?.focus({ preventScroll: true });
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onCancel]);
+
+  return (
+    <div className="modal-overlay" onClick={onCancel}>
+      <div
+        className="glass-panel modal-box confirm-box confirm-dialog"
+        role="alertdialog"
+        aria-modal="true"
+        aria-label={title}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <span
+          className="confirm-icon confirm-icon--danger"
+          aria-hidden="true"
+        >
+          <IconWarn size={21} />
+        </span>
+        <h3 className="confirm-title">{title}</h3>
+        <p className="confirm-msg">{message}</p>
+        {detail ? <p className="confirm-detail">{detail}</p> : null}
+        <div className="confirm-actions">
+          <button
+            ref={cancelRef}
+            type="button"
+            className="btn btn-secondary"
+            onClick={onCancel}
+            disabled={busy}
+          >
+            {cancelLabel}
+          </button>
+          <button
+            type="button"
+            className="btn btn-danger"
+            onClick={onConfirm}
+            disabled={busy}
+          >
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 

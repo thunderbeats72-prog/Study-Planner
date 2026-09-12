@@ -72,6 +72,8 @@ export type TaskCardProps = {
   onFocusTask: (taskId: number) => void;
   onClockOut: () => void;
   onEdit: (taskId: number) => void;
+  /** Removes the task for real; the row only offers Delete when it exists. */
+  onDelete?: (taskId: number) => void;
   onSkipSubject?: (subjectId: number, date: string) => void;
 };
 
@@ -114,6 +116,7 @@ export default function TaskCard({
   onFocusTask,
   onClockOut,
   onEdit,
+  onDelete,
   onSkipSubject,
 }: TaskCardProps) {
   const meta = KIND_META[task.kind] || KIND_META.learn;
@@ -247,6 +250,7 @@ export default function TaskCard({
             onFocusTask={onFocusTask}
             onClockOut={onClockOut}
             onEdit={onEdit}
+            onDelete={onDelete}
             onSkipSubject={onSkipSubject}
           />
         </div>

@@ -10,7 +10,15 @@ import React, {
 } from "react";
 import { createPortal } from "react-dom";
 import TaskClockButton from "./TaskClockButton";
-import { IconCheck, IconUndo } from "./icons";
+import { ConfirmDialog } from "./bits";
+import {
+  IconBook,
+  IconCheck,
+  IconClose,
+  IconEdit,
+  IconTrash,
+  IconUndo,
+} from "./icons";
 import type { SubjectRow, TaskRow } from "@/lib/client";
 
 let activeMenuId: string | null = null;
@@ -53,6 +61,7 @@ export default function TaskActions({
   onFocusTask,
   onClockOut,
   onEdit,
+  onDelete,
   onSkipSubject,
 }: {
   task: TaskRow;
@@ -65,12 +74,16 @@ export default function TaskActions({
   onFocusTask: (taskId: number) => void;
   onClockOut: () => void;
   onEdit: (taskId: number) => void;
+  /** Present once the page can really remove a task; the verb is only
+   *  rendered when the handler exists, so nothing ever offers a dead action. */
+  onDelete?: (taskId: number) => void;
   onSkipSubject?: (subjectId: number, date: string) => void;
 }) {
   const menuId = useId();
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPos, setMenuPos] = useState<MenuPlacement | null>(null);
   const [ratingOpen, setRatingOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -253,48 +266,83 @@ export default function TaskActions({
       <button
         type="button"
         role="menuitem"
+        className="task-menu-item"
         onClick={() => {
           closeMenu();
           onEdit(task.id);
         }}
       >
-        Edit task
+        <span className="task-menu-ic" aria-hidden="true">
+          <IconEdit size={14} />
+        </span>
+        <span className="task-menu-tx">Edit task</span>
       </button>
       {skipped && (
         <button
           type="button"
           role="menuitem"
+          className="task-menu-item"
           onClick={() => {
             closeMenu();
             onTaskStatus(task.id, "pending");
           }}
         >
-          Reopen
+          <span className="task-menu-ic" aria-hidden="true">
+            <IconUndo size={14} />
+          </span>
+          <span className="task-menu-tx">Reopen</span>
         </button>
       )}
       {!done && !skipped && (
         <button
           type="button"
           role="menuitem"
+          className="task-menu-item"
           onClick={() => {
             closeMenu();
             onTaskStatus(task.id, "skipped");
           }}
         >
-          Skip task
+          <span className="task-menu-ic" aria-hidden="true">
+            <IconClose size={14} />
+          </span>
+          <span className="task-menu-tx">Skip task</span>
         </button>
       )}
       {subject && !skipped && onSkipSubject && (
         <button
           type="button"
           role="menuitem"
+          className="task-menu-item"
           onClick={() => {
             closeMenu();
             onSkipSubject(subject.id, task.date);
           }}
         >
-          Skip {subject.name} today
+          <span className="task-menu-ic" aria-hidden="true">
+            <IconBook size={14} />
+          </span>
+          <span className="task-menu-tx">Skip {subject.name} today</span>
         </button>
+      )}
+      {onDelete && (
+        <>
+          <div className="task-menu-sep" role="separator" />
+          <button
+            type="button"
+            role="menuitem"
+            className="task-menu-item is-danger"
+            onClick={() => {
+              closeMenu();
+              setConfirmDelete(true);
+            }}
+          >
+            <span className="task-menu-ic" aria-hidden="true">
+              <IconTrash size={14} />
+            </span>
+            <span className="task-menu-tx">Delete task</span>
+          </button>
+        </>
       )}
     </div>
   );
@@ -355,6 +403,25 @@ export default function TaskActions({
         </div>
       </div>
       {renderedMenu}
+      {confirmDelete && onDelete && (
+        <ConfirmDialog
+          title="Delete this task?"
+          message={
+            <>
+              <strong>{task.title}</strong> will be removed from{" "}
+              {task.date} along with the minutes planned for it.
+            </>
+          }
+          detail="Your curriculum lesson stays in the syllabus — use Re-plan to reschedule it, or Skip if you only want it off today."
+          confirmLabel="Delete task"
+          cancelLabel="Keep it"
+          onCancel={() => setConfirmDelete(false)}
+          onConfirm={() => {
+            setConfirmDelete(false);
+            onDelete(task.id);
+          }}
+        />
+      )}
       {ratingOpen && !done && (
         <div
           className="rating-strip glass-panel slide-in"
