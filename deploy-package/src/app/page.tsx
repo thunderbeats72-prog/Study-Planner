@@ -112,7 +112,14 @@ const NAV: {
 ];
 
 type ToastTone = "success" | "info" | "error";
-type Toast = { id: number; msg: string; tone: ToastTone };
+type Toast = {
+  id: number;
+  msg: string;
+  tone: ToastTone;
+  /** Optional recovery verb. Only set when the user can actually do
+   *  something about it — a retry, never a "see logs". */
+  action?: { label: string; run: () => void };
+};
 type PendingSessionLog = {
   eventId: string;
   minutes: number;
@@ -266,13 +273,17 @@ export default function Home() {
     });
   };
 
-  /** Structured toast: one per event, auto-dismissed, stack-safe. */
-  const notify = useCallback((m: string, tone: ToastTone = "info") => {
-    const id = Date.now() + Math.random();
-    setToast({ id, msg: m, tone });
-    if (toastTimer.current) clearTimeout(toastTimer.current);
-    toastTimer.current = setTimeout(() => setToast(null), 3400);
-  }, []);
+  /** Structured toast: one per event, auto-dismissed, stack-safe. A notice
+   *  with a recovery action stays up longer — there is something to press. */
+  const notify = useCallback(
+    (m: string, tone: ToastTone = "info", action?: Toast["action"]) => {
+      const id = Date.now() + Math.random();
+      setToast({ id, msg: m, tone, action });
+      if (toastTimer.current) clearTimeout(toastTimer.current);
+      toastTimer.current = setTimeout(() => setToast(null), action ? 8000 : 3400);
+    },
+    [],
+  );
   useEffect(
     () => () => {
       if (toastTimer.current) clearTimeout(toastTimer.current);
@@ -1027,6 +1038,11 @@ export default function Home() {
     ],
   );
 
+  /* `askTutor` offers "Retry" from inside its own body, and a hook cannot
+     reference its own binding while it is still being declared. The ref always
+     points at the latest version, so Retry re-runs the real function. */
+  const askTutorRef = useRef<((q: string) => void) | null>(null);
+
   const askTutor = useCallback(
     async (q: string) => {
       const message = q.trim();
@@ -1053,7 +1069,11 @@ export default function Home() {
             source: string;
             model: string | null;
             degraded: boolean;
-            message?: string;
+            /** Learner-safe wording only — the server never sends provider
+             *  names, model IDs or environment-variable names here. */
+            notice?: string;
+            code?: string;
+            retryable?: boolean;
           };
         }>("/api/chat", {
           method: "POST",
@@ -1091,7 +1111,19 @@ export default function Home() {
           };
         });
         setPendingMsgs([]);
-        if (r.ai?.degraded && r.ai.message) notify(r.ai.message, "info");
+        /* The tutor still answered (from the local engine), so this is a
+           notice with a recovery verb — not an error panel, and never the
+           raw provider/model configuration the server logged. */
+        if (r.ai?.degraded && r.ai.notice) {
+          const retryQuestion = message;
+          notify(
+            r.ai.notice,
+            "info",
+            r.ai.retryable
+              ? { label: "Retry", run: () => askTutorRef.current?.(retryQuestion) }
+              : undefined,
+          );
+        }
         const a = r.action;
         if (a) {
           if (a.type === "navigate") goPage(String(a.payload) as Page);
@@ -1161,6 +1193,9 @@ export default function Home() {
     },
     [applyClockIntent, goPage, notify, patchSettings, state],
   );
+  useEffect(() => {
+    askTutorRef.current = askTutor;
+  }, [askTutor]);
 
   if (loading) {
     return (
@@ -2334,6 +2369,19 @@ export default function Home() {
             )}
           </span>
           <span className="toast-msg">{toast.msg}</span>
+          {toast.action ? (
+            <button
+              type="button"
+              className="btn btn-xs btn-secondary toast-action"
+              onClick={() => {
+                const run = toast.action?.run;
+                setToast(null);
+                run?.();
+              }}
+            >
+              {toast.action.label}
+            </button>
+          ) : null}
           <button
             className="toast-close"
             aria-label="Dismiss notification"
