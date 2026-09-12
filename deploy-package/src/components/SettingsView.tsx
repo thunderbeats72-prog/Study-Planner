@@ -7,6 +7,7 @@ import {
   IconRefresh, IconSpark, IconTarget, IconTrash, IconUser, IconVolume, IconWarn,
 } from "./icons";
 import { PageHead, Select } from "./bits";
+import AiKeyCard from "./AiKeyCard";
 import { StudioScene } from "./Illustrations";
 import { Reveal, Spot } from "@/lib/fx";
 import { cn } from "@/lib/cn";
@@ -236,6 +237,19 @@ export default function SettingsView({
                 );
               })}
             </div>
+          </Spot>
+        </Reveal>
+
+        {/* ── 2b. AI COACH / CONNECTIVITY ──
+            Without a cloud key the tutor silently degrades and learners read
+            that as "the AI is broken". This card makes the state visible and
+            lets a key be pasted and used immediately, with no redeploy. */}
+        <Reveal delay={70}>
+          <Spot className="glass-panel tilt-card section-card p-5 sm:p-6 space-y-4">
+            <h3 className="flex items-center gap-2 text-[length:var(--fs-md)] font-extrabold tracking-tight" style={{ color: "var(--text-main)" }}>
+              <IconSpark size={18} /> AI Coach
+            </h3>
+            <AiKeyCard />
           </Spot>
         </Reveal>
       </div>
