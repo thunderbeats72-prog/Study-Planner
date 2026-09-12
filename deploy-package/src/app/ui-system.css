@@ -4191,6 +4191,11 @@ body.theme-sunset {
 }
 .task-card-brief.clamp-2 {
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2;
+  /* Required: without it the clamped-out 3rd/4th lines still PAINT outside
+     the two-line box and collide with the meta row below (especially on
+     narrow screens, where every sentence runs to more lines). The ellipsis
+     and the clip are part of the same line-clamp contract. */
+  overflow: hidden;
 }
 .task-card-meta {
   display: flex; flex-wrap: wrap; align-items: center;
@@ -6939,8 +6944,17 @@ body > .task-menu button { min-height: 40px; }
   align-items: center;
   gap: 8px;
   min-width: 0;
-  flex: 1 1 240px;
+  /* `flex-basis` here must NOT be 240px on phones: under 860px the toolbar
+     stacks into a column, where a flex-basis with grow:1 sizes the CROSS
+     axis (height) — that was the 240px-tall "giant empty subject panel".
+     The horizontal grow is desktop-only (see the min-861 rule below). */
+  flex: 0 1 auto;
   max-width: 460px;
+}
+@media (min-width: 861px) {
+  /* Desktop/tablet-landscape toolbar is a ROW: grow the filter up to the
+     460px cap exactly as before. */
+  .planner-filter { flex: 1 1 240px; }
 }
 .planner-filter-label {
   flex: 0 0 auto;
@@ -7384,3 +7398,153 @@ body > .task-menu button { min-height: 40px; }
 html, body { min-width: 0; max-width: 100%; }
 img, svg, video, canvas { max-width: 100%; height: auto; }
 
+
+/* ══════════════════════════════════════════════════════════════════════
+   v34 · MOBILE PLANNER COMPACTNESS (phone-only, ≤860px)
+   ──────────────────────────────────────────────────────────────────────
+   Two defects, both measured in a real phone viewport (390×844):
+
+   1. The Subject filter rendered as a ~240px-tall empty panel. Root cause
+      was a desktop rule (`flex: 1 1 240px` on `.planner-filter`, v33)
+      becoming a HEIGHT once v30 stacked the toolbar into a column on
+      phones. The grow is desktop-only now; this layer also pins the
+      filter to content height so no inherited min-height/grid row can
+      re-inflate it.
+
+   2. Task cards were dense and collided: long descriptions painted a 3rd
+      (up to 4th) line over the meta row (clamp without overflow:hidden,
+      fixed at the base rule above), the Lesson-brief verb owned a full
+      row per card, and curriculum unit/difficulty crowded the meta row.
+      Now: 2-line clamped brief, secondary curriculum metadata steps aside
+      on phones (it lives inside the Lesson brief), and the brief verb
+      joins the same wrapping action flow as the clock/done/more controls.
+
+   Geometry/presentation only. Desktop (≥861px) is untouched, and nothing
+   here removes functionality: the subject dropdown and lesson brief keep
+   all of their behaviour.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* ── Subject filter: as tall as its control, nothing more ───────────── */
+@media (max-width: 860px) {
+  .planner-toolbar {
+    min-height: 0;
+    align-items: stretch;
+  }
+  .planner-filter {
+    /* Content height only: kill every inherited grow / stretch / fixed
+       row that inflated this label on phones (flex-basis, min-height,
+       grid implicit rows). */
+    flex: 0 0 auto;
+    align-self: stretch;
+    height: auto;
+    min-height: 0;
+    grid-template-rows: auto;
+    /* One compact form row: the control's 44px touch height + a hair of
+       padding, instead of a card-sized panel. */
+    gap: 7px;
+    padding: 5px 7px 5px 8px;
+  }
+  .planner-filter-label {
+    margin: 0;
+    line-height: 1;
+  }
+  /* The select owns the row width; the button keeps a comfortable tap
+     height but never stretches the panel vertically. */
+  .planner-filter .sp-select {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+}
+
+/* ── Task cards: compact, stacking-safe, natural height on phones ───── */
+@media (max-width: 860px) {
+  .task-card {
+    /* Natural document height — never a borrowed desktop height. */
+    height: auto;
+    max-height: none;
+    overflow: visible;
+  }
+  .task-card-body { gap: 5px; }
+
+  /* The Lesson-brief verb joins the button flow instead of claiming a
+     full-width row of its own on every card; the whole action band wraps
+     as one group when the row cannot fit (controlled wrap, never clipping
+     a label, never painting over the copy). */
+  .task-card .task-card-actions { gap: 7px; }
+  .task-card .task-brief-btn {
+    flex: 0 1 auto;
+    width: auto;
+    min-width: 0;
+    justify-content: center;
+  }
+  .task-card .task-btns {
+    flex: 1 1 auto;
+    min-width: 0;
+    justify-content: flex-end;
+  }
+}
+
+/* Phones: curriculum unit + difficulty are secondary — both are already
+   in the Lesson brief panel, and four meta chips + date crowded the row
+   into the description at 320–390px. Date, duration and logged minutes
+   stay. ≤480 so small tablets keep the richer row. */
+@media (max-width: 480px) {
+  .task-card .task-meta-extra { display: none; }
+  .task-card-meta { gap: 4px 12px; row-gap: 4px; }
+  /* Slightly tighter, even rhythm inside the card. */
+  .task-card .task-card-actions {
+    margin-top: 8px;
+    padding-top: 8px;
+  }
+  /* The Lesson-brief verb owns a clean full-width line; the clock/done/
+     more group wraps as a band below. */
+  .task-card .task-brief-btn {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+}
+
+/* Very narrow phones: the brief verb stays on top and the verb group
+   takes the whole next row. */
+@media (max-width: 360px) {
+  .task-card .task-brief-btn { order: 1; }
+  .task-card .task-btns { order: 2; flex: 1 1 100%; width: 100%; }
+}
+/* 320-class screens: an earlier mobile layer (`.task-btns .btn { flex:
+   1 1 100% }`) forced every verb to full width, which stacked Clock in /
+   Undo and stranded the ⋮ on a lone row. Keep the three idle verbs on
+   ONE row (they are short); only the Lesson-brief verb owns a line. */
+@media (max-width: 320px) {
+  .task-card .task-btns { flex-wrap: nowrap; gap: 6px; }
+  .task-card .task-btns .btn {
+    flex: 1 1 0;
+    min-width: 0;
+    padding-inline: 8px;
+    font-size: .72rem;
+  }
+  .task-card .task-btns .task-more {
+    flex: 0 0 38px;
+    width: 38px;
+    min-width: 38px;
+  }
+  /* Live row carries FOUR verbs (Pause · Clock out · Undo · ⋮) and cannot
+     share one line at 320 without clipping a label to "Und…". Let the
+     clock pair own the first wrapped line, Undo + ⋮ the second. */
+  .task-card.is-live .task-btns { flex-wrap: wrap; row-gap: 7px; }
+  .task-card.is-live .task-clock-group {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+  .task-card.is-live .task-clock-group .task-clock {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .task-card.is-live .task-btns > .task-primary { flex: 1 1 auto; }
+  /* Keep the day badge on the date's row instead of stacking it above
+     the title (the old column rule wasted a whole row on a 320px screen);
+     a Completed flag still wraps to its own line via flex-wrap. */
+  .planner-day .day-head { flex-direction: row; align-items: flex-start; }
+  .planner-day .planner-day-badge { width: 28px; height: 28px; }
+  .planner-day .planner-day-badge svg { width: 13px; height: 13px; }
+}
