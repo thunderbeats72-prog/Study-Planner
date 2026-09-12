@@ -158,9 +158,7 @@ body.theme-dark,body.theme-obsidian,body.theme-nebula{
 /* ---------------- Dashboard hierarchy ---------------- */
 .kpi-grid{gap:12px;margin-bottom:16px}
 .kpi-card{min-height:132px;padding:18px 20px;border-radius:18px}
-.kpi-label{font-size:.65rem}
 .kpi-value{margin-top:5px}
-.kpi-sub{font-size:.7rem;margin-top:7px}
 .dash-card{padding:20px;border-radius:20px}
 .planner-days .day-block{border-radius:20px}
 .planner-days .day-head{padding:15px 18px 13px}
@@ -183,8 +181,6 @@ body.theme-dark,body.theme-obsidian,body.theme-nebula{
   .page-subtitle{font-size:.76rem}
   .kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
   .kpi-card{min-height:100px;padding:14px;border-radius:16px}
-  .kpi-value{font-size:1.5rem}
-  .kpi-sub{font-size:.64rem}
   .dash-card{padding:15px;border-radius:17px}
   .up-next{padding:14px;border-radius:17px}
   .planner-days .day-block{border-radius:17px}
@@ -197,14 +193,11 @@ body.theme-dark,body.theme-obsidian,body.theme-nebula{
 @media(max-width:479px){
   .kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
   .kpi-card{padding:12px;min-height:92px}
-  .kpi-label{font-size:.56rem;letter-spacing:.05em}
-  .kpi-sub{font-size:.6rem;line-height:1.35}
 }
 
 @media(max-width:360px){
   .kpi-grid{grid-template-columns:1fr 1fr;gap:7px}
   .kpi-card{padding:10px}
-  .kpi-value{font-size:1.22rem}
   .nav-item{font-size:.6rem}
 }
 
@@ -309,8 +302,6 @@ body { background-attachment:fixed; color:var(--text-main); }
 .kpi-grid { gap:14px; margin-bottom:16px; }
 .kpi-card { min-height:138px; padding:19px 20px; border-radius:20px; overflow:hidden; position:relative; }
 .kpi-card::after { content:""; position:absolute; width:80px; height:80px; right:-30px; top:-30px; border-radius:50%; background:var(--accent-glow); }
-.kpi-label { font-size:.65rem; letter-spacing:.09em; }
-.kpi-value { font-size:clamp(1.65rem,2vw,2.25rem); }
 .dash-card,.day-block { padding:20px; border-radius:var(--radius-card); }
 .planner-days .day-block { padding:0; overflow:hidden; }
 .planner-days .day-head { padding:17px 19px 13px; margin:0; background:linear-gradient(100deg,color-mix(in srgb,var(--accent) 7%,var(--surface)),var(--surface)); }
@@ -348,9 +339,6 @@ body { background-attachment:fixed; color:var(--text-main); }
   .page-subtitle { font-size:.76rem; }
   .kpi-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
   .kpi-card { min-height:98px; padding:12px; }
-  .kpi-label { font-size:.56rem; }
-  .kpi-value { font-size:1.45rem; }
-  .kpi-sub { font-size:.62rem; line-height:1.35; }
   .task-row { padding:11px; }
   .planner-tools,.day-head,.tracker-bar { gap:8px; }
   .btn { min-height:42px; }
@@ -358,7 +346,6 @@ body { background-attachment:fixed; color:var(--text-main); }
 @media (max-width:375px) {
   .app-wrapper { padding-left:8px; padding-right:8px; }
   .kpi-card { padding:10px; }
-  .kpi-value { font-size:1.28rem; }
   .nav-item { padding-inline:3px; }
 }
 @media (prefers-reduced-motion:reduce) {
@@ -447,9 +434,6 @@ body { background-attachment:fixed; color:var(--text-main); }
   .kpi-grid { grid-template-columns:repeat(2,minmax(0,1fr)) !important; gap:10px !important; margin-bottom:14px !important; }
   .kpi-card { min-width:0 !important; min-height:112px !important; padding:15px !important; border-radius:18px !important; }
   .kpi-card::after { width:64px; height:64px; }
-  .kpi-label { font-size:.58rem !important; letter-spacing:.075em !important; }
-  .kpi-value { font-size:1.55rem !important; }
-  .kpi-sub { font-size:.64rem !important; overflow-wrap:anywhere; }
   .dash-card,.day-block,.section-card,.study-clock-panel,.timer-panel { min-width:0 !important; border-radius:20px !important; }
   .dash-card { padding:16px !important; }
 
@@ -488,7 +472,6 @@ body { background-attachment:fixed; color:var(--text-main); }
   .tracker-bar { padding:12px !important; }
   .tracker-bar .tracker-actions .btn,.tracker-bar .tracker-actions .tracker-zen { padding-inline:8px !important; font-size:.7rem !important; }
   .kpi-card { padding:12px !important; }
-  .kpi-value { font-size:1.4rem !important; }
   .sidebar { inset-inline:7px !important; }
 }
 
@@ -645,9 +628,6 @@ body {
 }
 /* (v25) the -.035em tracking that used to sit here is exactly the blanket squeeze
    this pass removes; size, leading and tracking now come from the ramp above. */
-.page-title {
-  color: var(--text-main);
-}
 /* Remove the shimmering gradient text pass on page titles — clean ink. */
 .page-title, .shimmer-text {
   background-image: none !important;
@@ -941,13 +921,10 @@ body {
   display: inline-flex; align-items: center; justify-content: center;
   margin-bottom: 12px;
 }
-.kpi-label { font-size: .68rem; letter-spacing: .09em; }
-.kpi-value { font-size: 1.85rem; font-weight: 780; letter-spacing: -.03em; }
 .kpi-sub { font-weight: 600; }
 @media (max-width: 430px) {
   .kpi-card { padding: 14px; }
   .kpi-icon { width: 32px; height: 32px; border-radius: 10px; margin-bottom: 8px; }
-  .kpi-value { font-size: 1.5rem; }
 }
 
 /* Mini calendar */
@@ -4219,8 +4196,8 @@ body.theme-sunset {
   font-size: var(--fs-xs); font-weight: 600; line-height: 1.5; color: var(--text-muted);
   margin: 3px 0 0; max-width: 64ch; text-wrap: pretty;
 }
-.section-title { font-size: var(--fs-h3); font-weight: 780; line-height: 1.24;
-  letter-spacing: -.014em; text-wrap: balance; }
+.section-title { font-size: var(--fs-h3); font-weight: 800; line-height: 1.22;
+  letter-spacing: -.014em; color: var(--text-main); text-wrap: balance; }
 .card-eyebrow {
   font-size: .64rem; font-weight: 800; letter-spacing: .16em; text-transform: uppercase;
   color: var(--accent); margin: 0 0 3px;
@@ -6475,9 +6452,6 @@ body.focus-live .tracker-bar {
   /* KPI grid stays 2-up but tighter. */
   .kpi-grid { gap: 10px; margin-bottom: 14px; }
   .kpi-card { min-height: 104px; padding: 14px; border-radius: 16px; }
-  .kpi-label { font-size: .6rem; letter-spacing: .07em; }
-  .kpi-value { font-size: 1.5rem; letter-spacing: -.02em; }
-  .kpi-sub { font-size: .64rem; line-height: 1.4; }
 
   /* Cards round more gently. */
   .glass-panel, .section-card, .dash-card, .day-block,
@@ -6516,8 +6490,6 @@ body.focus-live .tracker-bar {
 @media (max-width: 480px) {
   .kpi-card { padding: 12px; min-height: 96px; }
   .kpi-icon { width: 28px; height: 28px; border-radius: 9px; margin-bottom: 8px; }
-  .kpi-value { font-size: 1.35rem; }
-  .kpi-sub { font-size: .62rem; }
   .dash-hero { padding: 18px 16px; }
   .dash-hero-title { font-size: 1.18rem; }
   .dash-hero-actions .btn { min-height: 42px; padding: 0 14px; font-size: .82rem; }
@@ -6530,8 +6502,6 @@ body.focus-live .tracker-bar {
   .app-wrapper { padding-left: 8px; padding-right: 8px; }
   .kpi-grid { gap: 8px; }
   .kpi-card { padding: 11px; min-height: 90px; }
-  .kpi-value { font-size: 1.25rem; }
-  .kpi-sub { font-size: .6rem; }
   .dash-hero { padding: 16px 14px; }
   .dash-hero-title { font-size: 1.1rem; }
   .dash-hero-actions .btn { font-size: .78rem; padding: 0 12px; }
@@ -7441,17 +7411,11 @@ body > .task-menu button { min-height: 40px; }
 }
 
 /* ── 2 · GLOBAL TYPOGRAPHY HIERARCHY — one ramp, no per-page drift ──
-   Families/weights stay in globals.css; sizes here are the *only* sizes.
-   clamp() gives a fluid step; tracking/leading come from the same ramp so
-   a heading cannot be one voice on Overview and another on Planner. */
+   Sizes live ONLY in the `:root` ramp in globals.css and are READ here
+   exactly once per role — never re-clamped, never re-tuned per breakpoint.
+   Family/weight/leading/tracking stay in globals.css; wrapping here. */
 .page-stack .page-title,
 .page-title {
-  font-family: var(--font-display);
-  font-weight: 800;
-  font-size: clamp(1.35rem, 1rem + 1.1vw, 1.85rem);
-  line-height: 1.12;
-  letter-spacing: -.025em;
-  color: var(--text-main);
   text-wrap: balance;
   overflow-wrap: anywhere;
 }
@@ -7464,24 +7428,8 @@ body > .task-menu button { min-height: 40px; }
   text-wrap: pretty;
   overflow-wrap: anywhere;
 }
-.section-title,
-.card-title {
-  font-size: var(--fs-h3);
-  font-weight: 800;
-  line-height: 1.22;
-  letter-spacing: -.014em;
-  color: var(--text-main);
-  text-wrap: balance;
-}
-.card-sub {
-  font-size: var(--fs-xs);
-  font-weight: 600;
-  line-height: 1.5;
-  color: var(--text-muted);
-  text-wrap: pretty;
-}
 .kpi-label {
-  font-size: .62rem;
+  font-size: var(--fs-micro);
   font-weight: 800;
   letter-spacing: .08em;
   text-transform: uppercase;
@@ -7489,20 +7437,11 @@ body > .task-menu button { min-height: 40px; }
   line-height: 1.2;
 }
 .kpi-value {
-  font-size: clamp(1.45rem, 1.1rem + 1.2vw, 1.85rem);
   font-weight: 800;
   letter-spacing: -.02em;
   line-height: 1;
   font-variant-numeric: tabular-nums;
   color: var(--text-main);
-}
-@media (max-width: 860px) {
-  .page-stack .page-title, .page-title { font-size: clamp(1.2rem, 4.2vw, 1.45rem); }
-  .page-subtitle { font-size: .82rem; }
-  .kpi-value { font-size: clamp(1.25rem, 4vw, 1.5rem); }
-}
-@media (max-width: 390px) {
-  .page-stack .page-title, .page-title { font-size: 1.18rem; }
 }
 
 /* ── 3 · ALIGNMENT — one gutter, one rhythm ────────────────────────── */
@@ -7824,7 +7763,6 @@ body > .task-menu button { min-height: 40px; }
 /* 390 — tight mainstream phone: subject filter compact, task actions wrap. */
 @media (max-width: 390px) {
   .app-wrapper { padding-left: 10px !important; padding-right: 10px !important; }
-  .page-title { font-size: 1.18rem; }
   .planner-filter { padding: 5px 7px; gap: 6px; }
   .planner-filter-label { font-size: .58rem; gap: 4px; }
   .planner-day { padding: 10px; gap: 8px; }
@@ -7838,8 +7776,6 @@ body > .task-menu button { min-height: 40px; }
   .app-wrapper { padding-left: 8px !important; padding-right: 8px !important; }
   .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 7px !important; }
   .kpi-card { padding: 10px; min-height: 90px; }
-  .kpi-value { font-size: 1.22rem; }
-  .kpi-label { font-size: .56rem; }
   .planner-toolbar .seg-btn { font-size: .76rem; padding: 0 8px; }
   .planner-filter { gap: 6px; }
   .task-card { padding: 10px 10px 11px 0; }

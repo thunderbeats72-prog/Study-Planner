@@ -77,8 +77,8 @@
      Icons are sized from the same ramp as the text beside them, so an icon
      can never be "a bit big" or "a bit high" relative to its label — the
      gap and the box come from the token, not from the component. */
-  --btn-h:40px;          /* default control height */
-  --btn-h-sm:34px;       /* .btn-sm  */
+  --btn-h:44px;          /* default control height: buttons, selects, seg bar */
+  --btn-h-sm:34px;       /* small-control height (tracker verbs); .btn-sm itself is 32px */
   --btn-h-xs:30px;       /* .btn-xs / dense rows */
   --icon-gap:8px;        /* space between an icon and the word beside it */
   --icon-xs:11px; --icon-sm:13px; --icon-md:15px; --icon-lg:18px;
@@ -201,7 +201,7 @@ body{
    weight and colour stay here; size, leading, tracking and `text-wrap` come
    from the single rule at the type scale. */
 .page-title{
-  font-family:var(--font-display);font-weight:750;margin:0;
+  font-family:var(--font-display);font-weight:800;margin:0;
   color:var(--text-main);
 }
 .page-title .wave-emoji{
@@ -214,11 +214,9 @@ body{
   30%{transform:rotate(14deg)}40%{transform:rotate(-6deg)}
   50%{transform:rotate(10deg)}60%{transform:rotate(0)}
 }
-.page-subtitle{
-  font-size:var(--fs-sm);color:var(--text-muted);font-weight:550;
-  line-height:var(--lh-body);margin:var(--sp-1) 0 0;max-width:62ch;
-  text-wrap:pretty;
-}
+/* `margin` is the only voice this layer keeps — size/weight/leading/colour are
+   read once from the ramp in ui-system.css §32 so the subtitle cannot drift. */
+.page-subtitle{margin:var(--sp-1) 0 0}
 
 /* ============ CONTROLS ============ */
 .btn{display:inline-flex;align-items:center;justify-content:center;text-align:center;line-height:1.2;vertical-align:middle;box-sizing:border-box;gap:var(--icon-gap);min-height:var(--btn-h);padding:8px 16px;border-radius:var(--radius-md);font-size:.85rem;font-weight:600;cursor:pointer;border:1px solid transparent;transition:transform .14s var(--spring-soft),box-shadow .16s ease,background .14s ease,border-color .14s ease,color .14s ease;font-family:inherit;white-space:nowrap;letter-spacing:-.1px}
@@ -248,9 +246,7 @@ select.input-field{appearance:none;background-image:linear-gradient(45deg,transp
 /* ============ KPI / DASHBOARD ============ */
 .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:16px;margin-bottom:18px}
 .kpi-card{padding:24px}
-.kpi-label{font-size:.7rem;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted)}
-.kpi-value{font-size:2rem;font-weight:800;letter-spacing:-1.2px;margin-top:8px;line-height:1}
-.kpi-sub{font-size:.76rem;color:var(--text-muted);font-weight:600;margin-top:8px}
+/* KPI type is owned once: label in ui-system.css §32, value by `--fs-kpi`. */
 .dash-card{padding:24px}
 .bar-track{height:8px;border-radius:99px;background:var(--row-bg);overflow:hidden}
 .bar-fill{height:100%;border-radius:99px;background:var(--accent-gradient);transition:width .6s cubic-bezier(.22,1,.36,1)}
@@ -742,8 +738,6 @@ body.theme-dark .tracker-bar,body.theme-obsidian .tracker-bar,body.theme-nebula 
 }
 .kpi-value {
   font-family: var(--font-display);
-  letter-spacing: -1.2px;
-  font-variant-numeric: tabular-nums;
 }
 /* Smooth cross-fade when switching themes */
 body { transition: background-color .5s ease, color .3s ease; }
@@ -1055,7 +1049,7 @@ body.mode-young .btn{min-height:44px;font-size:.9rem}
 body.mode-young .btn-xs{min-height:34px;font-size:.78rem;padding:5px 14px}
 body.mode-young .nav-item{font-size:.92rem;padding:11px 14px}
 body.mode-young .page-title{font-size:calc(var(--fs-h1) * 1.06)}
-body.mode-young .kpi-value{font-size:2.3rem}
+body.mode-young .kpi-value{font-size:calc(var(--fs-kpi) * 1.06)}
 body.mode-young .chip{font-size:.7rem;padding:4px 12px}
 body.mode-young .lbl{font-size:.74rem;letter-spacing:.6px}
 body.mode-young .cal-cell{min-height:96px}
@@ -1071,7 +1065,7 @@ body.mode-focused .task-sub{font-size:.66rem}
 body.mode-focused .btn{min-height:36px;font-size:.8rem}
 body.mode-focused .btn-xs{min-height:26px;font-size:.7rem}
 body.mode-focused .page-title{font-size:calc(var(--fs-h1) * .94)}
-body.mode-focused .kpi-value{font-size:1.8rem}
+body.mode-focused .kpi-value{font-size:calc(var(--fs-kpi) * .94)}
 body.mode-focused .day-block{padding:13px 15px;margin-bottom:10px}
 body.mode-focused .glass-panel{border-radius:var(--radius-lg)}
 /* Focused mode: entrance choreography off — instant, professional */
@@ -1210,7 +1204,6 @@ img,svg,video,canvas{max-width:100%;height:auto}
 /* 5. Small phones (<=360px): SE, older Androids */
 @media(max-width:360px){
   .kpi-grid{grid-template-columns:1fr 1fr;gap:8px}
-  .kpi-value{font-size:1.35rem}
   .chip{font-size:.56rem;padding:2px 7px}
 }
 
@@ -1877,7 +1870,6 @@ body.mode-focused::before{opacity:.4}
 
 /* ═══ DASHBOARD PREMIUM REFINEMENT ═══ */
 .kpi-card{background:linear-gradient(180deg,var(--surface) 0%,var(--surface) 88%,var(--row-bg) 100%)}
-.kpi-label{font-size:.66rem;letter-spacing:.9px}
 .dash-grid-2 .glass-panel{overflow:hidden}
 /* Section headers: consistent editorial treatment */
 .day-head h3,.glass-panel > h3{letter-spacing:-.2px}
@@ -1900,7 +1892,6 @@ body.mode-focused::before{opacity:.4}
 @media(max-width:640px){
   html{font-size:15px}                       /* global 6% type scale-down */
   .kpi-card{padding:12px;min-height:88px}
-  .kpi-label{font-size:.58rem;letter-spacing:.7px}
   .kpi-grid{gap:8px;margin-bottom:12px}
   .glass-panel{border-radius:var(--radius-md)}
   .day-block{padding:12px 11px;margin-bottom:9px}
@@ -2200,7 +2191,6 @@ button,a,.nav-item,.vtab,.cal-cell,.chip,.task-row,.rate-btn,input,select{touch-
 @media(max-width:340px){
   .kpi-grid{grid-template-columns:1fr 1fr;gap:6px}
   .kpi-card{padding:10px;min-height:74px}
-  .kpi-value{font-size:1.25rem}
   .page-header{gap:8px}
   .task-row{padding:10px}
   .tracker-bar{padding:8px 10px;gap:6px}
@@ -2900,10 +2890,10 @@ svg{flex-shrink:0;vertical-align:middle}
   --fs-sm:clamp(.8rem,.76rem + .2vw,.9rem);
   --fs-md:clamp(.9rem,.85rem + .25vw,1.02rem);
   --fs-lg:clamp(1.02rem,.95rem + .34vw,1.22rem);
-  --fs-h1:clamp(1.32rem,1rem + 1.55vw,2.25rem);
+  --fs-h1:clamp(1.2rem,1rem + 1.1vw,1.85rem);
   --fs-h2:clamp(1.06rem,.96rem + .48vw,1.4rem);
   --fs-h3:clamp(.92rem,.86rem + .28vw,1.1rem);
-  --fs-kpi:clamp(1.5rem,1.25rem + 1.1vw,2.3rem);
+  --fs-kpi:clamp(1.45rem,1.1rem + 1.2vw,1.85rem);
   /* A number that lives INSIDE a card (a subject's %, a hero clock) — louder
      than body, quieter than a page KPI. Subjects/Dashboard/Settings were each
      hardcoding this as 26px / 22px / 17px, which is how the same idea ended up
@@ -2942,18 +2932,16 @@ svg{flex-shrink:0;vertical-align:middle}
 
 .page-title{
   font-size:var(--fs-h1);
-  line-height:1.08;
-  letter-spacing:-.022em;      /* optical correction, not a blanket squeeze */
+  line-height:1.12;
+  letter-spacing:-.025em;      /* optical correction, not a blanket squeeze */
   word-spacing:.012em;
   text-wrap:balance;
 }
 h1{letter-spacing:-.02em}
 h2, .dash-hero-title{font-size:var(--fs-h2);line-height:1.18;letter-spacing:-.016em;text-wrap:balance}
 h3{font-size:var(--fs-h3);line-height:1.25;letter-spacing:-.01em;text-wrap:balance}
-.page-subtitle{font-size:var(--fs-sm)}
 .lbl{font-size:var(--fs-micro)}
-.kpi-label{font-size:var(--fs-micro);letter-spacing:.09em}
-.kpi-value{font-size:var(--fs-kpi);line-height:1.1;letter-spacing:-.018em;font-feature-settings:"tnum" 1}
+.kpi-value{font-size:var(--fs-kpi)}
 .kpi-sub{font-size:var(--fs-chip)}
 .day-date{font-size:var(--fs-md);font-weight:750}
 .day-meta{font-size:var(--fs-chip)}
@@ -4267,13 +4255,7 @@ body.theme-mint,body.theme-sunset,body.theme-silver-lavender,body.theme-default{
 /* Leaf-card containers: type and gutters follow the card's own width. */
 .kpi-card,.day-block,.section-card,.dash-card{container:card / inline-size}
 @container card (max-width:150px){
-  .kpi-value{font-size:1.3rem}
-  .kpi-label{letter-spacing:.06em}
   .kpi-card .bar-track{margin-top:4px}
-}
-@container card (max-width:120px){
-  .kpi-value{font-size:1.15rem}
-  .kpi-sub{font-size:.62rem}
 }
 @container card (min-width:420px){
   .day-head{margin-bottom:var(--sp-3)}
