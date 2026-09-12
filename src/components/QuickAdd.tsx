@@ -81,7 +81,7 @@ export default function QuickAdd({
   return (
     <div className="quick-add">
       {!open ? (
-        <button type="button" className="btn btn-secondary btn-sm quick-add-toggle" onClick={openTray}>
+        <button type="button" className="btn btn-secondary quick-add-toggle" onClick={openTray}>
           <IconPlus size={13} /> Add task
         </button>
       ) : (
