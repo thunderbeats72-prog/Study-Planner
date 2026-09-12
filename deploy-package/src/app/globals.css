@@ -535,6 +535,29 @@ body.theme-dark .ai-msg.bot,body.theme-obsidian .ai-msg.bot,body.theme-nebula .a
 .ai-quick button{font-size:.7rem;font-weight:600;border-radius:99px;background:transparent;border:1px solid var(--glass-border);color:var(--text-muted);cursor:pointer;font-family:inherit;transition:background .15s ease,color .15s ease,border-color .15s ease}
 .ai-quick button:hover{background:var(--color-ai-soft);color:var(--color-ai);border-color:rgba(var(--ai-rgb),.35)}
 body.theme-dark .ai-quick button:hover,body.theme-obsidian .ai-quick button:hover,body.theme-nebula .ai-quick button:hover{background:rgba(var(--ai-rgb),.14)}
+/* ── "Connect AI" strip: shown only when no cloud provider is reachable,
+   so "the AI isn't working" turns into one visible, one-tap fix. ── */
+.ai-connect{
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  padding:9px 12px;background:var(--surface);
+  border-top:1px solid var(--glass-border);
+}
+.ai-connect-text{
+  flex:1 1 190px;min-width:0;font-size:.72rem;line-height:1.45;font-weight:500;
+  color:var(--text-muted);
+}
+.ai-connect-text strong{color:var(--text-main);font-weight:700}
+.ai-connect-btn{
+  flex-shrink:0;display:inline-flex;align-items:center;gap:5px;
+  font-size:.7rem;font-weight:700;font-family:inherit;cursor:pointer;
+  padding:6px 12px;border-radius:99px;
+  background:var(--color-ai-soft);color:var(--color-ai);
+  border:1px solid rgba(var(--ai-rgb),.35);
+  transition:background .15s ease,transform .15s ease;
+}
+.ai-connect-btn:hover{background:rgba(var(--ai-rgb),.18)}
+.ai-connect-btn:active{transform:scale(.96)}
+body.theme-dark .ai-connect-btn,body.theme-obsidian .ai-connect-btn,body.theme-nebula .ai-connect-btn{background:rgba(var(--ai-rgb),.14)}
 @keyframes blink{0%,80%,100%{opacity:.25}40%{opacity:1}}
 
 /* ============ TRACKER BAR ============ */

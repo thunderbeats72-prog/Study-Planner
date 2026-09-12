@@ -1,5 +1,7 @@
 "use client";
 
+import { byokHeader } from "./byok";
+
 export type UserRow = {
   id: number;
   userKey: string;
@@ -234,6 +236,14 @@ export async function api<T>(
 
   const headers = new Headers(init.headers);
   headers.set("x-user-key", userKey());
+  // Bring-your-own AI keys (Settings → AI coach). Sent only to this
+  // deployment over the same origin, never persisted server-side.
+  try {
+    const aiKeys = byokHeader();
+    if (aiKeys && aiKeys !== "{}") headers.set("x-ai-keys", aiKeys);
+  } catch {
+    /* storage blocked — server falls back to its own env configuration */
+  }
   const localNow = new Date();
   headers.set(
     "x-local-date",

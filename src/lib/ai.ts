@@ -54,7 +54,7 @@ function envValue(...names: string[]): string | null {
 }
 
 type ChatMsg = { role: "user" | "assistant"; content: string };
-type ProviderId =
+export type ProviderId =
   | "cerebras"
   | "groq"
   | "mistral"
@@ -362,9 +362,63 @@ const DEFAULT_PROVIDER_ORDER: ProviderId[] = [
   "cerebras", "groq", "mistral", "sambanova", "cohere", "gemini", "openrouter",
 ];
 
-function providerKeys(): Record<ProviderId, string | null> {
+/* ── Runtime (bring-your-own) keys ─────────────────────────────
+   Deployment env vars are the normal way to configure SHIGUN, but a
+   deployment with no key used to be *permanently* stuck in local mode:
+   the cloud chain never ran, every open question fell through to the
+   small on-device engine, and the learner saw "AI is not working" with
+   no way to fix it short of a redeploy.
+
+   `RuntimeProviderKeys` are supplied per-request by the browser (pasted
+   in Settings → AI coach, kept in localStorage, sent on the
+   `x-ai-keys` header). They override env vars for that single request
+   and are never persisted, logged or echoed back. */
+export type RuntimeProviderKeys = Partial<Record<ProviderId, string>>;
+
+/** Strip paste padding, drop control characters, reject absurd lengths. */
+function cleanRuntimeKey(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const cleaned = value
+    .replace(/^[\s"'`]+|[\s"'`]+$/g, "")
+    .replace(/[\r\n\t\0]/g, "")
+    .trim();
+  if (!cleaned || cleaned.length > 400) return null;
+  return cleaned;
+}
+
+/** Parse the `x-ai-keys` request header into per-provider runtime keys. */
+export function parseRuntimeKeys(raw: string | null | undefined): RuntimeProviderKeys {
+  const out: RuntimeProviderKeys = {};
+  if (!raw) return out;
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object") return out;
+    for (const id of DEFAULT_PROVIDER_ORDER) {
+      const key = cleanRuntimeKey((parsed as Record<string, unknown>)[id]);
+      if (key) out[id] = key;
+    }
+  } catch {
+    /* Header is absent or not JSON — fall back to env-only configuration. */
+  }
+  return out;
+}
+
+/** True when the caller supplied at least one usable runtime key. */
+export function hasRuntimeKeys(keys: RuntimeProviderKeys | undefined): boolean {
+  return !!keys && Object.keys(keys).length > 0;
+}
+
+function providerKeys(runtime?: RuntimeProviderKeys): Record<ProviderId, string | null> {
   const keys = {} as Record<ProviderId, string | null>;
   for (const id of DEFAULT_PROVIDER_ORDER) keys[id] = PROVIDERS[id].keyEnv();
+  // Runtime keys win over env keys: the learner pasted them deliberately
+  // and expects them to be used immediately.
+  if (runtime) {
+    for (const id of DEFAULT_PROVIDER_ORDER) {
+      const key = cleanRuntimeKey(runtime[id]);
+      if (key) keys[id] = key;
+    }
+  }
   return keys;
 }
 
@@ -380,8 +434,8 @@ function requestedProviderOrder(): ProviderId[] {
   return wanted.length ? [...new Set(wanted)] : DEFAULT_PROVIDER_ORDER;
 }
 
-function configuredProviderIds(): ProviderId[] {
-  const keys = providerKeys();
+function configuredProviderIds(runtime?: RuntimeProviderKeys): ProviderId[] {
+  const keys = providerKeys(runtime);
   const order = requestedProviderOrder().filter((id) => keys[id]);
   // Anything configured but missing from a partial custom order is still
   // appended, so a typo can never silently disable a working provider.
@@ -392,12 +446,12 @@ function configuredProviderIds(): ProviderId[] {
   return order;
 }
 
-export function configuredProviders(): string[] {
-  return configuredProviderIds().map((id) => PROVIDERS[id].label);
+export function configuredProviders(runtime?: RuntimeProviderKeys): string[] {
+  return configuredProviderIds(runtime).map((id) => PROVIDERS[id].label);
 }
 
-export function activeProvider(): string | null {
-  return configuredProviders()[0] || null;
+export function activeProvider(runtime?: RuntimeProviderKeys): string | null {
+  return configuredProviders(runtime)[0] || null;
 }
 
 export function llmHealthSnapshot(): LlmHealth {
@@ -480,7 +534,11 @@ function llmDeadline(): number {
 /* ============================================================
    LLM CALLER — one bounded budget across the provider chain
 ============================================================ */
-export type LlmCallOptions = { temperature?: number };
+export type LlmCallOptions = {
+  temperature?: number;
+  /** Per-request bring-your-own keys (Settings → AI coach). */
+  keys?: RuntimeProviderKeys;
+};
 
 export async function callLLMDetailed(
   system: string,
@@ -488,8 +546,8 @@ export async function callLLMDetailed(
   maxTokens = 2500,
   options: LlmCallOptions = {}
 ): Promise<LlmResult> {
-  const keys = providerKeys();
-  const providers = configuredProviderIds();
+  const keys = providerKeys(options.keys);
+  const providers = configuredProviderIds(options.keys);
   const attempts: LlmAttempt[] = [];
   const deadline = llmDeadline();
   const safeSystem = String(system || "").slice(0, 48_000);
@@ -612,8 +670,8 @@ export async function callLLM(
    Connectivity. One tiny real request per configured provider:
    the ONLY way to know whether the deployed keys actually work.
 ============================================================ */
-export async function probeProviders(): Promise<ProviderProbe[]> {
-  const keys = providerKeys();
+export async function probeProviders(runtime?: RuntimeProviderKeys): Promise<ProviderProbe[]> {
+  const keys = providerKeys(runtime);
   const ids = DEFAULT_PROVIDER_ORDER;
 
   return Promise.all(ids.map(async (id): Promise<ProviderProbe> => {
@@ -1670,10 +1728,202 @@ export function instantTutorReply(q: string, ctx: TutorContext): TutorReply | nu
   return null;
 }
 
+/* ── Greetings, small talk and "what can you do?" ───────────────
+   These are answered on-device from the learner's live plan in EVERY
+   case, including a deployment with no cloud key. They used to fall
+   through to the "I'm in local mode" line, which is precisely what
+   made the coach look broken — a learner who typed "hi" and got a
+   mode message concluded the AI was down. */
+type GreetPhrases = {
+  hello: (name: string, next: string | null) => string;
+  howAreYou: (next: string | null) => string;
+  thanks: string;
+  who: string;
+  help: string;
+};
+
+const GREET_I18N: Record<string, GreetPhrases> = {
+  en: {
+    hello: (name, next) =>
+      `Hey ${name}! ${next
+        ? `**${next}** is up next in today's plan.`
+        : "Nothing is pending on today's plan."} Ask me anything — *“what should I study today?”*, *“explain [a topic]”*, or *“give me practice questions”*.`,
+    howAreYou: (next) =>
+      next
+        ? `Ready when you are. Your next session is **${next}** — say **start timer** and I'll log it for you.`
+        : "Ready when you are. Nothing is pending today, so this is a good moment for a short recall session.",
+    thanks: "Anytime. Want me to line up the next step?",
+    who:
+      "I'm **SHIGUN**, your AI study coach inside Study Planner Pro. I plan your day, teach any topic, generate practice questions, track your pace and streak, and run the study clock for you. Try *“what should I study today?”*.",
+    help:
+      "Here's what I can do:\n\n- **Plan** — *“what should I study today?”*, *“I'm behind — replan”*\n- **Teach** — *“explain [a topic] in detail”*\n- **Test** — *“give me practice questions”*\n- **Track** — *“how am I doing?”*, *“what's my weakest subject?”*\n- **Control** — *“start timer”*, *“take a break”*, *“switch to dark mode”*\n\nWhat would you like first?",
+  },
+  hi: {
+    hello: (name, next) =>
+      `नमस्ते ${name}! ${next
+        ? `आज की योजना में अगला पाठ **${next}** है।`
+        : "आज के लिए कुछ बाकी नहीं है।"} कुछ भी पूछें — *“आज क्या पढ़ूँ?”*, *“[विषय] समझाओ”*, या *“अभ्यास प्रश्न दो”*।`,
+    howAreYou: (next) =>
+      next
+        ? `मैं तैयार हूँ। आपका अगला सत्र **${next}** है — **“टाइमर शुरू करो”** कहें, मैं इसे दर्ज कर लूँगा।`
+        : "मैं तैयार हूँ। आज कुछ बाकी नहीं है, इसलिए छोटा रिवीजन सत्र अच्छा रहेगा।",
+    thanks: "कभी भी। अगला कदम बताऊँ?",
+    who:
+      "मैं **SHIGUN** हूँ — Study Planner Pro में आपका AI स्टडी कोच। मैं आपका दिन प्लान करता हूँ, कोई भी विषय समझाता हूँ, अभ्यास प्रश्न बनाता हूँ, आपकी गति और स्ट्रीक ट्रैक करता हूँ, और स्टडी क्लॉक चलाता हूँ। *“आज क्या पढ़ूँ?”* पूछकर देखें।",
+    help:
+      "मैं यह सब कर सकता हूँ:\n\n- **योजना** — *“आज क्या पढ़ूँ?”*, *“मैं पीछे हूँ — replan”*\n- **पढ़ाएँ** — *“[विषय] विस्तार से समझाओ”*\n- **परीक्षा** — *“अभ्यास प्रश्न दो”*\n- **ट्रैक** — *“मैं कैसा कर रहा हूँ?”*\n- **नियंत्रण** — *“टाइमर शुरू करो”*, *“ब्रेक”*, *“डार्क मोड”*\n\nपहले क्या चाहिए?",
+  },
+  bn: {
+    hello: (name, next) =>
+      `নমস্কার ${name}! ${next
+        ? `আজকের পরিকল্পনায় পরের পাঠ **${next}**।`
+        : "আজকের জন্য কিছু বাকি নেই।"} যা খুশি জিজ্ঞেস করুন — *“আজ কী পড়ব?”*, *“[বিষয়] বুঝিয়ে দাও”*, বা *“অনুশীলনী প্রশ্ন দাও”*।`,
+    howAreYou: (next) =>
+      next
+        ? `আমি প্রস্তুত। আপনার পরের সেশন **${next}** — **“টাইমার শুরু করো”** বলুন, আমি রেকর্ড করে নেব।`
+        : "আমি প্রস্তুত। আজ কিছু বাকি নেই, তাই ছোট রিভিশন সেশন ভালো হবে।",
+    thanks: "যেকোনো সময়। পরের ধাপ বলব?",
+    who:
+      "আমি **SHIGUN** — Study Planner Pro-এর আপনার AI স্টাডি কোচ। আমি আপনার দিন পরিকল্পনা করি, যেকোনো বিষয় বুঝিয়ে দিই, অনুশীলনী প্রশ্ন তৈরি করি, আপনার গতি ও স্ট্রিক ট্র্যাক করি, এবং স্টাডি ক্লক চালাই। *“আজ কী পড়ব?”* জিজ্ঞেস করে দেখুন।",
+    help:
+      "আমি এগুলো করতে পারি:\n\n- **পরিকল্পনা** — *“আজ কী পড়ব?”*, *“আমি পিছিয়ে আছি — replan”*\n- **পড়ানো** — *“[বিষয়] বিস্তারিত বুঝিয়ে দাও”*\n- **পরীক্ষা** — *“অনুশীলনী প্রশ্ন দাও”*\n- **ট্র্যাক** — *“আমি কেমন করছি?”*\n- **নিয়ন্ত্রণ** — *“টাইমার শুরু করো”*, *“বিরতি”*, *“ডার্ক মোড”*\n\nপ্রথমে কী চাই?",
+  },
+  ta: {
+    hello: (name, next) =>
+      `வணக்கம் ${name}! ${next
+        ? `இன்றைய திட்டத்தில் அடுத்த பாடம் **${next}**।`
+        : "இன்றைக்கு எதுவும் நிலுவையில் இல்லை."} எதுவும் கேளுங்கள் — *“இன்று என்ன படிக்க வேண்டும்?”*, *“[பாடம்] விளக்கு”*, அல்லது *“பயிற்சி கேள்விகள்”*।`,
+    howAreYou: (next) =>
+      next
+        ? `நான் தயார். உங்கள் அடுத்த அமர்வு **${next}** — **“டைமரைத் தொடங்கு”** என்று சொல்லுங்கள், நான் பதிவு செய்கிறேன்.`
+        : "நான் தயார். இன்று எதுவும் நிலுவையில் இல்லை, எனவே சிறிய மறுஆய்வு அமர்வு நல்லது.",
+    thanks: "எப்போதும் வரவேற்கிறேன். அடுத்த படியைச் சொல்லட்டுமா?",
+    who:
+      "நான் **SHIGUN** — Study Planner Pro-ல் உங்கள் AI படிப்பு பயிற்சியாளர். நான் உங்கள் நாளைத் திட்டமிடுவேன், எந்தப் பாடத்தையும் கற்பிப்பேன், பயிற்சிக் கேள்விகள் உருவாக்குவேன், உங்கள் வேகம் மற்றும் ஸ்ட்ரீக்கைக் கண்காணிப்பேன், மற்றும் படிப்பு கடிகாரத்தை இயக்குவேன். *“இன்று என்ன படிக்க வேண்டும்?”* என்று கேளுங்கள்.",
+    help:
+      "நான் இவற்றைச் செய்ய முடியும்:\n\n- **திட்டம்** — *“இன்று என்ன படிக்க வேண்டும்?”*, *“நான் பின்தங்கியுள்ளேன் — replan”*\n- **கற்பித்தல்** — *“[பாடம்] விரிவாக விளக்கு”*\n- **பயிற்சி** — *“பயிற்சிக் கேள்விகள்”*\n- **கண்காணிப்பு** — *“நான் எப்படிச் செய்கிறேன்?”*\n- **கட்டுப்பாடு** — *“டைமரைத் தொடங்கு”*, *“இடைவேளை”*, *“டார்க் மோட்”*\n\nமுதலில் என்ன வேண்டும்?",
+  },
+  te: {
+    hello: (name, next) =>
+      `నమస్కారం ${name}! ${next
+        ? `ఈరోజు ప్లాన్‌లో తదుపరి పాఠం **${next}**।`
+        : "ఈరోజుకి ఏమీ పెండింగ్ లేదు."} ఏదైనా అడగండి — *“ఈరోజు ఏమి చదవాలి?”*, *“[విషయం] వివరించు”*, లేదా *“ప్రాక్టీస్ ప్రశ్నలు”*।`,
+    howAreYou: (next) =>
+      next
+        ? `నేను సిద్ధంగా ఉన్నాను. మీ తదుపరి సెషన్ **${next}** — **“టైమర్ ప్రారంభించు”** అనండి, నేను రికార్డ్ చేస్తాను.`
+        : "నేను సిద్ధంగా ఉన్నాను. ఈరోజు ఏమీ పెండింగ్ లేదు, కాబట్టి చిన్న రివిజన్ సెషన్ మంచిది.",
+    thanks: "ఎప్పుడైనా సరే. తదుపరి అడుగు చెప్పాలా?",
+    who:
+      "నేను **SHIGUN** — Study Planner Pro లో మీ AI స్టడీ కోచ్. నేను మీ రోజును ప్లాన్ చేస్తాను, ఏ విషయాన్నైనా బోధిస్తాను, ప్రాక్టీస్ ప్రశ్నలు తయారు చేస్తాను, మీ వేగం మరియు స్ట్రీక్‌ను ట్రాక్ చేస్తాను, మరియు స్టడీ క్లాక్‌ను నడుపుతాను. *“ఈరోజు ఏమి చదవాలి?”* అని అడగండి.",
+    help:
+      "నేను ఇవి చేయగలను:\n\n- **ప్లాన్** — *“ఈరోజు ఏమి చదవాలి?”*, *“నేను వెనుకబడ్డాను — replan”*\n- **బోధన** — *“[విషయం] వివరంగా వివరించు”*\n- **పరీక్ష** — *“ప్రాక్టీస్ ప్రశ్నలు”*\n- **ట్రాక్** — *“నేను ఎలా చేస్తున్నాను?”*\n- **నియంత్రణ** — *“టైమర్ ప్రారంభించు”*, *“విరామం”*, *“డార్క్ మోడ్”*\n\nమొదట ఏది కావాలి?",
+  },
+  kn: {
+    hello: (name, next) =>
+      `ನಮಸ್ಕಾರ ${name}! ${next
+        ? `ಇಂದಿನ ಯೋಜನೆಯಲ್ಲಿ ಮುಂದಿನ ಪಾಠ **${next}**।`
+        : "ಇಂದಿಗೆ ಏನೂ ಬಾಕಿ ಇಲ್ಲ."} ಏನಾದರೂ ಕೇಳಿ — *“ಇಂದು ಏನು ಓದಲಿ?”*, *“[ವಿಷಯ] ವಿವರಿಸು”*, ಅಥವಾ *“ಅಭ್ಯಾಸ ಪ್ರಶ್ನೆಗಳು”*।`,
+    howAreYou: (next) =>
+      next
+        ? `ನಾನು ಸಿದ್ಧ. ನಿಮ್ಮ ಮುಂದಿನ ಅಧಿವೇಶನ **${next}** — **“ಟೈಮರ್ ಪ್ರಾರಂಭಿಸು”** ಎನ್ನಿ, ನಾನು ದಾಖಲಿಸುತ್ತೇನೆ.`
+        : "ನಾನು ಸಿದ್ಧ. ಇಂದು ಏನೂ ಬಾಕಿ ಇಲ್ಲ, ಆದ್ದರಿಂದ ಸಣ್ಣ ಪುನರಾವರ್ತನೆ ಅಧಿವೇಶನ ಒಳ್ಳೆಯದು.",
+    thanks: "ಯಾವಾಗಲೂ ಸ್ವಾಗತ. ಮುಂದಿನ ಹೆಜ್ಜೆ ಹೇಳಲೇ?",
+    who:
+      "ನಾನು **SHIGUN** — Study Planner Pro ನಲ್ಲಿ ನಿಮ್ಮ AI ಅಧ್ಯಯನ ತರಬೇತುದಾರ. ನಾನು ನಿಮ್ಮ ದಿನವನ್ನು ಯೋಜಿಸುತ್ತೇನೆ, ಯಾವುದೇ ವಿಷಯವನ್ನು ಕಲಿಸುತ್ತೇನೆ, ಅಭ್ಯಾಸ ಪ್ರಶ್ನೆಗಳನ್ನು ರಚಿಸುತ್ತೇನೆ, ನಿಮ್ಮ ವೇಗ ಮತ್ತು ಸ್ಟ್ರೀಕ್ ಅನ್ನು ಟ್ರ್ಯಾಕ್ ಮಾಡುತ್ತೇನೆ, ಮತ್ತು ಅಧ್ಯಯನ ಗಡಿಯಾರವನ್ನು ನಡೆಸುತ್ತೇನೆ. *“ಇಂದು ಏನು ಓದಲಿ?”* ಎಂದು ಕೇಳಿ.",
+    help:
+      "ನಾನು ಇವುಗಳನ್ನು ಮಾಡಬಲ್ಲೆ:\n\n- **ಯೋಜನೆ** — *“ಇಂದು ಏನು ಓದಲಿ?”*, *“ನಾನು ಹಿಂದೆ ಬಿದ್ದಿದ್ದೇನೆ — replan”*\n- **ಕಲಿಸುವುದು** — *“[ವಿಷಯ] ವಿವರವಾಗಿ ವಿವರಿಸು”*\n- **ಪರೀಕ್ಷೆ** — *“ಅಭ್ಯಾಸ ಪ್ರಶ್ನೆಗಳು”*\n- **ಟ್ರ್ಯಾಕ್** — *“ನಾನು ಹೇಗೆ ಮಾಡುತ್ತಿದ್ದೇನೆ?”*\n- **ನಿಯಂತ್ರಣ** — *“ಟೈಮರ್ ಪ್ರಾರಂಭಿಸು”*, *“ವಿರಾಮ”*, *“ಡಾರ್ಕ್ ಮೋಡ್”*\n\nಮೊದಲು ಏನು ಬೇಕು?",
+  },
+  ml: {
+    hello: (name, next) =>
+      `നമസ്കാരം ${name}! ${next
+        ? `ഇന്നത്തെ പ്ലാനിൽ അടുത്ത പാഠം **${next}**।`
+        : "ഇന്ന് ഒന്നും ബാക്കിയില്ല."} എന്തും ചോദിക്കൂ — *“ഇന്ന് എന്ത് പഠിക്കണം?”*, *“[വിഷയം] വിശദീകരിക്കൂ”*, അല്ലെങ്കിൽ *“പരിശീലന ചോദ്യങ്ങൾ”*।`,
+    howAreYou: (next) =>
+      next
+        ? `ഞാൻ തയ്യാറാണ്. നിങ്ങളുടെ അടുത്ത സെഷൻ **${next}** — **“ടൈമർ തുടങ്ങൂ”** എന്ന് പറയൂ, ഞാൻ രേഖപ്പെടുത്താം.`
+        : "ഞാൻ തയ്യാറാണ്. ഇന്ന് ഒന്നും ബാക്കിയില്ല, അതിനാൽ ചെറിയ റിവിഷൻ സെഷൻ നല്ലതാണ്.",
+    thanks: "എപ്പോഴും സന്തോഷം. അടുത്ത ഘട്ടം പറയട്ടെ?",
+    who:
+      "ഞാൻ **SHIGUN** — Study Planner Pro-ൽ നിങ്ങളുടെ AI പഠന പരിശീലകൻ. ഞാൻ നിങ്ങളുടെ ദിവസം ആസൂത്രണം ചെയ്യുന്നു, ഏത് വിഷയവും പഠിപ്പിക്കുന്നു, പരിശീലന ചോദ്യങ്ങൾ ഉണ്ടാക്കുന്നു, നിങ്ങളുടെ വേഗതയും സ്ട്രീക്കും ട്രാക്ക് ചെയ്യുന്നു, പഠന ക്ലോക്ക് പ്രവർത്തിപ്പിക്കുന്നു. *“ഇന്ന് എന്ത് പഠിക്കണം?”* എന്ന് ചോദിക്കൂ.",
+    help:
+      "എനിക്ക് ഇവ ചെയ്യാം:\n\n- **പ്ലാൻ** — *“ഇന്ന് എന്ത് പഠിക്കണം?”*, *“ഞാൻ പിന്നിലാണ് — replan”*\n- **പഠിപ്പിക്കൽ** — *“[വിഷയം] വിശദമായി വിശദീകരിക്കൂ”*\n- **പരീക്ഷ** — *“പരിശീലന ചോദ്യങ്ങൾ”*\n- **ട്രാക്ക്** — *“ഞാൻ എങ്ങനെ ചെയ്യുന്നു?”*\n- **നിയന്ത്രണം** — *“ടൈമർ തുടങ്ങൂ”*, *“ഇടവേള”*, *“ഡാർക്ക് മോഡ്”*\n\nആദ്യം എന്താണ് വേണ്ടത്?",
+  },
+  gu: {
+    hello: (name, next) =>
+      `નમસ્તે ${name}! ${next
+        ? `આજની યોજનામાં આગળનો પાઠ **${next}** છે.`
+        : "આજે કંઈ બાકી નથી."} કંઈ પણ પૂછો — *“આજે શું ભણવું?”*, *“[વિષય] સમજાવો”*, અથવા *“પ્રેક્ટિસ પ્રશ્નો આપો”*।`,
+    howAreYou: (next) =>
+      next
+        ? `હું તૈયાર છું. તમારો આગળનો સત્ર **${next}** છે — **“ટાઈમર શરૂ કરો”** કહો, હું નોંધી લઈશ.`
+        : "હું તૈયાર છું. આજે કંઈ બાકી નથી, તેથી ટૂંકું રિવિઝન સત્ર સારું રહેશે.",
+    thanks: "કોઈ પણ સમયે. આગળનું પગલું કહું?",
+    who:
+      "હું **SHIGUN** છું — Study Planner Pro માં તમારો AI અભ્યાસ કોચ. હું તમારો દિવસ ગોઠવું છું, કોઈ પણ વિષય શીખવું છું, પ્રેક્ટિસ પ્રશ્નો બનાવું છું, તમારી ગતિ અને સ્ટ્રીક ટ્રેક કરું છું, અને અભ્યાસ ઘડિયાળ ચલાવું છું. *“આજે શું ભણવું?”* પૂછીને જુઓ.",
+    help:
+      "હું આ કરી શકું છું:\n\n- **આયોજન** — *“આજે શું ભણવું?”*, *“હું પાછળ છું — replan”*\n- **શીખવું** — *“[વિષય] વિગતે સમજાવો”*\n- **પરીક્ષા** — *“પ્રેક્ટિસ પ્રશ્નો આપો”*\n- **ટ્રેક** — *“હું કેવું કરી રહ્યો છું?”*\n- **નિયંત્રણ** — *“ટાઈમર શરૂ કરો”*, *“વિરામ”*, *“ડાર્ક મોડ”*\n\nપહેલાં શું જોઈએ?",
+  },
+  ur: {
+    hello: (name, next) =>
+      `السلام علیکم ${name}! ${next
+        ? `آج کے منصوبے میں اگلا سبق **${next}** ہے۔`
+        : "آج کے لیے کچھ باقی نہیں ہے۔"} کچھ بھی پوچھیں — *“آج کیا پڑھوں؟”*, *“[موضوع] سمجھائیں”*, یا *“مشقی سوالات دیں”*۔`,
+    howAreYou: (next) =>
+      next
+        ? `میں تیار ہوں۔ آپ کا اگلا سیشن **${next}** ہے — **“ٹائمر شروع کریں”** کہیں، میں ریکارڈ کر لوں گا۔`
+        : "میں تیار ہوں۔ آج کچھ باقی نہیں، اس لیے ایک چھوٹا ریویژن سیشن اچھا رہے گا۔",
+    thanks: "کسی بھی وقت۔ اگلا قدم بتاؤں؟",
+    who:
+      "میں **SHIGUN** ہوں — Study Planner Pro میں آپ کا AI اسٹڈی کوچ۔ میں آپ کا دن ترتیب دیتا ہوں، کوئی بھی موضوع سمجھاتا ہوں، مشقی سوالات بناتا ہوں، آپ کی رفتار اور اسٹریک ٹریک کرتا ہوں، اور اسٹڈی کلاک چلاتا ہوں۔ *“آج کیا پڑھوں؟”* پوچھ کر دیکھیں۔",
+    help:
+      "میں یہ سب کر سکتا ہوں:\n\n- **منصوبہ** — *“آج کیا پڑھوں؟”*, *“میں پیچھے ہوں — replan”*\n- **پڑھانا** — *“[موضوع] تفصیل سے سمجھائیں”*\n- **امتحان** — *“مشقی سوالات دیں”*\n- **ٹریک** — *“میں کیسا کر رہا ہوں؟”*\n- **کنٹرول** — *“ٹائمر شروع کریں”*, *“وقفہ”*, *“ڈارک موڈ”*\n\nپہلے کیا چاہیے؟",
+  },
+  ar: {
+    hello: (name, next) =>
+      `مرحباً ${name}! ${next
+        ? `الدرس التالي في خطة اليوم هو **${next}**।`
+        : "لا شيء متبقٍ اليوم."} اسأل أي شيء — *“ماذا أدرس اليوم؟”*, *“اشرح [الموضوع]”*, أو *“أعطني أسئلة تدريب”*.`,
+    howAreYou: (next) =>
+      next
+        ? `أنا جاهز. جلستك التالية هي **${next}** — قل **“ابدأ المؤقت”** وسأسجلها لك.`
+        : "أنا جاهز. لا شيء متبقٍ اليوم، لذا جلسة مراجعة قصيرة فكرة جيدة.",
+    thanks: "في أي وقت. هل أرتب لك الخطوة التالية؟",
+    who:
+      "أنا **SHIGUN**، مدربك الدراسي بالذكاء الاصطناعي داخل Study Planner Pro. أخطط ليومك، وأشرح أي موضوع، وأولّد أسئلة تدريب، وأتابع وتيرتك وسلسلتك، وأشغّل ساعة الدراسة. جرّب أن تسأل: *“ماذا أدرس اليوم؟”*.",
+    help:
+      "أستطيع فعل الآتي:\n\n- **التخطيط** — *“ماذا أدرس اليوم؟”*, *“أنا متأخر — replan”*\n- **الشرح** — *“اشرح [الموضوع] بالتفصيل”*\n- **الاختبار** — *“أعطني أسئلة تدريب”*\n- **المتابعة** — *“كيف أدائي؟”*\n- **التحكم** — *“ابدأ المؤقت”*, *“استراحة”*, *“الوضع الداكن”*\n\nماذا تريد أولاً؟",
+  },
+};
+
+const GREETING_ONLY =
+  /^\s*(h+i+|he+y+|hello+|yo+|hiya|good (morning|afternoon|evening|night)|namaste|namaskar|namaskaram|vanakkam|sat\s?sri\s?akal|salam(ualaikum)?|salaam|assalamu?\s?alaikum|bonjour|hola|ciao|hallo|guten\s+(tag|morgen|abend)|konnichiwa|annyeong|privet|nihao|merhaba|selam)\b[\s!.?,।]*(shigun|bot|there)?[\s!.?]*$/i;
+const HOW_ARE_YOU =
+  /\b(how are you|how'?s it going|how are you doing|what'?s up|whats up|how do you do|kaise ho|kaisa hai|kemon acho|eppadi irukka|ela unnaru)\b/i;
+const THANKS_ONLY =
+  /^\s*(thanks|thank you|thx|ty|thankyou|dhanyavad|dhanyavaad|shukriya|dhonnobad|nandri|nandi|sukriya|jazakallah|shukran|danke|gracias|merci)\b[\s!.?]*(you|so much|a lot|shigun)?[\s!.?]*$/i;
+const WHO_ARE_YOU =
+  /\b(who are you|what are you|what is your name|whats your name|what's your name|what can you do|what do you do|what can shigun|tu kaun|tum kaun|aap kaun|tumhara naam|aapka naam)\b/i;
+const HELP_ONLY =
+  /^\s*(help|help me|what can you do|options|commands|capabilities|features|menu|madad|sahayata|sahay)\s*[?!.]*$/i;
+
+function greetingReply(q: string, ctx: TutorContext, langTag: string): string | null {
+  const code = langTag.slice(0, 2);
+  const p = GREET_I18N[code] || GREET_I18N.en;
+  const next = ctx.today.find((task) => task.status === "pending")?.title || null;
+  const name = (ctx.name || "").trim().split(/\s+/)[0] || "there";
+
+  if (THANKS_ONLY.test(q.trim())) return p.thanks;
+  if (HOW_ARE_YOU.test(q)) return p.howAreYou(next);
+  if (WHO_ARE_YOU.test(q)) return p.who;
+  if (HELP_ONLY.test(q.trim())) return p.help;
+  if (GREETING_ONLY.test(q.trim())) return p.hello(name, next);
+  return null;
+}
+
 export async function localTutor(
   q: string,
   ctx: TutorContext,
-  options: { skipCloud?: boolean } = {}
+  options: { skipCloud?: boolean; keys?: RuntimeProviderKeys } = {}
 ): Promise<TutorReply> {
   const action = parseCommand(q);
   const n = q.toLowerCase();
@@ -1695,17 +1945,27 @@ export async function localTutor(
     return { text: msgs[action.type] || "Done.", action };
   }
 
+  /* Greetings, small talk and capability questions must ALWAYS be answered —
+     on a deployment with no cloud key they used to fall all the way through to
+     the "I'm in local mode" line, which is exactly what made the coach look
+     broken ("the AI never replies"). These are answered from the learner's own
+     live plan, so they are genuinely useful, not filler. */
+  const script = detectLanguage(q);
+  const greeting = greetingReply(q, ctx, script);
+  if (greeting) return { text: greeting };
+
   const instant = instantTutorReply(q, ctx);
   if (instant) return instant;
 
   const pct = percentQ(q);
   if (pct) return { text: pct };
 
-  if (!options.skipCloud && activeProvider()) {
+  if (!options.skipCloud && activeProvider(options.keys)) {
     const aiResponse = await callLLM(
       tutorSystemPrompt(ctx),
       [{ role: "user", content: q }],
-      800
+      800,
+      { keys: options.keys }
     );
     if (aiResponse) return { text: aiResponse };
   }
@@ -1724,11 +1984,20 @@ export async function localTutor(
   // Be honest about WHY the answer is limited. A deployment without an AI key
   // (or with a provider outage) previously got an unexplained generic line,
   // which read as "the AI is broken".
-  const cloudConfigured = !!activeProvider();
+  const cloudConfigured = !!activeProvider(options.keys);
   return {
     text: cloudConfigured
       ? `I couldn't find that in your study plan or my reference library just now. Try rephrasing your question, ask *"what should I study today?"*, or say *"explain [any topic from your subjects]"*.`
-      : `I'm in local mode right now — I can still guide you from your study plan and reference library. Try *"what should I study today?"*, *"give me practice questions"*, or ask me to explain any topic from your subjects.`,
+      : [
+          `I don't have an answer for that one from your plan or my reference library yet. Here's what I *can* do right now, with no setup:`,
+          ``,
+          `- *"what should I study today?"* — your priority order, live from your plan`,
+          `- *"give me practice questions"* — an exam-style set on the current lesson`,
+          `- *"how am I doing?"* — progress, streak and pace`,
+          `- *"explain [a topic from your subjects]"* — a lesson built from your own syllabus`,
+          ``,
+          `For open-ended questions on any topic, connect an AI key in **Settings → AI coach** and I'll answer in full.`,
+        ].join("\n"),
   };
 }
 

@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { mdToHtml, escapeHtml, type MessageRow } from "@/lib/client";
 import { IconChat, IconCheck, IconClose, IconCopy, IconSend, IconSpark } from "./icons";
+import { getByokKeys, byokHeader, byokProviderIds, onByokChange } from "@/lib/byok";
 
 const QUICKS = [
   "What should I study today?",
@@ -15,7 +16,7 @@ type HealthSnapshot = {
 };
 
 export default function ChatPanel({
-  open, setOpen, messages, onSend, thinking, provider, learner,
+  open, setOpen, messages, onSend, thinking, provider, learner, onOpenSettings,
 }: {
   open: boolean;
   setOpen: (v: boolean) => void;
@@ -24,14 +25,29 @@ export default function ChatPanel({
   thinking: boolean;
   provider?: string | null;
   learner?: { name: string; daysLeft: number; progressPct: number; streak: number; todayDone: number; todayTotal: number };
+  /** Opens Settings → AI coach so a learner can connect a cloud key. */
+  onOpenSettings?: () => void;
 }) {
   const [text, setText] = useState("");
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const [health, setHealth] = useState<HealthSnapshot | null>(null);
+  const [ownKeys, setOwnKeys] = useState<string[]>([]);
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  /* A send lock prevents double-submits on mobile. It MUST clear whenever a
+     send was not actually started — `onSend` can bail out (empty text, a
+     request already in flight) before `thinking` ever flips, and before this
+     guard the lock then stayed set forever: the button went dead and no
+     further message could be sent until a reload. Releasing on a short timer
+     as well as on `thinking` makes that state impossible. */
   const submitLock = useRef(false);
-  useEffect(() => { if (!thinking) submitLock.current = false; }, [thinking]);
+  const releaseLock = useCallback(() => { submitLock.current = false; }, []);
+  useEffect(() => {
+    if (!thinking) {
+      const timer = window.setTimeout(releaseLock, 0);
+      return () => window.clearTimeout(timer);
+    }
+  }, [thinking, messages.length, releaseLock]);
 
   /* Tell the document the coach is open. On desktop the panel is a floating
      card, and a floating card over a working page hides whatever is under it —
@@ -47,12 +63,31 @@ export default function ChatPanel({
   // Fetch health on every open — cheap, no-store, and we use raw fetch so
   // a 503 (db down) still preserves ai.configuredProviders from the body.
   // Also probe /api/ai-status GET for the shared llm snapshot.
+  /* Keys pasted in Settings → AI coach live in this browser, so the panel
+     must track them itself — the server alone cannot know. */
+  useEffect(() => {
+    let alive = true;
+    const readOwn = async () => {
+      const ids = byokProviderIds(getByokKeys());
+      if (alive) setOwnKeys(ids);
+    };
+    void readOwn();
+    const off = onByokChange((keys) => setOwnKeys(byokProviderIds(keys)));
+    return () => {
+      alive = false;
+      off();
+    };
+  }, []);
+
   useEffect(() => {
     if (!open) return;
     let alive = true;
     const fetchHealth = async () => {
       try {
-        const res = await fetch("/api/health", { cache: "no-store" });
+        const res = await fetch("/api/health", {
+          cache: "no-store",
+          headers: { "x-ai-keys": byokHeader() },
+        });
         const json = await res.json().catch(() => ({}));
         if (alive && json && typeof json === "object") {
           setHealth(json as HealthSnapshot);
@@ -61,7 +96,10 @@ export default function ChatPanel({
       } catch {}
       // Fallback to dedicated ai-status endpoint (doesn't need DB)
       try {
-        const res2 = await fetch("/api/ai-status", { cache: "no-store" });
+        const res2 = await fetch("/api/ai-status", {
+          cache: "no-store",
+          headers: { "x-ai-keys": byokHeader() },
+        });
         const json2 = await res2.json().catch(() => ({}));
         if (alive && json2 && typeof json2 === "object") {
           // Normalize to HealthSnapshot shape
@@ -104,6 +142,9 @@ export default function ChatPanel({
     const msg = (q ?? text).trim();
     if (!msg || thinking || submitLock.current) return;
     submitLock.current = true;
+    // If the parent refuses the send (empty input, request in flight) the
+    // lock is released on the next tick rather than wedging the composer.
+    window.setTimeout(releaseLock, 400);
     onSend(msg);
     setText("");
     requestAnimationFrame(autosize);
@@ -117,10 +158,11 @@ export default function ChatPanel({
     } catch { /* clipboard blocked */ }
   };
 
-  // Cloud is active if the health endpoint confirms providers, or the page prop says so.
-  // We deliberately never expose which provider — clean UI, no vendor lock-in feel.
+  // Cloud is active if the health endpoint confirms providers, the page prop
+  // says so, or this browser saved a key in Settings → AI coach. We
+  // deliberately never expose which provider — clean UI, no vendor lock-in feel.
   const isCloudActive = !!(
-    health?.ai?.configuredProviders?.length || provider
+    health?.ai?.configuredProviders?.length || provider || ownKeys.length
   );
 
   const statusText = thinking
@@ -227,6 +269,29 @@ export default function ChatPanel({
             )}
             <div ref={endRef} />
           </div>
+
+          {/* ── Connect prompt ──
+              With no cloud key the coach can only answer from the learner's
+              own plan, which reads as "the AI is broken". Say so plainly and
+              offer the one action that fixes it. */}
+          {!isCloudActive && onOpenSettings && (
+            <div className="ai-connect">
+              <div className="ai-connect-text">
+                <strong>Full AI chat isn’t connected yet.</strong> Right now I answer from your
+                plan and syllabus only.
+              </div>
+              <button
+                type="button"
+                className="ai-connect-btn"
+                onClick={() => {
+                  setOpen(false);
+                  onOpenSettings();
+                }}
+              >
+                <IconSpark size={13} /> Connect AI
+              </button>
+            </div>
+          )}
 
           {/* ── Quick suggestions ── */}
           <div className="ai-quick" aria-label="Suggested questions">

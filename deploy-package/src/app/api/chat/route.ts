@@ -6,6 +6,7 @@ import { buildContext, dateFrom, fullState, getOrCreateUser, getSettings, keyFro
 import {
   callLLMDetailed, localTutor, parseCommand, tutorSystemPrompt, activeProvider,
   extractLlmAction, languageCapabilityReply, instantTutorReply, commandReply,
+  parseRuntimeKeys, hasRuntimeKeys, type RuntimeProviderKeys,
 } from "@/lib/ai";
 import { checkRateLimit } from "@/lib/rateLimit";
 import { readJsonObject, validationPayload } from "@/lib/validation";
@@ -192,7 +193,10 @@ export function summarizeAttempts(attempts: AiAttempt[]): string {
  *   • one short sentence plus, where it helps, what to do next;
  *   • a stable machine `code` so the UI can offer Retry without parsing prose.
  */
-export function userFacingAiNotice(attempts: AiAttempt[]): { code: string; notice: string; retryable: boolean } {
+export function userFacingAiNotice(
+  attempts: AiAttempt[],
+  options: { usingOwnKey?: boolean } = {}
+): { code: string; notice: string; retryable: boolean } {
   if (!attempts.length) {
     return {
       code: "AI_LOCAL_ONLY",
@@ -215,9 +219,15 @@ export function userFacingAiNotice(attempts: AiAttempt[]): { code: string; notic
     };
   }
   if (attempts.some((attempt) => attempt.error === "auth" || attempt.error === "model")) {
+    // When the learner supplied their own key, "unavailable" is the wrong
+    // thing to say: the key itself is the problem and they can fix it in
+    // Settings. Saying so is the difference between "the AI is broken" and
+    // one actionable step.
     return {
       code: "AI_UNAVAILABLE",
-      notice: "AI assistant temporarily unavailable. We answered from your syllabus instead — try again shortly.",
+      notice: options.usingOwnKey
+        ? "The AI key saved in Settings was rejected. Open Settings → AI coach to check or replace it — I answered from your syllabus in the meantime."
+        : "AI assistant temporarily unavailable. We answered from your syllabus instead — try again shortly.",
       retryable: true,
     };
   }
@@ -251,8 +261,11 @@ export async function POST(req: Request) {
   if (rawText.length > 8_000) {
     return NextResponse.json({ error: "Message is too long (maximum 8,000 characters).", code: "MESSAGE_TOO_LONG" }, { status: 413 });
   }
+  // Bring-your-own keys (Settings → AI coach): per-request override of the
+  // deployment's env configuration. Never persisted, never logged.
+  const runtimeKeys = parseRuntimeKeys(req.headers.get("x-ai-keys"));
   try {
-    return await handleChat(req, { message: rawText });
+    return await handleChat(req, { message: rawText, keys: runtimeKeys });
   } catch (error) {
     console.error("Chat route handleChat failed, using local tutor fallback:", error instanceof Error ? error.message : error);
     const key = keyFrom(req);
@@ -273,7 +286,7 @@ export async function POST(req: Request) {
       } else if (instantReply) {
         finalText = instantReply.text;
       } else {
-        const local = await localTutor(text, ctx, { skipCloud: true });
+        const local = await localTutor(text, ctx, { skipCloud: true, keys: runtimeKeys });
         finalText = local.text;
       }
     } catch (inner) {
@@ -287,7 +300,7 @@ export async function POST(req: Request) {
       ...fallbackState,
       messages: appendChatTurn(fallbackState.messages, text, finalText, fallbackState.user.id),
       context: ctx,
-      aiProvider: activeProvider(),
+      aiProvider: activeProvider(runtimeKeys),
     };
     return NextResponse.json({
       reply: finalText,
@@ -299,8 +312,8 @@ export async function POST(req: Request) {
   }
 }
 
-async function handleChat(req: Request, opts: { message: string }) {
-  const { message: rawText } = opts;
+async function handleChat(req: Request, opts: { message: string; keys?: RuntimeProviderKeys }) {
+  const { message: rawText, keys: runtimeKeys } = opts;
   const key = keyFrom(req);
   const text = rawText;
 
@@ -349,7 +362,7 @@ async function handleChat(req: Request, opts: { message: string }) {
     finalText = instantReply.text;
   } else {
     let reply: string | null = null;
-    const cloudAttempted = !!activeProvider();
+    const cloudAttempted = !!activeProvider(runtimeKeys);
     if (cloudAttempted) {
       const history = state.messages.slice(-10).map((m) => ({
         role: m.role === "assistant" ? ("assistant" as const) : ("user" as const),
@@ -362,7 +375,7 @@ async function handleChat(req: Request, opts: { message: string }) {
         systemPrompt,
         [...history, { role: "user", content: text }],
         2400,
-        { temperature: 0.6 }
+        { temperature: 0.6, keys: runtimeKeys }
       );
       reply = result.text;
       if (result.text && result.provider) {
@@ -373,7 +386,7 @@ async function handleChat(req: Request, opts: { message: string }) {
         // sentence — the reply itself already came from the local tutor, so
         // nothing is actually broken for them.
         console.warn("Cloud tutor unavailable, answered locally:", summarizeAttempts(result.attempts));
-        const notice = userFacingAiNotice(result.attempts);
+        const notice = userFacingAiNotice(result.attempts, { usingOwnKey: hasRuntimeKeys(runtimeKeys) });
         aiMeta = { source: "local", model: null, degraded: true, ...notice };
       }
     }
@@ -397,7 +410,7 @@ async function handleChat(req: Request, opts: { message: string }) {
       const grounded = localCurriculumReply(text, state);
       let localText = "";
       try {
-        const local = await localTutor(text, ctx, { skipCloud: cloudAttempted });
+        const local = await localTutor(text, ctx, { skipCloud: cloudAttempted, keys: runtimeKeys });
         localText = local.text;
         if (local.action) action = local.action;
       } catch (error) {
@@ -456,7 +469,7 @@ async function handleChat(req: Request, opts: { message: string }) {
       ...fresh,
       messages: appendChatTurn(fresh.messages, text, finalText, fresh.user.id),
       context: buildContext(fresh, localDate),
-      aiProvider: activeProvider(),
+      aiProvider: activeProvider(runtimeKeys),
     },
     replanned,
     ai: aiMeta,

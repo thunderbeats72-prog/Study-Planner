@@ -1103,7 +1103,15 @@ export default function Home() {
         }>("/api/chat", {
           method: "POST",
           body: JSON.stringify({ message, source: "text" }),
-          timeoutMs: 35_000,
+          /* The server may walk several cloud providers (up to its
+             AI_TIMEOUT_MS budget, default 24 s) plus two database round
+             trips before it answers. The old 35 s ceiling was close enough
+             to that budget that a slow-but-successful cloud answer was
+             aborted by the browser — the learner then saw the client-side
+             "couldn't reach the cloud tutor" fallback even though the
+             server was about to reply successfully. Give the real answer
+             room to land. */
+          timeoutMs: 60_000,
         });
         const reply =
           (r.reply || "").trim() ||
@@ -1191,9 +1199,12 @@ export default function Home() {
           const pending = (currentCtx?.today || [])
             .filter((task) => task.status === "pending")
             .slice(0, 3);
+          /* Say plainly that the *request* failed, not that the assistant is
+             broken — the two read very differently to a learner, and only one
+             of them is true. */
           fallbackText = pending.length
-            ? `I couldn't reach the cloud tutor just now. From your plan, start with **${pending[0].title}**. Ask me to explain it, or say *"what should I study today?"*.`
-            : 'I couldn\'t reach the cloud tutor just now. Ask again in a moment, or say *"what should I study today?"* / *"explain [a topic from your subjects]"*.';
+            ? `That message didn't get through — check your connection and send it again. Meanwhile, start with **${pending[0].title}** from today's plan.`
+            : `That message didn't get through — check your connection and send it again. You can also ask *"what should I study today?"* or *"explain [a topic from your subjects]"*.`;
         }
 
         const botMsg: MessageRow = {
@@ -2131,6 +2142,7 @@ export default function Home() {
         onSend={askTutor}
         thinking={thinking}
         provider={state.aiProvider}
+        onOpenSettings={() => goPage("settings")}
         learner={{
           name: state.user.name,
           daysLeft: ctx.daysLeft,
