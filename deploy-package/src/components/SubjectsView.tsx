@@ -100,14 +100,24 @@ export default function SubjectsView({
                   <div>
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <h3 className="truncate text-[17px] font-extrabold tracking-tight" style={{ color: "var(--text-main)" }}>
+                        <h3
+                          className="subject-card-name text-[length:var(--fs-lg)] font-extrabold tracking-tight"
+                          style={{ color: "var(--text-main)" }}
+                          title={s.name}
+                        >
                           {s.name}
                         </h3>
-                        <p className="mono mt-1 text-[12px] font-semibold" style={{ color: "var(--text-dim)" }}>
+                        <p
+                          className="subject-card-meta mono mt-1 text-[length:var(--fs-meta)] font-semibold"
+                          style={{ color: "var(--text-dim)" }}
+                        >
                           {list.length || s.units} lessons · {s.difficulty}
                         </p>
                       </div>
-                      <span className="mono text-[26px] font-extrabold tracking-tight" style={{ color: s.color }}>
+                      <span
+                        className="mono shrink-0 text-[length:var(--fs-stat)] font-extrabold tracking-tight"
+                        style={{ color: s.color }}
+                      >
                         <CountUp to={pct} suffix="%" />
                       </span>
                     </div>
@@ -119,7 +129,7 @@ export default function SubjectsView({
                       />
                     </div>
 
-                    <div className="mt-3 flex items-center gap-2 text-[11px] font-semibold" style={{ color: "var(--text-muted)" }}>
+                    <div className="mt-3 flex items-center gap-2 text-[length:var(--fs-meta)] font-semibold" style={{ color: "var(--text-muted)" }}>
                       <span className="inline-flex items-center gap-1">
                         <IconCheck size={11} className="text-[var(--success-accent)]" />
                         {done}/{list.length || s.units}
@@ -305,7 +315,7 @@ export default function SubjectsView({
         <div className="modal-overlay" onClick={() => setAddModalOpen(false)}>
           <div className="glass-panel modal-box max-w-md" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-3 mb-4">
-              <h3 className="text-[17px] font-extrabold" style={{ color: "var(--text-main)" }}>
+              <h3 className="text-[length:var(--fs-lg)] font-extrabold" style={{ color: "var(--text-main)" }}>
                 Add New Subject
               </h3>
               <button
@@ -401,7 +411,7 @@ export default function SubjectsView({
         <div className="modal-overlay" onClick={() => setEditing(null)}>
           <div className="glass-panel modal-box max-w-md" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-3 mb-4">
-              <h3 className="text-[17px] font-extrabold" style={{ color: "var(--text-main)" }}>
+              <h3 className="text-[length:var(--fs-lg)] font-extrabold" style={{ color: "var(--text-main)" }}>
                 Edit Subject
               </h3>
               <button

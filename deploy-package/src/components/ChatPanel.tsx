@@ -33,6 +33,17 @@ export default function ChatPanel({
   const submitLock = useRef(false);
   useEffect(() => { if (!thinking) submitLock.current = false; }, [thinking]);
 
+  /* Tell the document the coach is open. On desktop the panel is a floating
+     card, and a floating card over a working page hides whatever is under it —
+     the Planner's Add Task / Rebalance row especially. `body.ai-open` lets the
+     workspace pull its content clear of the panel instead of letting the panel
+     sit on top of the controls. On phones the panel is a bottom sheet with a
+     scrim, so the same class is a no-op there. */
+  useEffect(() => {
+    document.body.classList.toggle("ai-open", open);
+    return () => document.body.classList.remove("ai-open");
+  }, [open]);
+
   // Fetch health on every open — cheap, no-store, and we use raw fetch so
   // a 503 (db down) still preserves ai.configuredProviders from the body.
   // Also probe /api/ai-status GET for the shared llm snapshot.
@@ -146,7 +157,7 @@ export default function ChatPanel({
                   title={
                     isCloudActive
                       ? "Shigun is connected to its cloud AI provider."
-                      : "No cloud AI key is configured, so Shigun answers with the on-device study engine (still plan-aware). Add CEREBRAS_API_KEY, MISTRAL_API_KEY, SAMBANOVA_API_KEY, COHERE_API_KEY or GEMINI_API_KEY in the deployment to unlock cloud tutoring."
+                      : "Shigun is answering with the on-device study engine, so it is still plan-aware but less conversational. Cloud tutoring is configured by whoever runs this deployment."
                   }
                 >
                   {statusText}

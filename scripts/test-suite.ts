@@ -30,8 +30,8 @@ import {
 import { validateQuickAdd, QUICK_ADD_KINDS } from "../src/lib/quickAdd";
 import { summarizeAttempts, userFacingAiNotice } from "../src/app/api/chat/route";
 import type { TaskRow } from "../src/lib/client";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { join, relative } from "node:path";
 import React from "react";
 import TestRenderer, { act } from "react-test-renderer";
 import { useStudyClock, type ClockApi } from "../src/lib/useTimer";
@@ -1480,6 +1480,52 @@ async function runTests() {
     check(importantCount <= 900, `The !important count keeps falling (${importantCount} vs 1107 at the merge baseline)`);
     check(!/transform:\s*translate\([^)]*\.[57]px/.test(sheets),
       "No half-pixel transforms, so text stops shimmering under the blur");
+  }
+
+  console.log("\n--- 17. Repository shape: one source of truth ---\n");
+  {
+    /* `src/` is the only tree the app runs (README.txt). Two separate breakages
+       have shipped through the mirrors, so both are locked here:
+
+       1. `deploy-package/src` — the drag-and-drop mirror — drifted 10 files
+          behind `src/`, so a drag-and-drop deploy silently shipped stale
+          behaviour.
+
+       2. A mis-aimed drag-and-drop dropped the app tree at the repository ROOT
+          (commit 93d2780, "Add files via upload", 73 files). Nothing imports
+          those copies, but `api/` at the root is also Vercel's zero-config
+          Serverless Functions directory, which collides with the Next.js routes
+          the build emits under `.vercel/output/functions/api/*`. Every Vercel
+          deployment from 93d2780 (2026-09-10) through c09d754 (2026-09-12)
+          failed at "Deploying outputs..." behind a green build. */
+
+    const walk = (dir: string, base: string = dir): string[] =>
+      readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+        const full = join(dir, entry.name);
+        return entry.isDirectory() ? walk(full, base) : [relative(base, full)];
+      });
+
+    const sourceFiles = walk(join(process.cwd(), "src")).sort();
+    const mirrorFiles = walk(join(process.cwd(), "deploy-package/src")).sort();
+    const missing = sourceFiles.filter((f) => !mirrorFiles.includes(f))
+      .concat(mirrorFiles.filter((f) => !sourceFiles.includes(f)));
+    const drifted = sourceFiles.filter((f) => mirrorFiles.includes(f) &&
+      readFileSync(join(process.cwd(), "src", f), "utf8") !==
+      readFileSync(join(process.cwd(), "deploy-package/src", f), "utf8"));
+    check(missing.length === 0 && drifted.length === 0,
+      `deploy-package/src is a byte-exact mirror of src/ (${sourceFiles.length} files)`,
+      [...missing, ...drifted].slice(0, 8).join(", "));
+
+    check(readFileSync(join(process.cwd(), "tsconfig.json"), "utf8") ===
+          readFileSync(join(process.cwd(), "deploy-package/tsconfig.json"), "utf8"),
+      "deploy-package/tsconfig.json matches the root tsconfig.json it ships with");
+
+    const rootStrays = ["api", "app", "components", "db", "fonts", "lib",
+      "globals.css", "ui-system.css", "layout.tsx", "page.tsx", "icon.svg"]
+      .filter((name) => existsSync(join(process.cwd(), name)));
+    check(rootStrays.length === 0,
+      "No copy of the app tree sits at the repository root (root api/ is Vercel's functions dir)",
+      rootStrays.join(", "));
   }
 
   console.log("\n==================================================");
