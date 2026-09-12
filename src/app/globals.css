@@ -178,7 +178,6 @@ body{
 .brand-title{font-family:var(--font-display);font-size:var(--fs-md);line-height:var(--lh-heading)}
 /* Full course name ALWAYS visible — wraps to as many lines as needed
    ("B.Com (Honours) (Marketing and Banking)" never gets chopped). */
-.brand-course{font-size:var(--fs-meta);color:var(--text-muted);font-weight:600;margin-top:2px;white-space:normal;overflow-wrap:anywhere;line-height:var(--lh-meta)}
 .nav-list{display:flex;flex-direction:column;gap:5px;margin-top:14px}
 .nav-item{display:flex;align-items:center;gap:var(--nav-gap);padding:0 12px;min-height:var(--nav-h);border-radius:12px;font-size:var(--fs-sm);color:var(--text-muted);cursor:pointer;border:1px solid transparent;transition:background .15s ease,color .15s ease,box-shadow .15s ease;user-select:none}
 .nav-item:hover{background:var(--row-hover);color:var(--text-main)}
@@ -228,6 +227,9 @@ body{
 .btn-secondary:hover{background:var(--surface-hover);border-color:var(--glass-border-hover)}
 .btn-danger{background:var(--status-skipped-bg);color:var(--status-skipped-text);border-color:transparent}
 .btn-sm{min-height:32px;padding:5px 12px;font-size:.78rem;line-height:1.25;border-radius:var(--radius-md);text-align:center}
+.btn-icon{padding:0;width:var(--btn-h);min-width:var(--btn-h)}
+.btn-sm.btn-icon{width:32px;min-width:32px}
+.btn-xs.btn-icon{width:30px;min-width:30px}
 .btn-xs{min-height:30px;padding:4px 12px;font-size:.74rem;line-height:1.25;border-radius:var(--radius-sm);font-weight:600;text-align:center;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center}
 .w-full{width:100%}
 .btn:disabled{opacity:.5;cursor:not-allowed}
@@ -580,7 +582,6 @@ body.theme-dark .tracker-bar,body.theme-obsidian .tracker-bar,body.theme-nebula 
   .mobile-header{position:fixed;top:0;left:0;right:0;z-index:100;background:var(--surface-elevated);border-bottom:1px solid var(--glass-border);box-shadow:0 2px 16px rgba(10,12,26,.12)}
   .ob-level-grid,.ob-schedule-grid{grid-template-columns:1fr}
   .ob-card{padding:24px 20px}
-  .ai-panel{right:8px;left:8px;width:auto;bottom:calc(86px + env(safe-area-inset-bottom));height:min(70vh,540px)}
   .ai-fab{bottom:calc(86px + env(safe-area-inset-bottom));right:14px;width:50px;height:50px}
   /* Touch devices: keep inputs at >=16px so iOS Safari never auto-zooms
      into the field (which permanently breaks sheet layout). */
@@ -594,11 +595,6 @@ body.theme-dark .tracker-bar,body.theme-obsidian .tracker-bar,body.theme-nebula 
   .heat-cell{width:11px;height:11px}
   /* AI chat = true full-screen bottom sheet on phones (431-640px band
      included): grab handle, 86dvh height, safe-area padded input */
-  .ai-panel{
-    bottom:0;right:0;left:0;
-    border-radius:var(--radius-xl) var(--radius-xl) 0 0;
-    box-shadow:0 -10px 40px rgba(10,12,26,.2);
-  }
   .ai-quick{overflow-x:auto;flex-wrap:nowrap;scrollbar-width:none}
   .ai-quick button{flex-shrink:0}
   /* Structured mobile task card: title block on top (full width),
@@ -1128,7 +1124,7 @@ body{overflow-x:clip}
 *{min-width:0}                       /* flex/grid children may always shrink */
 img,svg,video,canvas{max-width:100%;height:auto}
 .glass-panel,.day-block,.modal-box,.task-row{overflow-wrap:break-word}
-.task-title,.day-date,.kpi-label,.brand-course{overflow-wrap:break-word;word-break:normal;hyphens:auto}
+.task-title,.day-date,.kpi-label{overflow-wrap:break-word;word-break:normal;hyphens:auto}
 
 /* 2. Fluid type — (v25) these duplicated clamps are retired; `--fs-h1` and
    `--fs-kpi` in the ramp above are the only size owners. */
@@ -1156,11 +1152,6 @@ img,svg,video,canvas{max-width:100%;height:auto}
   .cal-cell{min-height:44px;padding:3px;border-radius:var(--radius-sm)}
   .cal-cell .cal-num{font-size:.68rem}
   .modal-box{padding:14px 12px calc(16px + env(safe-area-inset-bottom))}
-  .ai-panel{
-    bottom:0;right:0;left:0;width:100%;height:min(86dvh,680px);
-    border-radius:var(--radius-xl) var(--radius-xl) 0 0;
-    box-shadow:0 -10px 40px rgba(10,12,26,.2);
-  }
   .ai-fab{bottom:calc(88px + env(safe-area-inset-bottom))}
   .rating-btns{gap:5px}
   .heat-cell{width:9px;height:9px}
@@ -1600,11 +1591,6 @@ body.theme-switching{animation:themeBlink .3s ease}
 
 /* ═══ CHAT ON MOBILE — full usability pass ═══ */
 @media(max-width:640px){
-  .ai-panel{
-    left:0;right:0;bottom:0;
-    border-radius:var(--radius-xl) var(--radius-xl) 0 0;
-    border-bottom:none;
-  }
   .ai-panel::before{content:"";width:38px;height:4px;border-radius:99px;background:var(--text-dim);opacity:.4;margin:10px auto 0}
   .ai-msg{max-width:94%;font-size:.88rem;padding:11px 14px}
   .ai-quick{overflow-x:auto;flex-wrap:nowrap;scrollbar-width:none}
@@ -2203,6 +2189,8 @@ button,a,.nav-item,.vtab,.cal-cell,.chip,.task-row,.rate-btn,input,select{touch-
   position:fixed;inset:0;z-index:198;border:0;padding:0;background:rgba(12,14,28,.2);
   backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);animation:aiScrimIn .22s ease both;
 }
+/* Desktop: the panel floats — no scrim, the page stays fully interactive. */
+@media(min-width:861px){.ai-scrim{display:none}}
 @keyframes aiScrimIn{from{opacity:0}to{opacity:1}}
 /* ── Shigun premium avatar — replaces old .ai-avatar ── */
 .shigun-avatar{
@@ -2244,8 +2232,6 @@ button,a,.nav-item,.vtab,.cal-cell,.chip,.task-row,.rate-btn,input,select{touch-
 
 @media(max-width:640px){
   .ai-scrim{background:rgba(12,14,28,.32);backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px)}
-  .ai-panel{border-bottom:0!important;
-  }
   @keyframes aiSheetUp{from{opacity:.55;transform:translateY(42px)}to{opacity:1;transform:none}}
   .ai-head{flex-shrink:0}
   .ai-title{font-size:.86rem}
@@ -2371,7 +2357,6 @@ button,a,.nav-item,.vtab,.cal-cell,.chip,.task-row,.rate-btn,input,select{touch-
   .ai-panel{height:min(80dvh,660px)}
 }
 @media(max-width:640px){
-  .ai-panel{border-radius:20px 20px 0 0}
 }
 /* Landscape phones: the sheet becomes the screen */
 @media(max-height:500px) and (orientation:landscape){
@@ -2860,7 +2845,6 @@ h3{font-size:var(--fs-h3);line-height:1.25;letter-spacing:-.01em;text-wrap:balan
    here would out-rank .btn-sm/.btn-xs (equal specificity, later in source)
    and silently inflate every compact button on desktop. */
 .btn{font-size:var(--fs-sm)}
-.btn:not(.btn-sm):not(.btn-xs){min-height:44px}
 .btn-sm,.btn-xs{font-size:var(--fs-xs)}
 .chip{font-size:var(--fs-chip)}
 .tracker-time{font-size:clamp(1.02rem,.92rem + .5vw,1.3rem)}
@@ -4302,7 +4286,6 @@ body.mode-young .section-title::after{width:46px;height:3px;bottom:-8px}
 @media(max-width:640px){
   .glass-panel{padding:16px 14px}
   .kpi-card{padding:16px}
-  .page-title,.day-date{font-family:var(--font-display);letter-spacing:-.4px}
 }
 
 /* Enhanced glass panel with liquid gradient */
@@ -5095,8 +5078,8 @@ body.mode-young .section-title::after{width:46px;height:3px;bottom:-8px}
   }
   .tracker-bar .tracker-actions .tracker-zen svg{width:13px;height:13px}
 
-  /* ── Chat: one full-height solid conversation surface ── */
-  .ai-scrim{display:none}
+  /* ── Chat: one full-height solid conversation surface.
+     The scrim stays: tapping it dismisses the sheet (see ChatPanel). ── */
   .ai-panel{
     border:0!important;box-shadow:none!important;
     background-color:var(--app-bg)!important;background-image:none!important;
@@ -5312,14 +5295,6 @@ svg{overflow:visible;flex-shrink:0;max-width:none}
   }
 }
 @media(max-width:640px){
-  .ai-panel{
-    top:auto !important;left:8px !important;right:8px !important;
-    bottom:calc(var(--dock-h,72px) + 10px) !important;
-    width:auto !important;height:min(78dvh,640px) !important;
-    max-height:min(78dvh,640px) !important;
-    border-radius:24px !important;
-    margin:0 !important;
-  }
   .ai-message-row.bot .ai-msg{border-radius:18px 18px 18px 7px !important}
   .ai-message-row.user .ai-msg{border-radius:18px 18px 7px 18px !important}
 }
@@ -5471,8 +5446,6 @@ body.theme-nebula .spot::before {
   .task-subject-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .task-meta-item{font-size:var(--fs-meta);font-weight:600;color:var(--text-dim)}
   .task-card-brief{font-size:var(--fs-sm);line-height:var(--lh-body)}
-  /* The filter's current value is chrome, not content. */
-  .planner-filter .sp-select-btn{font-size:var(--fs-sm)}
 }
 
 /* ══════════════════════════════════════════════════════════════════════

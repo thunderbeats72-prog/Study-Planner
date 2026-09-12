@@ -84,11 +84,6 @@ body{
 body.theme-dark,body.theme-obsidian,body.theme-nebula{
   --refresh-canvas:var(--app-bg);
 }
-.sidebar{
-  border-radius:24px;
-  background:color-mix(in srgb,var(--surface-elevated) 96%,transparent);
-  box-shadow:var(--refresh-shadow);
-}
 /* The brand block reserves exactly the toggle's width on its right, so the
    gear/toggle can never sit on top of the course name and the name can never
    run under it. Everything else is the shared rhythm. */
@@ -256,7 +251,6 @@ body.theme-mint { --accent:#5da98f;--accent-hover:#448e76;--accent-light:#8dd0b8
 body.theme-sunset { --accent:#d88b68;--accent-hover:#bd7252;--accent-light:#efb092;--accent-glow:rgba(216,139,104,.16);--accent-gradient:linear-gradient(135deg,#f0b18f,#d88464); }
 body { background-attachment:fixed; color:var(--text-main); }
 ::selection { background:var(--accent-glow); color:var(--text-main); }
-.sidebar { border-radius:26px; background:color-mix(in srgb,var(--surface-elevated) 96%,transparent); box-shadow:var(--pastel-shadow); border-color:var(--glass-border); }
 .brand-logo-icon { box-shadow:0 8px 20px var(--accent-glow),inset 0 1px 0 rgba(255,255,255,.4); }
 .nav-list { gap:5px; margin-top:15px; }
 .nav-item.active { box-shadow:none; }
@@ -279,7 +273,6 @@ body { background-attachment:fixed; color:var(--text-main); }
    one viewport. The header is a real two-column grid now (see §25.3 below),
    the scene is a grid item, and nothing is reserved or overlapped. */
 .page-header::before,.page-header::after { display:none!important; }
-.page-header > :not(.page-header-scene) { z-index:1; }
 .study-scene { width:clamp(210px,22vw,300px); filter:drop-shadow(0 13px 13px rgba(43,38,74,.1)); }
 .study-scene__lamp { animation:sceneLamp 7s ease-in-out infinite alternate; }
 .study-scene__plant { animation:scenePlant 6s ease-in-out infinite alternate; }
@@ -356,7 +349,6 @@ body { background-attachment:fixed; color:var(--text-main); }
     margin:0 0 var(--sp-3);
   }
   .page-head-copy { grid-column:1; grid-row:1; }
-  .page-header-scene { grid-column:2; grid-row:1; align-self:end; position:static; }
   /* (v25) leading comes from the ramp; no per-breakpoint patch. */
   .tracker-bar { top:16px; }
 }
@@ -403,8 +395,6 @@ body { background-attachment:fixed; color:var(--text-main); }
   .tracker-bar .tracker-actions .btn { min-height:38px; padding:0 10px }
 
   .page-header { display:block; margin:0 0 var(--sp-2); padding:0; }
-  .page-header-scene { display:none; }
-  .page-subtitle { margin-top:var(--sp-1); font-size:var(--fs-sm); line-height:var(--lh-body); }
   .page-header > .flex-row, .planner-tools { margin-top:var(--sp-2); }
 
   .kpi-grid { grid-template-columns:repeat(2,minmax(0,1fr)) !important; gap:10px !important; margin-bottom:14px !important; }
@@ -676,14 +666,8 @@ body {
 .lbl { color: var(--text-muted); font-weight: 700; letter-spacing: .04em; }
 
 /* ── App shell: sidebar ─────────────────────────────────────────────────── */
-.sidebar {
-  border-radius: 24px;
-  box-shadow: var(--rd-shadow-card);
-  background: var(--surface);
-}
 .brand-logo-icon { border-radius: 13px; }
 .brand-title { font-weight: 780; letter-spacing: -.03em; }
-.brand-course { color: var(--text-muted); }
 .nav-item {
   border-radius: 13px;
   color: var(--text-muted);
@@ -818,7 +802,6 @@ body {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: none; }
 }
-@media (max-width: 1100px) { .page-header-scene { width: 200px; opacity: .8; } }
 .page-header > :not(.page-header-scene) { position: relative; z-index: 1; }
 
 /* Below the desktop breakpoint the header is a single column and the scene is
@@ -2449,15 +2432,13 @@ body.focus-live .tracker-bar::after { animation: none; }
   display: block;
   min-width: 0;
   max-width: 100%;
+  font-size: var(--fs-meta);
+  font-weight: 600;
   line-height: 1.45;
+  color: var(--text-muted);
+  margin-top: 2px;
   white-space: normal;
-  overflow-wrap: break-word;
-  word-break: normal;
-  hyphens: none;
-}
-
-.tracker-task {
-  overflow-wrap: break-word;
+  overflow-wrap: anywhere;
   word-break: normal;
   hyphens: none;
 }
@@ -2978,7 +2959,6 @@ body.theme-nebula .ob-range-value {
 
 /* Course/program values: wrap naturally instead of producing single-word
    columns such as "NMIMS / CDOE / MBA / Semester 1". */
-.brand-course,
 .ob-review-value,
 .ob-summary-value,
 .ob-program-name,
@@ -4124,14 +4104,6 @@ body.theme-sunset {
 /* The lesson name is the only flexible thing in the bar: it takes what the
    verbs leave and clips with an ellipsis, so a long title can never push
    Clock in / Zen / the utility icons off the right edge. */
-.tracker-task {
-  min-width: 0; line-height: 1.3; color: var(--text-muted);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.tracker-time {
-  font-variant-numeric: tabular-nums;
-  color: var(--accent); text-shadow: none;
-}
 .tracker-actions {
   display: flex; align-items: center;
   flex: 0 0 auto; min-width: 0;
@@ -4143,7 +4115,6 @@ body.theme-sunset {
 .tracker-actions .btn > svg { flex: 0 0 auto; }
 @media (max-width: 1080px) {
   .tracker-actions .chip { display: none; }
-  .tracker-task { max-width: min(34vw, 320px); }
 }
 @media (max-width: 860px) {
   .tracker-bar { top: calc(var(--header-h) + 6px); margin-bottom: 14px; }
@@ -4158,8 +4129,6 @@ body.theme-sunset {
   .tracker-bar .tracker-status { grid-area: status; gap: 8px; }
   .tracker-bar .tracker-clock { grid-area: clock; }
   .tracker-bar .tracker-actions { grid-area: actions; width: 100%; }
-  .tracker-task { max-width: 100%; font-size: .66rem; }
-  .tracker-time { font-size: 1.02rem; }
   .tracker-actions .btn { flex: 1 1 0; min-width: 0; padding: 0 10px; font-size: .72rem; }
 }
 @media (max-width: 380px) {
@@ -4442,11 +4411,8 @@ body.theme-sunset {
   display: grid; place-items: center; flex: 0 0 auto; width: 32px; height: 32px; border-radius: var(--radius-tile);
   background: color-mix(in srgb, var(--accent) 13%, transparent); color: var(--accent);
 }
-.subj-rows 
-.subj-row 
-.subj-row-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; font-size: .8rem; font-weight: 750; }
-.subj-name { color: var(--text-main); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.subj-count { flex: 0 0 auto; font-size: .72rem; font-weight: 750; }
+.subj-rows .subj-row .subj-row-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; min-width: 0; font-size: var(--fs-sm); font-weight: 750; }
+.subj-count { flex: 0 0 auto; font-size: var(--fs-meta); font-weight: 750; }
 .recovery-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
 .recovery-copy { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1 1 320px; }
 .recovery-title { margin: 0; font-size: .95rem; }
@@ -4663,7 +4629,7 @@ body.theme-sunset {
 .ana-ring { transform: rotate(-90deg); }
 .subj-rows { display: flex; flex-direction: column; gap: 14px; }
 .subj-row { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
-.subj-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: .7rem; font-weight: 650; color: var(--text-dim); }
+.subj-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: var(--fs-meta); font-weight: 650; color: var(--text-dim); }
 .stack-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 7px; font-size: .78rem; font-weight: 750; }
 .stack-title { color: var(--text-main); min-width: 0; }
 .stack-count { color: var(--accent); flex: 0 0 auto; font-size: .74rem; }
@@ -4789,7 +4755,7 @@ body.theme-sunset {
 .sp-select { position: relative; min-width: 0; }
 .sp-select-btn {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
-  width: 100%; min-height: 42px; padding: 9px 13px;
+  width: 100%; min-height: var(--btn-h); padding: 9px 13px;
   border: 1px solid var(--glass-border); border-radius: var(--radius-md);
   background: var(--surface); color: var(--text-main);
   font-family: inherit; font-size: .84rem; font-weight: 600; line-height: 1.3;
@@ -4825,7 +4791,7 @@ body.theme-sunset {
 .sp-option > svg { flex: 0 0 auto; color: var(--accent); }
 .sp-select-pop .sp-option:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 @media (max-width: 480px) {
-  .sp-select-btn { min-height: 44px; font-size: .82rem; }
+  .sp-select-btn { min-height: var(--btn-h); font-size: .82rem; }
   .sp-option { padding: 10px 10px; font-size: .82rem; }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -4971,9 +4937,6 @@ span.cal-cell.is-empty:hover {
 @media (max-width: 640px) {
   .mh-actions { gap: 6px; }
   .mh-more { min-width: 52px; padding-inline: 11px; }
-  .planner-toolbar .seg-btn {
-    min-height: 40px;
-  }
   .planner-filter {
     align-items: center;
     gap: 9px;
@@ -5002,7 +4965,6 @@ span.cal-cell.is-empty:hover {
   .cal-today { min-height: 40px; padding-inline: 11px; }
   .tracker-clock { gap: 6px; }
   .tracker-clock-icon { width: 23px; height: 23px; border-radius: 7px; }
-  .tracker-time { line-height: 1; }
   .tracker-actions .btn {
     min-height: 38px;
     height: 38px;
@@ -5186,11 +5148,19 @@ span.cal-cell.is-empty:hover {
   font-size: 1rem;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
+  color: var(--accent);
+  letter-spacing: -.01em;
+  line-height: 1;
+  white-space: nowrap;
 }
 .tracker-time.is-idle {
   color: var(--text-muted);
   font-weight: 700;
   letter-spacing: .02em;
+  font-variant-numeric: tabular-nums;
+  /* Live clock: keep ticking visible, no animation freeze. */
+  animation: none;
+  opacity: 1;
 }
 
 /* Action row: one rhythm for verbs, status chips and the icon trio, with a
@@ -5248,8 +5218,6 @@ span.cal-cell.is-empty:hover {
   .mh-actions { gap: 5px; }
   .mh-qbtn { width: 32px; height: 32px; border-radius: 10px; }
   .mobile-header .mh-streak {
-    padding: 0 7px;
-    font-size: .6rem;
     gap: 3px;
   }
   .tracker-bar .tracker-actions .btn { padding-inline: 8px; font-size: .7rem; }
@@ -5600,7 +5568,6 @@ body > .task-menu {
   .day-head { padding-bottom: 8px; }
   .task-card { padding: 10px 10px 10px 0; }
   .task-card-body { gap: 4px; }
-  .task-card-title { font-size: .9rem; line-height: 1.3; }
   .task-card-brief { font-size: .76rem; }
   .task-card-meta { gap: 4px 8px; }
   .task-card-actions { gap: 6px; }
@@ -5613,7 +5580,6 @@ body > .task-menu {
   .app-wrapper { padding-left: 8px; padding-right: 8px; }
   .day-date { font-size: .9rem; }
   .day-meta { font-size: .66rem; }
-  .task-card-title { font-size: .88rem; }
 }
 @media (max-width: 320px) {
   .day-head { flex-direction: column; align-items: flex-start; }
@@ -5696,23 +5662,31 @@ body > .task-menu {
 }
 .tracker-status,
 .tracker-labels,
-.tracker-task,
 .tracker-clock,
 .tracker-actions {
   min-width: 0;
   max-width: 100%;
   box-sizing: border-box;
 }
+/* The session-bar task name: one owner. Two-line clamp on desktop, a single
+   ellipsis line on phones (see the ≤640 rule below). */
 .tracker-task {
-  overflow-wrap: anywhere;
-  word-break: break-word;
-  white-space: normal;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--text-muted);
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  line-clamp: 2;
-  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  hyphens: none;
+  white-space: normal;
 }
 @media (max-width: 640px) {
   .tracker-task {
@@ -5737,21 +5711,8 @@ body > .task-menu {
   place-items: center;
   flex: 0 0 auto;
 }
-.tracker-time {
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -.01em;
-  line-height: 1;
-  white-space: nowrap;
-}
-.tracker-time.is-idle {
-  font-variant-numeric: tabular-nums;
-}
 
 /* ── Live clock: ensure ticking visible, no animation freeze ───────── */
-.tracker-time.is-idle {
-  animation: none;
-  opacity: 1;
-}
 
 /* ── Subject filter full-width in gutter, dropdown not outside viewport */
 @media (max-width: 860px) {
@@ -6158,8 +6119,6 @@ body.focus-live .tracker-bar {
   /* Subject rows wrap cleanly. */
   .subj-rows { gap: 10px; }
   .subj-row { gap: 4px; }
-  .subj-row-top { gap: 8px; font-size: .78rem; }
-  .subj-foot { font-size: .68rem; }
 
   /* Recovery actions wrap. */
   .recovery-panel { padding: 14px; margin-bottom: 14px; }
@@ -6219,7 +6178,7 @@ body.focus-live .tracker-bar {
 
 /* Ensure no interactive element is ever smaller than 44px on touch. */
 @media (pointer: coarse) {
-  .btn, .seg-btn, .sp-select-btn, select:not([multiple]),
+  .btn, .sp-select-btn, select:not([multiple]),
   .icon-quick-btn, .mh-qbtn, .sound-btn, .qa-min-chip, .qa-date-btn,
   .ob-range-chip, .theme-card, .mbn-item, .drawer-item, .cal-cell,
   .task-more, .task-brief-btn, .link-btn, .cal-arrow, .cal-today {
@@ -6358,10 +6317,6 @@ body.focus-live .tracker-bar {
   background: var(--accent);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
 }
-.tracker-task {
-  font-size: .78rem !important;
-  font-weight: 700;
-}
 @media (max-width: 860px) {
   .tracker-bar.session-bar .tracker-clock.is-live { gap: 7px; }
   .tracker-bar.session-bar .tracker-time { font-size: 1.18rem; }
@@ -6468,7 +6423,7 @@ body.focus-live .tracker-bar {
     min-height: 0;
   }
   .planner-toolbar .seg { display: flex; width: 100%; }
-  .planner-toolbar .seg-btn { flex: 1 1 0; justify-content: center; min-height: 40px; }
+  .planner-toolbar .seg-btn { flex: 1 1 0; justify-content: center; }
 
   .planner-filter {
     display: grid;
@@ -6570,12 +6525,6 @@ body.focus-live .tracker-bar {
     border-radius: 14px;
   }
   .task-card-top { gap: 6px 8px; }
-  .task-card-title {
-    font-size: .92rem;
-    line-height: 1.38;
-    overflow-wrap: anywhere;
-    word-break: break-word;
-  }
   .task-card-brief { font-size: .78rem; line-height: 1.55; }
   .task-card-meta { gap: 5px 11px; }
   /* Actions are their own band: separated from the copy, never above it. */
@@ -6669,8 +6618,6 @@ body > .task-menu button { min-height: 40px; }
   /* An open Quick Add tray takes the whole row — the form needs the width,
      and the Rebalance button drops below it instead of squeezing it. */
   .page-head-actions > *:has(.quick-add-panel) { flex: 1 1 100%; }
-  .page-head-actions .btn { min-height: 42px; }
-  .page-title { overflow-wrap: anywhere; text-wrap: balance; }
   .page-subtitle { overflow-wrap: anywhere; text-wrap: pretty; line-height: 1.5; }
 }
 
@@ -6823,7 +6770,7 @@ body > .task-menu button { min-height: 40px; }
     min-height: 0;
   }
   .planner-filter .sp-select-btn {
-    min-height: 36px;
+    min-height: var(--btn-h);
     padding: 6px 10px;
     font-size: .82rem;
   }
@@ -7028,7 +6975,6 @@ body > .task-menu button { min-height: 40px; }
   .page-header-scene { display: none !important; }
   .page-head-actions { width: 100%; }
   .page-head-actions > * { flex: 1 1 150px; min-width: 0; }
-  .page-head-actions .btn { width: 100%; justify-content: center; }
 }
 @media (max-width: 640px) {
   .planner-toolbar { flex-direction: column; align-items: stretch; gap: 10px; }
@@ -7151,7 +7097,6 @@ body > .task-menu button { min-height: 40px; }
     box-shadow: 0 2px 18px rgba(26,25,48,.07) !important;
     z-index: 120 !important;
   }
-  .mh-brand { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1 1 auto; }
   .mh-titles { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1 1 auto; }
   .mh-wordmark { font-size: .58rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--text-dim); line-height: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .mh-page { font-size: .82rem; font-weight: 800; letter-spacing: -.015em; color: var(--text-main); line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -7186,8 +7131,7 @@ body > .task-menu button { min-height: 40px; }
    inside a min-width:0 column; the percentage never leaves the card. Topic
    rows keep number · title · minutes · state on one line; unit/detail lives
    inside the brief. */
-.subject-card-name,
-.subj-name {
+.subject-card-name {
   min-width: 0;
   max-width: 100%;
   overflow-wrap: anywhere;
@@ -7201,14 +7145,7 @@ body > .task-menu button { min-height: 40px; }
 .subject-card-meta,
 .subj-foot,
 .subj-count { flex-shrink: 0; white-space: nowrap; }
-.subj-row-top {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-  min-width: 0;
-}
-.subj-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.subj-name { flex: 1 1 auto; min-width: 0; color: var(--text-main); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .topic-row-head {
   display: flex;
   align-items: center;
@@ -7228,7 +7165,6 @@ body > .task-menu button { min-height: 40px; }
 .topic-row-side { flex: 0 0 auto; gap: 8px; }
 @media (max-width: 640px) {
   .subject-card-name { font-size: var(--fs-md); }
-  .topic-row-title { font-size: .84rem; }
 }
 
 /* ── 6 · ANALYTICS CONSISTENCY RING — centred by construction ───────
@@ -7241,11 +7177,16 @@ body > .task-menu button { min-height: 40px; }
   display: grid;
   place-items: center;
   gap: 0;
-  min-width: 0;
+  /* Shrink to the ring: the SVG carries the fixed 170px size, so `inset: 0`
+     on the readout IS the ring's box and the digits centre on the ring —
+     not on the card around it. (The old `width: 100%` on the SVG below
+     defeated `.ana-ring`'s size and blew the ring up to full card width.) */
+  width: fit-content;
+  margin-inline: auto;
   max-width: 100%;
   box-sizing: border-box;
 }
-.ring-figure > .ring-svg { display: block; width: 100%; height: auto; }
+.ring-figure > .ring-svg { display: block; }
 .ring-center {
   position: absolute;
   inset: 0;
@@ -7322,7 +7263,6 @@ body > .task-menu button { min-height: 40px; }
     top: auto !important;
     border-radius: 20px !important;
   }
-  body.ai-open .page-header-scene { display: none !important; }
 }
 @media (max-width: 860px) {
   .ai-panel {
@@ -7396,7 +7336,6 @@ body > .task-menu button { min-height: 40px; }
   .planner-filter { padding: 5px 7px; gap: 6px; }
   .planner-filter-label { font-size: .58rem; gap: 4px; }
   .planner-day { padding: 10px; gap: 8px; }
-  .task-card-title { font-size: .88rem; }
   .task-card-actions { gap: 6px; }
   .cal-cell { min-height: 48px; padding: 4px; }
   .cal-daynum { font-size: .72rem; }
