@@ -2347,6 +2347,26 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
       "No half-pixel transforms, so text stops shimmering under the blur");
   }
 
+  console.log("\n--- 16b. Shigun credit meter ---\n");
+  {
+    const schemaSrc = readFileSync(join(process.cwd(), "src/db/schema.ts"), "utf8");
+    const usageLibSrc = readFileSync(join(process.cwd(), "src/lib/shigunUsage.ts"), "utf8");
+    const routeSrc = readFileSync(join(process.cwd(), "src/app/api/shigun-usage/route.ts"), "utf8");
+    const chatSrc = readFileSync(join(process.cwd(), "src/app/api/chat/route.ts"), "utf8");
+    const settingsSrc = readFileSync(join(process.cwd(), "src/components/SettingsView.tsx"), "utf8");
+
+    check(/shigun_usage/.test(schemaSrc) && /shigunUsage = pgTable/.test(schemaSrc),
+      "A shigun_usage table persists the per-learner credit counter");
+    check(/SHIGUN_DAILY_LIMIT/.test(usageLibSrc) && /resetShigunUsage/.test(usageLibSrc) && /recordShigunUse/.test(usageLibSrc),
+      "Credit lib tracks use, rolls over daily and offers a reset");
+    check(/resetAiCooldowns/.test(routeSrc) && /clearRateLimit\(req, "chat"\)/.test(routeSrc),
+      "The credit reset refills the counter, forgets provider failures and clears the rate limiter");
+    check(/getShigunUsage/.test(chatSrc) && /recordShigunUse/.test(chatSrc) && /CREDIT_EXHAUSTED/.test(chatSrc),
+      "The chat route spends a credit per AI answer and degrades politely when exhausted");
+    check(/ShigunCreditCard/.test(settingsSrc),
+      "Settings surfaces the Shigun credit meter");
+  }
+
   console.log("\n--- 17. Repository shape: one source of truth ---\n");
   {
     /* `src/` is the only tree the app runs (README.txt). Two separate breakages

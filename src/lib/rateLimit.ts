@@ -48,3 +48,13 @@ export function checkRateLimit(
     remaining: Math.max(0, limit - bucket.count),
   };
 }
+
+/**
+ * Forget the current bucket for this request, so a learner who has hit the
+ * per-minute ceiling can be reset from Settings (the Shigun credit reset)
+ * rather than waiting out the window.
+ */
+export function clearRateLimit(req: Request, scope: string): void {
+  const key = `${scope}:${fingerprint(req)}`;
+  buckets.delete(key);
+}

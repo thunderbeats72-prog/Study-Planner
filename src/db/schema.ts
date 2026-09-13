@@ -187,6 +187,26 @@ export const messages = pgTable(
   ]
 );
 
+/**
+ * SHIGUN credit meter — per learner, per day. One "credit" is one tutor
+ * question answered (a `full` or `finalise` chat turn). The period rolls over
+ * automatically each day; Settings shows the used/limit bar and offers a
+ * manual reset that refills the counter and clears provider cooldowns, so a
+ * learner who burns through a day's allowance is never locked out for good.
+ */
+export const shigunUsage = pgTable(
+  "shigun_usage",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id").notNull(),
+    periodStart: text("period_start").notNull(),
+    used: integer("used").notNull().default(0),
+    limit: integer("limit").notNull().default(100),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("shigun_usage_user_id_unique").on(t.userId)]
+);
+
 export type User = typeof users.$inferSelect;
 export type Settings = typeof settings.$inferSelect;
 export type Subject = typeof subjects.$inferSelect;
@@ -194,3 +214,4 @@ export type Topic = typeof topics.$inferSelect;
 export type Task = typeof tasks.$inferSelect;
 export type StudySession = typeof sessions.$inferSelect;
 export type Message = typeof messages.$inferSelect;
+export type ShigunUsage = typeof shigunUsage.$inferSelect;

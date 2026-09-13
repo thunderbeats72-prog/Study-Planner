@@ -8,6 +8,7 @@ import {
 } from "./icons";
 import { PageHead, Select } from "./bits";
 import AiKeyCard from "./AiKeyCard";
+import ShigunCreditCard from "./ShigunCreditCard";
 import { StudioScene } from "./Illustrations";
 import { Reveal, Spot } from "@/lib/fx";
 import { cn } from "@/lib/cn";
@@ -250,6 +251,9 @@ export default function SettingsView({
               <IconSpark size={18} /> AI Coach
             </h3>
             <AiKeyCard />
+            <div className="border-t border-[var(--border-subtle)] pt-4">
+              <ShigunCreditCard />
+            </div>
           </Spot>
         </Reveal>
       </div>
