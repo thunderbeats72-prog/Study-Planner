@@ -15,8 +15,15 @@ type HealthSnapshot = {
   ai?: { mode?: string; configuredProviders?: string[] };
 };
 
+/** What the last tutor reply actually came from — set by the page after
+ *  each /api/chat round-trip. "cloud" = a provider answered; "local" =
+ *  cloud was configured but the on-device engine answered instead;
+ *  "instant" = a deterministic reply (commands, greetings, plan queries)
+ *  that never needed the cloud. */
+export type LastReplySource = "cloud" | "local" | "instant" | null;
+
 export default function ChatPanel({
-  open, setOpen, messages, onSend, thinking, provider, learner, onOpenSettings,
+  open, setOpen, messages, onSend, thinking, provider, learner, onOpenSettings, lastSource = null,
 }: {
   open: boolean;
   setOpen: (v: boolean) => void;
@@ -24,6 +31,7 @@ export default function ChatPanel({
   onSend: (q: string) => void;
   thinking: boolean;
   provider?: string | null;
+  lastSource?: LastReplySource;
   learner?: { name: string; daysLeft: number; progressPct: number; streak: number; todayDone: number; todayTotal: number };
   /** Opens Settings → AI coach so a learner can connect a cloud key. */
   onOpenSettings?: () => void;
@@ -165,11 +173,26 @@ export default function ChatPanel({
     health?.ai?.configuredProviders?.length || provider || ownKeys.length
   );
 
+  /* The header used to say "Ready" whenever a key existed — even while every
+     cloud call was failing and the learner was getting fallback text. The
+     label now follows the LAST REAL REPLY: a cloud answer shows "Cloud AI",
+     a fallback shows "Local engine" so the state on screen matches what the
+     learner is experiencing. */
+  const degraded = isCloudActive && lastSource === "local";
   const statusText = thinking
     ? "Thinking…"
-    : isCloudActive
-      ? "Ready"
-      : "Local mode";
+    : !isCloudActive
+      ? "Local mode"
+      : lastSource === "cloud"
+        ? "Cloud AI · connected"
+        : degraded
+          ? "Cloud busy · local engine answered"
+          : "Ready";
+  const statusTitle = !isCloudActive
+    ? "Shigun is answering with the on-device study engine, so it is still plan-aware but less conversational. Connect a free key in Settings → AI coach for full tutoring."
+    : degraded
+      ? "The cloud providers didn't answer the last message in time, so the on-device engine replied. Send it again — the next provider in the chain picks it up."
+      : "Shigun is connected to its cloud AI layer, grounded by the on-device ML engine.";
 
   return (
     <>
@@ -194,13 +217,9 @@ export default function ChatPanel({
               <div className="ai-identity">
                 <div className="ai-title">Shigun</div>
                 <div
-                  className={`ai-status${isCloudActive ? "" : " off"}`}
+                  className={`ai-status${isCloudActive && !degraded ? "" : " off"}`}
                   aria-live="polite"
-                  title={
-                    isCloudActive
-                      ? "Shigun is connected to its cloud AI provider."
-                      : "Shigun is answering with the on-device study engine, so it is still plan-aware but less conversational. Cloud tutoring is configured by whoever runs this deployment."
-                  }
+                  title={statusTitle}
                 >
                   {statusText}
                 </div>

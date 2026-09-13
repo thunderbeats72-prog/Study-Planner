@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   configuredProviders, llmHealthSnapshot, probeProviders, activeProvider,
-  parseRuntimeKeys, hasRuntimeKeys,
+  parseRuntimeKeys, hasRuntimeKeys, providerCooldowns,
 } from "@/lib/ai";
 import { checkRateLimit } from "@/lib/rateLimit";
 
@@ -26,6 +26,9 @@ export async function GET(req: Request) {
     activeProvider: activeProvider(runtimeKeys),
     configuredProviders: providers,
     lastRequest: llmHealthSnapshot(),
+    /** Providers/models the failure memory is currently skipping, with the
+     *  reason and when they will be retried. Empty = nothing is benched. */
+    cooldowns: providerCooldowns(runtimeKeys),
     checkedAt: new Date().toISOString(),
   }, { headers: { "cache-control": "no-store" } });
 }
@@ -50,6 +53,7 @@ export async function POST(req: Request) {
     return NextResponse.json({
       ok: anyOk,
       probes,
+      cooldowns: providerCooldowns(runtimeKeys),
       usingOwnKey: hasRuntimeKeys(runtimeKeys),
       checkedAt: new Date().toISOString(),
     }, { headers: { "cache-control": "no-store" } });

@@ -33,6 +33,14 @@ const STOP = new Set([
   // solve", "what is the possible solution …") without carrying topic meaning
   "possible", "possibly", "solve", "solving", "solved", "going", "gonna", "want", "wants",
   "know", "knew", "think", "thinking", "really", "actually", "just", "like", "some", "any",
+  // talk ABOUT the assistant / the session — never a topic ("why did it
+  // take time to connect" once produced a lesson on the quiz show
+  // "Only Connect"; "why are you not responsive" hit a random article)
+  "take", "took", "taking", "time", "connect", "connected", "connecting", "connection",
+  "respond", "responding", "responsive", "response", "reply", "replying", "answer", "answering",
+  "work", "working", "works", "slow", "fast", "again", "still", "now", "yet", "already", "only",
+  "even", "also", "your", "you're", "youre", "are", "was", "were", "will", "would", "should",
+  "could", "there", "here", "then", "than", "very", "much", "many", "more", "most", "not",
   // Hindi / Marathi / Nepali (Devanagari)
   "क्या", "है", "हैं", "और", "में", "का", "की", "के", "को", "से", "पर", "यह", "वह", "कैसे", "कब",
   "कौन", "किस", "बताओ", "बताइए", "समझाओ", "समझाइए", "करो", "करें", "मतलब", "अर्थ", "के बारे में",
@@ -165,20 +173,62 @@ async function searchAndExtract(lang: string, term: string): Promise<Knowledge |
 
 /** True when the encyclopedia hit is actually about the asked topic, not a
  *  loosely related article that happened to share one common word. */
+/** Very light stemmer so "connected" ~ "connect", "elasticity" ~ "elastic". */
+function stem(word: string): string {
+  return word
+    .replace(/(ations?|ising|izing|ising|ities|ity|ment|ness|ings?|ied|ies|ed|ly|es|s)$/, "")
+    .replace(/(e)$/, "");
+}
+
+/** Does the article actually answer the question, or did the search just
+ *  latch onto one shared word? The previous check accepted an article when
+ *  ONE of the question's words appeared anywhere in the first 800
+ *  characters, which is how "why did it take time to connect" was "taught"
+ *  as the quiz show *Only Connect*. Now:
+ *   - the TITLE has to share a real word with the question, or
+ *   - the question's words have to cover most of the title AND appear in
+ *     the opening sentences (where the article defines its subject).
+ *  Disambiguation pages, TV/quiz-show/song/film articles for a study
+ *  question, and "may refer to" stubs are rejected outright. */
 export function isRelevantKnowledge(k: Knowledge, question: string): boolean {
   const term = searchTerms(question).toLowerCase();
   if (!term) return false;
   const title = k.title.toLowerCase();
   const extract = k.extract.toLowerCase();
-  const words = term.split(/\s+/).filter((word) => word.length >= 3);
+  const lead = extract.slice(0, 600);
+  if (/may refer to|disambiguation/.test(lead.slice(0, 160))) return false;
+
+  const latin = /[a-z]/.test(term);
+  const words = term.split(/\s+/).filter((word) => word.length >= (latin ? 3 : 2));
   if (!words.length) {
-    return title.includes(term) || extract.slice(0, 400).includes(term);
+    return title.includes(term) || lead.includes(term);
   }
-  if (words.length === 1) {
-    return title.includes(words[0]) || extract.slice(0, 600).includes(words[0]);
+  // Non-Latin scripts: substring matching is the only reliable tool.
+  if (!latin) {
+    const hits = words.filter((word) => title.includes(word) || lead.includes(word));
+    return hits.length >= Math.min(2, words.length) || title.includes(words[0]);
   }
-  const hits = words.filter((word) => title.includes(word) || extract.slice(0, 800).includes(word));
-  return hits.length >= Math.min(2, words.length);
+
+  const stems = words.map(stem).filter((w) => w.length >= 3);
+  const titleWords = title.split(/[^a-z0-9]+/).filter((w) => w.length >= 3).map(stem);
+  const titleHits = stems.filter((w) => titleWords.some((t) => t === w || t.startsWith(w) || w.startsWith(t)));
+  const leadHits = stems.filter((w) => lead.includes(w));
+
+  // A pop-culture article (quiz show, song, film, band, episode, video game)
+  // is almost never what a learner asking a concept question wanted, unless
+  // they explicitly asked about that show/film/song.
+  const popCulture = /\b(quiz show|game show|television (series|programme|program|show)|tv series|sitcom|episode|song|single|album|band|film|movie|video game|novel|manga|anime)\b/.test(lead.slice(0, 260));
+  const askedForMedia = /\b(show|series|film|movie|song|album|band|game|novel|book|anime|episode)\b/.test(term);
+  if (popCulture && !askedForMedia) return false;
+
+  if (stems.length === 1) {
+    return titleHits.length === 1 || (lead.slice(0, 300).includes(stems[0]) && titleWords.length <= 3);
+  }
+  // Multi-word: the title must share a real word, or the lead must contain
+  // most of the question's words.
+  if (titleHits.length >= 1 && leadHits.length >= Math.min(2, stems.length)) return true;
+  if (titleHits.length >= Math.min(2, stems.length)) return true;
+  return leadHits.length >= Math.max(2, Math.ceil(stems.length * 0.6));
 }
 
 /** Search Wikipedia (in the question's language, falling back to English)

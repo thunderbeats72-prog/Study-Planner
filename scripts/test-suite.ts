@@ -7,6 +7,15 @@ import {
   parseCommand,
   probeProviders,
   tutorSystemPrompt,
+  classifyProviderError,
+  stripThinking,
+  resetAiCooldowns,
+  providerCooldowns,
+  isAssistantStatusQuestion,
+  assistantStatusReply,
+  looksLikeConceptQuestion,
+  mlSignalLines,
+  type TutorContext,
 } from "../src/lib/ai";
 import { detectLanguage } from "../src/lib/language";
 import { wikiLangFor, searchTerms, teachFromKnowledge, isRelevantKnowledge } from "../src/lib/knowledge";
@@ -375,6 +384,165 @@ async function runTests() {
     if (oldCerebras === undefined) delete process.env.CEREBRAS_API_KEY; else process.env.CEREBRAS_API_KEY = oldCerebras;
     if (oldMistral === undefined) delete process.env.MISTRAL_API_KEY; else process.env.MISTRAL_API_KEY = oldMistral;
     if (oldSambanova === undefined) delete process.env.SAMBANOVA_API_KEY; else process.env.SAMBANOVA_API_KEY = oldSambanova;
+  }
+
+  console.log("\n--- 4c. v10 AI stack: error classes, failure memory, hedging, self-status ---");
+  {
+    // Error classification: the Cerebras retired-model wording says "does not
+    // exist or your API key does not have access" — that is a MODEL error,
+    // not an auth error (misreading it once benched the whole provider).
+    check(classifyProviderError(404, "Model llama3.1-70b does not exist or your API key does not have access to it") === "model",
+      "Cerebras retired-model 404 is classified as a model error, not auth");
+    check(classifyProviderError(401, "Invalid API key") === "auth", "401 is auth");
+    check(classifyProviderError(403, "Forbidden") === "auth", "403 is auth");
+    check(classifyProviderError(429, "Rate limit reached for model") === "rate_limit", "429 is rate_limit");
+    check(classifyProviderError(400, "The model `gemini-2.0-flash` has been decommissioned") === "model",
+      "400 decommissioned-model wording is a model error");
+    check(classifyProviderError(400, "reasoning_effort is not supported for this model") === "model",
+      "400 unsupported-parameter wording walks to the next model");
+    check(classifyProviderError(503, "upstream overloaded") === "provider", "503 is provider");
+    check(stripThinking("<think>plan the answer</think>Demand falls when price rises.") === "Demand falls when price rises.",
+      "Reasoning-model <think> blocks are stripped from the visible answer");
+    check(stripThinking("<think>still thinking and never closed") === "",
+      "An unclosed <think> block (budget spent thinking) yields an empty answer, not leaked reasoning");
+
+    // Failure memory + hedging: Cerebras stalls, Gemini answers; the second
+    // request must NOT wait on Cerebras again.
+    const originalFetch = globalThis.fetch;
+    const saved: Record<string, string | undefined> = {};
+    for (const name of ["GEMINI_API_KEY", "CEREBRAS_API_KEY", "GROQ_API_KEY", "MISTRAL_API_KEY", "SAMBANOVA_API_KEY", "COHERE_API_KEY", "OPENROUTER_API_KEY", "AI_TIMEOUT_MS"]) {
+      saved[name] = process.env[name];
+      delete process.env[name];
+    }
+    process.env.CEREBRAS_API_KEY = "test-cerebras-stall";
+    process.env.GEMINI_API_KEY = "test-gemini-live";
+    const stickyGlobal = globalThis as { __studyPlannerPreferred?: { provider: string; model: string } };
+    delete stickyGlobal.__studyPlannerPreferred;
+    resetAiCooldowns();
+
+    const hits: string[] = [];
+    globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input);
+      hits.push(url.includes("cerebras") ? "cerebras" : url.includes("generativelanguage") ? "gemini" : "other");
+      if (url.includes("cerebras")) {
+        // Never answers: resolve only when the caller aborts.
+        return new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
+        });
+      }
+      return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: "Hedged answer" }] } }] }), {
+        status: 200, headers: { "content-type": "application/json" },
+      });
+    }) as typeof fetch;
+
+    const started = Date.now();
+    const hedged = await callLLMDetailed("Tutor", [{ role: "user", content: "explain elasticity" }], 200);
+    const elapsed = Date.now() - started;
+    check(hedged.text === "Hedged answer" && hedged.provider === "gemini",
+      "A stalled first provider is hedged: the second provider answers in the same request");
+    check(elapsed < 6_000, `Hedged answer arrived in ${elapsed} ms — well under the per-attempt timeout`);
+    check(hits[0] === "cerebras" && hits.includes("gemini"),
+      "Priority order is kept — the hedge starts only after the leader goes silent");
+
+    // Give the abandoned Cerebras leg time to hit its own timeout so the
+    // failure memory records it, then check the next call skips it.
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    const benched = providerCooldowns();
+    hits.length = 0;
+    const second = await callLLMDetailed("Tutor", [{ role: "user", content: "explain supply" }], 200);
+    check(second.provider === "gemini" && second.text === "Hedged answer", "Second request still answers");
+    check(hits[0] === "gemini", "Sticky success goes straight to the provider that actually answered");
+    check(Array.isArray(benched) && benched.every((entry) => !JSON.stringify(entry).includes("test-cerebras")),
+      "Cooldown report never leaks the API key");
+
+    // Auth failure benches the provider for future requests.
+    resetAiCooldowns();
+    delete stickyGlobal.__studyPlannerPreferred;
+    hits.length = 0;
+    globalThis.fetch = (async (input: string | URL | Request) => {
+      const url = String(input);
+      hits.push(url.includes("cerebras") ? "cerebras" : url.includes("generativelanguage") ? "gemini" : "other");
+      if (url.includes("cerebras")) {
+        return new Response(JSON.stringify({ error: { message: "Invalid API key" } }), { status: 401, headers: { "content-type": "application/json" } });
+      }
+      return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: "Live" }] } }] }), { status: 200, headers: { "content-type": "application/json" } });
+    }) as typeof fetch;
+    await callLLMDetailed("Tutor", [{ role: "user", content: "q1" }], 100);
+    const afterAuth = providerCooldowns();
+    check(afterAuth.some((entry) => entry.provider === "Cerebras" && entry.reason === "auth" && entry.secondsLeft > 0),
+      "A rejected key is remembered (auth cooldown) so later requests do not pay for it");
+    hits.length = 0;
+    delete stickyGlobal.__studyPlannerPreferred;
+    await callLLMDetailed("Tutor", [{ role: "user", content: "q2" }], 100);
+    check(!hits.includes("cerebras"), "The benched provider is skipped on the next request");
+
+    globalThis.fetch = originalFetch;
+    resetAiCooldowns();
+    delete stickyGlobal.__studyPlannerPreferred;
+    for (const [name, value] of Object.entries(saved)) {
+      if (value === undefined) delete process.env[name]; else process.env[name] = value;
+    }
+
+    // Self-status questions: answered from connectivity state, never from
+    // the encyclopedia ("connect" → "Only Connect") and never with an apology.
+    const statusCtx: TutorContext = {
+      name: "Lakshit", courseName: "MBA", level: "pg", examDate: "2026-12-01", daysLeft: 79, dailyHours: 3,
+      subjects: [{ id: 1, name: "Financial Accounting", difficulty: "Hard", done: 2, total: 10 }],
+      today: [{ title: "Balance sheet basics", kind: "learn", minutes: 45, status: "pending" }],
+      progressPct: 20, streak: 4, hoursThisWeek: 5, overdue: 1,
+    };
+    for (const q of ["are you connected with ai", "are yoh connected with api", "why are you not responsive", "why ai is not working", "why did it take time to connect", "which model are you?"]) {
+      check(isAssistantStatusQuestion(q), `Self-status intent recognised: "${q}"`);
+    }
+    for (const q of ["explain what an API is", "what is artificial intelligence", "teach me linear regression", "is the balance sheet connected to the income statement"]) {
+      check(!isAssistantStatusQuestion(q), `Study question is NOT mistaken for self-status: "${q}"`);
+    }
+    const connected = assistantStatusReply("are you connected with ai", statusCtx, { cloud: true, lastOk: true });
+    check(/connected/i.test(connected) && /Balance sheet basics/.test(connected), "Connected status reply confirms and points at the next lesson");
+    check(!/cerebras|groq|gemini|mistral|cohere|sambanova|openrouter/i.test(connected), "Status reply never names a vendor");
+    const offline = assistantStatusReply("are you connected with ai", statusCtx, { cloud: false });
+    check(/Settings/.test(offline) && /on-device/i.test(offline), "No-key status reply explains local mode and how to connect a key");
+    check(!looksLikeConceptQuestion("why did it take time to connect") && !looksLikeConceptQuestion("this is wrong") && !looksLikeConceptQuestion("why are you repeating"),
+      "Feedback and meta chatter never reach the encyclopedia");
+    check(looksLikeConceptQuestion("what is a balance sheet") && looksLikeConceptQuestion("can you explain opportunity cost"),
+      "Real concept questions still reach the encyclopedia");
+    const onlyConnect = { title: "Only Connect", extract: "Only Connect is a British television quiz show presented by Victoria Coren Mitchell.", url: "", related: [], lang: "en" };
+    check(!isRelevantKnowledge(onlyConnect, "why did it take time to connect"), "\"Only Connect\" is rejected as an answer to a connection complaint");
+    const balance = { title: "Balance sheet", extract: "In financial accounting, a balance sheet is a summary of the financial balances of an organization.", url: "", related: [], lang: "en" };
+    check(isRelevantKnowledge(balance, "what is a balance sheet"), "A matching article still passes the stricter relevance gate");
+
+    // Navigation + theme vocabulary from the bug report.
+    check(parseCommand("navigate me to analytics")?.payload === "analytics", "\"navigate me to analytics\" opens Analytics");
+    check(parseCommand("bring me to the planner")?.payload === "planner", "\"bring me to the planner\" opens Planner");
+    check(parseCommand("analytics")?.payload === "analytics", "Bare \"analytics\" opens Analytics");
+    check(parseCommand("change theme to something green")?.payload === "mint", "\"something green\" maps to the mint theme");
+    check(parseCommand("purple theme please")?.payload === "silver-lavender", "\"purple\" maps to silver-lavender");
+    check(parseCommand("set orange mode")?.payload === "sunset", "\"orange\" maps to sunset");
+    check(parseCommand("I like green tea") === undefined, "A sentence with a colour word is not a theme command");
+
+    // ML signals reach the tutor.
+    const mlCtx: TutorContext = {
+      ...statusCtx,
+      ml: {
+        pace: 1.3, paceSamples: 12, slowSubjects: [{ name: "Financial Accounting", pace: 1.42 }], fastSubjects: [],
+        tomorrowSkipRisk: 0.62, peakHour: 21, focusSamples: 9,
+        readiness: { onTrack: false, loadPct: 118, likelyDays: 93, pessimisticDays: 110, samples: 12 },
+        effectiveDailyMinutes: 95, activeDays: 14, dueReviews: [{ title: "Ratios", overdueDays: 2 }],
+        memory: { strong: 5, fading: 2, atRisk: 1, tracked: 8 }, weekdayRates: null, weakestSubject: "Financial Accounting",
+      },
+    };
+    const prompt = tutorSystemPrompt(mlCtx);
+    check(/skip risk: 62%/i.test(prompt) && /9pm–11pm/.test(prompt) && /BEHIND/.test(prompt) && /Ratios \(2d overdue\)/.test(prompt),
+      "System prompt carries pace, skip-risk, peak-hour, readiness and due-review signals");
+    check(mlSignalLines(undefined).length === 0 && /not enough logged history/.test(tutorSystemPrompt(statusCtx)),
+      "Without history the prompt says so instead of inventing numbers");
+    const progress = instantTutorReply("how am I doing?", mlCtx);
+    check(!!progress && /behind/i.test(progress.text) && /30% slower/.test(progress.text) && /Ratios/.test(progress.text),
+      "Instant progress reply is enriched with readiness, pace and due reviews");
+    const peak = instantTutorReply("when do I focus best?", mlCtx);
+    check(!!peak && /9pm–11pm/.test(peak.text), "Peak-hour question is answered from the focus profile");
+    const risk = instantTutorReply("will I skip tomorrow?", mlCtx);
+    check(!!risk && /62%/.test(risk.text) && /high/i.test(risk.text), "Tomorrow skip-risk question is answered from the model");
   }
 
   console.log("\n--- 5. Study Clock Accounting ---");

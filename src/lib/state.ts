@@ -7,7 +7,12 @@ import { addDays, diffDays, todayStr } from "./planner";
 import type { TutorContext } from "./ai";
 import { advancedTopicMetadata } from "./curriculum";
 import { dateDistanceDays, isIsoDate } from "./validation";
-import { fsrsInit, fsrsReview, masteryDelta, type ReviewRating } from "./ml";
+import {
+  fsrsInit, fsrsReview, masteryDelta, type ReviewRating,
+  learnPace, paceFor, learnWeekdays, learnTimeOfDay, skipRisk, projectReadiness,
+  retrievability, learnEffectiveDailyMinutes, dueReviews,
+} from "./ml";
+import type { TutorMlSignals } from "./ai";
 import { prioritizeTasks, weakestSubjectIds } from "./prioritization";
 
 /** Transaction handle type as produced by `db.transaction(cb)`. */
@@ -271,12 +276,20 @@ export function buildContext(s: St, today = todayStr()): TutorContext {
         reason: ranked?.reason,
       };
     });
+  const daysLeft = Math.max(0, diffDays(today, s.settings.examDate));
+  let ml: TutorMlSignals | undefined;
+  try {
+    ml = mlSignals(s, today, daysLeft, weakIds, subs);
+  } catch (error) {
+    // The coach must never fail because a model choked on odd data.
+    console.warn("ML signals skipped:", error instanceof Error ? error.message : error);
+  }
   return {
     name: s.user.name,
     courseName: s.user.courseName,
     level: s.user.level,
     examDate: s.settings.examDate,
-    daysLeft: Math.max(0, diffDays(today, s.settings.examDate)),
+    daysLeft,
     dailyHours: s.settings.dailyHours,
     subjects: subs,
     today: todayContext,
@@ -284,6 +297,113 @@ export function buildContext(s: St, today = todayStr()): TutorContext {
     streak: s.user.streak,
     hoursThisWeek,
     overdue: s.tasks.filter((t) => t.status === "pending" && diffDays(t.date, today) > 0).length,
+    ml,
+  };
+}
+
+/**
+ * The ML engine's read of this learner, in the shape the coach consumes.
+ * Same models, same inputs as GET /api/analytics — so what the tutor says
+ * about pace, risk or readiness is exactly what the Intelligence card shows.
+ * Pure and synchronous: it runs on every chat turn, on data already loaded.
+ */
+function mlSignals(
+  s: St,
+  today: string,
+  daysLeft: number,
+  weakIds: number[],
+  subs: { id: number; name: string; done: number; total: number }[]
+): TutorMlSignals {
+  const history = s.tasks.map((t) => ({
+    subjectId: t.subjectId, topicId: t.topicId, date: t.date, kind: t.kind,
+    status: t.status, plannedMinutes: t.plannedMinutes, actualMinutes: t.actualMinutes,
+  }));
+  const pace = learnPace(history);
+  const perSubject = s.subjects.map((sub) => ({ name: sub.name, pace: paceFor(pace, sub.id), known: pace.bySubject.has(sub.id) }))
+    .filter((x) => x.known);
+  const slowSubjects = perSubject.filter((x) => x.pace >= 1.15).sort((a, b) => b.pace - a.pace).map(({ name, pace }) => ({ name, pace }));
+  const fastSubjects = perSubject.filter((x) => x.pace <= 0.85).sort((a, b) => a.pace - b.pace).map(({ name, pace }) => ({ name, pace }));
+
+  const weekdays = learnWeekdays(history);
+  const focus = learnTimeOfDay(s.sessions.map((x) => ({ createdAt: x.createdAt, minutes: x.minutes, mode: x.mode })));
+
+  const tomorrowStr = addDays(today, 1);
+  const tomorrowTasks = s.tasks.filter((t) => t.date === tomorrowStr && t.status === "pending");
+  const recent = s.tasks.filter((t) => t.date < today && t.kind !== "buffer");
+  const recentDone = recent.filter((t) => t.status === "done").length;
+  const tomorrowSkipRisk = tomorrowTasks.length
+    ? skipRisk({
+        dow: new Date(`${tomorrowStr}T12:00:00`).getDay(),
+        taskCount: tomorrowTasks.length,
+        totalMinutes: tomorrowTasks.reduce((a, t) => a + t.plannedMinutes, 0),
+        dailyBudgetMinutes: Math.round(s.settings.dailyHours * 60),
+        streak: s.user.streak,
+        recentCompletionRate: recent.length ? recentDone / recent.length : 0.7,
+      })
+    : null;
+
+  const remainingMin = s.tasks
+    .filter((t) => t.status === "pending" && t.kind === "learn")
+    .reduce((a, t) => a + t.plannedMinutes, 0);
+  const effective = learnEffectiveDailyMinutes(
+    s.sessions.map((x) => ({ date: x.date, minutes: x.minutes, mode: x.mode })),
+    today
+  );
+  const readinessFull = projectReadiness(
+    history, remainingMin, Math.round(s.settings.dailyHours * 60), daysLeft,
+    effective.activeDays > 0 ? { minutes: effective.minutes, activeDays: effective.activeDays } : undefined
+  );
+  const readiness = readinessFull.samples > 0 || effective.activeDays > 0
+    ? {
+        onTrack: readinessFull.onTrack, loadPct: readinessFull.loadPct,
+        likelyDays: readinessFull.likelyDays, pessimisticDays: readinessFull.pessimisticDays,
+        samples: readinessFull.samples,
+      }
+    : null;
+
+  const topicTitle = new Map(s.topics.map((t) => [t.id, t.title]));
+  const learned = s.topics.filter((t) => t.status === "done");
+  let strong = 0, fading = 0, atRisk = 0;
+  for (const t of learned) {
+    const stability = Number((t as { stability?: number }).stability || 0);
+    const lastReview = (t as { lastReview?: string | null }).lastReview || null;
+    if (stability > 0 && lastReview) {
+      const r = retrievability(stability, Math.max(0, diffDays(lastReview, today)));
+      if (r >= 0.85) strong++;
+      else if (r >= 0.65) fading++;
+      else atRisk++;
+    } else strong++;
+  }
+  const due = dueReviews(
+    learned.map((t) => ({
+      topicId: t.id,
+      stability: Number((t as { stability?: number }).stability || 0),
+      lastReview: (t as { lastReview?: string | null }).lastReview || "",
+    })),
+    today,
+    2
+  )
+    .sort((a, b) => b.overdueDays - a.overdueDays)
+    .slice(0, 6)
+    .map((d) => ({ title: topicTitle.get(d.topicId) || `Topic ${d.topicId}`, overdueDays: d.overdueDays }));
+
+  const weakest = weakIds.length ? subs.find((x) => x.id === weakIds[0]) : undefined;
+
+  return {
+    pace: Math.round(pace.global * 100) / 100,
+    paceSamples: pace.samples,
+    slowSubjects,
+    fastSubjects,
+    tomorrowSkipRisk,
+    peakHour: focus.peakHour,
+    focusSamples: focus.samples,
+    readiness,
+    effectiveDailyMinutes: effective.minutes,
+    activeDays: effective.activeDays,
+    dueReviews: due,
+    memory: { strong, fading, atRisk, tracked: learned.length },
+    weekdayRates: weekdays.samples >= 14 ? weekdays.rates : null,
+    weakestSubject: weakest && weakest.total > 0 ? weakest.name : null,
   };
 }
 
