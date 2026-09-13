@@ -2,6 +2,7 @@
 
 import React from "react";
 import { cn } from "@/lib/cn";
+import { mmss } from "@/lib/useTimer";
 import {
   dayDiff,
   KIND_META,
@@ -56,6 +57,10 @@ export type TaskCardProps = {
   live?: boolean;
   liveSeconds?: number;
   liveRunning?: boolean;
+  /** Active seconds of the open session not yet saved to `sessions`.
+   *  Added to the logged total while `live`, so the card shows the real
+   *  ticking value even before the first whole minute is flushed. */
+  livePendingSeconds?: number;
   /** Optional scroll target used when a planner brief opens. */
   briefRef?: React.RefObject<HTMLElement | null>;
   /** Planner passes handlers so the full brief can be expanded. */
@@ -81,6 +86,13 @@ const isCheckpoint = (task: TaskRow) =>
   task.kind === "checkpoint" ||
   (!!task.title && task.title.toLowerCase().startsWith("checkpoint:"));
 
+/** "12m" / "12.5m" — whole minutes stay integer, fractional sessions keep
+ *  one decimal so a 90-second clock-out reads "1.5m", not "2m". */
+function formatLoggedMinutes(minutes: number): string {
+  const rounded = Math.round(minutes * 10) / 10;
+  return Number.isInteger(rounded) ? `${rounded}m` : `${rounded.toFixed(1)}m`;
+}
+
 /** "Today" / "Tomorrow" / "Yesterday" / "in 3 days" — short, so the chip
  *  fits on a 320px screen without wrapping the whole meta row. */
 function dueLabel(date: string) {
@@ -103,6 +115,7 @@ export default function TaskCard({
   live,
   liveSeconds,
   liveRunning,
+  livePendingSeconds,
   briefRef,
   briefOpen,
   onToggleBrief,
@@ -132,6 +145,19 @@ export default function TaskCard({
   const brief = topic?.summary || task.detail || "";
   const hasBriefPanel = !!topic || !!task.detail;
   const due = dueLabel(task.date);
+
+  /* Actual study time for this task: saved sessions (persisted after clock
+     out) PLUS the active seconds of the open session that have not yet been
+     flushed to the server. The open session's already-flushed whole minutes
+     are already inside `loggedMinutes`, so adding `livePendingSeconds`
+     cannot double-count, and the value ticks every second while recording. */
+  const liveExtraSeconds = live
+    ? Math.max(0, Math.floor(livePendingSeconds ?? 0))
+    : 0;
+  const persistedLoggedSeconds = Math.round(loggedMinutes * 60);
+  const totalLoggedSeconds = persistedLoggedSeconds + liveExtraSeconds;
+  const totalLoggedMinutes = totalLoggedSeconds / 60;
+  const showLogged = live ? totalLoggedSeconds > 0 : loggedMinutes > 0;
 
   return (
     <article
@@ -191,9 +217,12 @@ export default function TaskCard({
             <IconCalendar size={11} />
             <span title={prettyLong(task.date)}>{due}</span>
           </li>
-          <li className="task-meta-item">
-            <IconClock size={11} />
-            <span>{task.plannedMinutes} min</span>
+          <li
+            className="task-meta-item is-planned"
+            title="Planned duration for this task"
+          >
+            <IconClock size={11} aria-hidden="true" />
+            <span>{task.plannedMinutes}m planned</span>
           </li>
           {topic?.unit && (
             <li
@@ -213,10 +242,28 @@ export default function TaskCard({
               <span>{topic.difficulty}</span>
             </li>
           )}
-          {loggedMinutes > 0 && (
-            <li className="task-meta-item is-logged" title="Minutes logged on this task">
+          {showLogged && (
+            <li
+              className={cn(
+                "task-meta-item is-logged",
+                live && "is-logging",
+              )}
+              title={
+                live
+                  ? `Actual study time logged on this task — recording now (${mmss(totalLoggedSeconds)})`
+                  : "Actual minutes studied and logged on this task"
+              }
+            >
               <IconCheck size={11} aria-hidden="true" />
-              <span>{Math.round(loggedMinutes)}m logged</span>
+              {live ? (
+                <span className="mono task-logged-value">
+                  {mmss(totalLoggedSeconds)} logged
+                </span>
+                ) : (
+                <span className="task-logged-value">
+                  {formatLoggedMinutes(totalLoggedMinutes)} logged
+                </span>
+              )}
             </li>
           )}
         </ul>

@@ -69,6 +69,7 @@ export default function PlannerView({
   onFocusTask,
   activeTaskId,
   activeClockSeconds,
+  clockPendingSeconds,
   clockRunning,
   clockSessionActive,
   onPauseOrResume,
@@ -86,6 +87,8 @@ export default function PlannerView({
   onFocusTask: (taskId: number) => void;
   activeTaskId?: number | null;
   activeClockSeconds?: number;
+  /** Active seconds of the open session not yet flushed to saved sessions. */
+  clockPendingSeconds?: number;
   clockRunning?: boolean;
   clockSessionActive?: boolean;
   onPauseOrResume?: () => void;
@@ -589,6 +592,7 @@ export default function PlannerView({
                           loggedMinutes={taskLogged(task.id)}
                           live={activeTaskId === task.id}
                           liveSeconds={activeClockSeconds}
+                          livePendingSeconds={clockPendingSeconds}
                           liveRunning={clockRunning}
                           briefRef={expanded === task.id ? briefRef : undefined}
                           briefOpen={expanded === task.id}
@@ -673,6 +677,7 @@ export default function PlannerView({
                     loggedMinutes={taskLogged(tk.id)}
                     live={activeTaskId === tk.id}
                     liveSeconds={activeClockSeconds}
+                    livePendingSeconds={clockPendingSeconds}
                     liveRunning={clockRunning}
                     briefOpen={expanded === tk.id}
                     onToggleBrief={

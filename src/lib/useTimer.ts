@@ -37,6 +37,11 @@ export type ClockApi = {
   sessionActive: boolean;
   elapsed: number;          // seconds in the current session (survives pause, clears on clock-out)
   sessionTotal: number;     // seconds accumulated today in this browser session
+  /** Active seconds of the open session not yet acknowledged into saved
+   *  sessions (0..59 while recording, the banked remainder while paused).
+   *  Lets the cards show the logged total ticking in real time without
+   *  double-counting minutes that have already been flushed to the server. */
+  pendingSeconds: number;
   subjectId: number | null;
   taskId: number | null;
   setSubjectId: (v: number | null) => void;
@@ -58,6 +63,7 @@ export function useStudyClock(
   const [sessionOpen, setSessionOpen] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [sessionTotal, setSessionTotal] = useState(0);
+  const [pendingSeconds, setPendingSeconds] = useState(0);
   const [subjectId, setSubjectId] = useState<number | null>(null);
   const [taskId, setTaskId] = useState<number | null>(null);
 
@@ -93,8 +99,9 @@ export function useStudyClock(
     const emitMs = fullMinutesOnly
       ? Math.floor(available / 60_000) * 60_000
       : available >= 1_000 ? available : 0;
-    if (emitMs <= 0) return;
     pendingLogMs.current = Math.max(0, available - emitMs);
+    setPendingSeconds(Math.floor(pendingLogMs.current / 1000));
+    if (emitMs <= 0) return;
     const minutes = Math.round((emitMs / 60_000) * 100) / 100;
     setSessionTotal((value) => value + Math.round(emitMs / 1000));
     logRef.current(minutes, meta.current.subjectId, meta.current.taskId, "clock");
@@ -111,6 +118,7 @@ export function useStudyClock(
       lastUnloggedAt.current = null;
     }
     setElapsed(Math.floor(accumulatedActiveMs.current / 1000));
+    setPendingSeconds(Math.floor(pendingLogMs.current / 1000));
   }, []);
 
   // Tick from wall-clock so active time remains accurate in throttled tabs.
@@ -166,6 +174,7 @@ export function useStudyClock(
     segmentStartedAt.current = now;
     lastUnloggedAt.current = now;
     setElapsed(0);
+    setPendingSeconds(0);
     changeBreak(false);
     changeSessionOpen(true);
     changeRunning(true);
@@ -215,6 +224,7 @@ export function useStudyClock(
     lastUnloggedAt.current = null;
     pendingLogMs.current = 0;
     setElapsed(0);
+    setPendingSeconds(0);
   }, [bankActiveSegment, changeBreak, changeRunning, changeSessionOpen, emitPending]);
 
   const toggle = useCallback(() => {
@@ -224,7 +234,8 @@ export function useStudyClock(
   }, [clockIn, pause, resume]);
 
   return {
-    running, onBreak, sessionActive: sessionOpen, elapsed, sessionTotal, subjectId, taskId,
+    running, onBreak, sessionActive: sessionOpen, elapsed, sessionTotal, pendingSeconds,
+    subjectId, taskId,
     setSubjectId, setTaskId, clockIn, pause, resume, takeBreak, endBreak, clockOut, toggle,
   };
 }

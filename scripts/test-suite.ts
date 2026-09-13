@@ -49,6 +49,7 @@ import {
   type SessionCommand, type SessionSnapshot,
 } from "../src/lib/studySession";
 import TaskActions from "../src/components/TaskActions";
+import TaskCard from "../src/components/TaskCard";
 import type { SubjectRow } from "../src/lib/client";
 
 let passed = 0;
@@ -822,6 +823,63 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
   if (originalDocument === undefined) delete (globalThis as { document?: unknown }).document;
   else (globalThis as { document?: unknown }).document = originalDocument;
 
+  console.log("\n--- 5e. Real-time logged seconds exposed while recording ---");
+  {
+    // Section 5 tears its window/document shims down on exit; the clock's
+    // interval needs them, so install minimal local ones for this block.
+    const g = globalThis as unknown as {
+      window?: unknown;
+      document?: unknown;
+      IS_REACT_ACT_ENVIRONMENT?: boolean;
+    };
+    const hadWindow = "window" in g;
+    const prevWindow = g.window;
+    const hadDocument = "document" in g;
+    const prevDocument = g.document;
+    g.window = globalThis;
+    g.IS_REACT_ACT_ENVIRONMENT = true;
+    g.document = {
+      visibilityState: "visible",
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    };
+    const liveLogged: number[] = [];
+    let liveClock!: ClockApi;
+    const LiveProbe = () => {
+      liveClock = useStudyClock((m) => liveLogged.push(m));
+      return React.createElement("div");
+    };
+    let liveRenderer!: TestRenderer.ReactTestRenderer;
+    await act(async () => {
+      liveRenderer = TestRenderer.create(React.createElement(LiveProbe));
+    });
+    await act(async () => { liveClock.clockIn({ taskId: 99 }); });
+    check(liveClock.pendingSeconds === 0, "Fresh clock-in starts with zero unflushed logged seconds");
+    // Let the real 1-second wall-clock interval tick a couple of times.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 2150));
+    });
+    check(
+      liveClock.elapsed >= 1 && liveClock.pendingSeconds >= 1,
+      "The open session ticks elapsed and pending logged seconds every second"
+    );
+    check(liveLogged.length === 0, "Sub-minute active time is not flushed to saved sessions yet");
+    await act(async () => { liveClock.pause(); });
+    check(liveClock.pendingSeconds === 0, "Pausing banks and flushes the pending active time");
+    check(
+      liveLogged.reduce((a, b) => a + b, 0) > 0,
+      "Pause persists the active seconds as fractional logged minutes"
+    );
+    await act(async () => { liveClock.clockOut(); });
+    check(!liveClock.sessionActive, "Clock-out closes the open session");
+    check(liveClock.pendingSeconds === 0 && liveClock.elapsed === 0, "Clock-out resets the live session counters");
+    await act(async () => { liveRenderer.unmount(); });
+    if (hadWindow) g.window = prevWindow;
+    else delete g.window;
+    if (hadDocument) g.document = prevDocument;
+    else delete g.document;
+  }
+
   console.log("\n--- 5b. Study-Clock Auto-Completion Rule ---");
   check(shouldAutoComplete(28, 15, "pending"), "28 logged minutes complete a 15-minute recall");
   check(shouldAutoComplete(15, 15, "pending"), "Exactly the planned time completes");
@@ -1419,6 +1477,78 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
   else (globalThis as { window?: unknown }).window = menuWindow;
   if (menuDocument === undefined) delete (globalThis as { document?: unknown }).document;
   else (globalThis as { document?: unknown }).document = menuDocument;
+
+  console.log("\n--- 15b. Task card shows planned AND real-time logged time ---");
+  {
+    const cardTask: TaskRow = {
+      id: 41, userId: 1, date: "2026-09-13", subjectId: null, topicId: null,
+      kind: "learn", title: "Photosynthesis basics", detail: "",
+      plannedMinutes: 60, actualMinutes: 0, status: "pending", position: 0,
+    };
+    const cardNoop = () => undefined;
+    const quietErr = () => {
+      const original = console.error;
+      console.error = (...args: unknown[]) => {
+        if (String(args[0] || "").includes("react-test-renderer is deprecated")) return;
+        original(...args as never[]);
+      };
+      return () => { console.error = original; };
+    };
+    const collectText = (node: unknown): string => {
+      if (node == null || typeof node === "boolean") return "";
+      if (typeof node === "string") return node;
+      if (Array.isArray(node)) return node.map(collectText).join("");
+      const children = (node as { children?: unknown }).children;
+      return children ? collectText(children) : "";
+    };
+    const fullText = (instance: TestRenderer.ReactTestRenderer) =>
+      collectText(instance.toJSON());
+    const renderCard = async (props: Record<string, unknown>) => {
+      let instance!: TestRenderer.ReactTestRenderer;
+      const restore = quietErr();
+      await act(async () => {
+        instance = TestRenderer.create(
+          React.createElement(TaskCard, {
+            task: cardTask,
+            onTaskStatus: cardNoop,
+            onFocusTask: cardNoop,
+            onClockOut: cardNoop,
+            onEdit: cardNoop,
+            ...props,
+          }),
+        );
+      });
+      restore();
+      return instance;
+    };
+
+    // 1) Idle, nothing logged yet: planned is labelled, logged is absent.
+    const idle = await renderCard({ loggedMinutes: 0 });
+    check(fullText(idle).includes("60m planned"), "Planned duration is clearly labelled '60m planned'");
+    check(!fullText(idle).includes("logged"), "No logged chip is shown before any study time exists");
+
+    // 2) Completed session: persisted minutes read clearly and separately.
+    const done = await renderCard({ loggedMinutes: 12.5 });
+    check(fullText(done).includes("12.5m logged"), "Persisted actual time reads '12.5m logged' after clock-out");
+    check(fullText(done).includes("60m planned"), "Planned and logged values are shown separately");
+
+    // 3) Live session: the not-yet-flushed active seconds join the saved
+    //    minutes and tick in mm:ss, so the card counts up while recording.
+    const live = await renderCard({
+      loggedMinutes: 12,
+      live: true,
+      liveSeconds: 154,
+      livePendingSeconds: 34,
+      liveRunning: true,
+      activeTaskId: 41,
+      clockSessionActive: true,
+      clockRunning: true,
+      onPauseOrResume: cardNoop,
+    });
+    const liveText = fullText(live);
+    check(liveText.includes("12:34 logged"), `Live card shows the ticking total '12:34 logged' (got ${liveText.match(/.{0,12}logged.{0,4}/g)})`);
+    check(liveText.includes("Recording"), "Live card keeps its recording badge");
+  }
 
   console.log("\n--- 16. Onboarding Contract & Polish Guards ---");
   const coursesRoute = readFileSync(join(process.cwd(), "src/app/api/courses/route.ts"), "utf8");

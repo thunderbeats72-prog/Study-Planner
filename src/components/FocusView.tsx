@@ -106,13 +106,38 @@ export default function FocusView({
   const circ = 2 * Math.PI * 104;
 
   const clockTask = state.tasks.find((x) => x.id === clock.taskId);
-  const loggedTodayRaw = state.sessions
-    .filter((x) => x.date === t)
-    .reduce((a, x) => a + x.minutes, 0);
+  /* The open session's not-yet-flushed active seconds count toward today and
+     toward the attached task, so the logged figures tick in real time and
+     agree with the task cards after clock-out (flushed minutes are already
+     part of state.sessions, so adding the pending remainder cannot double
+     count). */
+  const livePendingSeconds = clock.sessionActive
+    ? Math.max(0, clock.pendingSeconds)
+    : 0;
+  const loggedTodayRaw =
+    state.sessions
+      .filter((x) => x.date === t)
+      .reduce((a, x) => a + x.minutes, 0) + livePendingSeconds / 60;
   const loggedToday = Math.round(loggedTodayRaw * 10) / 10;
   const loggedTodayLabel = Number.isInteger(loggedToday)
     ? String(loggedToday)
     : loggedToday.toFixed(1);
+
+  const clockTaskLive = !!clockTask && clock.sessionActive && clock.taskId === clockTask.id;
+  const clockTaskLoggedRaw = clockTask
+    ? state.sessions
+        .filter((x) => x.taskId === clockTask.id)
+        .reduce((a, x) => a + x.minutes, 0)
+    : 0;
+  const clockTaskLoggedSec =
+    Math.round(clockTaskLoggedRaw * 60) +
+    (clockTaskLive ? livePendingSeconds : 0);
+  const clockTaskLoggedMin = Math.round((clockTaskLoggedSec / 60) * 10) / 10;
+  const clockTaskLoggedLabel = clockTaskLive
+    ? mmss(clockTaskLoggedSec)
+    : Number.isInteger(clockTaskLoggedMin)
+      ? String(clockTaskLoggedMin)
+      : clockTaskLoggedMin.toFixed(1);
 
   const clockStateLabel = clock.running
     ? "Recording now"
@@ -207,8 +232,10 @@ export default function FocusView({
               <p className="focus-clock-digits mono">{mmss(clock.elapsed)}</p>
               <p className="focus-clock-logged">
                 {loggedToday > 0
-                  ? `${loggedTodayLabel} min logged today`
-                  : "Nothing logged today yet"}
+                  ? `${loggedTodayLabel} min logged today${clock.sessionActive ? " · recording now" : ""}`
+                  : clock.sessionActive
+                    ? "Logging your first minute…"
+                    : "Nothing logged today yet"}
               </p>
               <svg
                 className="focus-clock-wave"
@@ -329,9 +356,14 @@ export default function FocusView({
 
             {clockTask && (
               <div className="focus-clock-task">
-                <span className="chip chip-kind">
-                  {clockTask.actualMinutes}m / {clockTask.plannedMinutes}m
-                  planned
+                <span
+                  className="chip chip-kind"
+                  title={`Actual logged time vs planned duration for “${clockTask.title}”`}
+                >
+                  <IconCheck size={11} aria-hidden="true" />{" "}
+                  {clockTaskLoggedLabel}
+                  {clockTaskLive ? "" : "m"} logged ·{" "}
+                  {clockTask.plannedMinutes}m planned
                 </span>
                 <button
                   type="button"
