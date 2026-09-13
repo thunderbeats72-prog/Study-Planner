@@ -111,6 +111,7 @@ export default function Dashboard({
   onFocusTask,
   activeTaskId,
   activeClockSeconds,
+  clockPendingSeconds,
   clockRunning,
   clockSessionActive,
   clockOnBreak,
@@ -132,6 +133,8 @@ export default function Dashboard({
   onFocusTask: (taskId: number) => void;
   activeTaskId?: number | null;
   activeClockSeconds?: number;
+  /** Active seconds of the open session not yet flushed to saved sessions. */
+  clockPendingSeconds?: number;
   clockRunning?: boolean;
   clockSessionActive?: boolean;
   clockOnBreak?: boolean;
@@ -289,6 +292,13 @@ export default function Dashboard({
     const r = Math.round(m * 10) / 10;
     return `${Number.isInteger(r) ? r : r.toFixed(1)}m`;
   };
+  /* Actual logged time for the hero task, including the open session's
+     not-yet-flushed active seconds so it ticks in real time while recording;
+     after clock out only the persisted sessions remain. */
+  const heroLoggedSeconds = top
+    ? Math.round(taskLogged(top.id) * 60) +
+      (heroLive ? Math.max(0, clockPendingSeconds ?? 0) : 0)
+    : 0;
 
   const stats = [
     {
@@ -362,8 +372,11 @@ export default function Dashboard({
                 </div>
                 <h2 className="dash-hero-title">{topTitle}</h2>
                 <div className="dash-hero-meta">
-                  <span className="meta-item">
-                    <IconClock size={14} /> {top.plannedMinutes} min
+                  <span
+                    className="meta-item is-planned"
+                    title="Planned duration"
+                  >
+                    <IconClock size={14} /> {top.plannedMinutes}m planned
                   </span>
                   {topSubject && (
                     <span className="meta-item">
@@ -374,9 +387,22 @@ export default function Dashboard({
                       {topSubject.name}
                     </span>
                   )}
-                  {taskLogged(top.id) > 0 && (
-                    <span className="meta-item is-logged mono">
-                      {fmtMin(taskLogged(top.id))} already logged
+                  {heroLoggedSeconds > 0 && (
+                    <span
+                      className={cn(
+                        "meta-item is-logged mono",
+                        heroLive && "is-logging",
+                      )}
+                      title={
+                        heroLive
+                          ? "Actual study time logged — recording now"
+                          : "Actual time already studied and logged"
+                      }
+                    >
+                      <IconCheck size={13} aria-hidden="true" />
+                      {heroLive
+                        ? `${mmss(heroLoggedSeconds)} logged`
+                        : `${fmtMin(heroLoggedSeconds / 60)} logged`}
                     </span>
                   )}
                 </div>
@@ -614,6 +640,7 @@ export default function Dashboard({
                         loggedMinutes={taskLogged(task.id)}
                         live={activeTaskId === task.id}
                         liveSeconds={activeClockSeconds}
+                        livePendingSeconds={clockPendingSeconds}
                         liveRunning={clockRunning}
                         briefOpen={expandedTaskId === task.id}
                         onToggleBrief={

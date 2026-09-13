@@ -2035,6 +2035,7 @@ export default function Home() {
               onFocusTask={focusTask}
               activeTaskId={clock.taskId}
               activeClockSeconds={clock.elapsed}
+              clockPendingSeconds={clock.pendingSeconds}
               clockRunning={clock.running}
               clockSessionActive={clock.sessionActive}
               clockOnBreak={clock.onBreak}
@@ -2059,6 +2060,7 @@ export default function Home() {
               onFocusTask={focusTask}
               activeTaskId={clock.taskId}
               activeClockSeconds={clock.elapsed}
+              clockPendingSeconds={clock.pendingSeconds}
               clockRunning={clock.running}
               clockSessionActive={clock.sessionActive}
               onPauseOrResume={pauseOrResume}
