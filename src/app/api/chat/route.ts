@@ -11,6 +11,7 @@ import {
 } from "@/lib/ai";
 import { classifyModelAnswer } from "@/lib/aiAnswer";
 import { checkRateLimit } from "@/lib/rateLimit";
+import { getShigunUsage, recordShigunUse } from "@/lib/shigunUsage";
 import { readJsonObject, validationPayload } from "@/lib/validation";
 import { regeneratePlan } from "@/lib/generate";
 import { appendChatTurn } from "@/lib/chatTurn";
@@ -425,6 +426,13 @@ async function handleChat(req: Request, opts: HandleChatOptions) {
   const state = await fullState(key);
   const localDate = dateFrom(req);
   const ctx = buildContext(state, localDate);
+  /* Shigun credit: a credit is spent only when the AI layer answers — a cloud
+     `full` attempt or an accepted browser-bridge `finalise`. Commands,
+     greetings and plan/syllabus lookups stay free. The exhausted flag is read
+     up front so this turn can degrade politely instead of burning quota. */
+  const shigunCredit = state.user.id > 0 ? await getShigunUsage(state.user.id) : null;
+  const creditExhausted = !!shigunCredit && shigunCredit.exhausted;
+  let creditSpent = false;
   let action = mode === "finalise" ? undefined : parseCommand(text);
   const languageReply = mode === "finalise" ? null : languageCapabilityReply(text);
   // "Are you connected to the AI?" / "why are you not responding?" are
@@ -502,7 +510,7 @@ async function handleChat(req: Request, opts: HandleChatOptions) {
     }, { headers: { "cache-control": "no-store" } });
   } else {
     let reply: string | null = null;
-    const cloudAttempted = !!activeProvider(runtimeKeys);
+    const cloudAttempted = !creditExhausted && !!activeProvider(runtimeKeys);
     if (mode === "finalise") {
       /* The browser bridge answered — but a browser running a cached bundle
          can still hand back a relay's own error notice (a 200 body whose
@@ -516,6 +524,7 @@ async function handleChat(req: Request, opts: HandleChatOptions) {
         // replanning, persistence, fresh state.
         reply = verdict.text;
         bridgeAccepted = true;
+        creditSpent = true;
         aiMeta = {
           source: "direct",
           model: directModel,
@@ -536,6 +545,7 @@ async function handleChat(req: Request, opts: HandleChatOptions) {
         aiMeta = { source: "local", model: null, degraded: true, ...notice };
       }
     } else if (cloudAttempted) {
+      creditSpent = true;
       const prompt = buildTutorPrompt(text, state, ctx);
       const result = await callLLMDetailed(
         prompt.system,
@@ -555,6 +565,18 @@ async function handleChat(req: Request, opts: HandleChatOptions) {
         const notice = userFacingAiNotice(result.attempts, { usingOwnKey: hasRuntimeKeys(runtimeKeys) });
         aiMeta = { source: "local", model: null, degraded: true, ...notice };
       }
+    } else if (creditExhausted) {
+      // The day's cloud allowance is spent. The on-device engine answers
+      // (nothing breaks) and the panel is told why cloud tutoring paused, with
+      // the stable code a Retry UI could act on. Reset refills it in Settings.
+      aiMeta = {
+        source: "local",
+        model: null,
+        degraded: true,
+        code: "CREDIT_EXHAUSTED",
+        retryable: false,
+        notice: "Today's Shigun cloud credit is used up, so the on-device engine answered. Reset it anytime in Settings → AI Coach.",
+      };
     }
     if (reply) {
       const extracted = extractLlmAction(reply);
@@ -582,8 +604,16 @@ async function handleChat(req: Request, opts: HandleChatOptions) {
       } catch (error) {
         console.warn("localTutor failed:", error instanceof Error ? error.message : error);
       }
+      // `localTutor` returns EITHER a real answer (an encyclopedia lesson, a
+      // greeting, a command, a live-data reply) OR one of its generic
+      // "I couldn't answer that" fallbacks. A real answer may beat a syllabus
+      // dump, but a fallback is not an answer — letting one win discarded a
+      // real curriculum lesson and, on a keyless deployment, answering
+      // "explain [topic]" with "connect an AI key" instead of teaching the
+      // topic. Every generic fallback phrase is listed so none of them can
+      // masquerade as knowledge.
       const knowledgeLooksGood = !!localText.trim()
-        && !/without a cloud answer|local mode|couldn't find that in your study plan|couldn't reach the cloud tutor/i.test(localText);
+        && !/without a cloud answer|local mode|couldn't find that in your study plan|couldn't reach the cloud tutor|don't have an answer for that one|didn't reach a cloud model/i.test(localText);
       // Practice / plan-card requests stay on the curriculum set. Concept
       // questions prefer a real Wikipedia-backed lesson over a syllabus dump.
       if (asksPractice && grounded) {
@@ -629,6 +659,14 @@ async function handleChat(req: Request, opts: HandleChatOptions) {
       `);
     } catch (e) {
       console.warn("DB write skip for assistant message:", e instanceof Error ? e.message : e);
+    }
+  }
+
+  if (creditSpent && state.user.id > 0) {
+    try {
+      await recordShigunUse(state.user.id);
+    } catch (e) {
+      console.warn("Shigun credit write skip:", e instanceof Error ? e.message : e);
     }
   }
 

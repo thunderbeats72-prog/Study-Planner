@@ -286,6 +286,23 @@ async function runTests() {
       "Chat POST always returns a visible reply");
     check(Array.isArray(chatJson.state?.messages) && chatJson.state.messages.some((m) => m.role === "assistant"),
       "Chat POST state includes the assistant message even without a database");
+
+    /* A teaching question about the learner's OWN syllabus must be answered
+       with the lesson, never the generic "connect an AI key" fallback. This
+       is the exact failure a keyless deployment hit: `localTutor`'s generic
+       fallback was judged "good knowledge" and overrode the curriculum lesson
+       `localCurriculumReply` had just found. */
+    const teachRes = await POST(new Request("http://localhost/api/chat", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-user-key": "u_CHATTESTCHATTESTCHAT" },
+      body: JSON.stringify({ message: "explain the accounting equation" }),
+    }));
+    const teachJson = await teachRes.json() as { reply?: string };
+    check(typeof teachJson.reply === "string"
+      && teachJson.reply.includes("### Accounting equation")
+      && !/don't have an answer for that one|didn't reach a cloud model|couldn't find that in your study plan/i.test(teachJson.reply),
+      "Teaching question about the learner's syllabus is answered with the lesson, not a 'connect a key' fallback",
+      (teachJson.reply || "").slice(0, 90));
   }
 
   console.log("\n--- 3. Safe LLM Action Handling ---");
@@ -1658,6 +1675,8 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
     "The Level step copy no longer advertises nursery / pre-school");
   check(onboardingSource.includes("From school and higher education through doctoral research"),
     "The Level step explains itself in real markup");
+  check(onboardingSource.includes("OnboardingArt") && onboardingSource.includes("STEP_ART[stepMeta.key]"),
+    "Each onboarding step renders its own themed illustration (the dynamic step art)");
   const polishCss = uiSystemCss;
   check(!/font-size:\s*0\s*!important/.test(polishCss),
     "The onboarding paragraph is no longer collapsed by a font-size:0 replacement");
@@ -1942,6 +1961,11 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
       "The month calendar is one component sized by its container, not the viewport");
     check(/\.cal-cell\.is-empty/.test(sheets),
       "Blank month cells stay inert on every screen size");
+    const plannerSrc = strip(readFileSync(join(process.cwd(), "src/components/PlannerView.tsx"), "utf8"));
+    check(!/matchMedia\?\(\s*"\(max-width:\s*900px\)"\)/.test(plannerSrc) &&
+          !/setView\("list"\)/.test(plannerSrc) &&
+          /setOpenDay\(dateKey\)/.test(plannerSrc),
+      "A calendar day tap opens the day sheet on every width (never redirects to List)");
     check(/\.mobile-bottom-nav\s*\{\s*display: *none/.test(sheets) &&
           /\.mobile-bottom-nav\s*\{\s*display: *grid/.test(sheets) && /\.mbn-item/.test(sheets),
       "Bottom nav is off by default and a multi-slot grid on phones");
@@ -2321,6 +2345,26 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
     check(importantCount <= 900, `The !important count keeps falling (${importantCount} vs 1107 at the merge baseline)`);
     check(!/transform:\s*translate\([^)]*\.[57]px/.test(sheets),
       "No half-pixel transforms, so text stops shimmering under the blur");
+  }
+
+  console.log("\n--- 16b. Shigun credit meter ---\n");
+  {
+    const schemaSrc = readFileSync(join(process.cwd(), "src/db/schema.ts"), "utf8");
+    const usageLibSrc = readFileSync(join(process.cwd(), "src/lib/shigunUsage.ts"), "utf8");
+    const routeSrc = readFileSync(join(process.cwd(), "src/app/api/shigun-usage/route.ts"), "utf8");
+    const chatSrc = readFileSync(join(process.cwd(), "src/app/api/chat/route.ts"), "utf8");
+    const settingsSrc = readFileSync(join(process.cwd(), "src/components/SettingsView.tsx"), "utf8");
+
+    check(/shigun_usage/.test(schemaSrc) && /shigunUsage = pgTable/.test(schemaSrc),
+      "A shigun_usage table persists the per-learner credit counter");
+    check(/SHIGUN_DAILY_LIMIT/.test(usageLibSrc) && /resetShigunUsage/.test(usageLibSrc) && /recordShigunUse/.test(usageLibSrc),
+      "Credit lib tracks use, rolls over daily and offers a reset");
+    check(/resetAiCooldowns/.test(routeSrc) && /clearRateLimit\(req, "chat"\)/.test(routeSrc),
+      "The credit reset refills the counter, forgets provider failures and clears the rate limiter");
+    check(/getShigunUsage/.test(chatSrc) && /recordShigunUse/.test(chatSrc) && /CREDIT_EXHAUSTED/.test(chatSrc),
+      "The chat route spends a credit per AI answer and degrades politely when exhausted");
+    check(/ShigunCreditCard/.test(settingsSrc),
+      "Settings surfaces the Shigun credit meter");
   }
 
   console.log("\n--- 17. Repository shape: one source of truth ---\n");
