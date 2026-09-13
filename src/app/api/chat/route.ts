@@ -582,8 +582,16 @@ async function handleChat(req: Request, opts: HandleChatOptions) {
       } catch (error) {
         console.warn("localTutor failed:", error instanceof Error ? error.message : error);
       }
+      // `localTutor` returns EITHER a real answer (an encyclopedia lesson, a
+      // greeting, a command, a live-data reply) OR one of its generic
+      // "I couldn't answer that" fallbacks. A real answer may beat a syllabus
+      // dump, but a fallback is not an answer — letting one win discarded a
+      // real curriculum lesson and, on a keyless deployment, answering
+      // "explain [topic]" with "connect an AI key" instead of teaching the
+      // topic. Every generic fallback phrase is listed so none of them can
+      // masquerade as knowledge.
       const knowledgeLooksGood = !!localText.trim()
-        && !/without a cloud answer|local mode|couldn't find that in your study plan|couldn't reach the cloud tutor/i.test(localText);
+        && !/without a cloud answer|local mode|couldn't find that in your study plan|couldn't reach the cloud tutor|don't have an answer for that one|didn't reach a cloud model/i.test(localText);
       // Practice / plan-card requests stay on the curriculum set. Concept
       // questions prefer a real Wikipedia-backed lesson over a syllabus dump.
       if (asksPractice && grounded) {

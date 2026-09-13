@@ -286,6 +286,23 @@ async function runTests() {
       "Chat POST always returns a visible reply");
     check(Array.isArray(chatJson.state?.messages) && chatJson.state.messages.some((m) => m.role === "assistant"),
       "Chat POST state includes the assistant message even without a database");
+
+    /* A teaching question about the learner's OWN syllabus must be answered
+       with the lesson, never the generic "connect an AI key" fallback. This
+       is the exact failure a keyless deployment hit: `localTutor`'s generic
+       fallback was judged "good knowledge" and overrode the curriculum lesson
+       `localCurriculumReply` had just found. */
+    const teachRes = await POST(new Request("http://localhost/api/chat", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-user-key": "u_CHATTESTCHATTESTCHAT" },
+      body: JSON.stringify({ message: "explain the accounting equation" }),
+    }));
+    const teachJson = await teachRes.json() as { reply?: string };
+    check(typeof teachJson.reply === "string"
+      && teachJson.reply.includes("### Accounting equation")
+      && !/don't have an answer for that one|didn't reach a cloud model|couldn't find that in your study plan/i.test(teachJson.reply),
+      "Teaching question about the learner's syllabus is answered with the lesson, not a 'connect a key' fallback",
+      (teachJson.reply || "").slice(0, 90));
   }
 
   console.log("\n--- 3. Safe LLM Action Handling ---");
@@ -1658,6 +1675,8 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
     "The Level step copy no longer advertises nursery / pre-school");
   check(onboardingSource.includes("From school and higher education through doctoral research"),
     "The Level step explains itself in real markup");
+  check(onboardingSource.includes("OnboardingArt") && onboardingSource.includes("STEP_ART[stepMeta.key]"),
+    "Each onboarding step renders its own themed illustration (the dynamic step art)");
   const polishCss = uiSystemCss;
   check(!/font-size:\s*0\s*!important/.test(polishCss),
     "The onboarding paragraph is no longer collapsed by a font-size:0 replacement");

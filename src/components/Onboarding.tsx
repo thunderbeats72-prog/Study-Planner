@@ -7,8 +7,8 @@ import {
   IconCalendar, IconCheck, IconLock, IconLogo, IconSpark, IconTarget,
   IconArrowRight, IconArrowLeft,
 } from "./icons";
-import { LampScene } from "./Illustrations";
 import { Select } from "./bits";
+import OnboardingArt, { type OnboardingArtVariant } from "./OnboardingArt";
 import { MaskWords, Scramble, Reveal } from "@/lib/fx";
 import { cn } from "@/lib/cn";
 
@@ -36,6 +36,18 @@ const STEP_META: StepMeta[] = [
   { key: "you", label: "You" }, { key: "level", label: "Level" }, { key: "course", label: "Course" }, { key: "details", label: "Details" },
   { key: "subjects", label: "Syllabus" }, { key: "style", label: "Style" }, { key: "schedule", label: "Rhythm" }, { key: "review", label: "Review" },
 ];
+/** A themed illustration per step, so the wizard reads as a short visual
+ *  story instead of a wall of forms (the "dynamic images" in onboarding). */
+const STEP_ART: Record<string, OnboardingArtVariant> = {
+  you: "you",
+  level: "level",
+  course: "course",
+  details: "details",
+  subjects: "syllabus",
+  style: "style",
+  schedule: "rhythm",
+  review: "review",
+};
 const STUDY_DAY_OPTIONS: ChoiceOption[] = [
   { id: "all", label: "All 7 days", description: "Fastest route to finish the syllabus." },
   { id: "6days", label: "6 days", description: "Keeps one weekly day off for recovery." },
@@ -434,6 +446,7 @@ export default function Onboarding({
 
       <div className="ob-card slide-in" key={step}>
         <div className="ob-card-head">
+          <OnboardingArt variant={STEP_ART[stepMeta.key] || "you"} />
           <div className="ob-step-kicker">
             Step {step} of {total} · {stepMeta.label}
           </div>
