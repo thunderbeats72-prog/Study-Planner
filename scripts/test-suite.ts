@@ -765,6 +765,228 @@ async function runTests() {
     else Object.assign(globalThis, { fetch: savedFetch });
   }
 
+  /* ── 4e · A 200 body is not proof of an answer ────────────────────────────
+     The failure this pins: free relays (Pollinations in particular) answer
+     HTTP 200 with a well-formed OpenAI body whose `content` is their OWN
+     error notice — "The API key used for this request has reached its
+     budget… 🌸 Ad 🌸 Powered by Pollinations.AI". Status 200 + non-empty
+     content used to mean SUCCESS, so the notice was shown to the learner as
+     if SHIGUN had written it, the broken leg became STICKY and was paid first
+     on every later message, and the on-device ML engine never ran because a
+     "cloud answer" existed. `lib/aiAnswer.ts` is now the single judge, used
+     by the server chain, the browser bridge and the chat route's finalise
+     path. False positives are the real danger — this is a planner used by
+     accounting students, and "the department has reached its budget ceiling"
+     is a good sentence about cost accounting — so the lesson cases below are
+     as load-bearing as the relay cases. */
+  console.log("\n--- 4e. Answer sanity gate: relay notices must never reach a learner ---");
+  {
+    const { classifyModelAnswer, sanitizeModelAnswer, stripRelayAds } = await import("../src/lib/aiAnswer");
+    const WALL = `The API key used for this request has reached its budget. Please ++[raise the key budget](https://enter.pollinations.ai/edit-key?id=89idjaTSg2hI4YwZDuO8ZME5Ma6GrFps&ref=agent_key_budget)++, then try again.
+
+Topping up the wallet does not raise this limit. If this isn't your Pollinations account, contact whoever runs the app or service you're using.
+
+---
+
+**Support [Pollinations.AI](http://Pollinations.AI):**
+
+🌸 **Ad** 🌸
+Powered by [Pollinations.AI](http://Pollinations.ai) free text APIs. ++[Support our mission](https://pollinations.ai/redirect/kofi)++ to keep AI accessible for everyone.`;
+
+    const polluted = classifyModelAnswer(WALL);
+    check(polluted.noise === true && polluted.reason === "auth",
+      "The exact budget notice a learner was shown is recognised as a provider notice, not an answer",
+      JSON.stringify(polluted));
+    check(sanitizeModelAnswer(WALL) === null,
+      "sanitizeModelAnswer refuses it, which is what makes the chain keep walking");
+    check(classifyModelAnswer('{"note":"You exceeded your current quota"} — error code: 429 - insufficient_quota').noise,
+      "A quota/billing notice delivered as content is refused");
+    check(classifyModelAnswer("<!doctype html><html><head><title>502 Bad Gateway</title></head></html>").noise,
+      "An HTML error page delivered as content is refused");
+    check(classifyModelAnswer("The model is currently overloaded. Please try again in a few seconds.").noise,
+      "An overload notice is refused and classed as a rate limit");
+    check(classifyModelAnswer("🌸 **Ad** 🌸\nPowered by Pollinations.AI free text APIs. Support our mission.").noise,
+      "A body that is nothing but advertising is refused");
+    check(classifyModelAnswer("").noise && classifyModelAnswer(null).noise,
+      "An empty completion is still treated as no answer at all");
+
+    /* The other half of the contract: real teaching must survive, including
+       teaching ABOUT budgets, quotas and credit balances. */
+    const LESSON = `### Budgetary control
+
+A **budget** is a quantitative plan for a future period. When a department has reached its budget ceiling, variance analysis explains the gap between the standard cost and the actual cost.
+
+**Example.** Standard labour cost for 500 units is ₹25,000. Actual cost is ₹27,400, so the adverse variance is ₹2,400.`;
+    check(classifyModelAnswer(LESSON).noise === false,
+      "A cost-accounting lesson about reaching a budget ceiling is NOT mistaken for a relay notice");
+    check(classifyModelAnswer("The department reached its budget ceiling in Q3, so the variance report shows an adverse ₹2,400.").noise === false,
+      "Nor is a one-line answer about a budget ceiling");
+    check(classifyModelAnswer("Import quota exhausted — the firm must now source domestically, which raises the landed cost per unit.").noise === false,
+      "Nor is a one-line answer about an import quota");
+    check(classifyModelAnswer("Yes — start with the ledger.").noise === false,
+      "A short real answer is not rejected for being short");
+    check(sanitizeModelAnswer(LESSON) === LESSON.trim(), "A clean lesson is returned byte-for-byte");
+
+    /* Advertising stapled under a good answer is trimmed, not fatal. */
+    const withAd = `**Opportunity cost** is the value of the next-best alternative forgone. Choosing revision tonight costs you the sleep you gave up.
+
+---
+
+🌸 **Ad** 🌸
+Powered by Pollinations.AI free text APIs. Support our mission to keep AI accessible for everyone.`;
+    const trimmed = sanitizeModelAnswer(withAd) ?? "";
+    check(classifyModelAnswer(withAd).noise === false && trimmed.includes("Opportunity cost") && !trimmed.includes("Pollinations"),
+      "A real answer with an ad footer keeps the lesson and loses the advert", JSON.stringify(trimmed.slice(-48)));
+    const midRule = stripRelayAds("### Costing\n\n1. Material\n2. Labour\n3. Overhead\n\n---\n\n**Recap.** Add the three elements.");
+    check(midRule.includes("**Recap.**") && midRule.includes("### Costing"),
+      "A markdown rule in the MIDDLE of a lesson is never treated as an ad boundary", JSON.stringify(midRule.slice(-30)));
+
+    /* ── the gate wired into the SERVER chain: Cerebras → Gemini → local ── */
+    const originalFetch = globalThis.fetch;
+    const saved = {
+      cerebras: process.env.CEREBRAS_API_KEY, gemini: process.env.GEMINI_API_KEY,
+      groq: process.env.GROQ_API_KEY, mistral: process.env.MISTRAL_API_KEY,
+      sambanova: process.env.SAMBANOVA_API_KEY, cohere: process.env.COHERE_API_KEY,
+      openrouter: process.env.OPENROUTER_API_KEY,
+    };
+    for (const name of ["GROQ_API_KEY", "MISTRAL_API_KEY", "SAMBANOVA_API_KEY", "COHERE_API_KEY", "OPENROUTER_API_KEY"]) delete process.env[name];
+    process.env.CEREBRAS_API_KEY = "csk_gate_test";
+    process.env.GEMINI_API_KEY = "gm_gate_test";
+    const stickyGlobal = globalThis as { __studyPlannerPreferred?: { provider: string; model: string } };
+    const openAiBody = (text: string) => new Response(JSON.stringify({ choices: [{ message: { content: text } }] }), { status: 200, headers: { "content-type": "application/json" } });
+    const geminiBody = (text: string) => new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text }] }, finishReason: "STOP" }] }), { status: 200, headers: { "content-type": "application/json" } });
+
+    resetAiCooldowns();
+    delete stickyGlobal.__studyPlannerPreferred;
+    const hits: string[] = [];
+    globalThis.fetch = (async (input: string | URL | Request) => {
+      const url = String(input);
+      hits.push(url);
+      if (url.includes("generativelanguage")) return geminiBody("A white hole is the time-reverse of a black hole: nothing can enter it.");
+      return openAiBody(WALL);
+    }) as unknown as typeof fetch;
+    const fellThrough = await callLLMDetailed("You are SHIGUN.", [{ role: "user", content: "why do white holes exist" }], 300);
+    check(fellThrough.provider === "gemini" && !/budget|wallet|pollinations/i.test(fellThrough.text ?? ""),
+      "Cerebras answering 200 with a budget notice falls through to Gemini in the SAME request",
+      `${fellThrough.provider}: ${JSON.stringify((fellThrough.text ?? "").slice(0, 50))}`);
+    check(hits.some((url) => url.includes("cerebras")), "Cerebras is still tried first — the priority order is unchanged");
+    check(fellThrough.attempts.some((attempt) => attempt.provider === "cerebras" && attempt.status === 200 && attempt.error === "auth"),
+      "The polluted attempt is recorded as a FAILURE, so /api/ai-status and the sticky slot tell the truth");
+    /* Read the slot back off globalThis: after a `delete` TypeScript narrows
+       the optional property to `undefined` for the rest of the block, which
+       would make this assertion compare `never` to a string. */
+    const preferredNow = (globalThis as { __studyPlannerPreferred?: { provider: string; model: string } }).__studyPlannerPreferred;
+    check(preferredNow?.provider === "gemini",
+      "The sticky slot goes to the leg that really answered, not the one that returned 200",
+      JSON.stringify(preferredNow));
+
+    resetAiCooldowns();
+    delete stickyGlobal.__studyPlannerPreferred;
+    globalThis.fetch = (async (input: string | URL | Request) =>
+      (String(input).includes("generativelanguage") ? geminiBody(WALL) : openAiBody(WALL))) as unknown as typeof fetch;
+    const exhausted = await callLLMDetailed("You are SHIGUN.", [{ role: "user", content: "why do black holes exist" }], 300);
+    check(exhausted.text === null && exhausted.provider === null,
+      "When no leg can produce a real answer the chain returns null — the cue for the on-device ML engine");
+    check(exhausted.attempts.length >= 2 && exhausted.attempts.every((attempt) => attempt.error),
+      "Every leg is reported as failed rather than one being reported as the winner");
+
+    resetAiCooldowns();
+    delete stickyGlobal.__studyPlannerPreferred;
+    globalThis.fetch = (async (input: string | URL | Request) =>
+      (String(input).includes("generativelanguage") ? geminiBody(WALL) : openAiBody(WALL))) as unknown as typeof fetch;
+    const gateProbes = await probeProviders();
+    check(gateProbes.filter((probe) => probe.configured).every((probe) => probe.ok === false),
+      "Settings' connectivity test refuses to call a polluted provider healthy");
+
+    globalThis.fetch = originalFetch;
+    resetAiCooldowns();
+    delete stickyGlobal.__studyPlannerPreferred;
+    for (const [name, value] of Object.entries(saved)) {
+      const envName = name === "cerebras" ? "CEREBRAS_API_KEY" : name === "gemini" ? "GEMINI_API_KEY" : name === "groq" ? "GROQ_API_KEY" : name === "mistral" ? "MISTRAL_API_KEY" : name === "sambanova" ? "SAMBANOVA_API_KEY" : name === "cohere" ? "COHERE_API_KEY" : "OPENROUTER_API_KEY";
+      if (value === undefined) delete process.env[envName]; else process.env[envName] = value;
+    }
+
+    /* ── the gate wired into the BROWSER bridge ── */
+    const bridgeGlobal2 = globalThis as { window?: unknown; fetch?: unknown };
+    const savedWindow2 = bridgeGlobal2.window;
+    const savedFetch2 = bridgeGlobal2.fetch;
+    const local2 = new Map<string, string>();
+    const session2 = new Map<string, string>();
+    const store2 = (map: Map<string, string>) => ({
+      getItem: (key: string) => (map.has(key) ? (map.get(key) as string) : null),
+      setItem: (key: string, value: string) => void map.set(key, String(value)),
+      removeItem: (key: string) => void map.delete(key),
+    });
+    Object.assign(globalThis, { window: { localStorage: store2(local2), sessionStorage: store2(session2),
+      setTimeout: (...args: unknown[]) => setTimeout(...(args as [() => void, number])),
+      clearTimeout: (handle: NodeJS.Timeout) => clearTimeout(handle),
+      addEventListener: () => undefined, removeEventListener: () => undefined, dispatchEvent: () => true } });
+    const { callBridge: bridge2, clearBridgeFailures: clear2, bridgeCooldowns: cooldowns2 } = await import("../src/lib/aiBridge");
+    const { clearByokKeys: clearKeys2 } = await import("../src/lib/byok");
+    const bridgePrompt2 = { system: "You are SHIGUN.", messages: [{ role: "user" as const, content: "Why do black holes exist?" }], maxTokens: 300, temperature: 0.5 };
+    const okBody = (text: string) => ({ status: 200, text: async () => JSON.stringify({ choices: [{ message: { content: text } }] }) });
+    const seen2: string[] = [];
+
+    clearKeys2(); clear2(); seen2.length = 0;
+    /* The broken relay is STICKY — exactly the state the learner's browser was
+       in: Pollinations had answered once, been promoted to first place, and
+       then hit its budget wall. */
+    session2.set("spp.ai.bridge.sticky.v1", "pollinations");
+    globalThis.fetch = (async (url: string) => {
+      const u = String(url); seen2.push(u);
+      if (u.includes("pollinations")) return okBody(WALL);
+      if (u.includes("oai.endpoints.kepler.ai.cloud.ovh.net")) return okBody("A black hole forms when a collapsing star's gravity traps even light.");
+      throw new TypeError("Failed to fetch");
+    }) as unknown as typeof fetch;
+    const stickyBroken = await bridge2(bridgePrompt2);
+    check(stickyBroken.text !== null && !/budget|wallet|pollinations/i.test(stickyBroken.text ?? ""),
+      "A sticky relay that now returns its budget notice is never shown to the learner",
+      JSON.stringify((stickyBroken.text ?? "").slice(0, 50)));
+    check(stickyBroken.leg === "ovh", "The bridge keeps walking and a healthy relay answers the same message", String(stickyBroken.leg));
+    check(seen2.filter((url) => url.includes("pollinations")).length === 1,
+      "The broken relay costs exactly one request before it is benched");
+    check(cooldowns2().some((entry) => entry.leg === "pollinations" && entry.model === null),
+      "The whole relay is benched, not just one model id — its key is shared");
+    check(session2.get("spp.ai.bridge.sticky.v1") !== "pollinations",
+      "The broken relay loses its promoted first position");
+
+    seen2.length = 0;
+    await bridge2(bridgePrompt2);
+    check(!seen2.some((url) => url.includes("pollinations")),
+      "The benched relay is skipped outright on the next question");
+
+    clear2(); seen2.length = 0;
+    globalThis.fetch = (async () => okBody(WALL)) as unknown as typeof fetch;
+    const allPolluted = await bridge2(bridgePrompt2);
+    check(allPolluted.text === null && allPolluted.attempts.every((attempt) => attempt.error !== null),
+      "With every leg polluted the bridge reports failure, so the server's local ML engine answers instead");
+
+    clearKeys2(); clear2();
+    if (savedWindow2 === undefined) delete (globalThis as { window?: unknown }).window;
+    else Object.assign(globalThis, { window: savedWindow2 });
+    if (savedFetch2 === undefined) delete (globalThis as { fetch?: unknown }).fetch;
+    else Object.assign(globalThis, { fetch: savedFetch2 });
+
+    /* ── the chat route is the LAST gate (an old cached bundle can still post
+          a relay notice as `directReply`) ── */
+    const chatSrc = readFileSync(join(process.cwd(), "src/app/api/chat/route.ts"), "utf8");
+    check(chatSrc.includes("classifyModelAnswer(directReply)") && chatSrc.includes("bridgeAccepted"),
+      "The finalise path re-checks the browser's answer and only then claims a cloud source");
+    check(/bridgeAccepted\s*\?\s*\(directKind === "free"/.test(chatSrc),
+      "A rejected relay notice never makes the panel claim 'Cloud AI · free endpoint'");
+    const aiSrc = readFileSync(join(process.cwd(), "src/lib/ai.ts"), "utf8");
+    const bridgeSrc2 = readFileSync(join(process.cwd(), "src/lib/aiBridge.ts"), "utf8");
+    check(aiSrc.includes('from "./aiAnswer"') && bridgeSrc2.includes('from "./aiAnswer"') && chatSrc.includes('@/lib/aiAnswer'),
+      "Server chain, browser bridge and chat route all judge an answer with ONE shared definition");
+    check(/const DEFAULT_PROVIDER_ORDER: ProviderId\[\] = \[\s*"cerebras", "gemini",/.test(aiSrc),
+      "Cerebras is primary and Gemini is the very next leg, as documented in .env.example");
+    check(bridgeSrc2.indexOf('id: "cerebras"') < bridgeSrc2.indexOf('id: "gemini"')
+       && bridgeSrc2.indexOf('id: "gemini"') < bridgeSrc2.indexOf('id: "groq"'),
+      "The browser bridge walks the same provider order as the server chain");
+    check(bridgeSrc2.includes("benched(sticky)"),
+      "A benched leg is never promoted to first place by the sticky slot");
+  }
+
   console.log("\n--- 5. Study Clock Accounting ---");
   const originalNow = Date.now;
   const originalWindow = (globalThis as { window?: unknown }).window;
@@ -1444,9 +1666,216 @@ async function runTests() {
   check(polishCss.includes("prefers-reduced-motion") && polishCss.includes("liveDotPulse"),
     "The live-session animation is defined and switched off for reduced motion");
 
+  /* ── The syllabus step: what the learner picked is what the learner edits ──
+     Two separate breakages made "click to edit the subject" look dead:
+       1. `/api/course-suggest` validated `body.courseName` while the wizard
+          posted `query`, so EVERY assessment — the button on the course step,
+          the automatic one on the details step, and "Re-assess" on the
+          syllabus step — failed with 400 "Course name is required." The list
+          on screen never changed and an error banner was the only feedback.
+       2. The details step re-ran the assessment whenever any detail changed,
+          silently replacing the syllabus of the course the learner had just
+          picked (or hand-edited) with a fresh AI guess.
+     Plus the row itself: a borderless, padding-less, outline-less text input
+     on a transparent background is indistinguishable from a static label. */
+  const suggestRoute = readFileSync(join(process.cwd(), "src/app/api/course-suggest/route.ts"), "utf8");
+  check(/body\.courseName \?\? body\.query/.test(suggestRoute),
+    "The assessment endpoint accepts the field name the wizard actually sends");
+  check(/courseName: query/.test(onboardingSource),
+    "The wizard sends the course title under the name the endpoint documents");
+  check(/if \(targetQuery && !subs\.length\)/.test(onboardingSource),
+    "The details step only builds a syllabus when there is nothing to lose — a picked course is never overwritten");
+  check(onboardingSource.includes("subsEdited") && onboardingSource.includes("confirmReassess"),
+    "A re-assessment asks before replacing subjects the learner edited by hand");
+  check(/key=\{s\.uid\}/.test(onboardingSource) && !/className="ob-sub-row" key=\{i\}/.test(onboardingSource),
+    "Syllabus rows are keyed by identity, so deleting a row cannot move another row's edit");
+  check(onboardingSource.includes("ob-sub-name") && onboardingSource.includes("ob-sub-units"),
+    "The subject fields carry their own classes so they can look like inputs");
+  check(globalsCss.includes(".ob-sub-name:focus") && globalsCss.includes(":focus-within"),
+    "Clicking a subject field gives visible feedback — a focus ring on the field and on its row");
+  check(!/\.ob-sub-row input\[type=text\]\{flex:1;background:transparent;border:none;outline:none/.test(globalsCss),
+    "The invisible borderless subject input is gone");
+  check(/weakSubject: \(\(\) =>/.test(onboardingSource) && /String\(s\.uid\) === weak/.test(onboardingSource),
+    "The weakest-subject choice survives a row being deleted above it");
+  check(onboardingSource.includes("DUPLICATE") || /already in the list/i.test(onboardingSource),
+    "A duplicate subject is caught in the wizard instead of failing the whole plan at the last step");
+
   /* ── v25 · the responsive / typography / token contract ─────────────────
      Each guard below pins one of the structural fixes, so a future pass can
      re-add a redesign without quietly re-breaking the one it replaced. */
+  /* ── 16b · The syllabus step, rendered and driven ─────────────────────────
+     The static guards above pin the source; this walks the real wizard from
+     step 1 to step 5 and edits a subject, which is the interaction the
+     learner reported as dead. */
+  console.log("\n--- 16b. Onboarding wizard: pick a course, then edit its subjects ---");
+  {
+    const savedWindow = (globalThis as { window?: unknown }).window;
+    const savedDocument = (globalThis as { document?: unknown }).document;
+    const savedFetch = globalThis.fetch;
+    const savedLocal = (globalThis as { localStorage?: unknown }).localStorage;
+    const savedSession = (globalThis as { sessionStorage?: unknown }).sessionStorage;
+
+    const localMap = new Map<string, string>();
+    const sessionMap = new Map<string, string>();
+    const makeStore = (map: Map<string, string>) => ({
+      getItem: (key: string) => (map.has(key) ? (map.get(key) as string) : null),
+      setItem: (key: string, value: string) => void map.set(key, String(value)),
+      removeItem: (key: string) => void map.delete(key),
+    });
+    Object.assign(globalThis, {
+      window: globalThis,
+      document: { activeElement: null, cookie: "" },
+      localStorage: makeStore(localMap),
+      sessionStorage: makeStore(sessionMap),
+      IS_REACT_ACT_ENVIRONMENT: true,
+    });
+
+    const CATALOGUE = [{
+      id: "bcom", name: "B.Com", level: "ug",
+      subjects: [
+        { name: "Corporate Accounting", units: 8, difficulty: "Medium", color: "#6366f1" },
+        { name: "Cost Accounting", units: 6, difficulty: "Hard", color: "#10b981" },
+      ],
+    }];
+    const posted: { url: string; body: Record<string, unknown> }[] = [];
+    globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input);
+      let body: Record<string, unknown> = {};
+      try { body = JSON.parse(String(init?.body || "{}")) as Record<string, unknown>; } catch { /* no body */ }
+      posted.push({ url, body });
+      const json = (payload: unknown) => new Response(JSON.stringify(payload), { status: 200, headers: { "content-type": "application/json" } });
+      if (url.includes("/api/courses")) {
+        return json({ levels: [{ id: "ug", label: "Undergraduate", sub: "B.Com" }], levelCourses: { ug: ["bcom"] }, courses: CATALOGUE, aiProvider: null });
+      }
+      if (url.includes("/api/course-suggest")) {
+        /* The real endpoint reads `courseName`; the wizard used to send only
+           `query`, so every assessment 400'd. Assert the contract here. */
+        if (typeof body.courseName !== "string" && typeof body.query !== "string") {
+          return new Response(JSON.stringify({ error: "Course name is required.", code: "INVALID_REQUEST" }), { status: 400, headers: { "content-type": "application/json" } });
+        }
+        return json({ subjects: [{ name: "Financial Accounting", units: 10, difficulty: "Hard", color: "#f59e0b" }], source: "ai" });
+      }
+      return json({});
+    }) as unknown as typeof fetch;
+
+    const restoreConsole = (() => {
+      const original = console.error;
+      console.error = (...args: unknown[]) => {
+        if (String(args[0] || "").includes("react-test-renderer is deprecated")) return;
+        original(...args);
+      };
+      return () => { console.error = original; };
+    })();
+
+    const Onboarding = (await import("../src/components/Onboarding")).default;
+    let wizard!: TestRenderer.ReactTestRenderer;
+    await act(async () => { wizard = TestRenderer.create(React.createElement(Onboarding, { onDone: () => undefined })); });
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)); });
+
+    const buttons = () => wizard.root.findAll((node) => node.type === "button");
+    const textOf = (node: TestRenderer.ReactTestInstance) =>
+      node.findAll((child) => typeof child.type === "string")
+        .map((child) => (child.children || []).filter((part) => typeof part === "string").join("")).join(" ").trim();
+    const primary = () => buttons().filter((node) => String(node.props.className || "").includes("ob-btn-primary")).pop()!;
+    const rows = () => wizard.root.findAll((node) => typeof node.type === "string"
+      && String(node.props.className || "").split(/\s+/).includes("ob-sub-row"));
+    const nameField = (row: TestRenderer.ReactTestInstance) => row.findAll((node) => node.type === "input" && node.props.type === "text")[0];
+    const unitField = (row: TestRenderer.ReactTestInstance) => row.findAll((node) => node.type === "input" && node.props.type === "number")[0];
+    const names = () => rows().map(nameField).map((node) => node?.props.value as string);
+    const banners = () => wizard.root.findAll((node) => node.props?.role === "alert").map((node) => (node.children || []).join(""));
+    const advance = async () => {
+      const node = primary();
+      await act(async () => { await node.props.onClick(); });
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 30)); });
+    };
+
+    // 1 → 2 (name), 2 → 3 (level), 3 → 4 (course), 4 → 5 (details)
+    await act(async () => {
+      wizard.root.findAll((node) => node.props?.className === "ob-name-input")[0].props.onChange({ target: { value: "Lakshit" } });
+    });
+    await advance();
+    await act(async () => { wizard.root.findAll((node) => String(node.props.className || "").startsWith("ob-level-btn"))[0].props.onClick(); });
+    await advance();
+    await act(async () => { wizard.root.findAll((node) => String(node.props.className || "").startsWith("ob-course-item"))[0].props.onClick(); });
+    await advance();
+    await advance();
+
+    check(wizard.root.findAll((node) => node.type === "h1").some((node) => (node.children || []).join("").includes("Review the syllabus structure")),
+      "The wizard arrives on the syllabus step");
+    check(JSON.stringify(names()) === JSON.stringify(["Corporate Accounting", "Cost Accounting"]),
+      "The subjects of the course the learner picked are the subjects on screen", names().join(", "));
+    check(banners().length === 0, "No error banner is waiting on the syllabus step", banners().join(" | "));
+    check(!posted.some((call) => call.url.includes("course-suggest")),
+      "Moving to the syllabus step does not silently re-assess over a picked course");
+
+    // Edit a name — the interaction that was reported as dead.
+    const target = rows().find((row) => nameField(row).props.value === "Corporate Accounting")!;
+    check(nameField(target).props.className === "ob-sub-name" && !nameField(target).props.readOnly && !nameField(target).props.disabled,
+      "The subject name is a real, enabled input with its own class (so it can look like one)");
+    await act(async () => { nameField(target).props.onChange({ target: { value: "Corporate Accounting (Revised)" } }); });
+    check(names().includes("Corporate Accounting (Revised)") && names().includes("Cost Accounting"),
+      "Typing in a subject name edits exactly that row", names().join(", "));
+
+    // Units can be cleared and retyped, then clamp to the server's range.
+    const costRow = rows().find((row) => nameField(row).props.value === "Cost Accounting")!;
+    await act(async () => { unitField(costRow).props.onChange({ target: { value: "" } }); });
+    await act(async () => { unitField(rows().find((row) => nameField(row).props.value === "Cost Accounting")!).props.onChange({ target: { value: "1" } }); });
+    check(unitField(rows().find((row) => nameField(row).props.value === "Cost Accounting")!).props.value === 1,
+      "Selecting all of Units and typing one digit is not swallowed by live clamping");
+    const costRow2 = rows().find((row) => nameField(row).props.value === "Cost Accounting")!;
+    await act(async () => { unitField(costRow2).props.onBlur({ target: { value: "999" } }); });
+    check(unitField(rows().find((row) => nameField(row).props.value === "Cost Accounting")!).props.value === 40,
+      "Units clamp to the maximum /api/onboard accepts, on blur");
+
+    // Deleting a row must not scramble the rows below it (identity keys).
+    const beforeDelete = names();
+    await act(async () => {
+      wizard.root.findAll((node) => String(node.props.className || "").includes("ob-sub-remove"))[0].props.onClick();
+    });
+    check(names().length === beforeDelete.length - 1 && !names().includes(beforeDelete[0]) && names()[0] === beforeDelete[1],
+      "Deleting a row removes that row and leaves the next one's edit intact", `${beforeDelete.join(",")} -> ${names().join(",")}`);
+
+    // Duplicates are refused in the wizard, not by the server at the last step.
+    await act(async () => {
+      wizard.root.findAll((node) => node.props?.className === "ob-add-sub-input")[0].props.onChange({ target: { value: "Cost Accounting" } });
+    });
+    await act(async () => { buttons().find((node) => textOf(node) === "Add")!.props.onClick(); });
+    check(names().filter((name) => name === "Cost Accounting").length === 1
+      && banners().some((banner) => /already in the list/i.test(banner)),
+      "A duplicate subject is refused with an explanation", banners().join(" | "));
+
+    // Re-assessment asks before replacing hand edits, then really runs.
+    const reassess = () => buttons().find((node) => /Re-assess|Replace my edits|Rebuilding/i.test(textOf(node)))!;
+    const beforeLabel = textOf(reassess());
+    await act(async () => { reassess().props.onClick(); });
+    check(/Replace my edits/.test(textOf(reassess())) && !/Replace my edits/.test(beforeLabel),
+      "Re-assess asks once before replacing subjects the learner edited", `${beforeLabel} -> ${textOf(reassess())}`);
+    check(!posted.some((call) => call.url.includes("course-suggest")),
+      "The first click does not throw the edits away");
+    await act(async () => { reassess().props.onClick(); });
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 40)); });
+    const suggestCall = posted.find((call) => call.url.includes("course-suggest"));
+    check(!!suggestCall, "The confirmed re-assessment really calls /api/course-suggest");
+    check(typeof suggestCall?.body.courseName === "string" && String(suggestCall?.body.courseName).length > 0,
+      "…and posts the course title under the field name the endpoint validates",
+      JSON.stringify(suggestCall?.body.courseName));
+    check(names().join(",") === "Financial Accounting", "The fresh assessment replaces the list once the learner has agreed", names().join(", "));
+    check(banners().every((banner) => !/Course name is required/i.test(banner)),
+      "The assessment no longer fails with 'Course name is required'", banners().join(" | "));
+
+    restoreConsole();
+    await act(async () => { wizard.unmount(); });
+    if (savedWindow === undefined) delete (globalThis as { window?: unknown }).window;
+    else Object.assign(globalThis, { window: savedWindow });
+    if (savedDocument === undefined) delete (globalThis as { document?: unknown }).document;
+    else Object.assign(globalThis, { document: savedDocument });
+    if (savedLocal === undefined) delete (globalThis as { localStorage?: unknown }).localStorage;
+    else Object.assign(globalThis, { localStorage: savedLocal });
+    if (savedSession === undefined) delete (globalThis as { sessionStorage?: unknown }).sessionStorage;
+    else Object.assign(globalThis, { sessionStorage: savedSession });
+    globalThis.fetch = savedFetch;
+  }
+
   console.log("\n--- v25 · typography, tokens and responsive contract ---");
   {
     const strip = (t: string) => t.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(?:^|[^:]):\/\/.*$/gm, " ");

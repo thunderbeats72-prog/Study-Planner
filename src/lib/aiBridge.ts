@@ -37,6 +37,7 @@
 ============================================================ */
 
 import { BYOK_PROVIDERS, getByokKeys, type ByokProviderId } from "./byok";
+import { classifyModelAnswer } from "./aiAnswer";
 
 export type BridgeMsg = { role: "user" | "assistant"; content: string };
 
@@ -166,14 +167,27 @@ function lowEffort(model: string): Record<string, unknown> {
 }
 
 /* ── leg catalogue ───────────────────────────────────────────
-   Own-key legs mirror the server catalogue in `ai.ts` (same hosts,
-   same current model ids) so a key pasted in Settings behaves the
-   same whichever side of the wire it is used on. */
+   Own-key legs mirror the server catalogue in `ai.ts` — same hosts, same
+   current model ids AND the same priority order (Cerebras → Gemini → Groq
+   → Mistral → SambaNova → Cohere → OpenRouter) — so a key pasted in
+   Settings walks exactly the chain the deployment would have walked,
+   whichever side of the wire the call is made on. */
 function byokKey(id: ByokProviderId): () => string | null {
   return () => getByokKeys()[id] || null;
 }
 
 const OWN_KEY_LEGS: LegSpec[] = [
+  {
+    id: "cerebras",
+    label: "Cerebras",
+    kind: "own-key",
+    url: () => "https://api.cerebras.ai/v1/chat/completions",
+    models: ["gpt-oss-120b", "qwen-3.8-27b", "llama-3.3-70b"],
+    key: byokKey("cerebras"),
+    headers: jsonHeaders,
+    body: (model, prompt) => openAiBody(model, prompt, lowEffort(model)),
+    extract: openAiExtract,
+  },
   {
     id: "gemini",
     label: "Google Gemini",
@@ -207,32 +221,6 @@ const OWN_KEY_LEGS: LegSpec[] = [
     models: ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "llama-3.3-70b-versatile", "llama-3.1-8b-instant"],
     key: byokKey("groq"),
     headers: jsonHeaders,
-    body: (model, prompt) => openAiBody(model, prompt, lowEffort(model)),
-    extract: openAiExtract,
-  },
-  {
-    id: "cerebras",
-    label: "Cerebras",
-    kind: "own-key",
-    url: () => "https://api.cerebras.ai/v1/chat/completions",
-    models: ["gpt-oss-120b", "qwen-3.8-27b", "llama-3.3-70b"],
-    key: byokKey("cerebras"),
-    headers: jsonHeaders,
-    body: (model, prompt) => openAiBody(model, prompt, lowEffort(model)),
-    extract: openAiExtract,
-  },
-  {
-    id: "openrouter",
-    label: "OpenRouter",
-    kind: "own-key",
-    url: () => "https://openrouter.ai/api/v1/chat/completions",
-    models: ["openai/gpt-oss-120b", "meta-llama/llama-3.3-70b-instruct", "google/gemini-2.5-flash"],
-    key: byokKey("openrouter"),
-    headers: (key) => ({
-      ...jsonHeaders(key),
-      // Optional attribution OpenRouter asks browser clients for.
-      "x-title": "Study Planner Pro",
-    }),
     body: (model, prompt) => openAiBody(model, prompt, lowEffort(model)),
     extract: openAiExtract,
   },
@@ -273,6 +261,21 @@ const OWN_KEY_LEGS: LegSpec[] = [
       const text = typeof json?.text === "string" ? json.text : null;
       return { text: text && text.trim() ? text : null, blocked: false };
     },
+  },
+  {
+    id: "openrouter",
+    label: "OpenRouter",
+    kind: "own-key",
+    url: () => "https://openrouter.ai/api/v1/chat/completions",
+    models: ["openai/gpt-oss-120b", "meta-llama/llama-3.3-70b-instruct", "google/gemini-2.5-flash"],
+    key: byokKey("openrouter"),
+    headers: (key) => ({
+      ...jsonHeaders(key),
+      // Optional attribution OpenRouter asks browser clients for.
+      "x-title": "Study Planner Pro",
+    }),
+    body: (model, prompt) => openAiBody(model, prompt, lowEffort(model)),
+    extract: openAiExtract,
   },
 ];
 
@@ -534,12 +537,27 @@ function setStickyLeg(id: string) {
   }
 }
 
+/** Drop the sticky slot when it belongs to a leg that just failed. A relay
+ *  that answered once and then hit its budget wall used to keep the promoted
+ *  first position, so EVERY later message paid it again before the healthy
+ *  legs behind it got a turn. */
+function clearStickyLeg(id: string) {
+  if (stickyLeg() !== id) return;
+  try {
+    storage("session")?.removeItem(STICKY_KEY);
+  } catch {
+    /* non-fatal */
+  }
+}
+
 /** Legs this browser may use, own keys first, sticky winner promoted. */
 function usableLegs(options: { includeFree?: boolean } = {}): LegSpec[] {
   const includeFree = operatorAllowsFreeBridge && (options.includeFree ?? freeBridgeEnabled());
   const legs = ALL_LEGS.filter((leg) => (leg.kind === "free" ? includeFree : !!leg.key?.()));
+  /* A benched leg is never promoted — promotion is a reward for answering,
+     and a leg on cooldown has just proved the opposite. */
   const sticky = stickyLeg();
-  if (!sticky) return legs;
+  if (!sticky || benched(sticky)) return legs;
   const winner = legs.find((leg) => leg.id === sticky);
   return winner ? [winner, ...legs.filter((leg) => leg.id !== sticky)] : legs;
 }
@@ -646,17 +664,36 @@ export async function callBridge(prompt: BridgePrompt, options: CallBridgeOption
         const ms = Date.now() - started;
         if (status >= 200 && status < 300) {
           const { text, blocked } = leg.extract(json);
-          if (text) {
+          /* A 200 is not an answer. The free relays in particular return a
+             well-formed OpenAI body whose content is their own notice —
+             "the API key used for this request has reached its budget", an
+             HTML 502 page, a sticky ad footer. lib/aiAnswer.ts is the single
+             judge, shared with the server chain, so the same text is refused
+             on both sides of the wire. */
+          const verdict = classifyModelAnswer(text);
+          if (!verdict.noise) {
             attempts.push({ leg: leg.id, model, status, error: null, ms });
             options.onAttempt?.(attempts[attempts.length - 1]);
             unbench(leg.id);
             setStickyLeg(leg.id);
-            return { text, leg: leg.id, label: leg.label, kind: leg.kind, model, attempts };
+            return { text: verdict.text, leg: leg.id, label: leg.label, kind: leg.kind, model, attempts };
           }
-          attempts.push({ leg: leg.id, model, status, error: blocked ? "blocked" : "empty", ms });
+          const reason: BridgeError = blocked ? "blocked" : text ? verdict.reason : "empty";
+          attempts.push({ leg: leg.id, model, status, error: reason, ms });
           options.onAttempt?.(attempts[attempts.length - 1]);
-          bench(`${leg.id}:${model}`, blocked ? "blocked" : "empty");
-          continue;
+          if (reason === "empty") {
+            // Model-specific (a reasoning model that spent the budget
+            // thinking) — bench the id and try the leg's next model.
+            bench(`${leg.id}:${model}`, "empty");
+            continue;
+          }
+          // The relay is talking about its own key/host, so every model on
+          // this leg would answer identically. Bench the whole leg, lose the
+          // sticky slot, and let the next leg try.
+          bench(leg.id, reason);
+          bench(`${leg.id}:${model}`, reason);
+          clearStickyLeg(leg.id);
+          break;
         }
         const error = classify(status, detail);
         attempts.push({ leg: leg.id, model, status, error, ms });
@@ -664,6 +701,7 @@ export async function callBridge(prompt: BridgePrompt, options: CallBridgeOption
         bench(`${leg.id}:${model}`, error);
         // A rejected key poisons every model on that leg.
         if (error === "auth") bench(leg.id, "auth");
+        clearStickyLeg(leg.id);
         if (error !== "rate_limit" && error !== "model") break;
       } catch (error) {
         const ms = Date.now() - started;
@@ -674,6 +712,7 @@ export async function callBridge(prompt: BridgePrompt, options: CallBridgeOption
         // A thrown fetch is either offline or a CORS refusal. Both are
         // properties of the HOST, so bench the whole leg, not the model.
         bench(leg.id, kind);
+        clearStickyLeg(leg.id);
         break;
       }
     }
@@ -704,12 +743,30 @@ export async function probeBridge(options: { ownKeysOnly?: boolean; timeoutMs?: 
       const latencyMs = Date.now() - started;
       if (status >= 200 && status < 300) {
         const { text, blocked } = leg.extract(json);
-        if (text) {
+        const verdict = classifyModelAnswer(text);
+        if (!verdict.noise) {
           unbench(leg.id);
           probes.push({ id: leg.id, label: leg.label, kind: leg.kind, ok: true, model, latencyMs, error: null, detail: `${leg.label} answered from this browser.` });
           continue;
         }
-        probes.push({ id: leg.id, label: leg.label, kind: leg.kind, ok: false, model, latencyMs, error: blocked ? "blocked" : "empty", detail: blocked ? "The request was blocked by the provider." : "The provider answered with an empty message." });
+        /* "Test from this browser" must never report a leg as healthy because
+           the relay returned 200 with its own budget notice. Bench it, so the
+           next real message skips straight past it. */
+        const reason: BridgeError = blocked ? "blocked" : text ? verdict.reason : "empty";
+        if (reason !== "empty") { bench(leg.id, reason); clearStickyLeg(leg.id); }
+        else bench(`${leg.id}:${model}`, "empty");
+        probes.push({
+          id: leg.id, label: leg.label, kind: leg.kind, ok: false, model, latencyMs, error: reason,
+          detail: blocked
+            ? "The request was blocked by the provider."
+            : reason === "empty"
+              ? "The provider answered with an empty message."
+              : reason === "auth"
+                ? "The provider refused its own key (budget, quota or billing limit). Nothing to fix in this app — the next relay will be used."
+                : reason === "rate_limit"
+                  ? "The provider is throttling this device right now. The next relay will be used."
+                  : "The provider returned an error page instead of an answer. The next relay will be used.",
+        });
         continue;
       }
       const error = classify(status, detail);
