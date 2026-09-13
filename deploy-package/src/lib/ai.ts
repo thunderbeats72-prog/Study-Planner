@@ -12,7 +12,7 @@ import {
   type SeedSubject,
   type GeneratedTopic,
 } from "./curriculum";
-import { lookupKnowledge, teachFromKnowledge } from "./knowledge";
+import { lookupKnowledge, teachFromKnowledge, isRelevantKnowledge } from "./knowledge";
 import { detectLanguage } from "./language";
 
 // Re-export the canonical topic shape so existing imports from "./ai" keep working.
@@ -123,7 +123,27 @@ type ProviderSpec = {
 /** Shared OpenAI-compatible POST. `headers` may add provider-specific
  *  fields (OpenRouter's optional attribution, for example); the bearer
  *  token is always taken from the provider's own key. */
-function openAiCompatRequest(url: string, headers: Record<string, string> = {}) {
+/** Reasoning models (gpt-oss, qwen3) spend the completion budget on hidden
+ *  "thinking" tokens first. With a tutoring-sized `max_tokens` that used to
+ *  come back as an EMPTY answer (status 200, no content) and the chain moved
+ *  on — or, on the 16-token connectivity probe, every reasoning model looked
+ *  dead. Ask for the lowest effort the provider documents so the budget goes
+ *  to the visible answer. Providers that do not know the field ignore it. */
+function reasoningExtras(provider: ProviderId, model: string): Record<string, unknown> {
+  const id = model.toLowerCase();
+  if (provider === "groq") {
+    if (/gpt-oss/.test(id)) return { reasoning_effort: "low", include_reasoning: false };
+    if (/qwen3\.[68]/.test(id)) return { reasoning_effort: "none" };
+    return {};
+  }
+  if (provider === "cerebras" && /gpt-oss/.test(id)) return { reasoning_effort: "low" };
+  if (provider === "openrouter" && /gpt-oss|qwen3|deepseek-r|o[134]-/.test(id)) {
+    return { reasoning: { effort: "low", exclude: true } };
+  }
+  return {};
+}
+
+function openAiCompatRequest(url: string, headers: Record<string, string> = {}, provider?: ProviderId) {
   return (model: string, key: string, system: string, messages: ChatMsg[], maxTokens: number, temperature: number) => ({
     url,
     init: {
@@ -138,16 +158,33 @@ function openAiCompatRequest(url: string, headers: Record<string, string> = {}) 
         max_tokens: maxTokens,
         temperature,
         messages: [{ role: "system", content: system }, ...messages],
+        ...(provider ? reasoningExtras(provider, model) : {}),
       }),
     },
   });
 }
 
+/** Some hosts return `<think>…</think>` inline (raw reasoning format). The
+ *  learner must never see it, and an answer that is ONLY thinking is empty. */
+export function stripThinking(text: string): string {
+  return text
+    .replace(/<think>[\s\S]*?<\/think>/gi, "")
+    .replace(/^<think>[\s\S]*$/i, "")
+    .trim();
+}
+
 function openAiCompatExtract(json: any): { text: string | null; blocked: boolean } {
   const message = json?.choices?.[0]?.message;
   if (message?.refusal) return { text: null, blocked: true };
-  const text = typeof message?.content === "string" ? message.content : null;
-  return { text: text && text.trim() ? text : null, blocked: false };
+  let raw: string | null = null;
+  if (typeof message?.content === "string") raw = message.content;
+  else if (Array.isArray(message?.content)) {
+    raw = message.content
+      .map((part: { text?: string; type?: string }) => (typeof part?.text === "string" ? part.text : ""))
+      .join("");
+  }
+  const text = raw ? stripThinking(raw) : "";
+  return { text: text ? text : null, blocked: false };
 }
 
 const PROVIDERS: Record<ProviderId, ProviderSpec> = {
@@ -161,30 +198,18 @@ const PROVIDERS: Record<ProviderId, ProviderSpec> = {
     // The chain keeps several CURRENT ids so a retired model costs one fast
     // 404 and the next leg answers, instead of the whole provider dropping
     // out (which is what "Cerebras stopped working" used to look like).
+    // Verified against inference-docs.cerebras.ai/models/overview (Sept 2026):
+    // the public endpoint serves gpt-oss-120b and qwen-3.8-27b. Older Llama
+    // ids were retired and each one used to cost a full request before the
+    // chain moved on. Legacy ids stay at the tail as a cheap last try.
     models: [
-      "llama-3.3-70b",
       "gpt-oss-120b",
-      "qwen-3-32b",
-      "llama-4-scout-17b-16e-instruct",
-      "zai-glm-4.6",
+      "qwen-3.8-27b",
+      "gemma-4-31b",
+      "llama-3.3-70b",
       "llama3.1-8b",
     ],
-    request: (model, key, system, messages, maxTokens, temperature) => ({
-      url: "https://api.cerebras.ai/v1/chat/completions",
-      init: {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          authorization: `Bearer ${key}`,
-        },
-        body: JSON.stringify({
-          model,
-          max_tokens: maxTokens,
-          temperature,
-          messages: [{ role: "system", content: system }, ...messages],
-        }),
-      },
-    }),
+    request: openAiCompatRequest("https://api.cerebras.ai/v1/chat/completions", {}, "cerebras"),
     extract: openAiCompatExtract,
   },
 
@@ -197,14 +222,17 @@ const PROVIDERS: Record<ProviderId, ProviderSpec> = {
     label: "Groq",
     keyEnv: () => envValue("GROQ_API_KEY", "NEXT_PUBLIC_GROQ_API_KEY"),
     modelEnv: "GROQ_MODEL",
+    // Verified against console.groq.com/docs/models (Sept 2026). The
+    // GPT-OSS ids are the current production models on the developer plan;
+    // the Llama ids are still served but are enterprise-tier on new keys.
     models: [
-      "llama-3.3-70b-versatile",
       "openai/gpt-oss-120b",
-      "qwen/qwen3-32b",
-      "moonshotai/kimi-k2-instruct",
+      "openai/gpt-oss-20b",
+      "llama-3.3-70b-versatile",
       "llama-3.1-8b-instant",
+      "qwen/qwen3.6-27b",
     ],
-    request: openAiCompatRequest("https://api.groq.com/openai/v1/chat/completions", {}),
+    request: openAiCompatRequest("https://api.groq.com/openai/v1/chat/completions", {}, "groq"),
     extract: openAiCompatExtract,
   },
 
@@ -215,7 +243,16 @@ const PROVIDERS: Record<ProviderId, ProviderSpec> = {
     keyEnv: () => envValue("MISTRAL_API_KEY", "NEXT_PUBLIC_MISTRAL_API_KEY"),
     modelEnv: "MISTRAL_MODEL",
     // mistral-small is cost-efficient; large / codestral as heavy fallbacks.
-    models: ["mistral-small-latest", "mistral-large-latest", "open-mistral-nemo"],
+    // Verified against docs.mistral.ai/models (Sept 2026): Mistral Small 4
+    // (mistral-small-2603) is the current GA small model; the "-latest"
+    // aliases still resolve. open-mistral-nemo was retired.
+    models: [
+      "mistral-small-latest",
+      "mistral-small-2603",
+      "mistral-medium-latest",
+      "ministral-8b-latest",
+      "mistral-large-latest",
+    ],
     request: (model, key, system, messages, maxTokens, temperature) => ({
       url: "https://api.mistral.ai/v1/chat/completions",
       init: {
@@ -241,7 +278,8 @@ const PROVIDERS: Record<ProviderId, ProviderSpec> = {
     label: "SambaNova",
     keyEnv: () => envValue("SAMBANOVA_API_KEY", "NEXT_PUBLIC_SAMBANOVA_API_KEY"),
     modelEnv: "SAMBANOVA_MODEL",
-    models: ["Meta-Llama-3.3-70B-Instruct", "Meta-Llama-3.1-70B-Instruct", "Meta-Llama-3.1-8B-Instruct"],
+    // Verified against docs.sambanova.ai (Sept 2026) — production models.
+    models: ["Meta-Llama-3.3-70B-Instruct", "gpt-oss-120b", "DeepSeek-V3.1", "MiniMax-M2.7"],
     request: (model, key, system, messages, maxTokens, temperature) => ({
       url: "https://api.sambanova.ai/v1/chat/completions",
       init: {
@@ -267,8 +305,10 @@ const PROVIDERS: Record<ProviderId, ProviderSpec> = {
     label: "Cohere",
     keyEnv: () => envValue("COHERE_API_KEY", "NEXT_PUBLIC_COHERE_API_KEY"),
     modelEnv: "COHERE_MODEL",
-    // command-r-plus is the flagship; command-r is cost-efficient fallback.
-    models: ["command-r-plus", "command-r", "command"],
+    // Verified against docs.cohere.com/docs/models (Sept 2026): Command A
+    // is the current flagship; the dated R ids are still live. Bare
+    // "command-r" / "command" were deprecated in 2025.
+    models: ["command-a-03-2025", "command-r-plus-08-2024", "command-r-08-2024", "command-r7b-12-2024", "command-r-plus"],
     request: (model, key, system, messages, maxTokens, temperature) => {
       // Cohere uses /v2/chat with role-based message array (OpenAI-style).
       return {
@@ -304,8 +344,17 @@ const PROVIDERS: Record<ProviderId, ProviderSpec> = {
     label: "Gemini",
     keyEnv: () => envValue("GEMINI_API_KEY", "GOOGLE_API_KEY", "NEXT_PUBLIC_GEMINI_API_KEY", "NEXT_PUBLIC_GOOGLE_API_KEY"),
     modelEnv: "GEMINI_MODEL",
-    // "-latest" aliases keep serving after individual versions retire.
-    models: ["gemini-flash-latest", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"],
+    // Verified against ai.google.dev/gemini-api/docs/models (Sept 2026).
+    // gemini-2.0-flash and gemini-1.5-flash are SHUT DOWN and each cost a
+    // request before the chain moved on. "-latest" aliases keep serving
+    // after individual versions retire; the 3.x Flash ids are current.
+    models: [
+      "gemini-flash-latest",
+      "gemini-3.5-flash-lite",
+      "gemini-3.5-flash",
+      "gemini-flash-lite-latest",
+      "gemini-2.5-flash",
+    ],
     request: (model, key, system, messages, maxTokens, temperature) => ({
       url: `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
       init: {
@@ -317,7 +366,16 @@ const PROVIDERS: Record<ProviderId, ProviderSpec> = {
             role: message.role === "assistant" ? "model" : "user",
             parts: [{ text: message.content }],
           })),
-          generationConfig: { maxOutputTokens: maxTokens, temperature },
+          generationConfig: {
+            maxOutputTokens: maxTokens,
+            temperature,
+            // Gemini 2.5/3.x "think" before answering and the thoughts are
+            // billed against maxOutputTokens: a tutoring-sized budget used to
+            // come back EMPTY (finishReason MAX_TOKENS, no text). Lowest
+            // documented level per family; 3.x rejects "minimal" on some ids,
+            // "low" is accepted everywhere, 2.5 only knows thinkingBudget.
+            thinkingConfig: /gemini-2\.5/.test(model) ? { thinkingBudget: 0 } : { thinkingLevel: "low" },
+          },
         }),
       },
     }),
@@ -327,7 +385,8 @@ const PROVIDERS: Record<ProviderId, ProviderSpec> = {
       const blocked = Boolean(json?.promptFeedback?.blockReason)
         || ["SAFETY", "BLOCKLIST", "PROHIBITED_CONTENT", "RECITATION"].includes(finish);
       const text = candidate?.content?.parts
-        ?.map((part: { text?: string }) => part.text || "").join("") ?? null;
+        ?.filter((part: { thought?: boolean }) => !part.thought)
+        .map((part: { text?: string }) => part.text || "").join("") ?? null;
       return { text: text && text.trim() ? text : null, blocked };
     },
   },
@@ -345,12 +404,13 @@ const PROVIDERS: Record<ProviderId, ProviderSpec> = {
       "openai/gpt-oss-120b",
       "meta-llama/llama-3.3-70b-instruct",
       "google/gemini-2.5-flash",
-      "mistralai/mistral-small",
+      "mistralai/mistral-small-3.2-24b-instruct",
+      "openrouter/auto",
     ],
     request: openAiCompatRequest("https://openrouter.ai/api/v1/chat/completions", {
       "HTTP-Referer": "https://study-planner-pro.local",
       "X-Title": "Study Planner Pro",
-    }),
+    }, "openrouter"),
     extract: openAiCompatExtract,
   },
 };
@@ -486,22 +546,127 @@ function modelsFor(id: ProviderId): string[] {
 }
 
 function boundedMessages(messages: ChatMsg[]): ChatMsg[] {
-  return messages
-    .slice(-16)
-    .map((message) => ({
+  const recent = messages.slice(-12);
+  const lastIndex = recent.length - 1;
+  return recent
+    .map((message, index) => ({
       role: message.role === "assistant" ? "assistant" as const : "user" as const,
-      content: String(message.content || "").slice(0, 24_000),
+      // Earlier turns are context, not the question: a run of long lessons in
+      // the history used to ship 100k+ characters per request, which is slow
+      // to send, slow to prefill and burns the free-tier token quota that
+      // then shows up as "rate limited". The latest message stays whole.
+      content: String(message.content || "").slice(0, index === lastIndex ? 24_000 : 2_400),
     }))
     .filter((message) => message.content.trim());
 }
 
-function classifyProviderError(status: number | null, detail: string): LlmAttempt["error"] {
-  if (status === 401 || status === 403 || /api.?key|unauthori|permission|invalid.*credential/i.test(detail)) return "auth";
-  if (status === 429 || /rate.?limit|quota|resource exhausted|too many requests/i.test(detail)) return "rate_limit";
-  if (status === 404 || /model.*(not found|unsupported|unavailable|decommission|deprecat)|not found.*model|does not exist/i.test(detail)) return "model";
-  if (/safety|blocked|moderation|refus/i.test(detail)) return "blocked";
+const MODEL_ERROR_RE =
+  /model.{0,40}(not found|unsupported|unavailable|decommission|deprecat|does not exist|not exist|no longer|retired|invalid|unknown|not available|not supported)|(invalid|unknown|unsupported|no such)\s+model|not found.{0,30}model|model_not_found|model_decommissioned|is not found for api version/i;
+const PARAM_ERROR_RE =
+  /thinking|reasoning_effort|include_reasoning|max_tokens|max_completion_tokens|unsupported (parameter|value)|unknown (field|parameter)|invalid (argument|parameter|value)|not supported (by|for) this model/i;
+
+/** Classify a failed provider response so the chain reacts correctly:
+ *  auth → abandon the provider; model → try the next model id; rate limit →
+ *  next provider; anything else → one retry.
+ *
+ *  Order matters. Cerebras answers a RETIRED model id with 404 "Model X does
+ *  not exist or your API key does not have access to it". The old classifier
+ *  tested the "api key" phrase first, mis-read that as a rejected key, and
+ *  abandoned the whole provider (and its sticky slot) — which is how a retired
+ *  model id silently took the fastest provider out of the chain. */
+export function classifyProviderError(status: number | null, detail: string): LlmAttempt["error"] {
+  if (status === 401 || status === 403) return "auth";
+  if (status === 429) return "rate_limit";
+  if (status === 404 || MODEL_ERROR_RE.test(detail)) return "model";
+  if (/rate.?limit|quota|resource.?exhausted|too many requests|tokens per (minute|day)|tpm|rpm/i.test(detail)) return "rate_limit";
+  if (/invalid.{0,20}api.?key|api.?key.{0,30}(invalid|missing|not valid|revoked|expired|incorrect)|unauthori|invalid.*credential|authentication|permission denied|forbidden/i.test(detail)) return "auth";
+  if (/safety|blocked|moderation|refus|content.?filter/i.test(detail)) return "blocked";
+  // A 400 about a request FIELD is model-specific (one id rejects a
+  // parameter the rest accept) — walk to the next model, not the next host.
+  if (status === 400 && PARAM_ERROR_RE.test(detail)) return "model";
   return status && status >= 400 ? "provider" : "network";
 }
+
+/* ── Failure memory (negative cache) ─────────────────────────────
+   Sticky success remembers the last leg that WORKED. This remembers what
+   FAILED, so the next request does not pay for it again: a rejected key
+   is skipped for ten minutes, a retired model id for half an hour, a
+   throttled or stalling host for about a minute. The learner's own
+   (BYOK) keys are tracked separately from the deployment's keys, so a
+   bad env key never blocks a working pasted key. If EVERYTHING is on
+   cooldown the chain still tries the soonest-to-expire leg — the memory
+   is a shortcut, never a lock-out. */
+type Cooldown = { until: number; reason: NonNullable<LlmAttempt["error"]> };
+type CooldownGlobal = typeof globalThis & { __studyPlannerAiCooldowns?: Map<string, Cooldown> };
+const cooldownGlobal = globalThis as CooldownGlobal;
+const cooldowns = cooldownGlobal.__studyPlannerAiCooldowns ?? new Map<string, Cooldown>();
+cooldownGlobal.__studyPlannerAiCooldowns = cooldowns;
+
+const COOLDOWN_MS: Record<NonNullable<LlmAttempt["error"]>, number> = {
+  auth: 10 * 60_000,
+  model: 30 * 60_000,
+  rate_limit: 45_000,
+  timeout: 60_000,
+  network: 60_000,
+  provider: 30_000,
+  empty: 5 * 60_000,
+  blocked: 0,
+};
+
+function keyFingerprint(key: string): string {
+  let hash = 5381;
+  for (let index = 0; index < key.length; index++) hash = ((hash << 5) + hash + key.charCodeAt(index)) | 0;
+  return (hash >>> 0).toString(36);
+}
+function cooldownKey(provider: ProviderId, key: string, model?: string): string {
+  return `${provider}:${keyFingerprint(key)}${model ? `:${model}` : ""}`;
+}
+function cooldownUntil(id: string): number {
+  const entry = cooldowns.get(id);
+  if (!entry) return 0;
+  if (entry.until <= Date.now()) { cooldowns.delete(id); return 0; }
+  return entry.until;
+}
+function setCooldown(id: string, reason: NonNullable<LlmAttempt["error"]>) {
+  const ms = COOLDOWN_MS[reason];
+  if (!ms) return;
+  cooldowns.set(id, { until: Date.now() + ms, reason });
+  if (cooldowns.size > 500) {
+    const now = Date.now();
+    for (const [entryKey, entry] of cooldowns) if (entry.until <= now) cooldowns.delete(entryKey);
+  }
+}
+function clearCooldowns(provider: ProviderId, key: string) {
+  const prefix = `${provider}:${keyFingerprint(key)}`;
+  for (const entryKey of [...cooldowns.keys()]) if (entryKey.startsWith(prefix)) cooldowns.delete(entryKey);
+}
+/** Keep the healthy legs, in order; if none is healthy, the soonest-to-expire leg. */
+function skipCooled<T>(items: T[], idFor: (item: T) => string): T[] {
+  const healthy = items.filter((item) => cooldownUntil(idFor(item)) === 0);
+  if (healthy.length) return healthy;
+  return [...items].sort((a, b) => cooldownUntil(idFor(a)) - cooldownUntil(idFor(b))).slice(0, 1);
+}
+
+/** Sanitised view for /api/ai-status: which legs are being skipped and why. */
+export function providerCooldowns(runtime?: RuntimeProviderKeys): { provider: string; model: string | null; reason: string; secondsLeft: number }[] {
+  const keys = providerKeys(runtime);
+  const now = Date.now();
+  const out: { provider: string; model: string | null; reason: string; secondsLeft: number }[] = [];
+  for (const id of DEFAULT_PROVIDER_ORDER) {
+    const key = keys[id];
+    if (!key) continue;
+    const prefix = `${id}:${keyFingerprint(key)}`;
+    for (const [entryKey, entry] of cooldowns) {
+      if (!entryKey.startsWith(prefix) || entry.until <= now) continue;
+      const model = entryKey.slice(prefix.length + 1) || null;
+      out.push({ provider: PROVIDERS[id].label, model, reason: entry.reason, secondsLeft: Math.ceil((entry.until - now) / 1000) });
+    }
+  }
+  return out;
+}
+
+/** Test/ops hook: forget every remembered failure. */
+export function resetAiCooldowns() { cooldowns.clear(); }
 
 async function requestJson(
   url: string,
@@ -547,7 +712,7 @@ export async function callLLMDetailed(
   options: LlmCallOptions = {}
 ): Promise<LlmResult> {
   const keys = providerKeys(options.keys);
-  const providers = configuredProviderIds(options.keys);
+  const allProviders = configuredProviderIds(options.keys).filter((id) => keys[id]);
   const attempts: LlmAttempt[] = [];
   const deadline = llmDeadline();
   const safeSystem = String(system || "").slice(0, 48_000);
@@ -575,34 +740,48 @@ export async function callLLMDetailed(
       delete aiGlobal.__studyPlannerPreferred;
     }
   };
-  /* Per-call timeout ledger: one slow answer is a slow model; two is a slow
-     HOST, and a hanging host must not eat the shared budget while every
-     healthy provider queued behind it is skipped. */
-  const timeoutsSeen = new Map<ProviderId, number>();
 
-  for (const provider of providers) {
-    if (deadline - Date.now() < 300) break;
+  /* Skip legs the failure memory says are down. A provider whose KEY is on
+     cooldown (auth) is dropped entirely; a provider with only some MODELS on
+     cooldown keeps its remaining models. */
+  const providers = skipCooled(allProviders, (id) => cooldownKey(id, keys[id] as string));
+
+  type LegOutcome =
+    | { kind: "ok"; text: string; provider: ProviderId; model: string }
+    | { kind: "fail"; provider: ProviderId };
+
+  /** Walk one provider's model chain. Resolves with the first answer, or
+   *  "fail" once the provider is exhausted / abandoned. `budgetEnd` bounds
+   *  the whole walk; a single model attempt never gets more than
+   *  `perAttemptMs`, so one hanging model cannot consume the provider's
+   *  entire slice. */
+  const runProvider = async (provider: ProviderId, budgetEnd: number, perAttemptMs: number): Promise<LegOutcome> => {
     const spec = PROVIDERS[provider];
-    const key = keys[provider];
-    if (!key) continue;
+    const key = keys[provider] as string;
+    const models = skipCooled(modelsFor(provider), (model) => cooldownKey(provider, key, model));
+    let timeouts = 0;
 
-    for (const model of modelsFor(provider)) {
-      if (deadline - Date.now() < 300) break;
+    for (const model of models) {
+      if (budgetEnd - Date.now() < 300) break;
       let retried = false;
-      let abandonProvider = false;
       for (;;) {
-        if (deadline - Date.now() < 300) break;
+        if (budgetEnd - Date.now() < 300) break;
         try {
           const { url, init } = spec.request(model, key, safeSystem, safeMessages, safeMaxTokens, temperature);
           // Once a provider has timed out, its remaining attempts get a
           // shorter leash so the rest of the chain keeps a usable slice.
-          const budget = timeoutsSeen.get(provider) ? 4_500 : 9_000;
-          const { response, json, detail } = await requestJson(url, init, deadline, budget);
+          const budget = timeouts ? Math.min(perAttemptMs, 4_500) : perAttemptMs;
+          const { response, json, detail } = await requestJson(url, init, budgetEnd, budget);
           if (response.ok) {
             const { text, blocked } = spec.extract(json);
-            if (text) return success(text, provider, model);
+            if (text) {
+              clearCooldowns(provider, key);
+              return { kind: "ok", text, provider, model };
+            }
             attempts.push({ provider, model, status: 200, error: blocked ? "blocked" : "empty" });
-            // An empty completion may be model-specific — try the next model.
+            // An empty completion is model-specific (usually a reasoning
+            // model that spent the budget thinking) — remember it, next model.
+            if (!blocked) setCooldown(cooldownKey(provider, key, model), "empty");
             break;
           }
           const error = classifyProviderError(response.status, detail);
@@ -611,10 +790,13 @@ export async function callLLMDetailed(
             // A rejected key invalidates this provider (and its sticky slot):
             // every other model would fail identically, so do not loop them.
             forgetSticky(provider);
-            abandonProvider = true;
-            break;
+            setCooldown(cooldownKey(provider, key), "auth");
+            return { kind: "fail", provider };
           }
-          if (error === "model") break; // walk to the next model ID
+          if (error === "model") {
+            setCooldown(cooldownKey(provider, key, model), "model");
+            break; // walk to the next model ID
+          }
           if ((error === "network" || (error === "provider" && response.status >= 500)) && !retried) {
             retried = true; // one fast retry for transient failures
             continue;
@@ -623,34 +805,78 @@ export async function callLLMDetailed(
           // sticky slot goes with it (a throttled provider is not "the last
           // one that worked" any more).
           forgetSticky(provider);
-          abandonProvider = true;
-          break;
+          if (error === "rate_limit" || error === "provider") setCooldown(cooldownKey(provider, key), error);
+          return { kind: "fail", provider };
         } catch (error) {
-          const timedOut = error instanceof DOMException && error.name === "AbortError";
+          const timedOut = error instanceof DOMException && (error.name === "AbortError" || error.name === "TimeoutError");
           attempts.push({ provider, model, status: null, error: timedOut ? "timeout" : "network" });
           if (timedOut) {
-            const seen = (timeoutsSeen.get(provider) || 0) + 1;
-            timeoutsSeen.set(provider, seen);
+            timeouts++;
             // One timeout: try the next model on a shorter leash. Two: the
             // host is the problem — leave it and spend the budget elsewhere.
-            if (seen >= 2) {
+            if (timeouts >= 2 || budgetEnd - Date.now() < 300) {
               forgetSticky(provider);
-              abandonProvider = true;
+              setCooldown(cooldownKey(provider, key), "timeout");
+              return { kind: "fail", provider };
             }
             break;
           }
           if (!retried) { retried = true; continue; }
           // A hard network failure affects this provider's whole host.
-          abandonProvider = true;
-          break;
+          forgetSticky(provider);
+          setCooldown(cooldownKey(provider, key), "network");
+          return { kind: "fail", provider };
         }
       }
-      if (abandonProvider) break;
     }
+    return { kind: "fail", provider };
+  };
+
+  /* Staggered hedging. The chain is walked in priority order, but a second
+     provider is started in PARALLEL once the leader has been silent for
+     `HEDGE_AFTER_MS`, instead of waiting for it to time out. The first
+     answer wins; the losing request is left to finish on its own (its
+     result is discarded). A healthy primary still answers alone — the hedge
+     only ever starts when the primary is slow — so this costs nothing in
+     the good case and turns a 9 s stall into a 2.5 s answer in the bad one. */
+  const HEDGE_AFTER_MS = 2_500;
+  const PER_ATTEMPT_MS = 9_000;
+  const queue = [...providers];
+  const inflight = new Map<ProviderId, Promise<LegOutcome>>();
+
+  const startNext = () => {
+    const provider = queue.shift();
+    if (!provider) return;
+    inflight.set(provider, runProvider(provider, deadline, PER_ATTEMPT_MS));
+  };
+
+  startNext();
+  while (inflight.size) {
+    if (deadline - Date.now() < 300) break;
+    const hedgeTimer = queue.length
+      ? new Promise<{ kind: "hedge" }>((resolve) => setTimeout(() => resolve({ kind: "hedge" }), HEDGE_AFTER_MS))
+      : null;
+    const settled = await Promise.race([
+      ...[...inflight.entries()].map(([provider, promise]) =>
+        promise.then((outcome) => ({ ...outcome, provider }))),
+      ...(hedgeTimer ? [hedgeTimer] : []),
+    ]);
+    if (settled.kind === "ok") {
+      return success(settled.text, settled.provider, settled.model);
+    }
+    if (settled.kind === "fail") {
+      inflight.delete(settled.provider);
+      if (!inflight.size) startNext();
+      continue;
+    }
+    // Leader still silent → start the next provider alongside it. Never run
+    // more than two at once: that is enough to hide one slow host without
+    // multiplying the token spend on the free tiers.
+    if (inflight.size < 2) startNext();
   }
 
   aiGlobal.__studyPlannerLlmHealth = {
-    checkedAt: new Date().toISOString(), ok: providers.length ? false : null,
+    checkedAt: new Date().toISOString(), ok: allProviders.length ? false : null,
     provider: null, model: null, attempts: [...attempts],
   };
   return { text: null, provider: null, model: null, attempts };
@@ -685,18 +911,25 @@ export async function probeProviders(runtime?: RuntimeProviderKeys): Promise<Pro
 
     const deadline = Date.now() + 12_000;
     let last: ProviderProbe = { ...base, detail: "No probe could be attempted." };
+    // The probe is the operator's "is it really working?" button, so it
+    // ignores the failure memory and tests reality — and then UPDATES it:
+    // a successful probe clears the provider's cooldowns immediately.
     for (const model of modelsFor(id).slice(0, 3)) {
       if (deadline - Date.now() < 400) break;
       const started = Date.now();
       try {
+        // 64 tokens, not 16: reasoning models spend a few tokens thinking
+        // even at the lowest effort, and a 16-token cap made every one of
+        // them look "empty" (dead) to the connectivity test.
         const { url, init } = spec.request(
-          model, key, "You are a connectivity health probe.",
-          [{ role: "user", content: "Reply with the single word: OK" }], 16, 0
+          model, key, "You are a connectivity health probe. Answer with plain text only.",
+          [{ role: "user", content: "Reply with the single word: OK" }], 64, 0
         );
         const { response, json, detail } = await requestJson(url, init, deadline, 8_000);
         const latencyMs = Date.now() - started;
         const { text, blocked } = spec.extract(json);
         if (response.ok && text) {
+          clearCooldowns(id, key);
           if (id === (aiGlobal.__studyPlannerPreferred?.provider ?? id)) {
             aiGlobal.__studyPlannerPreferred = { provider: id, model };
           }
@@ -707,7 +940,9 @@ export async function probeProviders(runtime?: RuntimeProviderKeys): Promise<Pro
           ...base, model, status: response.status, latencyMs, error,
           detail: (detail || `Provider returned no content (${error}).`).slice(0, 220),
         };
-        if (error === "auth" || error === "rate_limit") return last;
+        if (error === "auth") { setCooldown(cooldownKey(id, key), "auth"); return last; }
+        if (error === "rate_limit") { setCooldown(cooldownKey(id, key), "rate_limit"); return last; }
+        if (error === "model") setCooldown(cooldownKey(id, key, model), "model");
       } catch (error) {
         const timedOut = error instanceof DOMException && error.name === "AbortError";
         last = {
@@ -1040,12 +1275,103 @@ export function languageCapabilityReply(query: string): string | null {
   return hit.reply;
 }
 
+/** Live signals from the on-device ML engine (src/lib/ml.ts) — the same
+ *  numbers the Analytics card shows, so the coach and the dashboard never
+ *  disagree. Every field is optional: contexts built without history (a
+ *  brand-new learner, the no-DB fallback) simply omit what cannot be learned
+ *  yet, and the prompt says so instead of inventing figures. */
+export type TutorMlSignals = {
+  /** Global pace vs plan (1.0 = on plan, 1.3 = 30% slower than planned). */
+  pace: number;
+  paceSamples: number;
+  /** Subjects the learner runs slowest on (pace ≥ 1.15), most severe first. */
+  slowSubjects: { name: string; pace: number }[];
+  /** Subjects the learner runs faster than plan (pace ≤ 0.85). */
+  fastSubjects: { name: string; pace: number }[];
+  /** Probability (0–1) that tomorrow's plan is skipped. null = no plan tomorrow. */
+  tomorrowSkipRisk: number | null;
+  /** Best 2-hour focus window start hour (0–23) learned from sessions, or null. */
+  peakHour: number | null;
+  focusSamples: number;
+  /** Readiness projection for the exam date (null when there is no history). */
+  readiness: { onTrack: boolean; loadPct: number; likelyDays: number; pessimisticDays: number; samples: number } | null;
+  /** Observed minutes per active study day over the last 4 weeks. */
+  effectiveDailyMinutes: number;
+  activeDays: number;
+  /** Spaced-repetition reviews due now/soon (FSRS-lite), most overdue first. */
+  dueReviews: { title: string; overdueDays: number }[];
+  /** Memory health of learned topics by recall probability. */
+  memory: { strong: number; fading: number; atRisk: number; tracked: number };
+  /** Weekday completion rates (0–1, Sun..Sat) once there is enough history. */
+  weekdayRates: number[] | null;
+  /** Weakest subject by completion share (the plan's own definition). */
+  weakestSubject: string | null;
+};
+
 export type TutorContext = {
   name: string; courseName: string; level: string; examDate: string; daysLeft: number; dailyHours: number;
   subjects: { id: number; name: string; difficulty: string; done: number; total: number }[];
   today: { title: string; kind: string; minutes: number; status: string; reason?: string }[];
   progressPct: number; streak: number; hoursThisWeek: number; overdue: number;
+  ml?: TutorMlSignals;
 };
+
+const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+function hourLabel(hour: number): string {
+  const h = ((hour % 24) + 24) % 24;
+  const suffix = h < 12 ? "am" : "pm";
+  const twelve = h % 12 === 0 ? 12 : h % 12;
+  return `${twelve}${suffix}`;
+}
+
+/** Human-readable digest of the ML signals for prompts and instant replies. */
+export function mlSignalLines(ml: TutorMlSignals | undefined): string[] {
+  if (!ml) return [];
+  const lines: string[] = [];
+  if (ml.paceSamples >= 3) {
+    const pct = Math.round(Math.abs(ml.pace - 1) * 100);
+    lines.push(ml.pace > 1.1
+      ? `Pace: ~${pct}% SLOWER than planned (EWMA over ${ml.paceSamples} completed tasks) — expect lessons to take longer than the plan says.`
+      : ml.pace < 0.9
+        ? `Pace: ~${pct}% FASTER than planned (${ml.paceSamples} samples) — the plan is conservative for this learner.`
+        : `Pace: on plan (${ml.paceSamples} samples).`);
+  }
+  if (ml.slowSubjects.length) {
+    lines.push(`Slowest subjects: ${ml.slowSubjects.slice(0, 3).map((s) => `${s.name} (×${s.pace.toFixed(2)})`).join(", ")}.`);
+  }
+  if (ml.fastSubjects.length) {
+    lines.push(`Fastest subjects: ${ml.fastSubjects.slice(0, 3).map((s) => `${s.name} (×${s.pace.toFixed(2)})`).join(", ")}.`);
+  }
+  if (ml.tomorrowSkipRisk !== null) {
+    const pct = Math.round(ml.tomorrowSkipRisk * 100);
+    lines.push(`Tomorrow's skip risk: ${pct}%${pct >= 50 ? " — HIGH: suggest trimming or front-loading tomorrow" : pct >= 30 ? " — moderate" : " — low"}.`);
+  }
+  if (ml.peakHour !== null && ml.focusSamples >= 3) {
+    lines.push(`Peak focus window (learned from ${ml.focusSamples} sessions): ${hourLabel(ml.peakHour)}–${hourLabel(ml.peakHour + 2)}.`);
+  }
+  if (ml.readiness && ml.readiness.samples > 0) {
+    const r = ml.readiness;
+    lines.push(r.onTrack
+      ? `Readiness: ON TRACK — remaining work needs ~${r.loadPct}% of the days left (likely finish in ${r.likelyDays} days, worst case ${r.pessimisticDays}).`
+      : `Readiness: BEHIND — remaining work needs ~${r.loadPct}% of the days left (likely ${r.likelyDays} days vs ${r.pessimisticDays} worst case). Coaching should focus on prioritising, not adding.`);
+  }
+  if (ml.activeDays > 0) {
+    lines.push(`Observed study time: ~${ml.effectiveDailyMinutes} min per active day across ${ml.activeDays} active days in the last 4 weeks.`);
+  }
+  if (ml.dueReviews.length) {
+    lines.push(`Spaced-repetition reviews due: ${ml.dueReviews.slice(0, 4).map((d) => `${d.title}${d.overdueDays > 0 ? ` (${d.overdueDays}d overdue)` : ""}`).join("; ")}.`);
+  }
+  if (ml.memory.tracked > 0) {
+    lines.push(`Memory health: ${ml.memory.strong} strong / ${ml.memory.fading} fading / ${ml.memory.atRisk} at risk of ${ml.memory.tracked} learned topics.`);
+  }
+  if (ml.weekdayRates) {
+    const ranked = ml.weekdayRates.map((rate, i) => ({ rate, i })).sort((a, b) => b.rate - a.rate);
+    lines.push(`Best study days: ${DAY_NAMES[ranked[0].i]} (${Math.round(ranked[0].rate * 100)}%), weakest: ${DAY_NAMES[ranked[6].i]} (${Math.round(ranked[6].rate * 100)}%).`);
+  }
+  if (ml.weakestSubject) lines.push(`Weakest subject by completion: ${ml.weakestSubject}.`);
+  return lines;
+}
 export type TutorReply = { text: string; action?: { type: string; payload?: unknown } };
 
 function round(n: number): number { return Math.round(n * 10000) / 10000; }
@@ -1312,7 +1638,16 @@ const PAGE_LABELS: Record<string, string> = {
   subjects: "Subjects",
   settings: "Settings",
   focus: "Focus Studio",
+  analytics: "Analytics",
 };
+
+/* Navigation verbs. "navigate me to", "bring me to", "switch to", "move to",
+   "jump to", "head to", "launch" and "display" are all things people type;
+   the old list (open/go/show/view/take me/see) missed "navigate" — the most
+   literal one — so "navigate me to analytics" fell through to the LLM and,
+   when that was down, to an apology. */
+const NAV_VERB = "(open|go|goto|show|view|take me|bring me|send me|navigate|navigat|switch( me)?|move( me)?|jump|head|launch|display|visit|see|load|pull up)";
+const NAV_VERB_RE = new RegExp(`\\b${NAV_VERB}\\b`);
 
 export function commandReply(
   action: ActionShape,
@@ -1375,12 +1710,15 @@ export function parseCommand(q: string): TutorReply["action"] | undefined {
   if (matchesAny(n, MULTI.breakTime)) return { type: "break" };
 
   // ── Navigation ──
-  if ((/\b(planner|schedule|my plan|timetable)\b/.test(n) || matchesAny(n, MULTI.openPlanner)) && /(\b(open|go|show|view|take me|see)\b|dikhao|kholo|दिखाओ|खोलो|दाखवा|उघडा|দেখাও|খোলো|காட்டு|చూపించు|ತೋರಿಸು|બતાવો|ਵਿਖਾਓ|دکھاؤ)/i.test(n)) return { type: "navigate", payload: "planner" };
-  if ((/\b(dashboard|overview|home|stats?)\b/.test(n) || matchesAny(n, MULTI.openOverview)) && /(\b(open|go|show|view|take me|see)\b|dikhao|kholo|दिखाओ|खोलो|দেখাও|খোলো|காட்டு)/i.test(n)) return { type: "navigate", payload: "dashboard" };
-  if (/\b(subjects?|syllabus|topics?|lessons?)\b/.test(n) && /\b(open|go|show|view|manage|edit)\b/.test(n)) return { type: "navigate", payload: "subjects" };
-  if (/\b(settings?|preferences?|options?|profile)\b/.test(n) && /\b(open|go|show|change|edit)\b/.test(n)) return { type: "navigate", payload: "settings" };
-  if (/\b(focus( page| view| tab)?|pomodoro)\b/.test(n) && /\b(open|go|show|view|take me|see)\b/.test(n)) return { type: "navigate", payload: "focus" };
-  if (/\b(analytics|insights|trends|reports?)\b/.test(n) && /\b(open|go|show|view|take me|see)\b/.test(n)) return { type: "navigate", payload: "analytics" };
+  const navVerb = NAV_VERB_RE.test(n);
+  // Analytics first: "show my analytics dashboard" / "open the stats page"
+  // means the analytics view, not the overview.
+  if (/\b(analytics|analytic|insights?|trends?|reports?|statistics|intelligence|performance (page|view|tab|report))\b/.test(n) && navVerb) return { type: "navigate", payload: "analytics" };
+  if ((/\b(planner|schedule|my plan|timetable)\b/.test(n) || matchesAny(n, MULTI.openPlanner)) && (navVerb || /(dikhao|kholo|दिखाओ|खोलो|दाखवा|उघडा|দেখাও|খোলো|காட்டு|చూపించు|ತೋರಿಸು|બતાવો|ਵਿਖਾਓ|دکھاؤ)/i.test(n))) return { type: "navigate", payload: "planner" };
+  if ((/\b(dashboard|overview|home|stats?)\b/.test(n) || matchesAny(n, MULTI.openOverview)) && (navVerb || /(dikhao|kholo|दिखाओ|खोलो|দেখাও|খোলো|காட்டு)/i.test(n))) return { type: "navigate", payload: "dashboard" };
+  if (/\b(subjects?|syllabus|topics?|lessons?)\b/.test(n) && (navVerb || /\b(manage|edit)\b/.test(n))) return { type: "navigate", payload: "subjects" };
+  if (/\b(settings?|preferences?|options?|profile)\b/.test(n) && (navVerb || /\b(change|edit)\b/.test(n))) return { type: "navigate", payload: "settings" };
+  if (/\b(focus( page| view| tab| studio)?|pomodoro)\b/.test(n) && navVerb) return { type: "navigate", payload: "focus" };
   // Bare page names are valid voice/typed commands too ("planner", "home").
   // Full-message anchors keep a sentence like "the planner looks good" from
   // being misread as navigation.
@@ -1388,6 +1726,8 @@ export function parseCommand(q: string): TutorReply["action"] | undefined {
   if (/^(dashboard|overview|home)$/.test(n)) return { type: "navigate", payload: "dashboard" };
   if (/^(subjects|syllabus|topics|lessons)$/.test(n)) return { type: "navigate", payload: "subjects" };
   if (/^(settings|preferences|profile)$/.test(n)) return { type: "navigate", payload: "settings" };
+  if (/^(analytics|insights|stats|statistics|reports?)$/.test(n)) return { type: "navigate", payload: "analytics" };
+  if (/^(focus|focus studio|pomodoro)$/.test(n)) return { type: "navigate", payload: "focus" };
   if (/^(focus|pomodoro)$/.test(n)) return { type: "navigate", payload: "focus" };
   if (/^(analytics|insights|trends)$/.test(n)) return { type: "navigate", payload: "analytics" };
   if (/^\/?(planner|schedule)$/.test(n)) return { type: "navigate", payload: "planner" };
@@ -1404,19 +1744,21 @@ export function parseCommand(q: string): TutorReply["action"] | undefined {
   if (/\b(zen|focus mode|full ?screen|distraction ?free|deep work mode)\b/.test(n)) return { type: "zen" };
   if (/\b(re-?plan|rebuild|regenerate|reschedule|re-?balance|redo my (plan|schedule)|fix my (plan|schedule)|update my plan)\b/.test(n)) return { type: "replan" };
 
-  const themeIntent = n.includes("theme")
-    || /\b(dark|light|default|midnight|obsidian|nebula|mint|sunset|lavender|emerald) mode\b/.test(n)
-    || /\b(switch to|change to|use|set|enable)\b.*\b(dark|light|default|midnight|obsidian|nebula|mint|sunset|lavender|emerald|silver|samsung|clean|white)\b/.test(n);
+  const themeIntent = /\b(theme|colou?r scheme|colou?r mode|appearance|look and feel|skin)\b/.test(n)
+    || /\b(dark|light|default|midnight|obsidian|nebula|mint|sunset|lavender|emerald|green|purple|orange|night|space) mode\b/.test(n)
+    || /\b(switch to|change to|use|set|enable|make it|turn on|go)\b.*\b(dark|light|default|midnight|obsidian|nebula|mint|sunset|lavender|emerald|silver|samsung|clean|white)\b/.test(n);
   if (themeIntent) {
     // Payloads are the raw THEME IDS stored in settings.theme — the UI
     // applies them as `theme-${id}`, so never prefix "theme-" here.
-    if (/(midnight|dark|black)/.test(n)) return { type: "theme", payload: "dark" };
-    if (/(obsidian)/.test(n)) return { type: "theme", payload: "obsidian" };
-    if (/(nebula)/.test(n)) return { type: "theme", payload: "nebula" };
-    if (/(emerald|mint)/.test(n)) return { type: "theme", payload: "mint" };
-    if (/(sunset|champagne)/.test(n)) return { type: "theme", payload: "sunset" };
-    if (/(default|bright|lighter|light|samsung|clean|white)/.test(n)) return { type: "theme", payload: "default" };
-    if (/(silver|lavender)/.test(n)) return { type: "theme", payload: "silver-lavender" };
+    // Plain colour words map to the nearest palette so "something green",
+    // "a purple theme" or "orange mode" work without knowing the theme names.
+    if (/(obsidian|pitch black|pure black|amoled|oled)/.test(n)) return { type: "theme", payload: "obsidian" };
+    if (/(nebula|space|galaxy|cosmic|stars?)\b/.test(n)) return { type: "theme", payload: "nebula" };
+    if (/(midnight|dark|black|night)/.test(n)) return { type: "theme", payload: "dark" };
+    if (/(emerald|mint|green|teal|jade|forest|nature|fresh)/.test(n)) return { type: "theme", payload: "mint" };
+    if (/(sunset|champagne|orange|peach|warm|amber|gold|coral)/.test(n)) return { type: "theme", payload: "sunset" };
+    if (/(silver|lavender|purple|violet|lilac|mauve|grey|gray)/.test(n)) return { type: "theme", payload: "silver-lavender" };
+    if (/(default|bright|lighter|light|samsung|clean|white|normal|original|reset)/.test(n)) return { type: "theme", payload: "default" };
     // Vague requests ("something nicer/brighter/cooler") fall through to
     // the LLM, which understands intent and replies with [[action:theme:x]].
     // The old catch-all returned DARK here and hijacked every vague ask.
@@ -1706,8 +2048,21 @@ export function instantTutorReply(q: string, ctx: TutorContext): TutorReply | nu
     return { text: `Here is your priority order for today:\n\n${list}\n\nStart with the first one — say *“start timer”* when you are ready.` };
   }
   if (/how am i doing|my progress|progress report|performance/.test(n)) {
+    const ml = ctx.ml;
+    const extras: string[] = [];
+    if (ml?.readiness && ml.readiness.samples > 0) {
+      extras.push(ml.readiness.onTrack
+        ? `The readiness model says you're **on track** — remaining work needs about ${ml.readiness.loadPct}% of the days left.`
+        : `The readiness model says you're **behind** — remaining work needs about ${ml.readiness.loadPct}% of the days left, so prioritise rather than add.`);
+    }
+    if (ml && ml.paceSamples >= 3 && Math.abs(ml.pace - 1) >= 0.1) {
+      extras.push(`Your pace runs **${Math.round(Math.abs(ml.pace - 1) * 100)}% ${ml.pace > 1 ? "slower" : "faster"}** than the plan${ml.slowSubjects[0] ? ` (slowest: ${ml.slowSubjects[0].name})` : ""}.`);
+    }
+    if (ml?.dueReviews.length) {
+      extras.push(`**${ml.dueReviews.length}** spaced-repetition review${ml.dueReviews.length === 1 ? " is" : "s are"} due — start with *${ml.dueReviews[0].title}*.`);
+    }
     return {
-      text: `You are **${ctx.progressPct}%** through the syllabus with a **${ctx.streak}-day streak**. You studied **${ctx.hoursThisWeek} hours** this week and have **${ctx.overdue} overdue task${ctx.overdue === 1 ? "" : "s"}**. ${ctx.overdue ? "Clear the oldest overdue lesson first, then return to today's plan." : "Your schedule is current—protect the streak with today's highest-priority lesson."}`,
+      text: `You are **${ctx.progressPct}%** through the syllabus with a **${ctx.streak}-day streak**. You studied **${ctx.hoursThisWeek} hours** this week and have **${ctx.overdue} overdue task${ctx.overdue === 1 ? "" : "s"}**. ${ctx.overdue ? "Clear the oldest overdue lesson first, then return to today's plan." : "Your schedule is current—protect the streak with today's highest-priority lesson."}${extras.length ? `\n\n${extras.join(" ")}` : ""}`,
     };
   }
   if (/weakest (topic|subject)|what.*weak|where.*struggl/.test(n)
@@ -1717,8 +2072,35 @@ export function instantTutorReply(q: string, ctx: TutorContext): TutorReply | nu
       .sort((a, b) => (a.done / a.total) - (b.done / b.total))[0];
     if (weakest) {
       const pct = Math.round((weakest.done / weakest.total) * 100);
-      return { text: `Your lowest-completion subject is **${weakest.name}** at **${pct}%** (${weakest.done}/${weakest.total} lessons). Open Subjects and choose its first pending lesson; I can then teach it from first principles.` };
+      const slow = ctx.ml?.slowSubjects[0];
+      const paceNote = slow && slow.name !== weakest.name
+        ? ` The pace model adds that **${slow.name}** takes you ×${slow.pace.toFixed(2)} the planned time — budget extra minutes there.`
+        : slow
+          ? ` The pace model agrees: it takes you ×${slow.pace.toFixed(2)} the planned time.`
+          : "";
+      return { text: `Your lowest-completion subject is **${weakest.name}** at **${pct}%** (${weakest.done}/${weakest.total} lessons).${paceNote} Open Subjects and choose its first pending lesson; I can then teach it from first principles.` };
     }
+  }
+  if (/\b(when|what time|best time|peak|focus (hour|time|window))\b.*\b(study|focus|learn|productive)\b|\bwhen (am i|do i) (most )?(productive|focused)\b/.test(n)) {
+    const ml = ctx.ml;
+    if (ml?.peakHour !== null && ml?.peakHour !== undefined && ml.focusSamples >= 3) {
+      return { text: `Your focus profile (learned from ${ml.focusSamples} logged sessions) peaks around **${hourLabel(ml.peakHour)}–${hourLabel(ml.peakHour + 2)}**. Schedule the hardest lesson of the day inside that window and keep revision for the rest.` };
+    }
+    return { text: "I don't have enough logged focus sessions yet to learn your peak hours — run the study clock for a few sessions and I'll tell you exactly when you focus best." };
+  }
+  if (/\b(skip|miss|risk)\b.*\btomorrow\b|\btomorrow\b.*\b(risk|skip|miss|plan)\b/.test(n)) {
+    const ml = ctx.ml;
+    if (ml?.tomorrowSkipRisk === null || ml?.tomorrowSkipRisk === undefined) {
+      return { text: "Nothing is scheduled for tomorrow yet, so there is no skip risk to model. Say *replan* if you want me to rebuild the schedule from today." };
+    }
+    const pct = Math.round(ml.tomorrowSkipRisk * 100);
+    return {
+      text: pct >= 50
+        ? `The skip-risk model puts tomorrow at **${pct}%** — high. It's over-booked relative to your recent completion rate. Move one lesson later today or say *replan* to rebalance it.`
+        : pct >= 30
+          ? `Tomorrow's skip risk is **${pct}%** — moderate. Protect it by starting with the shortest lesson first thing.`
+          : `Tomorrow's skip risk is only **${pct}%** — the plan is realistic. Keep the streak going.`,
+    };
   }
   if (/i'?m behind|am i behind|catch up|overdue/.test(n)) {
     return ctx.overdue
@@ -1906,6 +2288,68 @@ const WHO_ARE_YOU =
 const HELP_ONLY =
   /^\s*(help|help me|what can you do|options|commands|capabilities|features|menu|madad|sahayata|sahay)\s*[?!.]*$/i;
 
+/* ── Questions about the assistant itself ─────────────────────────
+   "are you connected with ai?", "is the api working?", "why are you not
+   responding?", "why did it take so long to connect?" These are about
+   SHIGUN, not about the syllabus. They used to fall through to the
+   encyclopedia lookup, which searched for the leftover keywords and
+   taught whatever article matched — "connect" produced a lesson on the
+   quiz show *Only Connect*, and "responsive"/"api" produced the "couldn't
+   find that" apology. Both read as a broken assistant. These are now
+   answered deterministically from the live connectivity state. */
+const ASSISTANT_STATUS_RE =
+  /\b(are|r|is|were|was)\s+(you|yoh|yu|u|this|it|(the|your|ur)\s+(ai|api|bot|assistant|coach|app|chat|cloud|llm|model|server|backend))\s+(connected|linked|hooked|online|working|live|running|using|powered|down|offline|available)\b|\bconnected\s+(with|to)\s+(the\s+)?(ai|api|cloud|internet|llm|model|gpt|gemini|server)|\b(ai|api|cloud|llm|model|bot|assistant|coach|chat)\s+(is|not|isn'?t|ain'?t)\s+(not\s+)?(working|connected|responding|responsive|answering|replying|available|online|down|broken|slow)|\bwhy\s+(are|r)\s+(you|yoh|u)\s+(not|so|being)\s+(responsive|responding|replying|answering|slow|working|repeating|repetitive)|\bwhy\s+(is|does|did|do)\s+(it|the\s+(ai|api|bot|app|assistant|chat)|this)\s+(take|took|taking|so\s+slow|slow|not\s+work|keep|fail)|\b(took|take|taking)\s+(so\s+)?(much\s+|long\s+)?time\s+to\s+(connect|respond|reply|answer|load)|\bwhich\s+(ai|model|llm|api|provider)\s+(are\s+you|is\s+this|do\s+you\s+use|powers)|\bwhat\s+(ai|model|llm|api|provider)\s+(are\s+you|is\s+this|do\s+you\s+use|powers|runs)|\b(do|can)\s+you\s+(have|use)\s+(an?\s+)?(api|internet|cloud|llm)\b|\bare\s+you\s+(an?\s+)?(real\s+)?(ai|bot|human|chatgpt|gpt|gemini|llm)\b|\bapi\s+(key|status|health|connection)\b|\bcheck\s+(the\s+)?(ai|api)\s+(connection|status|health)|\b(ai|api)\s+(connection|status|health)\b/i;
+
+export function isAssistantStatusQuestion(q: string): boolean {
+  const t = q.trim();
+  if (t.length > 220) return false;
+  // Never hijack a study question that merely contains one of these words
+  // ("explain how an API gateway works", "what is machine learning / AI?").
+  if (/\b(explain|teach|define|definition|meaning of|what is (an?|the)?\s*(api|rest|artificial intelligence|machine learning)\b|lesson|chapter|syllabus|exam|notes|difference between)\b/i.test(t)
+    && !/\b(are|r|is)\s+(you|yoh|u)\b/i.test(t)) return false;
+  return ASSISTANT_STATUS_RE.test(t);
+}
+
+export function assistantStatusReply(
+  q: string,
+  ctx: TutorContext,
+  status: { cloud: boolean; usingOwnKey?: boolean; lastOk?: boolean | null; lastLatencyMs?: number | null }
+): string {
+  const n = q.toLowerCase();
+  const next = ctx.today.find((task) => task.status === "pending");
+  const cta = next
+    ? `\n\nWhen you're ready, your next lesson is **${next.title}** (${next.minutes} min) — say *"teach me ${next.title}"* or *"start timer"*.`
+    : `\n\nAsk me anything from your course, or *"what should I study today?"*`;
+  const slow = /slow|time to|took|take|long|late|delay|respons|repeat/.test(n);
+  const identity = /which|what\s+(ai|model)|are you (an?|a real|chatgpt|gpt|gemini|human)/.test(n);
+
+  if (!status.cloud) {
+    return [
+      `Right now I'm running on the **on-device study engine only** — no cloud AI key is connected for this deployment, so I answer from your plan, your syllabus and my reference library, but I can't hold an open-ended conversation yet.`,
+      `To enable full AI tutoring, open **Settings → AI coach**, paste a free key (Gemini or Groq take one minute), and press **Test connection**. It starts working immediately, no restart needed.`,
+      cta,
+    ].join("\n\n");
+  }
+  const health = status.lastOk === false
+    ? `The last cloud request **did not get through** (usually a rate limit or a slow provider), so that answer came from the local engine. Try again — a different provider in the chain will pick it up.`
+    : status.lastOk === true && status.lastLatencyMs
+      ? `The last cloud answer arrived in about **${(status.lastLatencyMs / 1000).toFixed(1)} s**.`
+      : `Cloud tutoring is active for this session.`;
+  const lines = [
+    `Yes — I'm connected. I run as a **hybrid**:`,
+    `- **Cloud AI layer** ${status.usingOwnKey ? "(using the key you added in Settings) " : ""}— a chain of fast providers answers open-ended questions and explanations. If one provider is slow or busy, the next one answers in the same request.`,
+    `- **Local ML engine** — spaced repetition (FSRS-lite), pace modelling (EWMA), skip-risk and focus-hour profiling run on your own data and feed every answer with live numbers: ${ctx.progressPct}% complete, ${ctx.streak}-day streak, ${ctx.overdue} overdue.`,
+    health,
+  ];
+  if (slow) {
+    lines.push(`If a reply was slow or repeated, the first provider in the chain was probably rate-limited (free tiers throttle per minute) and I waited for it before falling through. That wait is now capped at a couple of seconds and a second provider is started in parallel, so it shouldn't happen again. You can also check each provider in **Settings → AI coach → Test connection**.`);
+  }
+  if (identity) {
+    lines.push(`I'm **SHIGUN**, Study Planner Pro's coach — not a person. I don't expose which vendor answered a given message, but every reply is grounded in your plan.`);
+  }
+  return lines.join("\n\n") + cta;
+}
+
 function greetingReply(q: string, ctx: TutorContext, langTag: string): string | null {
   const code = langTag.slice(0, 2);
   const p = GREET_I18N[code] || GREET_I18N.en;
@@ -1918,6 +2362,31 @@ function greetingReply(q: string, ctx: TutorContext, langTag: string): string | 
   if (HELP_ONLY.test(q.trim())) return p.help;
   if (GREETING_ONLY.test(q.trim())) return p.hello(name, next);
   return null;
+}
+
+/** Does this message ask ABOUT something (a concept, a term, a topic) rather
+ *  than talk TO the assistant? Only the former should hit the encyclopedia. */
+export function looksLikeConceptQuestion(q: string): boolean {
+  const t = q.trim();
+  if (t.length < 3) return false;
+  // Talking to / about the assistant, or reacting to its last answer.
+  if (/\b(you|your|you're|youre|yoh|u r|ur)\b/i.test(t)
+    && !/\b(can|could|will|would)\s+you\s+(explain|teach|tell|describe|define|help me (with|understand))\b/i.test(t)) return false;
+  if (/^(no|nope|nah|yes|yeah|yep|ok|okay|k|hmm|huh|what\??|why\??|again|wrong|incorrect|not (this|that)|same|repeat|stop|thanks?)\b[\s!.?]*$/i.test(t)) return false;
+  if (/\b(this|that|it)\s+(is|was|isn'?t|wasn'?t)\s+(wrong|incorrect|not (what|right)|useless|unhelpful|the same|repeated|repeating)\b/i.test(t)) return false;
+  if (/\b(not working|doesn'?t work|isn'?t working|didn'?t (work|help)|keeps? (repeating|saying|showing)|same (answer|reply|response|thing)|repeating|repetitive)\b/i.test(t)) return false;
+  // Non-Latin scripts: the question-word filter in searchTerms already
+  // strips fillers; keep the lookup available for them.
+  if (!/[a-z]/i.test(t)) return true;
+  // At least one content-bearing token must survive the stop list.
+  return /[\p{L}]{3,}/u.test(searchTermsForGate(t));
+}
+function searchTermsForGate(q: string): string {
+  return q.toLowerCase()
+    .replace(/[?!.,;:"'`]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length > 2 && !/^(what|whats|who|why|how|when|where|which|is|are|the|this|that|it|its|explain|tell|about|please|can|could|you|your|me|my|does|did|do|was|were|will|would|should|there|here|very|much|many|some|any|just|like|want|need|know|think|going|take|took|time|connect|connected|connection|work|working|works|respond|responding|responsive|response|answer|answering|reply|replying|slow|fast|again|still|now|today|yet|already|only|even|also|really|actually|ai|api|bot|app|chat|assistant|coach)$/.test(w))
+    .join(" ");
 }
 
 export async function localTutor(
@@ -1954,6 +2423,17 @@ export async function localTutor(
   const greeting = greetingReply(q, ctx, script);
   if (greeting) return { text: greeting };
 
+  if (isAssistantStatusQuestion(q)) {
+    const health = llmHealthSnapshot();
+    return {
+      text: assistantStatusReply(q, ctx, {
+        cloud: !!activeProvider(options.keys),
+        usingOwnKey: hasRuntimeKeys(options.keys),
+        lastOk: health.ok,
+      }),
+    };
+  }
+
   const instant = instantTutorReply(q, ctx);
   if (instant) return instant;
 
@@ -1971,20 +2451,37 @@ export async function localTutor(
   }
 
   const subjectHint = ctx.subjects.find((s) => n.includes(s.name.toLowerCase().split(" ")[0]))?.name;
-  try {
-    const knowledge = await lookupKnowledge(q);
-    if (knowledge) {
-      const taught = teachFromKnowledge(knowledge, q, ctx.level, subjectHint);
-      if (taught.trim()) return { text: taught };
+  // The encyclopedia is for CONCEPT questions. Feedback, complaints and chat
+  // about the app ("why are you repeating", "this is wrong", "that didn't
+  // help") carry no topic; searching their leftover words used to return an
+  // unrelated article as a "lesson". Skip the lookup and answer honestly.
+  if (looksLikeConceptQuestion(q)) {
+    try {
+      const knowledge = await lookupKnowledge(q);
+      if (knowledge && isRelevantKnowledge(knowledge, q)) {
+        const taught = teachFromKnowledge(knowledge, q, ctx.level, subjectHint);
+        if (taught.trim()) return { text: taught };
+      }
+    } catch (error) {
+      console.warn("Local knowledge tutor failed:", error instanceof Error ? error.message : error);
     }
-  } catch (error) {
-    console.warn("Local knowledge tutor failed:", error instanceof Error ? error.message : error);
   }
 
   // Be honest about WHY the answer is limited. A deployment without an AI key
   // (or with a provider outage) previously got an unexplained generic line,
   // which read as "the AI is broken".
   const cloudConfigured = !!activeProvider(options.keys);
+  if (cloudConfigured && options.skipCloud) {
+    // The cloud chain was tried and failed for THIS request. Say so in one
+    // calm line and point at the recovery — not a generic "couldn't find".
+    const next = ctx.today.find((task) => task.status === "pending");
+    return {
+      text: [
+        `I couldn't reach the cloud tutor for that one just now, so I don't want to guess. Please send it again in a moment — the next provider in the chain will pick it up.`,
+        `Meanwhile I can still help from your plan: *"what should I study today?"*, *"give me practice questions"*${next ? `, or *"teach me ${next.title}"*` : ""}.`,
+      ].join("\n\n"),
+    };
+  }
   return {
     text: cloudConfigured
       ? `I couldn't find that in your study plan or my reference library just now. Try rephrasing your question, ask *"what should I study today?"*, or say *"explain [any topic from your subjects]"*.`
@@ -2016,13 +2513,19 @@ export function tutorSystemPrompt(ctx: TutorContext): string {
   const subjectLines = ctx.subjects.length
     ? ctx.subjects.slice(0, 10).map((subject) => `- ${subject.name}: ${subject.done}/${subject.total} lessons (${subject.difficulty})`).join("\n")
     : "- (no subjects loaded yet)";
+  const signals = mlSignalLines(ctx.ml);
+  const mlLines = signals.length
+    ? signals.map((line) => `- ${line}`).join("\n")
+    : "- (not enough logged history yet — the models start learning after the first few completed tasks and focus sessions)";
   return `You are SHIGUN — Study Planner Pro's AI-powered study coach.
 
 IDENTITY & ARCHITECTURE:
 You are a hybrid AI+ML system. Your intelligence comes from two layers working together:
-  1. CLOUD AI LAYER — powered by a priority chain of Cerebras (ultra-fast Llama inference),
-     Mistral, SambaNova, and Cohere, with Gemini as the final cloud safety net. This layer
-     handles open-ended tutoring, concept explanations, and nuanced coaching.
+  1. CLOUD AI LAYER — a priority chain of fast inference providers (Cerebras, Groq, Mistral,
+     SambaNova, Cohere, Gemini, OpenRouter) with automatic failover and parallel hedging, so a
+     slow or rate-limited provider never blocks an answer. This layer handles open-ended
+     tutoring, concept explanations, and nuanced coaching. Never name the vendor or model that
+     produced a reply — say "the cloud layer" if asked.
   2. LOCAL ML ENGINE — a deterministic on-device engine (FSRS-lite spaced repetition, EWMA
      pace modelling, skip-risk logistic regression, weekday propensity, time-of-day focus
      profiling, and Ebbinghaus decay) trained continuously on the learner's own logged
@@ -2044,6 +2547,10 @@ Name: ${ctx.name} | Course: ${ctx.courseName} | Level: ${ctx.level}
 Days left: ${ctx.daysLeft} (exam: ${ctx.examDate}) | Progress: ${ctx.progressPct}%
 Streak: ${ctx.streak} days | This week: ${ctx.hoursThisWeek}h studied vs ${ctx.dailyHours * 7}h target
 Overdue tasks: ${ctx.overdue}
+
+ML SIGNALS (learned from this learner's own history — quote these numbers when relevant;
+if a signal is missing, the model has too little history yet — say so, never invent one):
+${mlLines}
 
 Today's plan (ML-scheduled, ALREADY IN PRIORITY ORDER — the first pending item is the best next step):
 ${todayPlan}
@@ -2085,8 +2592,9 @@ APP CONTROL — SHIGUN directly controls this app. When the learner requests an 
 [[action:theme:mint]]  [[action:theme:sunset]]  [[action:theme:default]]  [[action:theme:silver-lavender]]
 [[action:startTimer]]  [[action:stopTimer]]  [[action:pause]]  [[action:resume]]
 [[action:break]]  [[action:zen]]  [[action:replan]]
-Theme aliases: default/light/clean/white → default | lavender/silver → silver-lavender |
-emerald → mint | champagne → sunset | midnight/dark/black → dark | "previous" → silver-lavender.
+Theme aliases: default/light/clean/white → default | lavender/silver/purple → silver-lavender |
+emerald/green/teal → mint | champagne/orange/warm → sunset | midnight/dark/black → dark |
+pure black/AMOLED → obsidian | space/galaxy → nebula | "previous" → silver-lavender.
 Rules: emit ONE tag max, only when the learner clearly requests that specific action.
 Never claim you cannot control themes, timers, navigation or replanning — you always can.
 For pure study questions, emit no tag.

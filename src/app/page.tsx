@@ -29,7 +29,7 @@ import FocusView from "@/components/FocusView";
 import SubjectsView from "@/components/SubjectsView";
 import AnalyticsView from "@/components/AnalyticsView";
 import SettingsView from "@/components/SettingsView";
-import ChatPanel from "@/components/ChatPanel";
+import ChatPanel, { type LastReplySource } from "@/components/ChatPanel";
 import CommandPalette, { type Command } from "@/components/CommandPalette";
 import { onSoundChange, stopSound } from "@/lib/sound";
 import { haptic } from "@/lib/haptics";
@@ -182,6 +182,7 @@ export default function Home() {
   const [busy, setBusy] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [thinking, setThinking] = useState(false);
+  const [lastReplySource, setLastReplySource] = useState<LastReplySource>(null);
   const [zen, setZen] = useState(false);
   const [ambient, setAmbient] = useState("none");
   useEffect(() => onSoundChange(setAmbient), []);
@@ -1147,6 +1148,13 @@ export default function Home() {
         /* The tutor still answered (from the local engine), so this is a
            notice with a recovery verb — not an error panel, and never the
            raw provider/model configuration the server logged. */
+        setLastReplySource(
+          r.ai?.source && r.ai.source !== "local"
+            ? "cloud"
+            : r.ai?.degraded
+              ? "local"
+              : "instant",
+        );
         if (r.ai?.degraded && r.ai.notice) {
           const retryQuestion = message;
           notify(
@@ -2142,6 +2150,7 @@ export default function Home() {
         onSend={askTutor}
         thinking={thinking}
         provider={state.aiProvider}
+        lastSource={lastReplySource}
         onOpenSettings={() => goPage("settings")}
         learner={{
           name: state.user.name,

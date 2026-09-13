@@ -7,6 +7,7 @@ import {
   callLLMDetailed, localTutor, parseCommand, tutorSystemPrompt, activeProvider,
   extractLlmAction, languageCapabilityReply, instantTutorReply, commandReply,
   parseRuntimeKeys, hasRuntimeKeys, type RuntimeProviderKeys,
+  isAssistantStatusQuestion, assistantStatusReply, llmHealthSnapshot,
 } from "@/lib/ai";
 import { checkRateLimit } from "@/lib/rateLimit";
 import { readJsonObject, validationPayload } from "@/lib/validation";
@@ -157,13 +158,13 @@ type AiAttempt = { provider: string; model: string; status: number | null; error
  */
 export function summarizeAttempts(attempts: AiAttempt[]): string {
   if (!attempts.length) {
-    return "No cloud provider is configured — the local ML engine answered. Add a CEREBRAS_API_KEY, MISTRAL_API_KEY, SAMBANOVA_API_KEY, COHERE_API_KEY, or GEMINI_API_KEY to enable cloud tutoring.";
+    return "No cloud provider is configured — the local ML engine answered. Add a CEREBRAS_API_KEY, GROQ_API_KEY, MISTRAL_API_KEY, SAMBANOVA_API_KEY, COHERE_API_KEY, GEMINI_API_KEY, or OPENROUTER_API_KEY to enable cloud tutoring.";
   }
   const first = attempts[0];
   const chain = attempts
     .map((attempt) => `${attempt.provider}(${attempt.model}): ${attempt.error || attempt.status || "unknown"}`)
     .join(" · ");
-  const tail = " Check deployment keys (CEREBRAS_API_KEY, MISTRAL_API_KEY, SAMBANOVA_API_KEY, COHERE_API_KEY, GEMINI_API_KEY) or POST /api/ai-status for a live diagnosis.";
+  const tail = " Check deployment keys (CEREBRAS_API_KEY, GROQ_API_KEY, MISTRAL_API_KEY, SAMBANOVA_API_KEY, COHERE_API_KEY, GEMINI_API_KEY, OPENROUTER_API_KEY) or POST /api/ai-status for a live diagnosis.";
   if (first.error === "auth") {
     return `The ${first.provider} API key was rejected (${first.status ?? "auth"}). Check the key in your deployment environment.${tail}`;
   }
@@ -322,7 +323,18 @@ async function handleChat(req: Request, opts: { message: string; keys?: RuntimeP
   const ctx = buildContext(state, localDate);
   let action = parseCommand(text);
   const languageReply = languageCapabilityReply(text);
-  const instantReply = action ? null : instantTutorReply(text, ctx);
+  // "Are you connected to the AI?" / "why are you not responding?" are
+  // questions about the assistant, answered from live connectivity state —
+  // never sent to the cloud (a model cannot know its own plumbing) and never
+  // to the encyclopedia (which once answered "connect" with a quiz show).
+  const statusReply = !action && !languageReply && isAssistantStatusQuestion(text)
+    ? assistantStatusReply(text, ctx, {
+        cloud: !!activeProvider(runtimeKeys),
+        usingOwnKey: hasRuntimeKeys(runtimeKeys),
+        lastOk: llmHealthSnapshot().ok,
+      })
+    : null;
+  const instantReply = action || statusReply ? null : instantTutorReply(text, ctx);
 
   if (state.user.id > 0) {
     try {
@@ -358,6 +370,8 @@ async function handleChat(req: Request, opts: { message: string; keys?: RuntimeP
       }
     }
     finalText = commandReply(action, text, ctx.daysLeft);
+  } else if (statusReply) {
+    finalText = statusReply;
   } else if (instantReply) {
     finalText = instantReply.text;
   } else {
@@ -417,7 +431,7 @@ async function handleChat(req: Request, opts: { message: string; keys?: RuntimeP
         console.warn("localTutor failed:", error instanceof Error ? error.message : error);
       }
       const knowledgeLooksGood = !!localText.trim()
-        && !/without a cloud answer|local mode|couldn't find that in your study plan/i.test(localText);
+        && !/without a cloud answer|local mode|couldn't find that in your study plan|couldn't reach the cloud tutor/i.test(localText);
       // Practice / plan-card requests stay on the curriculum set. Concept
       // questions prefer a real Wikipedia-backed lesson over a syllabus dump.
       if (asksPractice && grounded) {
