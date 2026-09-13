@@ -74,11 +74,26 @@ GROQ_API_KEY, MISTRAL_API_KEY, SAMBANOVA_API_KEY, COHERE_API_KEY,
 GEMINI_API_KEY (alias GOOGLE_API_KEY) and/or OPENROUTER_API_KEY. Never put a
 secret in a NEXT_PUBLIC_* variable. You do NOT need all seven — one key works.
 Providers fail over inside one bounded request in priority order Cerebras →
-Groq → Mistral → SambaNova → Cohere → Gemini → OpenRouter, each with its own
+Gemini → Groq → Mistral → SambaNova → Cohere → OpenRouter, each with its own
 MODEL FALLBACK CHAIN because model IDs retire. The last provider/model that
 answered is remembered and tried first, and failures are benched (rejected key
 10 min, retired model 30 min, rate limit ~45 s, stall ~60 s) so the next
-message skips the broken leg.
+message skips the broken leg. Override the order with AI_PROVIDER_ORDER.
+A 200 STATUS IS NOT AN ANSWER. Free relays — Pollinations above all — reply
+HTTP 200 with a valid OpenAI-shaped body whose content is their OWN notice
+("The API key used for this request has reached its budget … 🌸 Ad 🌸 Powered
+by Pollinations.AI"). That text used to be shown to the learner as SHIGUN's
+reply, the broken leg was remembered as the one that "worked" and promoted to
+first place, and the on-device engine never ran because a "cloud answer"
+existed. src/lib/aiAnswer.ts is now the single judge of a 200 body and is used
+by the server chain, the browser bridge AND /api/chat's finalise path (which is
+the last gate for a browser still running an older bundle): a provider notice
+counts as a FAILURE, the leg is benched, its sticky slot is dropped, and the
+chain keeps walking until something real answers or the local ML engine takes
+over. It is deliberately conservative — a cost-accounting lesson about a
+department that "has reached its budget ceiling" is teaching, not a billing
+error, and is always delivered untouched. Advertising stapled under a good
+answer is trimmed instead of being treated as a failure.
 BROWSER KEYS (one learner, no redeploy). Settings → AI coach accepts the same
 seven providers. The key stays in that browser's localStorage, travels on the
 `x-ai-keys` header, and is used for that request only — never stored, never

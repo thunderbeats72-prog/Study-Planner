@@ -3,6 +3,91 @@
 
 ---
 
+## v35 — A 200 STATUS IS NOT AN ANSWER, + THE SYLLABUS STEP WAS NEVER WIRED UP (this session)
+
+Two unrelated bugs produced one complaint each. Both are now pinned by tests.
+
+### 1. The relay's own error notice was shown as SHIGUN's reply
+
+**The symptom.** Every answer came back as *"The API key used for this request
+has reached its budget. Please ++[raise the key budget](…)++, then try again…
+🌸 **Ad** 🌸 Powered by Pollinations.AI free text APIs."* — under the header
+`Shigun · Cloud AI · free endpoint`. The learner could not hold a conversation.
+
+**The diagnosis.** Every leg of every chain was judged by its HTTP status. Free
+relays (Pollinations above all) answer **200 with a valid OpenAI-shaped body
+whose `content` is their own billing notice**. `openAiExtract` saw non-empty
+content and reported SUCCESS, so:
+
+1. the notice was rendered as the tutor's answer;
+2. `setStickyLeg` / `__studyPlannerPreferred` recorded the broken relay as the
+   leg that "worked" and **promoted it to first place**, so every later message
+   paid it again before the healthy legs behind it;
+3. because a "cloud answer" existed, `degraded` stayed `false` and the on-device
+   ML engine — the one thing that always works — **never ran**.
+
+**The fix.** `src/lib/aiAnswer.ts` — one shared judge of a 200 body, imported by
+the server chain (`ai.ts`), the browser bridge (`aiBridge.ts`) and `/api/chat`'s
+`finalise` path (the last gate, for a browser still running a cached bundle).
+A provider notice is treated as a FAILURE: the leg/model is benched with the
+right reason (`auth` / `rate_limit` / `provider`), the sticky slot is dropped,
+and the chain keeps walking until something real answers or the local engine
+takes over. Advertising stapled under a *good* answer is trimmed, not fatal.
+
+**Do not loosen the detector.** False positives are the real danger here: this
+planner is used by accounting students, and "the department **has reached its
+budget** ceiling" / "import **quota exhausted**" / "the **credit** balance
+**exceeded** the limit" are *teaching*. `HARD_NOISE` holds relay-specific strings
+no lesson contains; `CONTEXT_NOISE` is only believed when the answer ALSO names
+AI plumbing (`AI_PLUMBING` — deliberately excludes budget/quota/credit/balance)
+or addresses the app's user (`ADDRESSES_USER`), and never inside something
+`looksLikeLesson()` (a heading, a 3+ item list, 4+ sentences or 900+ chars).
+Section 4e of `scripts/test-suite.ts` pins both halves — the lesson cases are as
+load-bearing as the relay cases.
+
+**Also changed:** `DEFAULT_PROVIDER_ORDER` is now
+`cerebras → gemini → groq → mistral → sambanova → cohere → openrouter` (Gemini is
+the free key learners actually add, so it is tried second rather than held back
+as the last leg), and `OWN_KEY_LEGS` in the bridge was reordered to match, so a
+pasted key walks the same chain the deployment would have. `usableLegs()` no
+longer promotes a sticky leg that is currently benched.
+
+### 2. The syllabus step: every AI assessment 400'd, and edits got overwritten
+
+**`/api/course-suggest` validated `body.courseName`; the wizard posted `query`.**
+So the "AI: Assess & Build Subjects" button, the automatic assessment on the
+details step and "↻ Re-assess subjects with AI" **all** failed with
+`400 "Course name is required."` The subject list never changed and an error
+banner was the only feedback — which reads exactly as "clicking does nothing".
+The endpoint now accepts `courseName ?? query ?? course ?? name`, and the wizard
+sends both spellings.
+
+**The details step re-assessed on every change**, silently replacing the syllabus
+of the course the learner had just picked (or hand-edited) with a fresh AI guess.
+It now only assesses when `!subs.length` — when there is nothing to lose. The
+explicit button is the only way to rebuild a list that exists, and it asks once
+(`confirmReassess`) when `subsEdited` is true.
+
+**The rows themselves were unreadable as inputs:** `.ob-sub-row input[type=text]`
+was `background:transparent; border:none; outline:none` with no padding and no
+`:focus` rule anywhere — visually identical to a static label. Now
+`.ob-sub-name` / `.ob-sub-units` are real fields with hover + focus rings and a
+`:focus-within` highlight on the row, plus a caption row that says
+*"Subject — click any field to edit"*.
+
+**Also fixed while in there:** rows were `key={i}`, so deleting a row made React
+hand row N+1's DOM node to row N's data and the field being typed in jumped
+subject; keys are now a client-only `uid` (stripped before the payload, so
+`/api/onboard` still sees exactly `{name, units, difficulty, color}`). The
+"weakest subject" choice is stored by uid and resolved to an index at launch, so
+deleting a row above it can no longer re-point the setting. Units clamp on blur
+instead of on every keystroke (live clamping is what made "select all, type 1"
+produce 10). Duplicate and blank names are caught in the wizard with a sentence
+instead of failing the whole plan at the last step.
+
+`scripts/test-suite.ts` §16b renders the real wizard, walks it 1→5 and drives
+every one of these interactions.
+
 ## v34 — BROWSER-DIRECT AI BRIDGE: "AI IS NOT CONNECTED" FIXED AT THE ROOT (this session)
 
 Read this before touching anything AI-shaped: it explains why two server-side

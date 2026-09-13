@@ -14,25 +14,33 @@ import {
 } from "./curriculum";
 import { lookupKnowledge, teachFromKnowledge, isRelevantKnowledge } from "./knowledge";
 import { detectLanguage } from "./language";
+import { classifyModelAnswer } from "./aiAnswer";
+
+// Re-exported so the browser bridge and the chat route judge a 200 body the
+// same way the server chain does — one definition of "that was not an answer".
+export { classifyModelAnswer, sanitizeModelAnswer, isRelayNoise, stripRelayAds } from "./aiAnswer";
 
 // Re-export the canonical topic shape so existing imports from "./ai" keep working.
 export type { GeneratedTopic, CurriculumSource } from "./curriculum";
 
 /* ============================================================
    SERVER-SIDE PROVIDER CONFIGURATION
-   ─ Cerebras → Groq → Mistral → SambaNova → Cohere → Gemini → OpenRouter ─
+   ─ Cerebras → Gemini → Groq → Mistral → SambaNova → Cohere → OpenRouter ─
    Design goals (v9 multi-provider + ML-blend architecture):
-   • PRIMARY TIER: Cerebras, Groq, Mistral, SambaNova, Cohere — the
-     explicitly configured high-speed providers. The app tries them
-     in this order first, each with its own MODEL FALLBACK CHAIN so
-     a retired model ID costs only one fast 404 before moving on
-     (this is what keeps "Cerebras is down" from becoming "AI is
-     down": the next leg answers in the same request).
-   • SAFETY NET: Gemini, then OpenRouter (one key, many vendors) as
-     the widest last cloud leg, then SHIGUN's deterministic local ML
-     engine (ml.ts — FSRS-lite, pace models, skip-risk, time-of-day
-     profiling) answers from the learner's own logged history without
-     any network call.
+   • PRIMARY TIER: Cerebras, then Gemini — the two legs an operator is
+     most likely to have keyed, and the two the learner is told about.
+     Groq, Mistral, SambaNova and Cohere follow. The app tries them in
+     this order, each with its own MODEL FALLBACK CHAIN so a retired
+     model ID costs only one fast 404 before moving on (this is what
+     keeps "Cerebras is down" from becoming "AI is down": the next leg
+     answers in the same request).
+   • SAFETY NET: OpenRouter (one key, many vendors) as the widest last
+     cloud leg, then SHIGUN's deterministic local ML engine (ml.ts —
+     FSRS-lite, pace models, skip-risk, time-of-day profiling) answers
+     from the learner's own logged history without any network call.
+     The local engine is not optional: it runs whenever no cloud leg
+     produced a USABLE answer, which includes a leg that answered 200
+     with a provider error notice (see lib/aiAnswer.ts).
    • STICKY SUCCESS: the last (provider, model) that answered is
      tried first on the next request — one hop for a working leg.
    • ONE bounded retry for transient (network / 5xx) failures;
@@ -415,11 +423,13 @@ const PROVIDERS: Record<ProviderId, ProviderSpec> = {
   },
 };
 
-// Priority order: Cerebras (fastest) → Groq → Mistral → SambaNova → Cohere →
-// Gemini (safety net) → OpenRouter (widest last cloud leg).
+// Priority order: Cerebras (fastest) → Gemini (the safety net the learner is
+// told about, so it is tried early rather than last) → Groq → Mistral →
+// SambaNova → Cohere → OpenRouter (widest last cloud leg).
 // The local ML engine (ml.ts) always runs last if every cloud call fails.
+// Override with AI_PROVIDER_ORDER=cerebras,gemini,groq,…
 const DEFAULT_PROVIDER_ORDER: ProviderId[] = [
-  "cerebras", "groq", "mistral", "sambanova", "cohere", "gemini", "openrouter",
+  "cerebras", "gemini", "groq", "mistral", "sambanova", "cohere", "openrouter",
 ];
 
 /* ── Runtime (bring-your-own) keys ─────────────────────────────
@@ -799,15 +809,34 @@ export async function callLLMDetailed(
           const { response, json, detail } = await requestJson(url, init, budgetEnd, budget);
           if (response.ok) {
             const { text, blocked } = spec.extract(json);
-            if (text) {
+            /* HTTP 200 is NOT proof of an answer. Relays and some keyed
+               providers return a well-formed body whose content is their own
+               error notice ("the API key used for this request has reached its
+               budget", an HTML 502 page, a sticky ad footer). Showing that to
+               the learner — and worse, remembering the leg as the one that
+               "worked" — is exactly the failure this gate exists to stop. */
+            const verdict = classifyModelAnswer(text);
+            if (!verdict.noise) {
               clearCooldowns(provider, key);
-              return { kind: "ok", text, provider, model };
+              return { kind: "ok", text: verdict.text, provider, model };
             }
-            attempts.push({ provider, model, status: 200, error: blocked ? "blocked" : "empty" });
-            // An empty completion is model-specific (usually a reasoning
-            // model that spent the budget thinking) — remember it, next model.
-            if (!blocked) setCooldown(cooldownKey(provider, key, model), "empty");
-            break;
+            const reason: NonNullable<LlmAttempt["error"]> = blocked
+              ? "blocked"
+              // A relay error notice is a property of the KEY/host, not of one
+              // model id — every model on that leg would answer identically.
+              : text ? verdict.reason : "empty";
+            attempts.push({ provider, model, status: 200, error: reason });
+            if (reason === "empty") {
+              // Model-specific (usually a reasoning model that spent the
+              // budget thinking) — remember it, walk to the next model id.
+              setCooldown(cooldownKey(provider, key, model), "empty");
+              break;
+            }
+            // Provider-level failure: bench the whole leg, drop its sticky
+            // slot and let the next provider in the chain answer.
+            forgetSticky(provider);
+            if (reason !== "blocked") setCooldown(cooldownKey(provider, key), reason);
+            return { kind: "fail", provider };
           }
           const error = classifyProviderError(response.status, detail);
           attempts.push({ provider, model, status: response.status, error });
@@ -953,14 +982,22 @@ export async function probeProviders(runtime?: RuntimeProviderKeys): Promise<Pro
         const { response, json, detail } = await requestJson(url, init, deadline, 8_000);
         const latencyMs = Date.now() - started;
         const { text, blocked } = spec.extract(json);
-        if (response.ok && text) {
+        /* The probe is the operator's "is this key really working?" button, so
+           it must not report a leg as healthy because the relay answered 200
+           with its own budget notice. */
+        const verdict = classifyModelAnswer(response.ok ? text : null);
+        // Narrowed once, here: the ternaries below cannot re-prove it to TS.
+        const noiseReason: NonNullable<LlmAttempt["error"]> = verdict.noise ? verdict.reason : "empty";
+        if (response.ok && !verdict.noise) {
           clearCooldowns(id, key);
           if (id === (aiGlobal.__studyPlannerPreferred?.provider ?? id)) {
             aiGlobal.__studyPlannerPreferred = { provider: id, model };
           }
           return { ...base, ok: true, model, status: 200, latencyMs, detail: `Answered in ${latencyMs} ms.` };
         }
-        const error: ProviderProbe["error"] = response.ok ? (blocked ? "blocked" : "empty") : classifyProviderError(response.status, detail);
+        const error: ProviderProbe["error"] = response.ok
+          ? (blocked ? "blocked" : noiseReason)
+          : classifyProviderError(response.status, detail);
         last = {
           ...base, model, status: response.status, latencyMs, error,
           detail: (detail || `Provider returned no content (${error}).`).slice(0, 220),

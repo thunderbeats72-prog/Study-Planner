@@ -371,9 +371,30 @@ select.input-field{appearance:none;background-image:linear-gradient(45deg,transp
 .ob-course-item.selected .ob-course-check{background:var(--accent);border-color:var(--accent)}
 .ob-subs-grid{display:flex;flex-direction:column;gap:8px;overflow-y:auto;margin-bottom:12px}
 .ob-sub-row{display:flex;align-items:center;gap:9px;border-radius:var(--radius-md);background:var(--row-bg)}
-.ob-sub-row input[type=text]{flex:1;background:transparent;border:none;outline:none;color:var(--text-main);font-size:.85rem;font-weight:700;font-family:inherit;min-width:0}
-.ob-sub-row input[type=number]{width:54px;background:var(--input-bg);border:1px solid var(--glass-border);border-radius:var(--radius-sm);padding:4px 6px;color:var(--text-main);font-size:.76rem;font-weight:700;outline:none;font-family:inherit}
-.ob-sub-row select{background:var(--input-bg);border:1px solid var(--glass-border);border-radius:var(--radius-sm);padding:4px 6px;color:var(--text-main);font-size:.72rem;font-weight:700;outline:none;font-family:inherit}
+/* Every field in a syllabus row is an input the learner can click into. The
+   name field used to be borderless, padding-less and outline-less on a
+   transparent background — visually identical to a static label, so
+   "click to edit the subject" produced no visible response whatsoever and
+   read as a dead UI. It now looks like a field, glows on focus, and the
+   whole row lights up while any of its fields has the caret. */
+.ob-sub-name,.ob-sub-units{
+  background:var(--input-bg);border:1px solid var(--glass-border);border-radius:var(--radius-sm);
+  color:var(--text-main);font-family:inherit;font-weight:700;outline:none;
+  transition:border-color .18s ease,box-shadow .18s ease,background .18s ease;
+}
+.ob-sub-name{flex:1;min-width:0;padding:8px 11px;font-size:var(--fs-xs)}
+.ob-sub-units{width:62px;padding:8px 6px;font-size:var(--fs-meta);text-align:center;font-variant-numeric:tabular-nums}
+.ob-sub-name:hover,.ob-sub-units:hover{border-color:var(--glass-border-hover)}
+.ob-sub-name:focus,.ob-sub-units:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow);background:var(--surface-solid)}
+.ob-sub-row:focus-within{border-color:var(--accent)}
+.ob-sub-swatch{width:10px;height:10px;flex:0 0 10px;border-radius:99px}
+.ob-sub-difficulty{flex:0 0 auto;min-width:0}
+.ob-sub-remove{flex:0 0 auto}
+.ob-subs-head{display:flex;align-items:center;gap:9px;padding:2px 4px 0;font-size:var(--fs-meta);font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:var(--text-dim)}
+.ob-subs-head span:first-child{flex:1;min-width:0;text-transform:none;letter-spacing:0;font-weight:700}
+.ob-subs-head span:nth-child(2){width:62px;text-align:center}
+.ob-subs-head span:nth-child(3),.ob-subs-head span:nth-child(4){width:0;overflow:hidden;white-space:nowrap}
+.ob-subs-empty{font-size:var(--fs-xs);color:var(--text-dim);padding:10px 2px;line-height:1.5}
 .ob-add-sub-row{display:flex;gap:9px;margin-bottom:6px}
 .ob-add-sub-input{flex:1;padding:11px 14px;border-radius:var(--radius-md);border:1px solid var(--glass-border);background:var(--input-bg);color:var(--text-main);font-size:.85rem;font-weight:650;outline:none;font-family:inherit}
 
@@ -666,9 +687,11 @@ body.theme-dark .tracker-bar,body.theme-obsidian .tracker-bar,body.theme-nebula 
   .ob-range-head{flex-direction:column;align-items:stretch}
   .ob-range-value{align-self:flex-start}
   .ob-sub-row{display:grid;grid-template-columns:12px minmax(0,1fr) 64px;gap:8px}
-  .ob-sub-row input[type=number]{width:100%}
-  .ob-sub-row select{grid-column:2 / 3;width:100%;min-width:0}
-  .ob-sub-row .btn{grid-column:3 / 4;grid-row:2 / 3;justify-self:end}
+  .ob-sub-units{width:100%}
+  .ob-sub-difficulty{grid-column:2 / 3;width:100%;min-width:0}
+  .ob-sub-remove{grid-column:3 / 4;grid-row:2 / 3;justify-self:end}
+  /* The three-column caption cannot line up with a two-row phone grid. */
+  .ob-subs-head{display:none}
 }
 @media(max-width:420px){
   .kpi-grid{grid-template-columns:1fr}

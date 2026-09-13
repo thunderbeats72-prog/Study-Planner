@@ -9,6 +9,7 @@ import {
   parseRuntimeKeys, hasRuntimeKeys, type RuntimeProviderKeys,
   isAssistantStatusQuestion, assistantStatusReply, llmHealthSnapshot,
 } from "@/lib/ai";
+import { classifyModelAnswer } from "@/lib/aiAnswer";
 import { checkRateLimit } from "@/lib/rateLimit";
 import { readJsonObject, validationPayload } from "@/lib/validation";
 import { regeneratePlan } from "@/lib/generate";
@@ -450,6 +451,9 @@ async function handleChat(req: Request, opts: HandleChatOptions) {
 
   let finalText: string;
   let replanned = false;
+  /** Set only when a browser-bridge answer survived the sanity gate, so a
+   *  rejected relay notice never makes the panel claim a cloud source. */
+  let bridgeAccepted = false;
   let aiMeta: {
     source: string;
     model: string | null;
@@ -500,16 +504,37 @@ async function handleChat(req: Request, opts: HandleChatOptions) {
     let reply: string | null = null;
     const cloudAttempted = !!activeProvider(runtimeKeys);
     if (mode === "finalise") {
-      // The browser bridge answered. Same post-processing as a cloud reply:
-      // action extraction, replanning, persistence, fresh state.
-      reply = directReply;
-      aiMeta = {
-        source: "direct",
-        model: directModel,
-        degraded: false,
-        via: directKind === "free" ? "browser-free" : "browser-own-key",
-        leg: directLeg,
-      };
+      /* The browser bridge answered — but a browser running a cached bundle
+         can still hand back a relay's own error notice (a 200 body whose
+         content is "the API key used for this request has reached its
+         budget"). The server is the last gate: refuse it exactly as the chain
+         would have, and let the on-device engine answer instead of storing
+         someone else's billing message as SHIGUN's reply. */
+      const verdict = classifyModelAnswer(directReply);
+      if (!verdict.noise) {
+        // Same post-processing as a cloud reply: action extraction,
+        // replanning, persistence, fresh state.
+        reply = verdict.text;
+        bridgeAccepted = true;
+        aiMeta = {
+          source: "direct",
+          model: directModel,
+          degraded: false,
+          via: directKind === "free" ? "browser-free" : "browser-own-key",
+          leg: directLeg,
+        };
+      } else {
+        console.warn(
+          "Rejected a browser-bridge reply that was a provider notice, answering locally:",
+          `${directLeg ?? "?"}/${directModel ?? "?"} — ${verdict.reason} (${verdict.matched})`
+        );
+        reply = null;
+        const notice = userFacingAiNotice(
+          [{ provider: directLeg || "bridge", model: directModel || "unknown", status: 200, error: verdict.reason }],
+          { usingOwnKey: directKind === "own-key" }
+        );
+        aiMeta = { source: "local", model: null, degraded: true, ...notice };
+      }
     } else if (cloudAttempted) {
       const prompt = buildTutorPrompt(text, state, ctx);
       const result = await callLLMDetailed(
@@ -627,7 +652,7 @@ async function handleChat(req: Request, opts: HandleChatOptions) {
       context: buildContext(fresh, localDate),
       // A browser-bridge answer counts as cloud: the panel should not fall
       // back to "Local mode" just because the deployment has no env key.
-      aiProvider: mode === "finalise"
+      aiProvider: bridgeAccepted
         ? (directKind === "free" ? "browser-free" : "browser-own-key")
         : activeProvider(runtimeKeys),
     },

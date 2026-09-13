@@ -14,6 +14,11 @@ import { cn } from "@/lib/cn";
 
 type Level = { id: string; label: string; sub: string };
 type SeedSubject = { name: string; units: number; difficulty: string; color: string };
+/** A syllabus row while the wizard owns it. `uid` is a stable React key and
+ *  the identity the "weakest subject" choice is stored against — it is
+ *  stripped before the payload is posted, so `/api/onboard` sees exactly the
+ *  `{name, units, difficulty, color}` shape it validates. */
+type EditableSubject = SeedSubject & { uid: number };
 type CurriculumSource = { title: string; publisher: string; type: string; url?: string; note?: string };
 type CourseMeta = { id: string; name: string; level: string; subjects: SeedSubject[] };
 type StepMeta = { key: string; label: string };
@@ -162,7 +167,13 @@ export default function Onboarding({
   const [level, setLevel] = useState("");
   const [course, setCourse] = useState("");
   const [year, setYear] = useState("1");
-  const [subs, setSubs] = useState<SeedSubject[]>([]);
+  const [subs, setSubs] = useState<EditableSubject[]>([]);
+  /** True once the learner has typed in the syllabus list themselves. An
+   *  automatic re-assessment must never silently throw those edits away. */
+  const [subsEdited, setSubsEdited] = useState(false);
+  /** Second click confirms a re-assessment that would replace hand edits. */
+  const [confirmReassess, setConfirmReassess] = useState(false);
+  const uidRef = useRef(1);
   const [newSub, setNewSub] = useState("");
   const [customName, setCustomName] = useState("");
   const [goalText, setGoalText] = useState("");
@@ -218,20 +229,47 @@ export default function Onboarding({
   const isSchool = level === "school";
   const isCompetitive = level === "competitive";
 
+  /** Stamp every incoming row with a uid exactly once. */
+  const adopt = (list: SeedSubject[]): EditableSubject[] =>
+    list.map((s, i) => ({ ...s, color: s.color || PALETTE[i % PALETTE.length], uid: uidRef.current++ }));
+
   const pickCourse = (courseId: string) => {
     setCourse(courseId);
     const found = courses.find((c) => c.id === courseId);
     if (found && found.subjects?.length) {
-      setSubs(found.subjects.map((s, i) => ({ ...s, color: s.color || PALETTE[i % PALETTE.length] })));
+      setSubs(adopt(found.subjects));
+      setSubsEdited(false);
+      setConfirmReassess(false);
       setSuggestSource(found.name);
       setSuggestSources([]);
     }
   };
 
   const addSubject = () => {
-    if (!newSub.trim()) return;
-    setSubs((p) => [...p, { name: newSub.trim(), units: 6, difficulty: "Medium", color: PALETTE[p.length % PALETTE.length] }]);
+    const name = newSub.trim();
+    if (!name) return;
+    if (subs.length >= 12) { setErr("That is the maximum — 12 subjects. Remove one first."); return; }
+    if (subs.some((s) => s.name.trim().toLocaleLowerCase() === name.toLocaleLowerCase())) {
+      setErr(`"${name}" is already in the list — edit that row instead of adding a duplicate.`);
+      return;
+    }
+    setErr("");
+    setSubs((p) => [...p, { name, units: 6, difficulty: "Medium", color: PALETTE[p.length % PALETTE.length], uid: uidRef.current++ }]);
+    setSubsEdited(true);
     setNewSub("");
+  };
+
+  /** One place edits the list, so every row keeps its identity and the
+   *  "learner touched this" flag is never forgotten. */
+  const updateSub = (uid: number, patch: Partial<SeedSubject>) => {
+    setSubs((p) => p.map((s) => (s.uid === uid ? { ...s, ...patch } : s)));
+    setSubsEdited(true);
+  };
+
+  const removeSub = (uid: number) => {
+    setSubs((p) => p.filter((s) => s.uid !== uid));
+    setWeak((w) => (w === String(uid) ? "-1" : w));
+    setSubsEdited(true);
   };
 
   const suggestFor = async (query: string, userGoal?: string) => {
@@ -242,6 +280,11 @@ export default function Onboarding({
       const d = await api<{ subjects: SeedSubject[]; source: string; sources?: CurriculumSource[] }>("/api/course-suggest", {
         method: "POST",
         body: JSON.stringify({
+          // `/api/course-suggest` reads the title from `courseName`. It was
+          // only ever sent as `query`, so every assessment came back 400
+          // "Course name is required." — both are sent while the server
+          // accepts either, so an older cached bundle still works.
+          courseName: query,
           query,
           level,
           specialisation: specialisation.trim() || undefined,
@@ -252,9 +295,15 @@ export default function Onboarding({
         }),
       });
       if (d.subjects?.length) {
-        setSubs(d.subjects.map((s, i) => ({ ...s, color: s.color || PALETTE[i % PALETTE.length] })));
+        setSubs(adopt(d.subjects));
+        // A freshly assessed list has no hand edits in it yet.
+        setSubsEdited(false);
+        setConfirmReassess(false);
+        setWeak("-1");
         setSuggestSource(d.source || "AI assessment");
         setSuggestSources(d.sources || []);
+      } else {
+        setErr("The assessment came back empty — add your subjects below, or press Continue to keep the ones you have.");
       }
     } catch (e: unknown) {
       setErr(e instanceof Error ? e.message : "Failed to suggest subjects");
@@ -279,12 +328,27 @@ export default function Onboarding({
     if (step === 4) {
       const targetQuery = resolvedCourseName;
       const signature = `${targetQuery}|${level}|${institution}|${specialisation}|${board}|${year}|${goalText}`;
-      if (targetQuery && (!subs.length || lastAssessmentRef.current !== signature)) {
+      /* Only assess when there is NOTHING to lose. This used to re-run on
+         every details change, which silently replaced the syllabus the
+         learner had just picked from the catalogue (or hand-edited) with a
+         fresh AI guess — the subjects on screen were not the ones they
+         chose, and any edit looked like it had been ignored. The explicit
+         "Re-assess subjects with AI" button on the next step is the only way
+         to rebuild a list that already exists. */
+      if (targetQuery && !subs.length) {
         lastAssessmentRef.current = signature;
         await suggestFor(targetQuery, goalText);
+      } else {
+        lastAssessmentRef.current = signature;
       }
     }
     if (step === 5 && !subs.length) { setErr("Add at least one subject to continue"); return; }
+    if (step === 5) {
+      const blanks = subs.filter((s) => !s.name.trim()).length;
+      if (blanks) { setErr(`${blanks} subject${blanks === 1 ? "" : "s"} still need${blanks === 1 ? "s" : ""} a name — fill it in or remove the row.`); return; }
+      const names = subs.map((s) => s.name.trim().toLocaleLowerCase());
+      if (new Set(names).size !== names.length) { setErr("Two subjects share the same name — rename one so the planner can tell them apart."); return; }
+    }
     setStep((s) => Math.min(total, s + 1));
   };
 
@@ -306,7 +370,7 @@ export default function Onboarding({
         attempt,
         priorPrep,
         goal: goalText.trim(),
-        subjects: subs,
+        subjects: subs.map(({ name, units, difficulty, color }) => ({ name: name.trim(), units, difficulty, color })),
         // `/api/onboard` reads the schedule settings FLAT (body.startDate,
         // body.dailyHours, …), not nested under a `settings` key. Sending them
         // nested left body.startDate undefined, so the wizard failed with
@@ -320,8 +384,14 @@ export default function Onboarding({
         bufferDays: Number(buffer) || 5,
         planMode,
         studyStyle: style,
-        // The API expects the weak subject's INDEX (-1 = none), not its name.
-        weakSubject: weak === "-1" ? -1 : Number(weak),
+        /* The API expects the weak subject's INDEX (-1 = none), not its name.
+           The wizard stores the row's uid, so deleting a subject earlier in
+           the list can no longer shift the choice onto a different subject. */
+        weakSubject: (() => {
+          if (weak === "-1") return -1;
+          const at = subs.findIndex((s) => String(s.uid) === weak);
+          return at >= 0 ? at : -1;
+        })(),
         revisionWeeks: Number(revision) || 1,
       };
       const res = await api<AppState>("/api/onboard", { method: "POST", body: JSON.stringify(payload) });
@@ -686,35 +756,59 @@ export default function Onboarding({
             </div>
 
             <div className="ob-subs-grid">
+              <div className="ob-subs-head" aria-hidden="true">
+                <span>Subject — click any field to edit</span>
+                <span>Units</span>
+                <span>Difficulty</span>
+                <span />
+              </div>
               {subs.map((s, i) => (
-                <div className="ob-sub-row" key={i}>
-                  <div style={{ width: 10, height: 10, borderRadius: 99, background: s.color || PALETTE[i % 8] }} />
+                /* Keyed by uid, not by position: deleting row 2 used to make
+                   React reuse row 3's DOM node for row 2's data, so the field
+                   the learner was typing in jumped to another subject. */
+                <div className="ob-sub-row" key={s.uid}>
+                  <span className="ob-sub-swatch" style={{ background: s.color || PALETTE[i % PALETTE.length] }} aria-hidden="true" />
                   <input
                     type="text"
+                    className="ob-sub-name"
                     value={s.name}
-                    onChange={(e) => setSubs((p) => p.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))}
+                    placeholder="Subject name"
+                    aria-label={`Name of subject ${i + 1}`}
+                    onChange={(e) => updateSub(s.uid, { name: e.target.value })}
                   />
                   <input
                     type="number"
+                    className="ob-sub-units"
                     min={1}
                     max={40}
                     value={s.units}
-                    onChange={(e) => setSubs((p) => p.map((x, j) => (j === i ? { ...x, units: Number(e.target.value) } : x)))}
+                    aria-label={`Lesson units for ${s.name || `subject ${i + 1}`}`}
+                    onChange={(e) => updateSub(s.uid, { units: e.target.value === "" ? 0 : Number(e.target.value) })}
+                    /* Clamp on blur, not on every keystroke: clamping while
+                       typing is what made the field feel stuck (select-all,
+                       type "1", get "10"). */
+                    onBlur={(e) => updateSub(s.uid, { units: Math.min(40, Math.max(1, Math.round(Number(e.target.value) || 1))) })}
                   />
                   <Select
-                    ariaLabel={`Difficulty for ${s.name}`}
+                    className="ob-sub-difficulty"
+                    ariaLabel={`Difficulty for ${s.name || `subject ${i + 1}`}`}
                     value={s.difficulty}
-                    onChange={(v) => setSubs((p) => p.map((x, j) => (j === i ? { ...x, difficulty: v } : x)))}
+                    onChange={(v) => updateSub(s.uid, { difficulty: v })}
                     options={["Easy", "Medium", "Hard"].map((d) => ({ value: d, label: d }))}
                   />
-                  <button className="btn btn-xs btn-danger" onClick={() => setSubs((p) => p.filter((_, j) => j !== i))}>
+                  <button
+                    type="button"
+                    className="btn btn-xs btn-danger ob-sub-remove"
+                    aria-label={`Remove ${s.name || `subject ${i + 1}`}`}
+                    onClick={() => removeSub(s.uid)}
+                  >
                     ✕
                   </button>
                 </div>
               ))}
               {!subs.length && (
-                <div style={{ fontSize: ".82rem", color: "var(--text-dim)", padding: "10px 2px" }}>
-                  No subjects yet — add one below.
+                <div className="ob-subs-empty">
+                  No subjects yet — add one below, or press “Re-assess” to let the AI build the list.
                 </div>
               )}
             </div>
@@ -734,13 +828,32 @@ export default function Onboarding({
 
             <div className="flex-row gap-sm" style={{ flexWrap: "wrap", marginTop: 10 }}>
               <button
+                type="button"
                 className="btn btn-sm btn-secondary"
                 disabled={suggesting}
-                onClick={() => suggestFor(resolvedCourseName, goalText)}
+                aria-expanded={confirmReassess}
+                onClick={() => {
+                  if (suggesting) return;
+                  /* Hand edits are expensive to redo. Ask once before a
+                     re-assessment replaces them. */
+                  if (subsEdited && subs.length && !confirmReassess) { setConfirmReassess(true); return; }
+                  setConfirmReassess(false);
+                  void suggestFor(resolvedCourseName, goalText);
+                }}
               >
-                {suggesting ? "Rebuilding…" : "↻ Re-assess subjects with AI"}
+                {suggesting
+                  ? "Rebuilding…"
+                  : confirmReassess
+                    ? "↻ Replace my edits and rebuild"
+                    : "↻ Re-assess subjects with AI"}
               </button>
+              {confirmReassess && !suggesting && (
+                <button type="button" className="btn btn-sm btn-secondary" onClick={() => setConfirmReassess(false)}>
+                  Keep my list
+                </button>
+              )}
               {suggestSource && <span className="chip chip-kind">source: {suggestSource}</span>}
+              {subsEdited && <span className="chip chip-kind">your edits kept</span>}
             </div>
 
             {!!suggestSources.length && (
@@ -780,7 +893,9 @@ export default function Onboarding({
                     onChange={setWeak}
                     options={[
                       { value: "-1", label: "None / not sure" },
-                      ...subs.map((s, i) => ({ value: String(i), label: s.name })),
+                      // uid, not position: deleting a row above the chosen
+                      // subject must not silently re-point this setting.
+                      ...subs.map((s) => ({ value: String(s.uid), label: s.name || "Unnamed subject" })),
                     ]}
                   />
                 </div>
