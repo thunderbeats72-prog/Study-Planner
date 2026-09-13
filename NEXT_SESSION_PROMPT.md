@@ -3,6 +3,122 @@
 
 ---
 
+## v34 — BROWSER-DIRECT AI BRIDGE: "AI IS NOT CONNECTED" FIXED AT THE ROOT (this session)
+
+Read this before touching anything AI-shaped: it explains why two server-side
+rewrites did not fix the complaint, and where the model call lives now.
+
+**The diagnosis.** `src/lib/ai.ts` walks Cerebras → Groq → Mistral → SambaNova →
+Cohere → Gemini → OpenRouter **from the server**, with v10's failure memory,
+hedging and sticky success. That is all still true and still first in line. But
+"AI is not connected" has two causes no server-side code can fix:
+
+1. **The deployment has no key** — a fresh Vercel deploy, a fork, a preview.
+   Nothing can be invented server-side, so every open-ended question fell to the
+   on-device engine and the chat strip said "Full AI chat isn't connected yet".
+2. **The host has no outbound network** — Arena/e2b sandboxes and CI allowlist
+   egress. Verified in this sandbox: `registry.npmjs.org` and `api.github.com`
+   answer, while `api.groq.com`, `generativelanguage.googleapis.com`,
+   `text.pollinations.ai` and even `www.google.com` fail at TLS
+   (`SSL_ERROR_SYSCALL`). So **a perfectly valid key still produced `network`
+   on every leg**, and Settings → "Save & test" agreed with the learner because
+   it probed from the server too.
+
+**The fix.** The learner's browser is on the open internet, holds the pasted
+key, and every provider here accepts a cross-origin POST. So the model call
+moved to the browser; grounding, action extraction, replanning and persistence
+stayed on the server.
+
+| Route | When | Who calls the model |
+| --- | --- | --- |
+| deployment env key | `serverProviderIds.length > 0` | server (`ai.ts` chain, unchanged) |
+| learner's own key | BYOK in localStorage, no env key | **browser** (`aiBridge.ts`) |
+| free community relay | nothing configured, relays allowed | **browser** (`aiBridge.ts`) |
+| on-device engine | everything above failed | server (`localTutor`, `ml.ts`) |
+
+**Files changed:**
+```
+src/lib/aiBridge.ts        NEW — browser-side chain: 7 own-key legs (same hosts
+                           + current model ids as ai.ts) then 3 anonymous free
+                           relays (OVHcloud AI Endpoints → Kilo Gateway →
+                           Pollinations). Per-tab failure memory (CORS/offline
+                           15 min, auth 10 min, rate limit 60 s, model 30 min),
+                           sticky winner in sessionStorage, `probeBridge()` for
+                           the honest browser-side connectivity test,
+                           `setFreeBridgeAllowedByOperator()` for the
+                           AI_FREE_BRIDGE=off kill-switch. A free leg is never
+                           given a key — enforced by a test.
+src/lib/chatClient.ts      NEW — `askTutorMessage()`: picks the route, runs
+                           prepare → bridge → finalise, and upgrades a degraded
+                           server answer from the browser. `serverAiStatus()`
+                           caches /api/ai-status for 45 s.
+src/app/api/chat/route.ts  ONE route, THREE modes: `full` (unchanged), `prepare`
+                           (returns the grounded prompt after answering
+                           commands/greetings/status itself), `finalise`
+                           (`directReply` → same extractLlmAction / replan /
+                           persist / fresh-state path). `prepared:true` stops a
+                           duplicate user row, `replaceLast:true` overwrites the
+                           fallback answer so one question never shows two.
+                           Rate limit 18 → 36/min (one question = two calls).
+                           `buildTutorPrompt()` is now the ONE prompt builder.
+src/lib/ai.ts              `envConfiguredProviderIds()` (ids, not labels —
+                           "Gemini" ≠ "Google Gemini" made a configured
+                           deployment read as unconfigured),
+                           `freeBridgeAllowed()`, `assistantStatusReply()` and
+                           `localTutor()` accept `browserBridge` so "are you
+                           connected?" and the no-answer fallback describe the
+                           route that actually exists.
+src/app/api/ai-status,     `serverProviderIds`, `serverProviders`,
+src/app/api/health         `freeBridgeAllowed`.
+src/app/page.tsx           `askTutorMessage()` replaces the raw /api/chat call;
+                           `lastReplyVia` ("own-key" | "free") feeds the panel.
+src/components/ChatPanel.tsx  "Cloud AI · free endpoint" / "Free AI endpoint ·
+                           ready" statuses, and the strip is either the old
+                           "Connect AI" warning or a plain "a free community
+                           endpoint is answering — add my key" note.
+src/components/AiKeyCard.tsx  "Test from this browser" + per-leg results with
+                           latency and reason, the free-relay Seg switch with
+                           the privacy trade-off beside it, stuck-off state
+                           when the operator banned relays, server providers
+                           matched by ID.
+src/app/globals.css        `.ai-connect-free` (accent edge + dimmer copy) next
+                           to the `.ai-connect` rules it variants — no new
+                           owner, no restated component.
+scripts/test-suite.ts      +27 checks (section 4d), 365 total.
+.env.example               three routes explained, AI_FREE_BRIDGE documented.
+README.txt                 AI CONFIGURATION rewritten (it still claimed Groq and
+                           OpenRouter were removed) + v34 section.
+docs/design/v34-browser-ai-bridge.md   NEW design note.
+deploy-package/**          byte-exact re-sync from src/ (rule below).
+```
+
+**Verification tricks that work here — keep using them:**
+1. The sandbox has no AI egress, so test the bridge the way the suite does:
+   stub `globalThis.window` (localStorage/sessionStorage/setTimeout/
+   dispatchEvent) and `globalThis.fetch`, then assert WHICH url was fetched and
+   with which `authorization` header. That is how "a saved key is never handed
+   to a free relay" is proven without a network.
+2. Route-level checks with curl against `npm run dev` (SPP_DEMO_DATA=1, no DB):
+   `POST /api/chat {"message":"…","prepare":true}` must return `needsCloud` +
+   `prompt.system`; `POST /api/chat {"message":"…","directReply":"…",
+   "prepared":true,"replaceLast":true}` must return `ai.source === "direct"`.
+3. Free-relay liveness/model lists can be read from the sandbox even though the
+   APIs cannot be called: `curl -H "Accept: application/vnd.github.raw"
+   https://api.github.com/repos/<owner>/<repo>/contents/<path>` and the
+   `fetch_page` tool both work. That is how the OVH, Kilo and Pollinations
+   model ids here were checked against live `/models` listings.
+4. `npm run check` is still the gate: typecheck, zero-warning lint, 365 tests,
+   ui-audit budget. `deploy-package/src` must stay a byte-exact mirror of
+   `src/` or the suite fails.
+
+**Open decisions for the next session:** the free relays default to ON when
+nothing else can answer (a learner can switch them off, an operator can ban
+them with `AI_FREE_BRIDGE=off`). If the owner would rather they were opt-IN,
+flip the default in `freeBridgePreference()` and update the AiKeyCard copy and
+the `4d` checks that assert the default.
+
+---
+
 ## v25 — CSS CONSOLIDATION · ONE TYPE SCALE · RESPONSIVE CALENDAR · DE-BLUR (this session)
 
 Read this block first: it changes the rules for every later UI pass.

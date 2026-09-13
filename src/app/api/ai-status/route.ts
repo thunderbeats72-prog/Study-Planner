@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import {
-  configuredProviders, llmHealthSnapshot, probeProviders, activeProvider,
-  parseRuntimeKeys, hasRuntimeKeys, providerCooldowns,
+  configuredProviders, envConfiguredProviderIds, freeBridgeAllowed, llmHealthSnapshot,
+  probeProviders, activeProvider, parseRuntimeKeys, hasRuntimeKeys, providerCooldowns,
 } from "@/lib/ai";
 import { checkRateLimit } from "@/lib/rateLimit";
 
@@ -21,10 +21,24 @@ export async function GET(req: Request) {
   // exactly what this learner's tutor will actually use.
   const runtimeKeys = parseRuntimeKeys(req.headers.get("x-ai-keys"));
   const providers = configuredProviders(runtimeKeys);
+  /* Env-only view, ignoring the caller's bring-your-own keys. The browser
+     bridge (lib/chatClient.ts) reads `serverProviderIds` to decide who makes
+     the model call: if the deployment has its own key the server keeps the
+     call; if it has none, the learner's browser asks the model directly —
+     which is also the only route that works when the host has no outbound
+     network at all (sandboxed previews). Ids, not labels: the client matches
+     on ids and a label mismatch reads as "not connected". */
+  const serverIds = envConfiguredProviderIds();
+  /* Operator kill-switch for the free community relays the browser bridge can
+     use (AI_FREE_BRIDGE=off). Reported here so every client obeys it without
+     a rebuild, and so the Settings card can say why the switch is stuck. */
   return NextResponse.json({
+    freeBridgeAllowed: freeBridgeAllowed(),
     mode: providers.length ? "cloud-with-local-fallback" : "local-only",
     activeProvider: activeProvider(runtimeKeys),
     configuredProviders: providers,
+    serverProviderIds: serverIds,
+    serverProviders: configuredProviders(),
     lastRequest: llmHealthSnapshot(),
     /** Providers/models the failure memory is currently skipping, with the
      *  reason and when they will be retried. Empty = nothing is benched. */
