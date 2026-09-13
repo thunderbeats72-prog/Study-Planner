@@ -25,15 +25,18 @@ export type { GeneratedTopic, CurriculumSource } from "./curriculum";
 
 /* ============================================================
    SERVER-SIDE PROVIDER CONFIGURATION
-   ─ Cerebras → Gemini → Groq → Mistral → SambaNova → Cohere → OpenRouter ─
+   ─ Gemini → Cerebras → Groq → Mistral → SambaNova → Cohere → OpenRouter ─
+   Keys come ONLY from the deployment environment (Vercel env vars):
+   every learner on the deployment shares them and nobody is ever asked
+   to paste a key anywhere in the app.
    Design goals (v9 multi-provider + ML-blend architecture):
-   • PRIMARY TIER: Cerebras, then Gemini — the two legs an operator is
-     most likely to have keyed, and the two the learner is told about.
-     Groq, Mistral, SambaNova and Cohere follow. The app tries them in
-     this order, each with its own MODEL FALLBACK CHAIN so a retired
-     model ID costs only one fast 404 before moving on (this is what
-     keeps "Cerebras is down" from becoming "AI is down": the next leg
-     answers in the same request).
+   • PRIMARY TIER: Gemini first — the key most deployments configure —
+     then Cerebras, Groq, Mistral, SambaNova and Cohere. When one
+     provider's quota is exhausted or it goes down, the NEXT provider
+     answers inside the same request, so "Gemini is limited" never
+     becomes "AI is down". Each provider also walks its own MODEL
+     FALLBACK CHAIN so a retired model ID costs only one fast 404
+     before moving on.
    • SAFETY NET: OpenRouter (one key, many vendors) as the widest last
      cloud leg, then SHIGUN's deterministic local ML engine (ml.ts —
      FSRS-lite, pace models, skip-risk, time-of-day profiling) answers
@@ -423,26 +426,22 @@ const PROVIDERS: Record<ProviderId, ProviderSpec> = {
   },
 };
 
-// Priority order: Cerebras (fastest) → Gemini (the safety net the learner is
-// told about, so it is tried early rather than last) → Groq → Mistral →
-// SambaNova → Cohere → OpenRouter (widest last cloud leg).
+// Priority order: Gemini (the primary most deployments configure) → Cerebras
+// → Groq → Mistral → SambaNova → Cohere → OpenRouter (widest last cloud leg).
 // The local ML engine (ml.ts) always runs last if every cloud call fails.
 // Override with AI_PROVIDER_ORDER=cerebras,gemini,groq,…
 const DEFAULT_PROVIDER_ORDER: ProviderId[] = [
-  "cerebras", "gemini", "groq", "mistral", "sambanova", "cohere", "openrouter",
+  "gemini", "cerebras", "groq", "mistral", "sambanova", "cohere", "openrouter",
 ];
 
-/* ── Runtime (bring-your-own) keys ─────────────────────────────
-   Deployment env vars are the normal way to configure SHIGUN, but a
-   deployment with no key used to be *permanently* stuck in local mode:
-   the cloud chain never ran, every open question fell through to the
-   small on-device engine, and the learner saw "AI is not working" with
-   no way to fix it short of a redeploy.
-
-   `RuntimeProviderKeys` are supplied per-request by the browser (pasted
-   in Settings → AI coach, kept in localStorage, sent on the
-   `x-ai-keys` header). They override env vars for that single request
-   and are never persisted, logged or echoed back. */
+/* ── Runtime keys (internal override hook) ─────────────────────
+   SHIGUN is configured ONLY through the deployment environment
+   (GEMINI_API_KEY, CEREBRAS_API_KEY, … on the server). Learners are
+   never asked for a key anywhere in the app, and nothing in the UI
+   sends the `x-ai-keys` header. The plumbing below still understands
+   it so an operator tool could override a key per-request; such keys
+   would apply to that single request only and are never persisted,
+   logged or echoed back. */
 export type RuntimeProviderKeys = Partial<Record<ProviderId, string>>;
 
 /** Strip paste padding, drop control characters, reject absurd lengths. */
@@ -521,28 +520,12 @@ export function configuredProviders(runtime?: RuntimeProviderKeys): string[] {
 }
 
 /** Provider ids the DEPLOYMENT itself configured through its environment —
- *  bring-your-own keys on the request are deliberately ignored.
- *
- *  The browser-direct bridge (lib/aiBridge.ts + lib/chatClient.ts) reads this
- *  through GET /api/ai-status to decide who should make the model call: an
- *  operator's env key wins and stays on the server, and only when the
- *  deployment has none does the learner's browser take over. Returning LABELS
- *  here (as `configuredProviders` does) is not enough — the client matches on
- *  ids, and "Gemini" vs "Google Gemini" is exactly the kind of mismatch that
- *  silently reports "not connected". */
+ *  per-request runtime keys are deliberately ignored. GET /api/ai-status
+ *  reports these so the UI can show the deployment's real connection state.
+ *  Ids, not labels: "Gemini" vs "Google Gemini" mismatches used to make a
+ *  connected deployment report "not connected". */
 export function envConfiguredProviderIds(): ProviderId[] {
   return configuredProviderIds();
-}
-
-/** Whether the deployment allows the browser bridge to fall back to the free
- *  community relays (lib/aiBridge.ts). Default: allowed. Set
- *  `AI_FREE_BRIDGE=off` (or `false`) to forbid them for every learner — the
- *  flag is reported by GET /api/ai-status and the browser obeys it, so no
- *  rebuild or re-paste is needed. The server's own provider chain and the
- *  on-device engine are unaffected either way. */
-export function freeBridgeAllowed(): boolean {
-  const raw = envValue("AI_FREE_BRIDGE", "SPP_FREE_BRIDGE")?.toLowerCase();
-  return raw !== "off" && raw !== "false" && raw !== "0";
 }
 
 export function activeProvider(runtime?: RuntimeProviderKeys): string | null {
@@ -2377,15 +2360,8 @@ export function assistantStatusReply(
   ctx: TutorContext,
   status: {
     cloud: boolean;
-    usingOwnKey?: boolean;
     lastOk?: boolean | null;
     lastLatencyMs?: number | null;
-    /** What the learner's BROWSER can reach (lib/aiBridge.ts): their own
-     *  pasted key, a free community endpoint, or nothing. The server cannot
-     *  see either — a sandboxed host has no outbound network at all — so the
-     *  client reports it and the answer stays honest instead of claiming
-     *  "not connected" while the browser is answering. */
-    browserBridge?: "own-key" | "free" | null;
   }
 ): string {
   const n = q.toLowerCase();
@@ -2396,26 +2372,10 @@ export function assistantStatusReply(
   const slow = /slow|time to|took|take|long|late|delay|respons|repeat/.test(n);
   const identity = /which|what\s+(ai|model)|are you (an?|a real|chatgpt|gpt|gemini|human)/.test(n);
 
-  if (!status.cloud && status.browserBridge === "own-key") {
-    return [
-      `Yes — I'm connected through **the key you saved in this browser**. This deployment has no AI key of its own, so your device calls the provider directly and hands the answer back to me: same tutoring, and your key never has to live on a server.`,
-      `- **Cloud AI layer** — your key, called from this device.\n- **Local ML engine** — spaced repetition (FSRS-lite), pace modelling, skip-risk and focus-hour profiling on your own data: ${ctx.progressPct}% complete, ${ctx.streak}-day streak, ${ctx.overdue} overdue.`,
-      `To let every learner on this deployment use it without pasting a key, set the provider's environment variable on the server (**Settings → AI coach** lists the names).`,
-      cta,
-    ].join("\n\n");
-  }
-  if (!status.cloud && status.browserBridge === "free") {
-    return [
-      `Yes — open-ended questions are answered by a **free community AI endpoint**, called straight from this device. No key is configured on this deployment and none is saved in your browser, so this is the zero-setup route.`,
-      `What that means for you: your question and a short summary of your plan are sent to a public AI relay (they are rate-limited and anonymous, and the relay is named in **Settings → AI coach**). Everything about your schedule, progress and revision stays on the on-device ML engine: ${ctx.progressPct}% complete, ${ctx.streak}-day streak, ${ctx.overdue} overdue.`,
-      `Prefer a private connection? Open **Settings → AI coach**, paste a free key (Gemini or Groq take one minute) and press **Test from this browser** — it takes priority immediately. You can also switch the free endpoint off there.`,
-      cta,
-    ].join("\n\n");
-  }
   if (!status.cloud) {
     return [
-      `Right now I'm running on the **on-device study engine only** — no cloud AI key is connected for this deployment, no key is saved in this browser, and the free community endpoint is switched off, so I answer from your plan, your syllabus and my reference library, but I can't hold an open-ended conversation yet.`,
-      `To enable full AI tutoring, open **Settings → AI coach** and either paste a free key (Gemini or Groq take one minute) or switch the free community endpoint on. Both start working immediately, no restart needed.`,
+      `Right now I'm running on the **on-device study engine only** — no AI provider keys are configured on this deployment, so I answer from your plan, your syllabus and my reference library, but I can't hold an open-ended conversation yet.`,
+      `Cloud tutoring is switched on by the deployment itself: its owner adds provider keys (such as GEMINI_API_KEY) to the server environment, and every learner gets them automatically — no key is ever entered in the app. **Settings → AI coach** shows the live connection state.`,
       cta,
     ].join("\n\n");
   }
@@ -2426,7 +2386,7 @@ export function assistantStatusReply(
       : `Cloud tutoring is active for this session.`;
   const lines = [
     `Yes — I'm connected. I run as a **hybrid**:`,
-    `- **Cloud AI layer** ${status.usingOwnKey ? "(using the key you added in Settings) " : ""}— a chain of fast providers answers open-ended questions and explanations. If one provider is slow or busy, the next one answers in the same request.`,
+    `- **Cloud AI layer** — the deployment's own provider chain answers open-ended questions and explanations. If one provider hits its limit or goes down, the next one answers in the same request.`,
     `- **Local ML engine** — spaced repetition (FSRS-lite), pace modelling (EWMA), skip-risk and focus-hour profiling run on your own data and feed every answer with live numbers: ${ctx.progressPct}% complete, ${ctx.streak}-day streak, ${ctx.overdue} overdue.`,
     health,
   ];
@@ -2484,11 +2444,6 @@ export async function localTutor(
   options: {
     skipCloud?: boolean;
     keys?: RuntimeProviderKeys;
-    /** What the learner's browser could reach (lib/aiBridge.ts). Decides
-     *  whether the fallback says "your cloud route is busy, retry" or "no AI
-     *  is connected at all" — two very different situations that used to
-     *  share one misleading sentence. */
-    browserBridge?: "own-key" | "free" | null;
   } = {}
 ): Promise<TutorReply> {
   const action = parseCommand(q);
@@ -2525,7 +2480,6 @@ export async function localTutor(
     return {
       text: assistantStatusReply(q, ctx, {
         cloud: !!activeProvider(options.keys),
-        usingOwnKey: hasRuntimeKeys(options.keys),
         lastOk: health.ok,
       }),
     };
@@ -2589,23 +2543,12 @@ export async function localTutor(
   return {
     text: cloudConfigured
       ? `I couldn't find that in your study plan or my reference library just now. Try rephrasing your question, ask *"what should I study today?"*, or say *"explain [any topic from your subjects]"*.`
-      : options.browserBridge
-        // The browser DID try a cloud route (the learner's own key, or the free
-        // community endpoint) and nothing answered. That is a retry, not a
-        // missing key — telling them to "connect a key" here sent learners to
-        // Settings to fix something that was already configured.
-        ? [
-            `That one didn't reach a cloud model just now — ${options.browserBridge === "own-key" ? "the key saved in this browser" : "the free community endpoint"} didn't answer (offline, busy or rate-limited). Send it again in a moment. Meanwhile, from your plan:`,
-            capabilityList,
-            ``,
-            `**Settings → AI coach → Test from this browser** shows which route is reachable right now.`,
-          ].join("\n")
-        : [
-            `I don't have an answer for that one from your plan or my reference library yet. Here's what I *can* do right now, with no setup:`,
-            capabilityList,
-            ``,
-            `For open-ended questions on any topic, connect an AI key in **Settings → AI coach** — or switch on the free community endpoint there — and I'll answer in full.`,
-          ].join("\n"),
+      : [
+          `I don't have an answer for that one from your plan or my reference library yet. Here's what I *can* do right now, with no setup:`,
+          capabilityList,
+          ``,
+          `For open-ended questions on any topic, the deployment owner adds AI provider keys to the server environment — every learner then gets full cloud tutoring automatically, with no key entered in the app.`,
+        ].join("\n"),
   };
 }
 

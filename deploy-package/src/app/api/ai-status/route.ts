@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import {
-  configuredProviders, envConfiguredProviderIds, freeBridgeAllowed, llmHealthSnapshot,
+  configuredProviders, envConfiguredProviderIds, llmHealthSnapshot,
   probeProviders, activeProvider, parseRuntimeKeys, hasRuntimeKeys, providerCooldowns,
 } from "@/lib/ai";
 import { checkRateLimit } from "@/lib/rateLimit";
@@ -9,31 +9,21 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
 /**
- * GET  — cheap, cache-free snapshot: which providers are configured and what
- *        the last real tutor request did. Never returns keys.
- * POST — live connectivity probe: one tiny real request to EVERY configured
- *        provider, with per-provider status, latency and a sanitised reason.
- *        Distinguishes a rejected key, a retired model, a rate limit,
- *        a timeout and a network block from each other.
+ * GET  — cheap, cache-free snapshot: which providers the deployment's
+ *        environment configured and what the last real tutor request did.
+ *        Never returns keys.
+ * POST — live connectivity probe (operator tool): one tiny real request to
+ *        EVERY configured provider, with per-provider status, latency and a
+ *        sanitised reason. Distinguishes a rejected key, a retired model, a
+ *        rate limit, a timeout and a network block from each other.
  */
 export async function GET(req: Request) {
-  // Include any bring-your-own keys the browser sent, so Settings reflects
-  // exactly what this learner's tutor will actually use.
   const runtimeKeys = parseRuntimeKeys(req.headers.get("x-ai-keys"));
   const providers = configuredProviders(runtimeKeys);
-  /* Env-only view, ignoring the caller's bring-your-own keys. The browser
-     bridge (lib/chatClient.ts) reads `serverProviderIds` to decide who makes
-     the model call: if the deployment has its own key the server keeps the
-     call; if it has none, the learner's browser asks the model directly —
-     which is also the only route that works when the host has no outbound
-     network at all (sandboxed previews). Ids, not labels: the client matches
-     on ids and a label mismatch reads as "not connected". */
+  /* Env-only view: exactly what the DEPLOYMENT configured, which is what
+     every learner on it shares. Ids, not labels — the client matches on ids. */
   const serverIds = envConfiguredProviderIds();
-  /* Operator kill-switch for the free community relays the browser bridge can
-     use (AI_FREE_BRIDGE=off). Reported here so every client obeys it without
-     a rebuild, and so the Settings card can say why the switch is stuck. */
   return NextResponse.json({
-    freeBridgeAllowed: freeBridgeAllowed(),
     mode: providers.length ? "cloud-with-local-fallback" : "local-only",
     activeProvider: activeProvider(runtimeKeys),
     configuredProviders: providers,
@@ -48,10 +38,10 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  // Generous: this is the "is my key working?" button in Settings → AI
-  // coach, and someone connecting a key for the first time legitimately
-  // tests, fixes a paste, and tests again. Only *configured* providers are
-  // actually contacted, so the cost stays proportional to the keys present.
+  // Generous: this is the "is the deployment's key working?" check, and an
+  // operator fixing a key legitimately tests, edits, and tests again. Only
+  // *configured* providers are actually contacted, so the cost stays
+  // proportional to the keys present.
   const limit = checkRateLimit(req, "ai-status", 20, 60_000);
   if (!limit.allowed) {
     return NextResponse.json(

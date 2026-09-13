@@ -184,11 +184,6 @@ export default function Home() {
   const [chatOpen, setChatOpen] = useState(false);
   const [thinking, setThinking] = useState(false);
   const [lastReplySource, setLastReplySource] = useState<LastReplySource>(null);
-  /* Which side of the wire the last answer came from: "own-key" = the
-     learner's own key, called from this browser; "free" = a free community
-     endpoint; null = the server (deployment keys) or the on-device engine.
-     The chat header says so honestly — a free relay is not "your" AI. */
-  const [lastReplyVia, setLastReplyVia] = useState<"own-key" | "free" | null>(null);
   const [zen, setZen] = useState(false);
   const [ambient, setAmbient] = useState("none");
   useEffect(() => onSoundChange(setAmbient), []);
@@ -1093,20 +1088,16 @@ export default function Home() {
       };
       setPendingMsgs((p) => [...p, optimistic]);
       try {
-        /* One call, three possible routes, decided in lib/chatClient.ts:
-           the deployment's own keys (server-side chain) → this browser's
-           keys → a free community endpoint from this browser → the
-           on-device engine. The browser route is what makes cloud tutoring
-           work on a deployment that has no key, and on a host with no
-           outbound network at all (a sandboxed preview), because the
-           learner's device is on the open internet even when the server
-           is not.
+        /* One call, one route: POST /api/chat walks the deployment's own
+           provider chain (GEMINI_API_KEY, CEREBRAS_API_KEY, … from the
+           server environment) with automatic failover, and falls back to
+           the on-device engine only when every cloud leg failed. Learners
+           never enter a key — the deployment's keys work for everyone.
 
-           The server may still walk several providers (AI_TIMEOUT_MS,
-           default 24 s) plus two database round trips, and the bridge adds
-           its own hop, so the ceiling stays generous: a slow-but-successful
-           answer must never be aborted into the "didn't get through"
-           fallback. */
+           The server may walk several providers (AI_TIMEOUT_MS, default
+           24 s) plus two database round trips, so the ceiling stays
+           generous: a slow-but-successful answer must never be aborted
+           into the "didn't get through" fallback. */
         const r = await askTutorMessage(message, { timeoutMs: 60_000 });
         const reply =
           (r.reply || "").trim() ||
@@ -1148,13 +1139,6 @@ export default function Home() {
             : r.ai?.degraded
               ? "local"
               : "instant",
-        );
-        setLastReplyVia(
-          r.ai?.via === "browser-free"
-            ? "free"
-            : r.ai?.via === "browser-own-key"
-              ? "own-key"
-              : null,
         );
         if (r.ai?.degraded && r.ai.notice) {
           const retryQuestion = message;
@@ -2152,8 +2136,6 @@ export default function Home() {
         thinking={thinking}
         provider={state.aiProvider}
         lastSource={lastReplySource}
-        lastVia={lastReplyVia}
-        onOpenSettings={() => goPage("settings")}
         learner={{
           name: state.user.name,
           daysLeft: ctx.daysLeft,

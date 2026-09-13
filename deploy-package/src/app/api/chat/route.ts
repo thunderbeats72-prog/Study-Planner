@@ -1,17 +1,16 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { messages } from "@/db/schema";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import { buildContext, dateFrom, fullState, getOrCreateUser, getSettings, keyFrom, defaultFallbackState } from "@/lib/state";
 import {
   callLLMDetailed, localTutor, parseCommand, tutorSystemPrompt, activeProvider,
   extractLlmAction, languageCapabilityReply, instantTutorReply, commandReply,
-  parseRuntimeKeys, hasRuntimeKeys, type RuntimeProviderKeys,
+  parseRuntimeKeys, type RuntimeProviderKeys,
   isAssistantStatusQuestion, assistantStatusReply, llmHealthSnapshot,
 } from "@/lib/ai";
-import { classifyModelAnswer } from "@/lib/aiAnswer";
 import { checkRateLimit } from "@/lib/rateLimit";
-import { getShigunUsage, recordShigunUse } from "@/lib/shigunUsage";
+import { recordShigunUse } from "@/lib/shigunUsage";
 import { readJsonObject, validationPayload } from "@/lib/validation";
 import { regeneratePlan } from "@/lib/generate";
 import { appendChatTurn } from "@/lib/chatTurn";
@@ -121,7 +120,7 @@ function curriculumGrounding(question: string, state: GroundingState): string {
       const overlap = titleTokens.filter((token) => queryTokens.has(token)).length;
       const subject = subjectById.get(topic.subjectId);
       const subjectHit = subject && normalized.includes(subject.name.toLowerCase()) ? 3 : 0;
-      const weakestHit = weakestSubjectId === topic.subjectId && topic.status !== "done" ? 12 - Math.min(8, topic.position / 10) : 0;
+      const weakestHit = topic.subjectId === weakestSubjectId && topic.status !== "done" ? 12 - Math.min(8, topic.position / 10) : 0;
       return { topic, subject, score: exact + overlap + subjectHit + weakestHit };
     })
     .filter((candidate) => candidate.score >= 2)
@@ -160,18 +159,18 @@ type AiAttempt = { provider: string; model: string; status: number | null; error
  */
 export function summarizeAttempts(attempts: AiAttempt[]): string {
   if (!attempts.length) {
-    return "No cloud provider is configured — the local ML engine answered. Add a CEREBRAS_API_KEY, GROQ_API_KEY, MISTRAL_API_KEY, SAMBANOVA_API_KEY, COHERE_API_KEY, GEMINI_API_KEY, or OPENROUTER_API_KEY to enable cloud tutoring.";
+    return "No cloud provider is configured — the local ML engine answered. Add a GEMINI_API_KEY, CEREBRAS_API_KEY, GROQ_API_KEY, MISTRAL_API_KEY, SAMBANOVA_API_KEY, COHERE_API_KEY, or OPENROUTER_API_KEY to the deployment environment to enable cloud tutoring for every learner.";
   }
   const first = attempts[0];
   const chain = attempts
     .map((attempt) => `${attempt.provider}(${attempt.model}): ${attempt.error || attempt.status || "unknown"}`)
     .join(" · ");
-  const tail = " Check deployment keys (CEREBRAS_API_KEY, GROQ_API_KEY, MISTRAL_API_KEY, SAMBANOVA_API_KEY, COHERE_API_KEY, GEMINI_API_KEY, OPENROUTER_API_KEY) or POST /api/ai-status for a live diagnosis.";
+  const tail = " Check the deployment environment keys (GEMINI_API_KEY, CEREBRAS_API_KEY, GROQ_API_KEY, MISTRAL_API_KEY, SAMBANOVA_API_KEY, COHERE_API_KEY, OPENROUTER_API_KEY) or POST /api/ai-status for a live diagnosis.";
   if (first.error === "auth") {
     return `The ${first.provider} API key was rejected (${first.status ?? "auth"}). Check the key in your deployment environment.${tail}`;
   }
   if (first.error === "rate_limit") {
-    return `The ${first.provider} key is rate-limited right now (quota/TPM). Wait a minute or add a second provider key.${tail}`;
+    return `The ${first.provider} key is rate-limited right now (quota/TPM). The chain falls through to the next provider automatically; add a second provider key for more headroom.${tail}`;
   }
   if (attempts.some((attempt) => attempt.error === "model")) {
     return `Configured AI model IDs were rejected as unavailable (${chain}).${tail}`;
@@ -197,8 +196,7 @@ export function summarizeAttempts(attempts: AiAttempt[]): string {
  *   • a stable machine `code` so the UI can offer Retry without parsing prose.
  */
 export function userFacingAiNotice(
-  attempts: AiAttempt[],
-  options: { usingOwnKey?: boolean } = {}
+  attempts: AiAttempt[]
 ): { code: string; notice: string; retryable: boolean } {
   if (!attempts.length) {
     return {
@@ -222,15 +220,9 @@ export function userFacingAiNotice(
     };
   }
   if (attempts.some((attempt) => attempt.error === "auth" || attempt.error === "model")) {
-    // When the learner supplied their own key, "unavailable" is the wrong
-    // thing to say: the key itself is the problem and they can fix it in
-    // Settings. Saying so is the difference between "the AI is broken" and
-    // one actionable step.
     return {
       code: "AI_UNAVAILABLE",
-      notice: options.usingOwnKey
-        ? "The AI key saved in Settings was rejected. Open Settings → AI coach to check or replace it — I answered from your syllabus in the meantime."
-        : "AI assistant temporarily unavailable. We answered from your syllabus instead — try again shortly.",
+      notice: "AI assistant temporarily unavailable. We answered from your syllabus instead — try again shortly.",
       retryable: true,
     };
   }
@@ -241,20 +233,8 @@ export function userFacingAiNotice(
   };
 }
 
-/** One model id / leg label from the browser bridge. Display-only, so it is
- *  stripped to a conservative character set and length before it is echoed. */
-function cleanToken(value: unknown, max = 48): string | null {
-  if (typeof value !== "string") return null;
-  const cleaned = value.replace(/[^A-Za-z0-9._:/ -]/g, "").trim().slice(0, max);
-  return cleaned || null;
-}
-
 export async function POST(req: Request) {
-  /* The browser-direct bridge (lib/aiBridge.ts → lib/chatClient.ts) spends
-     TWO calls on one learner question: `prepare` for the grounded prompt and
-     `finalise` for the answer. The bucket is sized for that, so a learner on
-     the bridge is not rate-limited at half the speed of everyone else. */
-  const limit = checkRateLimit(req, "chat", 36, 60_000);
+  const limit = checkRateLimit(req, "chat", 24, 60_000);
   if (!limit.allowed) {
     return NextResponse.json(
       { error: "Too many tutor requests. Please wait a moment and try again.", code: "RATE_LIMITED" },
@@ -277,45 +257,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Message is too long (maximum 8,000 characters).", code: "MESSAGE_TOO_LONG" }, { status: 413 });
   }
 
-  /* Three modes, one route:
-       full     — the classic path: the server walks its own provider chain.
-       prepare  — build the grounded prompt and hand it back so the BROWSER
-                  can call a model directly (no deployment key, or a sandbox
-                  with no outbound network). Answers commands/instant queries
-                  itself, exactly like `full`, so nothing needless is bridged.
-       finalise — accept the browser's model answer, then run the same action
-                  extraction, replanning, persistence and state refresh. */
-  const directReply = typeof body.directReply === "string" ? body.directReply.replace(/\0/g, "").trim() : "";
-  /* What the caller's BROWSER can reach (lib/aiBridge.ts). The server cannot
-     discover this — a sandboxed host has no outbound network at all — so the
-     client reports it and "are you connected?" gets an honest answer. */
-  const clientBridge: "own-key" | "free" | null =
-    body.bridge === "own-key" || body.bridge === "free" ? body.bridge : null;
-  const mode: ChatMode = directReply ? "finalise" : body.prepare === true ? "prepare" : "full";
-  if (mode === "finalise" && directReply.length > 24_000) {
-    return NextResponse.json({ error: "Reply is too long.", code: "REPLY_TOO_LONG" }, { status: 413 });
-  }
-
-  // Bring-your-own keys (Settings → AI coach): per-request override of the
-  // deployment's env configuration. Never persisted, never logged.
+  /* ONE route, ONE direction: the server walks the deployment's own provider
+     chain (GEMINI_API_KEY, CEREBRAS_API_KEY, GROQ_API_KEY, … from the server
+     environment) with automatic failover, and falls back to the on-device
+     engine only when every cloud leg failed. Learners are never asked for a
+     key — whatever the deployment configured works for everyone. */
   const runtimeKeys = parseRuntimeKeys(req.headers.get("x-ai-keys"));
   try {
-    return await handleChat(req, {
-      message: rawText,
-      keys: runtimeKeys,
-      clientBridge,
-      mode,
-      directReply: mode === "finalise" ? directReply : null,
-      directLeg: mode === "finalise" ? cleanToken(body.directLeg) : null,
-      directModel: mode === "finalise" ? cleanToken(body.directModel) : null,
-      directKind: mode === "finalise" && body.directKind === "free" ? "free" : "own-key",
-      // `prepared: true` means a prepare call for this same message already
-      // stored the learner's row — never write it twice.
-      prepared: body.prepared === true,
-      // `replaceLast: true` swaps the fallback answer this turn already wrote
-      // for the better one the browser bridge just produced.
-      replaceLast: body.replaceLast === true,
-    });
+    return await handleChat(req, { message: rawText, keys: runtimeKeys });
   } catch (error) {
     console.error("Chat route handleChat failed, using local tutor fallback:", error instanceof Error ? error.message : error);
     const key = keyFrom(req);
@@ -336,7 +285,9 @@ export async function POST(req: Request) {
       } else if (instantReply) {
         finalText = instantReply.text;
       } else {
-        const local = await localTutor(text, ctx, { skipCloud: true, keys: runtimeKeys, browserBridge: clientBridge });
+        // Even this last-resort path may use the deployment's cloud keys:
+        // only the state lookup failed, and the cloud chain does not need it.
+        const local = await localTutor(text, ctx, { keys: runtimeKeys });
         finalText = local.text;
       }
     } catch (inner) {
@@ -362,23 +313,16 @@ export async function POST(req: Request) {
   }
 }
 
-/** The teaching instruction appended to every grounded cloud prompt. Shared by
- *  the server-side call and the `prepare` payload the browser bridge sends, so
- *  both routes ask the model for the same kind of answer. */
+/** The teaching instruction appended to every grounded cloud prompt. */
 const TEACH_SUFFIX =
   "\n\nAnswer the learner's question directly. If they asked you to explain something, TEACH it with a definition, how it works, one worked example, and a short recap. Do not reply with only a syllabus outline or learning-objective list.";
 
-/** Cloud token budget for a tutoring answer. The browser bridge uses the same
- *  number; free anonymous tiers reject or truncate very large budgets. */
+/** Cloud token budget for a tutoring answer. */
 const TUTOR_MAX_TOKENS = 2000;
-
-type ChatMode = "full" | "prepare" | "finalise";
 
 /**
  * The exact request SHIGUN sends to a model: system identity + live ML
- * signals + curriculum grounding + bounded history. One builder, so the
- * server-side chain and the browser-direct bridge are always asking the same
- * question in the same way.
+ * signals + curriculum grounding + bounded history.
  */
 function buildTutorPrompt(text: string, state: GroundingState, ctx: ReturnType<typeof buildContext>) {
   const history = state.messages.slice(-10).map((m) => ({
@@ -396,60 +340,36 @@ function buildTutorPrompt(text: string, state: GroundingState, ctx: ReturnType<t
 type HandleChatOptions = {
   message: string;
   keys?: RuntimeProviderKeys;
-  /** "own-key" | "free" | null — reported by the caller's browser. */
-  clientBridge?: "own-key" | "free" | null;
-  mode?: ChatMode;
-  directReply?: string | null;
-  directLeg?: string | null;
-  directModel?: string | null;
-  directKind?: "own-key" | "free";
-  prepared?: boolean;
-  replaceLast?: boolean;
 };
 
 async function handleChat(req: Request, opts: HandleChatOptions) {
-  const {
-    message: rawText,
-    keys: runtimeKeys,
-    clientBridge = null,
-    mode = "full",
-    directReply = null,
-    directLeg = null,
-    directModel = null,
-    directKind = "own-key",
-    prepared = false,
-    replaceLast = false,
-  } = opts;
+  const { message: rawText, keys: runtimeKeys } = opts;
   const key = keyFrom(req);
   const text = rawText;
 
   const state = await fullState(key);
   const localDate = dateFrom(req);
   const ctx = buildContext(state, localDate);
-  /* Shigun credit: a credit is spent only when the AI layer answers — a cloud
-     `full` attempt or an accepted browser-bridge `finalise`. Commands,
-     greetings and plan/syllabus lookups stay free. The exhausted flag is read
-     up front so this turn can degrade politely instead of burning quota. */
-  const shigunCredit = state.user.id > 0 ? await getShigunUsage(state.user.id) : null;
-  const creditExhausted = !!shigunCredit && shigunCredit.exhausted;
+  /* Shigun credit is a VISIBILITY meter only — one credit per cloud-answered
+     question, written after a real cloud answer below. It is never read as a
+     gate here: a meter problem must never be able to take the tutor offline
+     (the exact failure that paused cloud tutoring before). */
   let creditSpent = false;
-  let action = mode === "finalise" ? undefined : parseCommand(text);
-  const languageReply = mode === "finalise" ? null : languageCapabilityReply(text);
+  let action = parseCommand(text);
+  const languageReply = languageCapabilityReply(text);
   // "Are you connected to the AI?" / "why are you not responding?" are
   // questions about the assistant, answered from live connectivity state —
   // never sent to the cloud (a model cannot know its own plumbing) and never
   // to the encyclopedia (which once answered "connect" with a quiz show).
-  const statusReply = mode === "finalise" || action || languageReply || !isAssistantStatusQuestion(text)
+  const statusReply = action || languageReply || !isAssistantStatusQuestion(text)
     ? null
     : assistantStatusReply(text, ctx, {
         cloud: !!activeProvider(runtimeKeys),
-        usingOwnKey: hasRuntimeKeys(runtimeKeys),
         lastOk: llmHealthSnapshot().ok,
-        browserBridge: clientBridge,
       });
-  const instantReply = mode === "finalise" || action || statusReply ? null : instantTutorReply(text, ctx);
+  const instantReply = action || statusReply ? null : instantTutorReply(text, ctx);
 
-  if (state.user.id > 0 && !prepared) {
+  if (state.user.id > 0) {
     try {
       await db.insert(messages).values({ userId: state.user.id, role: "user", content: text });
     } catch (e) {
@@ -459,9 +379,6 @@ async function handleChat(req: Request, opts: HandleChatOptions) {
 
   let finalText: string;
   let replanned = false;
-  /** Set only when a browser-bridge answer survived the sanity gate, so a
-   *  rejected relay notice never makes the panel claim a cloud source. */
-  let bridgeAccepted = false;
   let aiMeta: {
     source: string;
     model: string | null;
@@ -471,11 +388,8 @@ async function handleChat(req: Request, opts: HandleChatOptions) {
     /** Stable machine code so the UI can offer Retry without parsing prose. */
     code?: string;
     retryable?: boolean;
-    /** Which side made the model call: "server" | "browser-own-key" |
-     *  "browser-free". The learner sees "your key" or "free endpoint". */
+    /** Always "server" for a cloud answer: the deployment's own keys. */
     via?: string;
-    /** Bridge leg id, display-only (already sanitised). */
-    leg?: string | null;
   } = { source: "local", model: null, degraded: false };
 
   if (languageReply) {
@@ -495,57 +409,10 @@ async function handleChat(req: Request, opts: HandleChatOptions) {
     finalText = statusReply;
   } else if (instantReply) {
     finalText = instantReply.text;
-  } else if (mode === "prepare") {
-    /* The learner's browser is going to make the model call (no deployment key,
-       or a server with no outbound network). Hand back exactly what the server
-       would have sent upstream: identity, live ML signals, curriculum
-       grounding and the recent history — never keys, never another learner's
-       data. The user row is already stored above; `finalise` stores the
-       answer. */
-    return NextResponse.json({
-      needsCloud: true,
-      message: text,
-      prompt: buildTutorPrompt(text, state, ctx),
-      ai: { source: "pending", model: null, degraded: false },
-    }, { headers: { "cache-control": "no-store" } });
   } else {
     let reply: string | null = null;
-    const cloudAttempted = !creditExhausted && !!activeProvider(runtimeKeys);
-    if (mode === "finalise") {
-      /* The browser bridge answered — but a browser running a cached bundle
-         can still hand back a relay's own error notice (a 200 body whose
-         content is "the API key used for this request has reached its
-         budget"). The server is the last gate: refuse it exactly as the chain
-         would have, and let the on-device engine answer instead of storing
-         someone else's billing message as SHIGUN's reply. */
-      const verdict = classifyModelAnswer(directReply);
-      if (!verdict.noise) {
-        // Same post-processing as a cloud reply: action extraction,
-        // replanning, persistence, fresh state.
-        reply = verdict.text;
-        bridgeAccepted = true;
-        creditSpent = true;
-        aiMeta = {
-          source: "direct",
-          model: directModel,
-          degraded: false,
-          via: directKind === "free" ? "browser-free" : "browser-own-key",
-          leg: directLeg,
-        };
-      } else {
-        console.warn(
-          "Rejected a browser-bridge reply that was a provider notice, answering locally:",
-          `${directLeg ?? "?"}/${directModel ?? "?"} — ${verdict.reason} (${verdict.matched})`
-        );
-        reply = null;
-        const notice = userFacingAiNotice(
-          [{ provider: directLeg || "bridge", model: directModel || "unknown", status: 200, error: verdict.reason }],
-          { usingOwnKey: directKind === "own-key" }
-        );
-        aiMeta = { source: "local", model: null, degraded: true, ...notice };
-      }
-    } else if (cloudAttempted) {
-      creditSpent = true;
+    const cloudConfigured = !!activeProvider(runtimeKeys);
+    if (cloudConfigured) {
       const prompt = buildTutorPrompt(text, state, ctx);
       const result = await callLLMDetailed(
         prompt.system,
@@ -555,6 +422,7 @@ async function handleChat(req: Request, opts: HandleChatOptions) {
       );
       reply = result.text;
       if (result.text && result.provider) {
+        creditSpent = true;
         aiMeta = { source: result.provider, model: result.model, degraded: false, via: "server" };
       } else {
         // Technical detail goes to the server log, where an operator (or
@@ -562,21 +430,9 @@ async function handleChat(req: Request, opts: HandleChatOptions) {
         // sentence — the reply itself already came from the local tutor, so
         // nothing is actually broken for them.
         console.warn("Cloud tutor unavailable, answered locally:", summarizeAttempts(result.attempts));
-        const notice = userFacingAiNotice(result.attempts, { usingOwnKey: hasRuntimeKeys(runtimeKeys) });
+        const notice = userFacingAiNotice(result.attempts);
         aiMeta = { source: "local", model: null, degraded: true, ...notice };
       }
-    } else if (creditExhausted) {
-      // The day's cloud allowance is spent. The on-device engine answers
-      // (nothing breaks) and the panel is told why cloud tutoring paused, with
-      // the stable code a Retry UI could act on. Reset refills it in Settings.
-      aiMeta = {
-        source: "local",
-        model: null,
-        degraded: true,
-        code: "CREDIT_EXHAUSTED",
-        retryable: false,
-        notice: "Today's Shigun cloud credit is used up, so the on-device engine answered. Reset it anytime in Settings → AI Coach.",
-      };
     }
     if (reply) {
       const extracted = extractLlmAction(reply);
@@ -598,7 +454,7 @@ async function handleChat(req: Request, opts: HandleChatOptions) {
       const grounded = localCurriculumReply(text, state);
       let localText = "";
       try {
-        const local = await localTutor(text, ctx, { skipCloud: cloudAttempted, keys: runtimeKeys, browserBridge: clientBridge });
+        const local = await localTutor(text, ctx, { skipCloud: cloudConfigured, keys: runtimeKeys });
         localText = local.text;
         if (local.action) action = local.action;
       } catch (error) {
@@ -607,13 +463,13 @@ async function handleChat(req: Request, opts: HandleChatOptions) {
       // `localTutor` returns EITHER a real answer (an encyclopedia lesson, a
       // greeting, a command, a live-data reply) OR one of its generic
       // "I couldn't answer that" fallbacks. A real answer may beat a syllabus
-      // dump, but a fallback is not an answer — letting one win discarded a
+      // dump, but a fallback is not a answer — letting one win discarded a
       // real curriculum lesson and, on a keyless deployment, answering
       // "explain [topic]" with "connect an AI key" instead of teaching the
       // topic. Every generic fallback phrase is listed so none of them can
       // masquerade as knowledge.
       const knowledgeLooksGood = !!localText.trim()
-        && !/without a cloud answer|local mode|couldn't find that in your study plan|couldn't reach the cloud tutor|don't have an answer for that one|didn't reach a cloud model/i.test(localText);
+        && !/without a cloud answer|local mode|couldn't find that in your study plan|couldn't reach the cloud tutor|don't have an answer for that one/i.test(localText);
       // Practice / plan-card requests stay on the curriculum set. Concept
       // questions prefer a real Wikipedia-backed lesson over a syllabus dump.
       if (asksPractice && grounded) {
@@ -631,22 +487,7 @@ async function handleChat(req: Request, opts: HandleChatOptions) {
 
   if (state.user.id > 0) {
     try {
-      if (replaceLast) {
-        /* This turn already wrote a fallback answer (the server chain failed
-           and the browser bridge then produced a better one). Overwrite that
-           row instead of storing two answers to a single question. */
-        const last = await db.select({ id: messages.id }).from(messages)
-          .where(and(eq(messages.userId, state.user.id), eq(messages.role, "assistant")))
-          .orderBy(desc(messages.id))
-          .limit(1);
-        if (last[0]) {
-          await db.update(messages).set({ content: finalText }).where(eq(messages.id, last[0].id));
-        } else {
-          await db.insert(messages).values({ userId: state.user.id, role: "assistant", content: finalText });
-        }
-      } else {
-        await db.insert(messages).values({ userId: state.user.id, role: "assistant", content: finalText });
-      }
+      await db.insert(messages).values({ userId: state.user.id, role: "assistant", content: finalText });
       await db.execute(sql`
         delete from messages
         where user_id = ${state.user.id}
@@ -688,11 +529,7 @@ async function handleChat(req: Request, opts: HandleChatOptions) {
       ...fresh,
       messages: appendChatTurn(fresh.messages, text, finalText, fresh.user.id),
       context: buildContext(fresh, localDate),
-      // A browser-bridge answer counts as cloud: the panel should not fall
-      // back to "Local mode" just because the deployment has no env key.
-      aiProvider: bridgeAccepted
-        ? (directKind === "free" ? "browser-free" : "browser-own-key")
-        : activeProvider(runtimeKeys),
+      aiProvider: activeProvider(runtimeKeys),
     },
     replanned,
     ai: aiMeta,

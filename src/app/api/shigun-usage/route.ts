@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import {
-  activeProvider, configuredProviders, freeBridgeAllowed, llmHealthSnapshot,
+  activeProvider, configuredProviders, llmHealthSnapshot,
   parseRuntimeKeys, providerCooldowns, resetAiCooldowns, type RuntimeProviderKeys,
 } from "@/lib/ai";
 import { checkRateLimit, clearRateLimit } from "@/lib/rateLimit";
@@ -66,7 +66,6 @@ function payload(usage: Awaited<ReturnType<typeof getShigunUsage>>, keys: Runtim
   return {
     usage,
     dailyLimit: SHIGUN_DAILY_LIMIT,
-    freeBridgeAllowed: freeBridgeAllowed(),
     mode: configuredProviders(keys).length ? "cloud-with-local-fallback" : "local-only",
     activeProvider: activeProvider(keys),
     lastRequest: llmHealthSnapshot(),

@@ -325,13 +325,13 @@ async function runTests() {
   globalThis.fetch = (async (input: string | URL | Request) => {
     const url = String(input);
     called.push(url);
-    if (url.includes("cerebras")) {
+    if (url.includes("generativelanguage")) {
       return new Response(JSON.stringify({ error: { message: "API key rejected" } }), {
         status: 403, headers: { "content-type": "application/json" },
       });
     }
-    if (url.includes("generativelanguage")) {
-      return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: "Fallback answer" }] } }] }), {
+    if (url.includes("cerebras")) {
+      return new Response(JSON.stringify({ choices: [{ message: { content: "Fallback answer" } }] }), {
         status: 200, headers: { "content-type": "application/json" },
       });
     }
@@ -340,8 +340,8 @@ async function runTests() {
     });
   }) as typeof fetch;
   const failover = await callLLMDetailed("Tutor", [{ role: "user", content: "Explain demand" }], 200);
-  check(failover.text === "Fallback answer" && failover.provider === "gemini", "Rejected Cerebras key falls through to Gemini");
-  check(called.filter((url) => url.includes("cerebras")).length === 1, "Auth failure does not loop through Cerebras models");
+  check(failover.text === "Fallback answer" && failover.provider === "cerebras", "Rejected Gemini key falls through to Cerebras");
+  check(called.filter((url) => url.includes("generativelanguage")).length === 1, "Auth failure does not loop through Gemini models");
   globalThis.fetch = originalFetch;
   if (oldGemini === undefined) delete process.env.GEMINI_API_KEY; else process.env.GEMINI_API_KEY = oldGemini;
   if (oldCerebras === undefined) delete process.env.CEREBRAS_API_KEY; else process.env.CEREBRAS_API_KEY = oldCerebras;
@@ -423,8 +423,8 @@ async function runTests() {
     check(stripThinking("<think>still thinking and never closed") === "",
       "An unclosed <think> block (budget spent thinking) yields an empty answer, not leaked reasoning");
 
-    // Failure memory + hedging: Cerebras stalls, Gemini answers; the second
-    // request must NOT wait on Cerebras again.
+    // Failure memory + hedging: Gemini (the primary) stalls, Cerebras
+    // answers the hedge; the second request must NOT wait on Gemini again.
     const originalFetch = globalThis.fetch;
     const saved: Record<string, string | undefined> = {};
     for (const name of ["GEMINI_API_KEY", "CEREBRAS_API_KEY", "GROQ_API_KEY", "MISTRAL_API_KEY", "SAMBANOVA_API_KEY", "COHERE_API_KEY", "OPENROUTER_API_KEY", "AI_TIMEOUT_MS"]) {
@@ -441,13 +441,13 @@ async function runTests() {
     globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
       const url = String(input);
       hits.push(url.includes("cerebras") ? "cerebras" : url.includes("generativelanguage") ? "gemini" : "other");
-      if (url.includes("cerebras")) {
+      if (url.includes("generativelanguage")) {
         // Never answers: resolve only when the caller aborts.
         return new Promise<Response>((_resolve, reject) => {
           init?.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
         });
       }
-      return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: "Hedged answer" }] } }] }), {
+      return new Response(JSON.stringify({ choices: [{ message: { content: "Hedged answer" } }] }), {
         status: 200, headers: { "content-type": "application/json" },
       });
     }) as typeof fetch;
@@ -455,20 +455,20 @@ async function runTests() {
     const started = Date.now();
     const hedged = await callLLMDetailed("Tutor", [{ role: "user", content: "explain elasticity" }], 200);
     const elapsed = Date.now() - started;
-    check(hedged.text === "Hedged answer" && hedged.provider === "gemini",
+    check(hedged.text === "Hedged answer" && hedged.provider === "cerebras",
       "A stalled first provider is hedged: the second provider answers in the same request");
     check(elapsed < 6_000, `Hedged answer arrived in ${elapsed} ms — well under the per-attempt timeout`);
-    check(hits[0] === "cerebras" && hits.includes("gemini"),
+    check(hits[0] === "gemini" && hits.includes("cerebras"),
       "Priority order is kept — the hedge starts only after the leader goes silent");
 
-    // Give the abandoned Cerebras leg time to hit its own timeout so the
+    // Give the abandoned Gemini leg time to hit its own timeout so the
     // failure memory records it, then check the next call skips it.
     await new Promise((resolve) => setTimeout(resolve, 200));
     const benched = providerCooldowns();
     hits.length = 0;
     const second = await callLLMDetailed("Tutor", [{ role: "user", content: "explain supply" }], 200);
-    check(second.provider === "gemini" && second.text === "Hedged answer", "Second request still answers");
-    check(hits[0] === "gemini", "Sticky success goes straight to the provider that actually answered");
+    check(second.provider === "cerebras" && second.text === "Hedged answer", "Second request still answers");
+    check(hits[0] === "cerebras", "Sticky success goes straight to the provider that actually answered");
     check(Array.isArray(benched) && benched.every((entry) => !JSON.stringify(entry).includes("test-cerebras")),
       "Cooldown report never leaks the API key");
 
@@ -479,19 +479,19 @@ async function runTests() {
     globalThis.fetch = (async (input: string | URL | Request) => {
       const url = String(input);
       hits.push(url.includes("cerebras") ? "cerebras" : url.includes("generativelanguage") ? "gemini" : "other");
-      if (url.includes("cerebras")) {
+      if (url.includes("generativelanguage")) {
         return new Response(JSON.stringify({ error: { message: "Invalid API key" } }), { status: 401, headers: { "content-type": "application/json" } });
       }
-      return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: "Live" }] } }] }), { status: 200, headers: { "content-type": "application/json" } });
+      return new Response(JSON.stringify({ choices: [{ message: { content: "Live" } }] }), { status: 200, headers: { "content-type": "application/json" } });
     }) as typeof fetch;
     await callLLMDetailed("Tutor", [{ role: "user", content: "q1" }], 100);
     const afterAuth = providerCooldowns();
-    check(afterAuth.some((entry) => entry.provider === "Cerebras" && entry.reason === "auth" && entry.secondsLeft > 0),
+    check(afterAuth.some((entry) => entry.provider === "Gemini" && entry.reason === "auth" && entry.secondsLeft > 0),
       "A rejected key is remembered (auth cooldown) so later requests do not pay for it");
     hits.length = 0;
     delete stickyGlobal.__studyPlannerPreferred;
     await callLLMDetailed("Tutor", [{ role: "user", content: "q2" }], 100);
-    check(!hits.includes("cerebras"), "The benched provider is skipped on the next request");
+    check(!hits.includes("gemini"), "The benched provider is skipped on the next request");
 
     globalThis.fetch = originalFetch;
     resetAiCooldowns();
@@ -562,226 +562,53 @@ async function runTests() {
     check(!!risk && /62%/.test(risk.text) && /high/i.test(risk.text), "Tomorrow skip-risk question is answered from the model");
   }
 
-  /* ── v34 · the browser-direct AI bridge ──────────────────────────────────
-     "AI is not connected" had two causes that no server-side change could
-     fix: a deployment with no key at all, and a host with no outbound
-     network (every sandboxed preview), where even a valid key produced
-     network errors on all seven providers. lib/aiBridge.ts answers from the
-     learner's BROWSER instead, and lib/chatClient.ts decides who calls the
-     model. These checks hold the contract: own keys before free relays, a
-     blocked leg is remembered, no key ever leaks to a free leg, the free
-     relay is one tap off, and the server route keeps ownership of grounding,
-     actions and persistence. */
-  console.log("\n--- 4d. v34 browser-direct AI bridge ---");
+  /* ── Deployment-keys-only tutoring contract ─────────────────────────────
+     The product decision this pins: SHIGUN is configured EXCLUSIVELY by the
+     deployment environment (GEMINI_API_KEY, CEREBRAS_API_KEY, … on the
+     server). Learners are never asked to paste a key anywhere in the app,
+     no browser-side model calls exist, and there are no anonymous public
+     relays. One message → POST /api/chat → the server walks its own
+     provider chain with automatic failover → the on-device engine answers
+     only when every cloud leg failed. The old browser bridge (v34) and the
+     Settings key paste were removed outright, and these checks keep them
+     out: the files are gone, the product paths never reference them, and
+     the Settings AI-coach card is read-only status. */
+  console.log("\n--- 4d. Deployment-keys-only tutoring contract ---");
   {
-    const bridgeSrc = readFileSync(join(process.cwd(), "src/lib/aiBridge.ts"), "utf8");
+    check(!existsSync(join(process.cwd(), "src/lib/byok.ts")),
+      "Browser key storage (byok.ts) is removed — the app never stores a learner-pasted key");
+    check(!existsSync(join(process.cwd(), "src/lib/aiBridge.ts")),
+      "The browser-direct bridge (aiBridge.ts) is removed — model calls happen only on the server");
+    check(!existsSync(join(process.cwd(), "src/components/AiKeyCard.tsx")),
+      "The Settings key-paste card is removed");
+
     const chatClientSrc = readFileSync(join(process.cwd(), "src/lib/chatClient.ts"), "utf8");
+    check(chatClientSrc.includes('api<ChatReply>("/api/chat"') && !/prepare|finalise|aiBridge|byok/i.test(chatClientSrc),
+      "One transport: every message POSTs to /api/chat; no bridge handshake, no BYOK");
+
     const chatRouteSrc = readFileSync(join(process.cwd(), "src/app/api/chat/route.ts"), "utf8");
+    check(chatRouteSrc.includes("callLLMDetailed") && !/directReply|prepare === true|ChatMode/.test(chatRouteSrc),
+      "The chat route walks the deployment's own provider chain — no prepare/finalise modes");
+    check(!/creditExhausted|CREDIT_EXHAUSTED/.test(chatRouteSrc),
+      "Shigun credit is informational only — it can never block a cloud answer");
+    check(chatRouteSrc.includes("localTutor") && chatRouteSrc.includes("localCurriculumReply"),
+      "When every cloud leg fails the on-device engine and the syllabus still answer");
+
+    const clientSrc = readFileSync(join(process.cwd(), "src/lib/client.ts"), "utf8");
+    check(!/x-ai-keys|byok/i.test(clientSrc),
+      "The API client never sends an x-ai-keys header — deployment env keys are the only keys");
+
     const chatPanelSrc = readFileSync(join(process.cwd(), "src/components/ChatPanel.tsx"), "utf8");
-    const aiKeyCardSrc = readFileSync(join(process.cwd(), "src/components/AiKeyCard.tsx"), "utf8");
+    check(!/byok|aiBridge|free community|free endpoint/i.test(chatPanelSrc),
+      "The chat panel has no BYOK or free-relay state — its status reflects the deployment chain");
 
-    check(chatClientSrc.includes("!serverHasCloud && canBridge"),
-      "The deployment's own keys keep the model call on the server; the browser bridges only when it must");
-    check(chatClientSrc.includes("reply?.ai?.degraded && canBridge"),
-      "A failed server chain is upgraded from the browser instead of leaving the learner on the local engine");
-    check(chatRouteSrc.includes('mode: ChatMode = directReply ? "finalise" : body.prepare === true ? "prepare" : "full"'),
-      "One chat route, three modes: full, prepare (hand out the grounded prompt) and finalise (store the browser's answer)");
-    check(chatRouteSrc.includes("replaceLast") && chatRouteSrc.includes("prepared"),
-      "Finalise can overwrite the fallback answer and never writes the learner's message twice");
-    check(/own-key[\s\S]{0,400}free/.test(bridgeSrc) && bridgeSrc.indexOf("OWN_KEY_LEGS: LegSpec[]") < bridgeSrc.indexOf("FREE_LEGS: LegSpec[]"),
-      "Own-key legs are catalogued (and therefore tried) before the free community relays");
-    check(!/id: "(ovh|kilo|pollinations)"[\s\S]{0,300}?key:/.test(bridgeSrc),
-      "No free relay leg is given a key — anonymous means anonymous");
-    check(chatPanelSrc.includes("free community AI endpoint"),
-      "The chat panel labels a free relay as free instead of claiming a private cloud connection");
-    check(aiKeyCardSrc.includes("setFreeBridgePreference") && aiKeyCardSrc.includes("probeBridge"),
-      "Settings can switch the free relay off and test the connection from the browser itself");
-
-    /* Functional pass: run the bridge in Node with a stubbed `window` and a
-       stubbed fetch, exactly as the provider-failover block above does for
-       the server chain. */
-    const bridgeGlobal = globalThis as { window?: unknown; fetch?: unknown };
-    const savedWindow = bridgeGlobal.window;
-    const savedFetch = bridgeGlobal.fetch;
-    const localStore = new Map<string, string>();
-    const sessionStore = new Map<string, string>();
-    const makeStore = (map: Map<string, string>) => ({
-      getItem: (key: string) => (map.has(key) ? (map.get(key) as string) : null),
-      setItem: (key: string, value: string) => void map.set(key, String(value)),
-      removeItem: (key: string) => void map.delete(key),
-    });
-    const listeners = new Map<string, Set<() => void>>();
-    const bridgeWindowStub = {
-      localStorage: makeStore(localStore),
-      sessionStorage: makeStore(sessionStore),
-      setTimeout: (...args: unknown[]) => setTimeout(...(args as [() => void, number])),
-      clearTimeout: (handle: NodeJS.Timeout) => clearTimeout(handle),
-      addEventListener: (type: string, handler: () => void) => {
-        const set = listeners.get(type) ?? new Set<() => void>();
-        set.add(handler);
-        listeners.set(type, set);
-      },
-      removeEventListener: (type: string, handler: () => void) => {
-        listeners.get(type)?.delete(handler);
-      },
-      dispatchEvent: (event: { type: string }) => {
-        for (const handler of listeners.get(event.type) ?? []) handler();
-        return true;
-      },
-    };
-    Object.assign(globalThis, { window: bridgeWindowStub });
-
-    const {
-      callBridge, probeBridge, bridgeAvailability, clearBridgeFailures, bridgeCooldowns,
-      freeBridgeEnabled, setFreeBridgePreference,
-    } = await import("../src/lib/aiBridge");
-    const { setByokKey, clearByokKeys } = await import("../src/lib/byok");
-
-    const bridgePrompt = {
-      system: "You are SHIGUN.",
-      messages: [{ role: "user" as const, content: "Explain opportunity cost." }],
-      maxTokens: 400,
-      temperature: 0.5,
-    };
-    const openAiOk = (text: string) => ({ status: 200, text: async () => JSON.stringify({ choices: [{ message: { content: text } }] }) });
-    const seen: { url: string; auth: string | null }[] = [];
-
-    /* OVH refuses the browser (no CORS) — the failure every sandbox preview
-       used to hit on every leg. Kilo answers, so the chain must move on. */
-    clearByokKeys();
-    clearBridgeFailures();
-    seen.length = 0;
-    globalThis.fetch = (async (url: string, init: { headers?: Record<string, string> }) => {
-      seen.push({ url, auth: init?.headers?.authorization ?? null });
-      if (url.includes("oai.endpoints.kepler.ai.cloud.ovh.net")) throw new TypeError("Failed to fetch");
-      if (url.includes("api.kilo.ai")) return openAiOk("Opportunity cost is the value of the next-best alternative you give up.");
-      return openAiOk("");
-    }) as unknown as typeof fetch;
-
-    const first = await callBridge(bridgePrompt);
-    check(first.text?.includes("Opportunity cost") === true && first.leg === "kilo" && first.kind === "free",
-      "A CORS-blocked free relay falls through to the next one and still answers",
-      `${first.leg}/${first.model}`);
-    check(seen.some((hit) => hit.url.includes("ovh")) && seen.filter((hit) => hit.url.includes("kilo")).length === 1,
-      "The blocked relay is tried once and the working relay answers on the first model that replies");
-    check(bridgeCooldowns().some((entry) => entry.leg === "ovh" && entry.reason === "network"),
-      "An unreachable relay is remembered, so the next message does not pay for it again");
-
-    seen.length = 0;
-    const second = await callBridge(bridgePrompt);
-    check(second.text !== null && !seen.some((hit) => hit.url.includes("ovh")),
-      "The benched relay is skipped on the next question");
-
-    /* A key saved in this browser outranks every free relay, and the key is
-       sent to its own provider only. */
-    clearBridgeFailures();
-    setByokKey("groq", "gsk_test_bridge_key");
-    seen.length = 0;
-    globalThis.fetch = (async (url: string, init: { headers?: Record<string, string> }) => {
-      seen.push({ url, auth: init?.headers?.authorization ?? null });
-      if (url.includes("api.groq.com")) return openAiOk("From your own Groq key.");
-      if (url.includes("api.kilo.ai")) return openAiOk("From a free relay.");
-      throw new TypeError("Failed to fetch");
-    }) as unknown as typeof fetch;
-    const withKey = await callBridge(bridgePrompt);
-    check(withKey.leg === "groq" && withKey.kind === "own-key" && withKey.text === "From your own Groq key.",
-      "The learner's own key is tried before any free relay");
-    check(seen.every((hit) => !hit.url.includes("kilo") || hit.auth === null),
-      "A saved key is never handed to a free relay");
-    check(seen.some((hit) => hit.url.includes("groq") && hit.auth === "Bearer gsk_test_bridge_key"),
-      "The saved key reaches its own provider from the browser");
-    check(bridgeAvailability().ownKeyLegs.some((leg) => leg.id === "groq"),
-      "Availability reports the saved key so the panel stops saying 'not connected'");
-
-    /* A rejected key must not loop: the leg is benched and the chain moves on. */
-    clearBridgeFailures();
-    seen.length = 0;
-    globalThis.fetch = (async (url: string) => {
-      seen.push({ url, auth: null });
-      if (url.includes("api.groq.com")) return { status: 401, text: async () => '{"error":{"message":"invalid api key"}}' };
-      if (url.includes("api.kilo.ai")) return openAiOk("Free relay answered after the bad key.");
-      throw new TypeError("Failed to fetch");
-    }) as unknown as typeof fetch;
-    const rejected = await callBridge(bridgePrompt);
-    check(rejected.text?.includes("Free relay") === true && seen.filter((hit) => hit.url.includes("groq")).length === 1,
-      "A rejected key costs one request, is benched, and the chain keeps going");
-    check(bridgeCooldowns().some((entry) => entry.leg === "groq" && entry.reason === "auth"),
-      "The rejected key is remembered for later messages");
-
-    /* Free relays off = nothing but the learner's own key. */
-    clearBridgeFailures();
-    setFreeBridgePreference("off");
-    seen.length = 0;
-    globalThis.fetch = (async (url: string) => {
-      seen.push({ url, auth: null });
-      return openAiOk("should not be used");
-    }) as unknown as typeof fetch;
-    check(freeBridgeEnabled() === false && bridgeAvailability().freeLegs.length === 0,
-      "The free relay switch is honoured immediately, with no reload");
-    const keyOnly = await callBridge(bridgePrompt);
-    check(keyOnly.leg === "groq" && seen.every((hit) => !hit.url.includes("kilo") && !hit.url.includes("pollinations") && !hit.url.includes("ovh")),
-      "With the free relays off, no anonymous endpoint is ever contacted");
-    clearByokKeys();
-    clearBridgeFailures();
-    seen.length = 0;
-    const nothing = await callBridge(bridgePrompt);
-    check(nothing.text === null && seen.length === 0,
-      "With no key and no free relay the bridge declines without a single request, so the server's local engine answers");
-    setFreeBridgePreference("on");
-
-    /* The operator kill-switch: AI_FREE_BRIDGE=off forbids the public relays
-       for every learner on the deployment, whatever their own preference says. */
-    const { setFreeBridgeAllowedByOperator, freeBridgeAllowedByOperator } = await import("../src/lib/aiBridge");
-    const aiSrc = readFileSync(join(process.cwd(), "src/lib/ai.ts"), "utf8");
-    const aiStatusSrc = readFileSync(join(process.cwd(), "src/app/api/ai-status/route.ts"), "utf8");
-    check(/AI_FREE_BRIDGE/.test(aiSrc) && aiStatusSrc.includes("freeBridgeAllowed: freeBridgeAllowed()"),
-      "The deployment can forbid the free relays with AI_FREE_BRIDGE=off, and /api/ai-status reports it");
-    setByokKey("groq", "gsk_operator_test");
-    setFreeBridgeAllowedByOperator(false);
-    seen.length = 0;
-    globalThis.fetch = (async (url: string) => {
-      seen.push({ url, auth: null });
-      return openAiOk("answered");
-    }) as unknown as typeof fetch;
-    check(freeBridgeAllowedByOperator() === false && bridgeAvailability().freeLegs.length === 0 && freeBridgeEnabled() === false,
-      "An operator ban empties the free-relay list immediately");
-    const operatorBanned = await callBridge(bridgePrompt);
-    check(operatorBanned.leg === "groq" && seen.every((hit) => !hit.url.includes("kilo") && !hit.url.includes("pollinations") && !hit.url.includes("ovh")),
-      "With the relays banned the learner's own key still works and no public relay is contacted");
-    clearByokKeys();
-    seen.length = 0;
-    const bannedNothing = await callBridge(bridgePrompt);
-    check(bannedNothing.text === null && seen.length === 0,
-      "Banned relays plus no key means the bridge stays silent and the on-device engine answers");
-    setFreeBridgeAllowedByOperator(true);
-    clearBridgeFailures();
-
-    /* The browser-side probe is what Settings shows: honest per-leg results. */
-    clearBridgeFailures();
-    setByokKey("gemini", "AIza_test_bridge_key");
-    globalThis.fetch = (async (url: string) => {
-      if (url.includes("generativelanguage.googleapis.com")) {
-        return { status: 200, text: async () => JSON.stringify({ candidates: [{ content: { parts: [{ text: "OK" }] } }] }) };
-      }
-      if (url.includes("api.kilo.ai")) return openAiOk("OK");
-      throw new TypeError("Failed to fetch");
-    }) as unknown as typeof fetch;
-    const probes = await probeBridge();
-    const geminiProbe = probes.find((probe) => probe.id === "gemini");
-    check(!!geminiProbe?.ok && geminiProbe.kind === "own-key" && geminiProbe.latencyMs >= 0,
-      "The browser probe confirms a working key with latency, which the server-side probe cannot do on a blocked host");
-    check(probes.some((probe) => probe.id === "ovh" && probe.ok === false && probe.error === "network"),
-      "The browser probe reports a blocked relay as unreachable rather than as a bad key");
-
-    clearByokKeys();
-    clearBridgeFailures();
-    setFreeBridgePreference("on");
-    if (savedWindow === undefined) delete (globalThis as { window?: unknown }).window;
-    else Object.assign(globalThis, { window: savedWindow });
-    if (savedFetch === undefined) delete (globalThis as { fetch?: unknown }).fetch;
-    else Object.assign(globalThis, { fetch: savedFetch });
+    const coachCardSrc = readFileSync(join(process.cwd(), "src/components/AiCoachCard.tsx"), "utf8");
+    check(coachCardSrc.includes("/api/ai-status") && !/type="password"|setByokKey|<input| Seg</i.test(coachCardSrc),
+      "Settings → AI coach is a read-only status card: no key input, nothing to toggle");
+    const settingsSrc = readFileSync(join(process.cwd(), "src/components/SettingsView.tsx"), "utf8");
+    check(settingsSrc.includes("AiCoachCard") && !/AiKeyCard/.test(settingsSrc),
+      "Settings renders the deployment status card, not the key-paste card");
   }
-
   /* ── 4e · A 200 body is not proof of an answer ────────────────────────────
      The failure this pins: free relays (Pollinations in particular) answer
      HTTP 200 with a well-formed OpenAI body whose `content` is their OWN
@@ -879,21 +706,21 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
     globalThis.fetch = (async (input: string | URL | Request) => {
       const url = String(input);
       hits.push(url);
-      if (url.includes("generativelanguage")) return geminiBody("A white hole is the time-reverse of a black hole: nothing can enter it.");
-      return openAiBody(WALL);
+      if (url.includes("api.cerebras.ai")) return openAiBody("A white hole is the time-reverse of a black hole: nothing can enter it.");
+      return geminiBody(WALL);
     }) as unknown as typeof fetch;
     const fellThrough = await callLLMDetailed("You are SHIGUN.", [{ role: "user", content: "why do white holes exist" }], 300);
-    check(fellThrough.provider === "gemini" && !/budget|wallet|pollinations/i.test(fellThrough.text ?? ""),
-      "Cerebras answering 200 with a budget notice falls through to Gemini in the SAME request",
+    check(fellThrough.provider === "cerebras" && !/budget|wallet|pollinations/i.test(fellThrough.text ?? ""),
+      "Gemini answering 200 with a budget notice falls through to Cerebras in the SAME request",
       `${fellThrough.provider}: ${JSON.stringify((fellThrough.text ?? "").slice(0, 50))}`);
-    check(hits.some((url) => url.includes("cerebras")), "Cerebras is still tried first — the priority order is unchanged");
-    check(fellThrough.attempts.some((attempt) => attempt.provider === "cerebras" && attempt.status === 200 && attempt.error === "auth"),
+    check(hits.some((url) => url.includes("generativelanguage")), "Gemini is tried first — the priority order is unchanged");
+    check(fellThrough.attempts.some((attempt) => attempt.provider === "gemini" && attempt.status === 200 && attempt.error === "auth"),
       "The polluted attempt is recorded as a FAILURE, so /api/ai-status and the sticky slot tell the truth");
     /* Read the slot back off globalThis: after a `delete` TypeScript narrows
        the optional property to `undefined` for the rest of the block, which
        would make this assertion compare `never` to a string. */
     const preferredNow = (globalThis as { __studyPlannerPreferred?: { provider: string; model: string } }).__studyPlannerPreferred;
-    check(preferredNow?.provider === "gemini",
+    check(preferredNow?.provider === "cerebras",
       "The sticky slot goes to the leg that really answered, not the one that returned 200",
       JSON.stringify(preferredNow));
 
@@ -923,85 +750,12 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
       if (value === undefined) delete process.env[envName]; else process.env[envName] = value;
     }
 
-    /* ── the gate wired into the BROWSER bridge ── */
-    const bridgeGlobal2 = globalThis as { window?: unknown; fetch?: unknown };
-    const savedWindow2 = bridgeGlobal2.window;
-    const savedFetch2 = bridgeGlobal2.fetch;
-    const local2 = new Map<string, string>();
-    const session2 = new Map<string, string>();
-    const store2 = (map: Map<string, string>) => ({
-      getItem: (key: string) => (map.has(key) ? (map.get(key) as string) : null),
-      setItem: (key: string, value: string) => void map.set(key, String(value)),
-      removeItem: (key: string) => void map.delete(key),
-    });
-    Object.assign(globalThis, { window: { localStorage: store2(local2), sessionStorage: store2(session2),
-      setTimeout: (...args: unknown[]) => setTimeout(...(args as [() => void, number])),
-      clearTimeout: (handle: NodeJS.Timeout) => clearTimeout(handle),
-      addEventListener: () => undefined, removeEventListener: () => undefined, dispatchEvent: () => true } });
-    const { callBridge: bridge2, clearBridgeFailures: clear2, bridgeCooldowns: cooldowns2 } = await import("../src/lib/aiBridge");
-    const { clearByokKeys: clearKeys2 } = await import("../src/lib/byok");
-    const bridgePrompt2 = { system: "You are SHIGUN.", messages: [{ role: "user" as const, content: "Why do black holes exist?" }], maxTokens: 300, temperature: 0.5 };
-    const okBody = (text: string) => ({ status: 200, text: async () => JSON.stringify({ choices: [{ message: { content: text } }] }) });
-    const seen2: string[] = [];
-
-    clearKeys2(); clear2(); seen2.length = 0;
-    /* The broken relay is STICKY — exactly the state the learner's browser was
-       in: Pollinations had answered once, been promoted to first place, and
-       then hit its budget wall. */
-    session2.set("spp.ai.bridge.sticky.v1", "pollinations");
-    globalThis.fetch = (async (url: string) => {
-      const u = String(url); seen2.push(u);
-      if (u.includes("pollinations")) return okBody(WALL);
-      if (u.includes("oai.endpoints.kepler.ai.cloud.ovh.net")) return okBody("A black hole forms when a collapsing star's gravity traps even light.");
-      throw new TypeError("Failed to fetch");
-    }) as unknown as typeof fetch;
-    const stickyBroken = await bridge2(bridgePrompt2);
-    check(stickyBroken.text !== null && !/budget|wallet|pollinations/i.test(stickyBroken.text ?? ""),
-      "A sticky relay that now returns its budget notice is never shown to the learner",
-      JSON.stringify((stickyBroken.text ?? "").slice(0, 50)));
-    check(stickyBroken.leg === "ovh", "The bridge keeps walking and a healthy relay answers the same message", String(stickyBroken.leg));
-    check(seen2.filter((url) => url.includes("pollinations")).length === 1,
-      "The broken relay costs exactly one request before it is benched");
-    check(cooldowns2().some((entry) => entry.leg === "pollinations" && entry.model === null),
-      "The whole relay is benched, not just one model id — its key is shared");
-    check(session2.get("spp.ai.bridge.sticky.v1") !== "pollinations",
-      "The broken relay loses its promoted first position");
-
-    seen2.length = 0;
-    await bridge2(bridgePrompt2);
-    check(!seen2.some((url) => url.includes("pollinations")),
-      "The benched relay is skipped outright on the next question");
-
-    clear2(); seen2.length = 0;
-    globalThis.fetch = (async () => okBody(WALL)) as unknown as typeof fetch;
-    const allPolluted = await bridge2(bridgePrompt2);
-    check(allPolluted.text === null && allPolluted.attempts.every((attempt) => attempt.error !== null),
-      "With every leg polluted the bridge reports failure, so the server's local ML engine answers instead");
-
-    clearKeys2(); clear2();
-    if (savedWindow2 === undefined) delete (globalThis as { window?: unknown }).window;
-    else Object.assign(globalThis, { window: savedWindow2 });
-    if (savedFetch2 === undefined) delete (globalThis as { fetch?: unknown }).fetch;
-    else Object.assign(globalThis, { fetch: savedFetch2 });
-
-    /* ── the chat route is the LAST gate (an old cached bundle can still post
-          a relay notice as `directReply`) ── */
-    const chatSrc = readFileSync(join(process.cwd(), "src/app/api/chat/route.ts"), "utf8");
-    check(chatSrc.includes("classifyModelAnswer(directReply)") && chatSrc.includes("bridgeAccepted"),
-      "The finalise path re-checks the browser's answer and only then claims a cloud source");
-    check(/bridgeAccepted\s*\?\s*\(directKind === "free"/.test(chatSrc),
-      "A rejected relay notice never makes the panel claim 'Cloud AI · free endpoint'");
+    /* ── static contract: one shared judge, Gemini-first chain ── */
     const aiSrc = readFileSync(join(process.cwd(), "src/lib/ai.ts"), "utf8");
-    const bridgeSrc2 = readFileSync(join(process.cwd(), "src/lib/aiBridge.ts"), "utf8");
-    check(aiSrc.includes('from "./aiAnswer"') && bridgeSrc2.includes('from "./aiAnswer"') && chatSrc.includes('@/lib/aiAnswer'),
-      "Server chain, browser bridge and chat route all judge an answer with ONE shared definition");
-    check(/const DEFAULT_PROVIDER_ORDER: ProviderId\[\] = \[\s*"cerebras", "gemini",/.test(aiSrc),
-      "Cerebras is primary and Gemini is the very next leg, as documented in .env.example");
-    check(bridgeSrc2.indexOf('id: "cerebras"') < bridgeSrc2.indexOf('id: "gemini"')
-       && bridgeSrc2.indexOf('id: "gemini"') < bridgeSrc2.indexOf('id: "groq"'),
-      "The browser bridge walks the same provider order as the server chain");
-    check(bridgeSrc2.includes("benched(sticky)"),
-      "A benched leg is never promoted to first place by the sticky slot");
+    check(aiSrc.includes('from "./aiAnswer"'),
+      "The server chain judges every 200 body with the shared aiAnswer gate");
+    check(/const DEFAULT_PROVIDER_ORDER: ProviderId\[\] = \[\s*"gemini", "cerebras",/.test(aiSrc),
+      "Gemini is the primary leg and Cerebras the very next, as documented in .env.example");
   }
 
   console.log("\n--- 5. Study Clock Accounting ---");
@@ -2361,10 +2115,12 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
       "Credit lib tracks use, rolls over daily and offers a reset");
     check(/resetAiCooldowns/.test(routeSrc) && /clearRateLimit\(req, "chat"\)/.test(routeSrc),
       "The credit reset refills the counter, forgets provider failures and clears the rate limiter");
-    check(/getShigunUsage/.test(chatSrc) && /recordShigunUse/.test(chatSrc) && /CREDIT_EXHAUSTED/.test(chatSrc),
-      "The chat route spends a credit per AI answer and degrades politely when exhausted");
-    check(/ShigunCreditCard/.test(settingsSrc),
-      "Settings surfaces the Shigun credit meter");
+    check(/recordShigunUse/.test(chatSrc) && !/creditExhausted|CREDIT_EXHAUSTED/.test(chatSrc),
+      "The chat route records one credit per cloud answer — and credit can NEVER gate the cloud call");
+    check(/never throws/i.test(usageLibSrc) && /ensureShigunTable/.test(usageLibSrc),
+      "The meter self-heals a missing table and degrades to memory — it can never take the tutor down");
+    check(/ShigunCreditCard/.test(settingsSrc) && /AiCoachCard/.test(settingsSrc),
+      "Settings surfaces the deployment AI status and the usage meter — and nothing asks for a key");
   }
 
   console.log("\n--- 17. Repository shape: one source of truth ---\n");

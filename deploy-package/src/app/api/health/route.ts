@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { sql } from "drizzle-orm";
-import { configuredProviders, envConfiguredProviderIds, freeBridgeAllowed, llmHealthSnapshot } from "@/lib/ai";
+import { configuredProviders, envConfiguredProviderIds, llmHealthSnapshot } from "@/lib/ai";
 
 export const dynamic = "force-dynamic";
 
@@ -10,11 +10,9 @@ export async function GET() {
   const ai = {
     mode: providers.length ? "cloud-with-local-fallback" : "local-only",
     configuredProviders: providers,
-    // Ids (not labels) so the browser bridge can match them, and env-only so
-    // it reflects the deployment rather than one learner's pasted key.
+    // Ids (not labels), env-only: exactly what the deployment configured,
+    // which every learner on it shares.
     serverProviderIds: envConfiguredProviderIds(),
-    // Operator kill-switch for the browser bridge's free community relays.
-    freeBridgeAllowed: freeBridgeAllowed(),
     // Deep per-provider diagnosis (live probe) lives at POST /api/ai-status.
     diagnostics: "GET/POST /api/ai-status",
     lastRequest: llm,

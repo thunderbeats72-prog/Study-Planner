@@ -19,11 +19,10 @@
         last-resort tutor that always works — never ran at all.
 
    This module is the single place that decides whether a 200 body is a
-   real answer. It is imported by the server chain (`lib/ai.ts`), the
-   browser bridge (`lib/aiBridge.ts`) and the chat route's `finalise`
-   path, so one definition of "broken relay" covers all three. It has
-   NO server-only imports and touches no globals, so it is safe in both
-   runtimes.
+   real answer. It is imported by the server provider chain (`lib/ai.ts`),
+   so one definition of "that was a provider notice, not an answer" covers
+   every cloud leg. It has NO server-only imports and touches no globals,
+   so it is safe in any runtime.
 
    FALSE POSITIVES ARE THE REAL RISK. This is a study planner used by
    accounting students: "the department has reached its budget ceiling"

@@ -3,8 +3,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { mdToHtml, escapeHtml, type MessageRow } from "@/lib/client";
 import { IconChat, IconCheck, IconClose, IconCopy, IconSend, IconSpark } from "./icons";
-import { getByokKeys, byokHeader, byokProviderIds, onByokChange } from "@/lib/byok";
-import { freeBridgeEnabled, onBridgeChange, setFreeBridgeAllowedByOperator } from "@/lib/aiBridge";
 
 const QUICKS = [
   "What should I study today?",
@@ -13,7 +11,7 @@ const QUICKS = [
 ];
 
 type HealthSnapshot = {
-  ai?: { mode?: string; configuredProviders?: string[]; freeBridgeAllowed?: boolean };
+  ai?: { mode?: string; configuredProviders?: string[] };
 };
 
 /** What the last tutor reply actually came from — set by the page after
@@ -24,8 +22,8 @@ type HealthSnapshot = {
 export type LastReplySource = "cloud" | "local" | "instant" | null;
 
 export default function ChatPanel({
-  open, setOpen, messages, onSend, thinking, provider, learner, onOpenSettings,
-  lastSource = null, lastVia = null,
+  open, setOpen, messages, onSend, thinking, provider, learner,
+  lastSource = null,
 }: {
   open: boolean;
   setOpen: (v: boolean) => void;
@@ -34,22 +32,11 @@ export default function ChatPanel({
   thinking: boolean;
   provider?: string | null;
   lastSource?: LastReplySource;
-  /** Which side of the wire produced the last answer: the learner's own key
-   *  called from this browser ("own-key"), a free community endpoint ("free"),
-   *  or null for the server's own chain / the on-device engine. */
-  lastVia?: "own-key" | "free" | null;
   learner?: { name: string; daysLeft: number; progressPct: number; streak: number; todayDone: number; todayTotal: number };
-  /** Opens Settings → AI coach so a learner can connect a cloud key. */
-  onOpenSettings?: () => void;
 }) {
   const [text, setText] = useState("");
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const [health, setHealth] = useState<HealthSnapshot | null>(null);
-  const [ownKeys, setOwnKeys] = useState<string[]>([]);
-  /* The free community endpoint is a bridge leg this browser can use with no
-     key at all. The panel has to know about it, or a learner who never pastes
-     a key keeps being told the AI "isn't connected" while it is answering. */
-  const [freeOn, setFreeOn] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   /* A send lock prevents double-submits on mobile. It MUST clear whenever a
@@ -81,63 +68,31 @@ export default function ChatPanel({
   // Fetch health on every open — cheap, no-store, and we use raw fetch so
   // a 503 (db down) still preserves ai.configuredProviders from the body.
   // Also probe /api/ai-status GET for the shared llm snapshot.
-  /* Keys pasted in Settings → AI coach live in this browser, so the panel
-     must track them itself — the server alone cannot know. */
-  useEffect(() => {
-    let alive = true;
-    const readOwn = () => {
-      if (!alive) return;
-      setOwnKeys(byokProviderIds(getByokKeys()));
-      setFreeOn(freeBridgeEnabled());
-    };
-    readOwn();
-    const off = onByokChange(() => readOwn());
-    const offBridge = onBridgeChange(() => readOwn());
-    return () => {
-      alive = false;
-      off();
-      offBridge();
-    };
-  }, []);
-
   useEffect(() => {
     if (!open) return;
     let alive = true;
     const fetchHealth = async () => {
       try {
-        const res = await fetch("/api/health", {
-          cache: "no-store",
-          headers: { "x-ai-keys": byokHeader() },
-        });
+        const res = await fetch("/api/health", { cache: "no-store" });
         const json = await res.json().catch(() => ({}));
         if (alive && json && typeof json === "object") {
           setHealth(json as HealthSnapshot);
-          /* A deployment can forbid the free community relays for everyone
-             (AI_FREE_BRIDGE=off). Obey it before labelling the connection. */
-          setFreeBridgeAllowedByOperator((json as HealthSnapshot).ai?.freeBridgeAllowed);
-          setFreeOn(freeBridgeEnabled());
           return;
         }
       } catch {}
       // Fallback to dedicated ai-status endpoint (doesn't need DB)
       try {
-        const res2 = await fetch("/api/ai-status", {
-          cache: "no-store",
-          headers: { "x-ai-keys": byokHeader() },
-        });
+        const res2 = await fetch("/api/ai-status", { cache: "no-store" });
         const json2 = await res2.json().catch(() => ({}));
         if (alive && json2 && typeof json2 === "object") {
           // Normalize to HealthSnapshot shape
           const snap: HealthSnapshot = {
             ai: {
-              mode: (json2 as any).mode,
-              configuredProviders: (json2 as any).configuredProviders,
-              freeBridgeAllowed: (json2 as any).freeBridgeAllowed,
+              mode: (json2 as { mode?: string }).mode,
+              configuredProviders: (json2 as { configuredProviders?: string[] }).configuredProviders,
             },
           };
           setHealth(snap);
-          setFreeBridgeAllowedByOperator((json2 as any).freeBridgeAllowed);
-          setFreeOn(freeBridgeEnabled());
         }
       } catch {
         /* fall back to provider prop */
@@ -186,15 +141,10 @@ export default function ChatPanel({
     } catch { /* clipboard blocked */ }
   };
 
-  /* Cloud is active if the deployment has providers, the page prop says a
-     model answered, this browser saved a key in Settings → AI coach, or the
-     free community endpoint is switched on. Which provider it is stays
-     private — clean UI, no vendor lock-in feel — but HOW it is reached does
-     not: a free public relay is labelled as one. */
-  const serverCloud = !!(health?.ai?.configuredProviders?.length || provider);
-  const isCloudActive = serverCloud || ownKeys.length > 0 || freeOn;
-  /** Only the free community legs can answer — no deployment key, no own key. */
-  const freeOnly = !serverCloud && ownKeys.length === 0 && freeOn;
+  /* Cloud is active when the deployment configured at least one provider key
+     in its environment, or when the page just saw a model answer. Which
+     provider it is stays private — clean UI, no vendor lock-in feel. */
+  const isCloudActive = !!(health?.ai?.configuredProviders?.length || provider);
 
   /* The header used to say "Ready" whenever a key existed — even while every
      cloud call was failing and the learner was getting fallback text. The
@@ -202,27 +152,20 @@ export default function ChatPanel({
      a fallback shows "Local engine" so the state on screen matches what the
      learner is experiencing. */
   const degraded = isCloudActive && lastSource === "local";
-  const answeredByFree = lastSource === "cloud" && lastVia === "free";
   const statusText = thinking
     ? "Thinking…"
     : !isCloudActive
-      ? "Local mode"
+      ? "On-device engine"
       : lastSource === "cloud"
-        ? answeredByFree
-          ? "Cloud AI · free endpoint"
-          : "Cloud AI · connected"
+        ? "Cloud AI · connected"
         : degraded
           ? "Cloud busy · local engine answered"
-          : freeOnly
-            ? "Free AI endpoint · ready"
-            : "Ready";
+          : "Ready";
   const statusTitle = !isCloudActive
-    ? "Shigun is answering with the on-device study engine, so it is still plan-aware but less conversational. Connect a free key in Settings → AI coach for full tutoring."
+    ? "This deployment has no AI provider keys configured, so Shigun answers from the on-device study engine — plan-aware, but less conversational. Keys are added once in the deployment's server environment and then work for every learner."
     : degraded
       ? "The cloud providers didn't answer the last message in time, so the on-device engine replied. Send it again — the next provider in the chain picks it up."
-      : answeredByFree || freeOnly
-        ? "No AI key is configured, so this answer came from a free community AI endpoint, called straight from this device. Your question and plan summary were sent to that provider. Add your own key in Settings → AI coach for a private, faster connection — or switch the free endpoint off there."
-        : "Shigun is connected to its cloud AI layer, grounded by the on-device ML engine.";
+      : "Shigun is connected to its cloud AI layer through this deployment's own keys, grounded by the on-device ML engine.";
 
   return (
     <>
@@ -319,49 +262,16 @@ export default function ChatPanel({
             <div ref={endRef} />
           </div>
 
-          {/* ── Connect prompt ──
-              With no cloud key the coach can only answer from the learner's
-              own plan, which reads as "the AI is broken". Say so plainly and
-              offer the one action that fixes it. */}
-          {!isCloudActive && onOpenSettings && (
+          {/* ── No cloud keys configured ──
+              Keys live in the deployment environment, never in the app, so
+              the only honest note is a calm one-liner — no setup wizard. */}
+          {!isCloudActive && (
             <div className="ai-connect">
               <div className="ai-connect-text">
-                <strong>Full AI chat isn’t connected yet.</strong> Right now I answer from your
-                plan and syllabus only.
+                <strong>Cloud AI isn&apos;t configured on this deployment yet.</strong> I&apos;m answering from your
+                plan, syllabus and the on-device engine. Provider keys added to the deployment&apos;s environment
+                switch full tutoring on for everyone automatically.
               </div>
-              <button
-                type="button"
-                className="ai-connect-btn"
-                onClick={() => {
-                  setOpen(false);
-                  onOpenSettings();
-                }}
-              >
-                <IconSpark size={13} /> Connect AI
-              </button>
-            </div>
-          )}
-
-          {/* Free community endpoint only: say plainly where the answer comes
-              from and offer the upgrade. A learner must never discover by
-              accident that a public relay saw their question. */}
-          {freeOnly && onOpenSettings && (
-            <div className="ai-connect ai-connect-free">
-              <div className="ai-connect-text">
-                <strong>No key needed — a free community AI endpoint is answering.</strong> Your
-                question and plan summary go to that provider from this device. Add your own key
-                for a private, faster connection.
-              </div>
-              <button
-                type="button"
-                className="ai-connect-btn"
-                onClick={() => {
-                  setOpen(false);
-                  onOpenSettings();
-                }}
-              >
-                <IconSpark size={13} /> Add my key
-              </button>
             </div>
           )}
 
