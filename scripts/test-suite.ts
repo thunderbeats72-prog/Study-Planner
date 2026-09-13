@@ -545,6 +545,226 @@ async function runTests() {
     check(!!risk && /62%/.test(risk.text) && /high/i.test(risk.text), "Tomorrow skip-risk question is answered from the model");
   }
 
+  /* ── v34 · the browser-direct AI bridge ──────────────────────────────────
+     "AI is not connected" had two causes that no server-side change could
+     fix: a deployment with no key at all, and a host with no outbound
+     network (every sandboxed preview), where even a valid key produced
+     network errors on all seven providers. lib/aiBridge.ts answers from the
+     learner's BROWSER instead, and lib/chatClient.ts decides who calls the
+     model. These checks hold the contract: own keys before free relays, a
+     blocked leg is remembered, no key ever leaks to a free leg, the free
+     relay is one tap off, and the server route keeps ownership of grounding,
+     actions and persistence. */
+  console.log("\n--- 4d. v34 browser-direct AI bridge ---");
+  {
+    const bridgeSrc = readFileSync(join(process.cwd(), "src/lib/aiBridge.ts"), "utf8");
+    const chatClientSrc = readFileSync(join(process.cwd(), "src/lib/chatClient.ts"), "utf8");
+    const chatRouteSrc = readFileSync(join(process.cwd(), "src/app/api/chat/route.ts"), "utf8");
+    const chatPanelSrc = readFileSync(join(process.cwd(), "src/components/ChatPanel.tsx"), "utf8");
+    const aiKeyCardSrc = readFileSync(join(process.cwd(), "src/components/AiKeyCard.tsx"), "utf8");
+
+    check(chatClientSrc.includes("!serverHasCloud && canBridge"),
+      "The deployment's own keys keep the model call on the server; the browser bridges only when it must");
+    check(chatClientSrc.includes("reply?.ai?.degraded && canBridge"),
+      "A failed server chain is upgraded from the browser instead of leaving the learner on the local engine");
+    check(chatRouteSrc.includes('mode: ChatMode = directReply ? "finalise" : body.prepare === true ? "prepare" : "full"'),
+      "One chat route, three modes: full, prepare (hand out the grounded prompt) and finalise (store the browser's answer)");
+    check(chatRouteSrc.includes("replaceLast") && chatRouteSrc.includes("prepared"),
+      "Finalise can overwrite the fallback answer and never writes the learner's message twice");
+    check(/own-key[\s\S]{0,400}free/.test(bridgeSrc) && bridgeSrc.indexOf("OWN_KEY_LEGS: LegSpec[]") < bridgeSrc.indexOf("FREE_LEGS: LegSpec[]"),
+      "Own-key legs are catalogued (and therefore tried) before the free community relays");
+    check(!/id: "(ovh|kilo|pollinations)"[\s\S]{0,300}?key:/.test(bridgeSrc),
+      "No free relay leg is given a key — anonymous means anonymous");
+    check(chatPanelSrc.includes("free community AI endpoint"),
+      "The chat panel labels a free relay as free instead of claiming a private cloud connection");
+    check(aiKeyCardSrc.includes("setFreeBridgePreference") && aiKeyCardSrc.includes("probeBridge"),
+      "Settings can switch the free relay off and test the connection from the browser itself");
+
+    /* Functional pass: run the bridge in Node with a stubbed `window` and a
+       stubbed fetch, exactly as the provider-failover block above does for
+       the server chain. */
+    const bridgeGlobal = globalThis as { window?: unknown; fetch?: unknown };
+    const savedWindow = bridgeGlobal.window;
+    const savedFetch = bridgeGlobal.fetch;
+    const localStore = new Map<string, string>();
+    const sessionStore = new Map<string, string>();
+    const makeStore = (map: Map<string, string>) => ({
+      getItem: (key: string) => (map.has(key) ? (map.get(key) as string) : null),
+      setItem: (key: string, value: string) => void map.set(key, String(value)),
+      removeItem: (key: string) => void map.delete(key),
+    });
+    const listeners = new Map<string, Set<() => void>>();
+    const bridgeWindowStub = {
+      localStorage: makeStore(localStore),
+      sessionStorage: makeStore(sessionStore),
+      setTimeout: (...args: unknown[]) => setTimeout(...(args as [() => void, number])),
+      clearTimeout: (handle: NodeJS.Timeout) => clearTimeout(handle),
+      addEventListener: (type: string, handler: () => void) => {
+        const set = listeners.get(type) ?? new Set<() => void>();
+        set.add(handler);
+        listeners.set(type, set);
+      },
+      removeEventListener: (type: string, handler: () => void) => {
+        listeners.get(type)?.delete(handler);
+      },
+      dispatchEvent: (event: { type: string }) => {
+        for (const handler of listeners.get(event.type) ?? []) handler();
+        return true;
+      },
+    };
+    Object.assign(globalThis, { window: bridgeWindowStub });
+
+    const {
+      callBridge, probeBridge, bridgeAvailability, clearBridgeFailures, bridgeCooldowns,
+      freeBridgeEnabled, setFreeBridgePreference,
+    } = await import("../src/lib/aiBridge");
+    const { setByokKey, clearByokKeys } = await import("../src/lib/byok");
+
+    const bridgePrompt = {
+      system: "You are SHIGUN.",
+      messages: [{ role: "user" as const, content: "Explain opportunity cost." }],
+      maxTokens: 400,
+      temperature: 0.5,
+    };
+    const openAiOk = (text: string) => ({ status: 200, text: async () => JSON.stringify({ choices: [{ message: { content: text } }] }) });
+    const seen: { url: string; auth: string | null }[] = [];
+
+    /* OVH refuses the browser (no CORS) — the failure every sandbox preview
+       used to hit on every leg. Kilo answers, so the chain must move on. */
+    clearByokKeys();
+    clearBridgeFailures();
+    seen.length = 0;
+    globalThis.fetch = (async (url: string, init: { headers?: Record<string, string> }) => {
+      seen.push({ url, auth: init?.headers?.authorization ?? null });
+      if (url.includes("oai.endpoints.kepler.ai.cloud.ovh.net")) throw new TypeError("Failed to fetch");
+      if (url.includes("api.kilo.ai")) return openAiOk("Opportunity cost is the value of the next-best alternative you give up.");
+      return openAiOk("");
+    }) as unknown as typeof fetch;
+
+    const first = await callBridge(bridgePrompt);
+    check(first.text?.includes("Opportunity cost") === true && first.leg === "kilo" && first.kind === "free",
+      "A CORS-blocked free relay falls through to the next one and still answers",
+      `${first.leg}/${first.model}`);
+    check(seen.some((hit) => hit.url.includes("ovh")) && seen.filter((hit) => hit.url.includes("kilo")).length === 1,
+      "The blocked relay is tried once and the working relay answers on the first model that replies");
+    check(bridgeCooldowns().some((entry) => entry.leg === "ovh" && entry.reason === "network"),
+      "An unreachable relay is remembered, so the next message does not pay for it again");
+
+    seen.length = 0;
+    const second = await callBridge(bridgePrompt);
+    check(second.text !== null && !seen.some((hit) => hit.url.includes("ovh")),
+      "The benched relay is skipped on the next question");
+
+    /* A key saved in this browser outranks every free relay, and the key is
+       sent to its own provider only. */
+    clearBridgeFailures();
+    setByokKey("groq", "gsk_test_bridge_key");
+    seen.length = 0;
+    globalThis.fetch = (async (url: string, init: { headers?: Record<string, string> }) => {
+      seen.push({ url, auth: init?.headers?.authorization ?? null });
+      if (url.includes("api.groq.com")) return openAiOk("From your own Groq key.");
+      if (url.includes("api.kilo.ai")) return openAiOk("From a free relay.");
+      throw new TypeError("Failed to fetch");
+    }) as unknown as typeof fetch;
+    const withKey = await callBridge(bridgePrompt);
+    check(withKey.leg === "groq" && withKey.kind === "own-key" && withKey.text === "From your own Groq key.",
+      "The learner's own key is tried before any free relay");
+    check(seen.every((hit) => !hit.url.includes("kilo") || hit.auth === null),
+      "A saved key is never handed to a free relay");
+    check(seen.some((hit) => hit.url.includes("groq") && hit.auth === "Bearer gsk_test_bridge_key"),
+      "The saved key reaches its own provider from the browser");
+    check(bridgeAvailability().ownKeyLegs.some((leg) => leg.id === "groq"),
+      "Availability reports the saved key so the panel stops saying 'not connected'");
+
+    /* A rejected key must not loop: the leg is benched and the chain moves on. */
+    clearBridgeFailures();
+    seen.length = 0;
+    globalThis.fetch = (async (url: string) => {
+      seen.push({ url, auth: null });
+      if (url.includes("api.groq.com")) return { status: 401, text: async () => '{"error":{"message":"invalid api key"}}' };
+      if (url.includes("api.kilo.ai")) return openAiOk("Free relay answered after the bad key.");
+      throw new TypeError("Failed to fetch");
+    }) as unknown as typeof fetch;
+    const rejected = await callBridge(bridgePrompt);
+    check(rejected.text?.includes("Free relay") === true && seen.filter((hit) => hit.url.includes("groq")).length === 1,
+      "A rejected key costs one request, is benched, and the chain keeps going");
+    check(bridgeCooldowns().some((entry) => entry.leg === "groq" && entry.reason === "auth"),
+      "The rejected key is remembered for later messages");
+
+    /* Free relays off = nothing but the learner's own key. */
+    clearBridgeFailures();
+    setFreeBridgePreference("off");
+    seen.length = 0;
+    globalThis.fetch = (async (url: string) => {
+      seen.push({ url, auth: null });
+      return openAiOk("should not be used");
+    }) as unknown as typeof fetch;
+    check(freeBridgeEnabled() === false && bridgeAvailability().freeLegs.length === 0,
+      "The free relay switch is honoured immediately, with no reload");
+    const keyOnly = await callBridge(bridgePrompt);
+    check(keyOnly.leg === "groq" && seen.every((hit) => !hit.url.includes("kilo") && !hit.url.includes("pollinations") && !hit.url.includes("ovh")),
+      "With the free relays off, no anonymous endpoint is ever contacted");
+    clearByokKeys();
+    clearBridgeFailures();
+    seen.length = 0;
+    const nothing = await callBridge(bridgePrompt);
+    check(nothing.text === null && seen.length === 0,
+      "With no key and no free relay the bridge declines without a single request, so the server's local engine answers");
+    setFreeBridgePreference("on");
+
+    /* The operator kill-switch: AI_FREE_BRIDGE=off forbids the public relays
+       for every learner on the deployment, whatever their own preference says. */
+    const { setFreeBridgeAllowedByOperator, freeBridgeAllowedByOperator } = await import("../src/lib/aiBridge");
+    const aiSrc = readFileSync(join(process.cwd(), "src/lib/ai.ts"), "utf8");
+    const aiStatusSrc = readFileSync(join(process.cwd(), "src/app/api/ai-status/route.ts"), "utf8");
+    check(/AI_FREE_BRIDGE/.test(aiSrc) && aiStatusSrc.includes("freeBridgeAllowed: freeBridgeAllowed()"),
+      "The deployment can forbid the free relays with AI_FREE_BRIDGE=off, and /api/ai-status reports it");
+    setByokKey("groq", "gsk_operator_test");
+    setFreeBridgeAllowedByOperator(false);
+    seen.length = 0;
+    globalThis.fetch = (async (url: string) => {
+      seen.push({ url, auth: null });
+      return openAiOk("answered");
+    }) as unknown as typeof fetch;
+    check(freeBridgeAllowedByOperator() === false && bridgeAvailability().freeLegs.length === 0 && freeBridgeEnabled() === false,
+      "An operator ban empties the free-relay list immediately");
+    const operatorBanned = await callBridge(bridgePrompt);
+    check(operatorBanned.leg === "groq" && seen.every((hit) => !hit.url.includes("kilo") && !hit.url.includes("pollinations") && !hit.url.includes("ovh")),
+      "With the relays banned the learner's own key still works and no public relay is contacted");
+    clearByokKeys();
+    seen.length = 0;
+    const bannedNothing = await callBridge(bridgePrompt);
+    check(bannedNothing.text === null && seen.length === 0,
+      "Banned relays plus no key means the bridge stays silent and the on-device engine answers");
+    setFreeBridgeAllowedByOperator(true);
+    clearBridgeFailures();
+
+    /* The browser-side probe is what Settings shows: honest per-leg results. */
+    clearBridgeFailures();
+    setByokKey("gemini", "AIza_test_bridge_key");
+    globalThis.fetch = (async (url: string) => {
+      if (url.includes("generativelanguage.googleapis.com")) {
+        return { status: 200, text: async () => JSON.stringify({ candidates: [{ content: { parts: [{ text: "OK" }] } }] }) };
+      }
+      if (url.includes("api.kilo.ai")) return openAiOk("OK");
+      throw new TypeError("Failed to fetch");
+    }) as unknown as typeof fetch;
+    const probes = await probeBridge();
+    const geminiProbe = probes.find((probe) => probe.id === "gemini");
+    check(!!geminiProbe?.ok && geminiProbe.kind === "own-key" && geminiProbe.latencyMs >= 0,
+      "The browser probe confirms a working key with latency, which the server-side probe cannot do on a blocked host");
+    check(probes.some((probe) => probe.id === "ovh" && probe.ok === false && probe.error === "network"),
+      "The browser probe reports a blocked relay as unreachable rather than as a bad key");
+
+    clearByokKeys();
+    clearBridgeFailures();
+    setFreeBridgePreference("on");
+    if (savedWindow === undefined) delete (globalThis as { window?: unknown }).window;
+    else Object.assign(globalThis, { window: savedWindow });
+    if (savedFetch === undefined) delete (globalThis as { fetch?: unknown }).fetch;
+    else Object.assign(globalThis, { fetch: savedFetch });
+  }
+
   console.log("\n--- 5. Study Clock Accounting ---");
   const originalNow = Date.now;
   const originalWindow = (globalThis as { window?: unknown }).window;

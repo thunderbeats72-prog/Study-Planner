@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { messages } from "@/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { buildContext, dateFrom, fullState, getOrCreateUser, getSettings, keyFrom, defaultFallbackState } from "@/lib/state";
 import {
   callLLMDetailed, localTutor, parseCommand, tutorSystemPrompt, activeProvider,
@@ -239,8 +239,20 @@ export function userFacingAiNotice(
   };
 }
 
+/** One model id / leg label from the browser bridge. Display-only, so it is
+ *  stripped to a conservative character set and length before it is echoed. */
+function cleanToken(value: unknown, max = 48): string | null {
+  if (typeof value !== "string") return null;
+  const cleaned = value.replace(/[^A-Za-z0-9._:/ -]/g, "").trim().slice(0, max);
+  return cleaned || null;
+}
+
 export async function POST(req: Request) {
-  const limit = checkRateLimit(req, "chat", 18, 60_000);
+  /* The browser-direct bridge (lib/aiBridge.ts → lib/chatClient.ts) spends
+     TWO calls on one learner question: `prepare` for the grounded prompt and
+     `finalise` for the answer. The bucket is sized for that, so a learner on
+     the bridge is not rate-limited at half the speed of everyone else. */
+  const limit = checkRateLimit(req, "chat", 36, 60_000);
   if (!limit.allowed) {
     return NextResponse.json(
       { error: "Too many tutor requests. Please wait a moment and try again.", code: "RATE_LIMITED" },
@@ -249,7 +261,7 @@ export async function POST(req: Request) {
   }
 
   let body: Record<string, unknown>;
-  try { body = await readJsonObject(req, 20_000); }
+  try { body = await readJsonObject(req, 60_000); }
   catch (error) {
     const payload = validationPayload(error);
     return NextResponse.json({ error: payload.error, code: payload.code }, { status: payload.status });
@@ -262,11 +274,46 @@ export async function POST(req: Request) {
   if (rawText.length > 8_000) {
     return NextResponse.json({ error: "Message is too long (maximum 8,000 characters).", code: "MESSAGE_TOO_LONG" }, { status: 413 });
   }
+
+  /* Three modes, one route:
+       full     — the classic path: the server walks its own provider chain.
+       prepare  — build the grounded prompt and hand it back so the BROWSER
+                  can call a model directly (no deployment key, or a sandbox
+                  with no outbound network). Answers commands/instant queries
+                  itself, exactly like `full`, so nothing needless is bridged.
+       finalise — accept the browser's model answer, then run the same action
+                  extraction, replanning, persistence and state refresh. */
+  const directReply = typeof body.directReply === "string" ? body.directReply.replace(/\0/g, "").trim() : "";
+  /* What the caller's BROWSER can reach (lib/aiBridge.ts). The server cannot
+     discover this — a sandboxed host has no outbound network at all — so the
+     client reports it and "are you connected?" gets an honest answer. */
+  const clientBridge: "own-key" | "free" | null =
+    body.bridge === "own-key" || body.bridge === "free" ? body.bridge : null;
+  const mode: ChatMode = directReply ? "finalise" : body.prepare === true ? "prepare" : "full";
+  if (mode === "finalise" && directReply.length > 24_000) {
+    return NextResponse.json({ error: "Reply is too long.", code: "REPLY_TOO_LONG" }, { status: 413 });
+  }
+
   // Bring-your-own keys (Settings → AI coach): per-request override of the
   // deployment's env configuration. Never persisted, never logged.
   const runtimeKeys = parseRuntimeKeys(req.headers.get("x-ai-keys"));
   try {
-    return await handleChat(req, { message: rawText, keys: runtimeKeys });
+    return await handleChat(req, {
+      message: rawText,
+      keys: runtimeKeys,
+      clientBridge,
+      mode,
+      directReply: mode === "finalise" ? directReply : null,
+      directLeg: mode === "finalise" ? cleanToken(body.directLeg) : null,
+      directModel: mode === "finalise" ? cleanToken(body.directModel) : null,
+      directKind: mode === "finalise" && body.directKind === "free" ? "free" : "own-key",
+      // `prepared: true` means a prepare call for this same message already
+      // stored the learner's row — never write it twice.
+      prepared: body.prepared === true,
+      // `replaceLast: true` swaps the fallback answer this turn already wrote
+      // for the better one the browser bridge just produced.
+      replaceLast: body.replaceLast === true,
+    });
   } catch (error) {
     console.error("Chat route handleChat failed, using local tutor fallback:", error instanceof Error ? error.message : error);
     const key = keyFrom(req);
@@ -287,7 +334,7 @@ export async function POST(req: Request) {
       } else if (instantReply) {
         finalText = instantReply.text;
       } else {
-        const local = await localTutor(text, ctx, { skipCloud: true, keys: runtimeKeys });
+        const local = await localTutor(text, ctx, { skipCloud: true, keys: runtimeKeys, browserBridge: clientBridge });
         finalText = local.text;
       }
     } catch (inner) {
@@ -313,30 +360,87 @@ export async function POST(req: Request) {
   }
 }
 
-async function handleChat(req: Request, opts: { message: string; keys?: RuntimeProviderKeys }) {
-  const { message: rawText, keys: runtimeKeys } = opts;
+/** The teaching instruction appended to every grounded cloud prompt. Shared by
+ *  the server-side call and the `prepare` payload the browser bridge sends, so
+ *  both routes ask the model for the same kind of answer. */
+const TEACH_SUFFIX =
+  "\n\nAnswer the learner's question directly. If they asked you to explain something, TEACH it with a definition, how it works, one worked example, and a short recap. Do not reply with only a syllabus outline or learning-objective list.";
+
+/** Cloud token budget for a tutoring answer. The browser bridge uses the same
+ *  number; free anonymous tiers reject or truncate very large budgets. */
+const TUTOR_MAX_TOKENS = 2000;
+
+type ChatMode = "full" | "prepare" | "finalise";
+
+/**
+ * The exact request SHIGUN sends to a model: system identity + live ML
+ * signals + curriculum grounding + bounded history. One builder, so the
+ * server-side chain and the browser-direct bridge are always asking the same
+ * question in the same way.
+ */
+function buildTutorPrompt(text: string, state: GroundingState, ctx: ReturnType<typeof buildContext>) {
+  const history = state.messages.slice(-10).map((m) => ({
+    role: m.role === "assistant" ? ("assistant" as const) : ("user" as const),
+    content: m.content,
+  }));
+  return {
+    system: tutorSystemPrompt(ctx) + curriculumGrounding(text, state) + TEACH_SUFFIX,
+    messages: [...history, { role: "user" as const, content: text }],
+    maxTokens: TUTOR_MAX_TOKENS,
+    temperature: 0.6,
+  };
+}
+
+type HandleChatOptions = {
+  message: string;
+  keys?: RuntimeProviderKeys;
+  /** "own-key" | "free" | null — reported by the caller's browser. */
+  clientBridge?: "own-key" | "free" | null;
+  mode?: ChatMode;
+  directReply?: string | null;
+  directLeg?: string | null;
+  directModel?: string | null;
+  directKind?: "own-key" | "free";
+  prepared?: boolean;
+  replaceLast?: boolean;
+};
+
+async function handleChat(req: Request, opts: HandleChatOptions) {
+  const {
+    message: rawText,
+    keys: runtimeKeys,
+    clientBridge = null,
+    mode = "full",
+    directReply = null,
+    directLeg = null,
+    directModel = null,
+    directKind = "own-key",
+    prepared = false,
+    replaceLast = false,
+  } = opts;
   const key = keyFrom(req);
   const text = rawText;
 
   const state = await fullState(key);
   const localDate = dateFrom(req);
   const ctx = buildContext(state, localDate);
-  let action = parseCommand(text);
-  const languageReply = languageCapabilityReply(text);
+  let action = mode === "finalise" ? undefined : parseCommand(text);
+  const languageReply = mode === "finalise" ? null : languageCapabilityReply(text);
   // "Are you connected to the AI?" / "why are you not responding?" are
   // questions about the assistant, answered from live connectivity state —
   // never sent to the cloud (a model cannot know its own plumbing) and never
   // to the encyclopedia (which once answered "connect" with a quiz show).
-  const statusReply = !action && !languageReply && isAssistantStatusQuestion(text)
-    ? assistantStatusReply(text, ctx, {
+  const statusReply = mode === "finalise" || action || languageReply || !isAssistantStatusQuestion(text)
+    ? null
+    : assistantStatusReply(text, ctx, {
         cloud: !!activeProvider(runtimeKeys),
         usingOwnKey: hasRuntimeKeys(runtimeKeys),
         lastOk: llmHealthSnapshot().ok,
-      })
-    : null;
-  const instantReply = action || statusReply ? null : instantTutorReply(text, ctx);
+        browserBridge: clientBridge,
+      });
+  const instantReply = mode === "finalise" || action || statusReply ? null : instantTutorReply(text, ctx);
 
-  if (state.user.id > 0) {
+  if (state.user.id > 0 && !prepared) {
     try {
       await db.insert(messages).values({ userId: state.user.id, role: "user", content: text });
     } catch (e) {
@@ -355,6 +459,11 @@ async function handleChat(req: Request, opts: { message: string; keys?: RuntimeP
     /** Stable machine code so the UI can offer Retry without parsing prose. */
     code?: string;
     retryable?: boolean;
+    /** Which side made the model call: "server" | "browser-own-key" |
+     *  "browser-free". The learner sees "your key" or "free endpoint". */
+    via?: string;
+    /** Bridge leg id, display-only (already sanitised). */
+    leg?: string | null;
   } = { source: "local", model: null, degraded: false };
 
   if (languageReply) {
@@ -374,26 +483,44 @@ async function handleChat(req: Request, opts: { message: string; keys?: RuntimeP
     finalText = statusReply;
   } else if (instantReply) {
     finalText = instantReply.text;
+  } else if (mode === "prepare") {
+    /* The learner's browser is going to make the model call (no deployment key,
+       or a server with no outbound network). Hand back exactly what the server
+       would have sent upstream: identity, live ML signals, curriculum
+       grounding and the recent history — never keys, never another learner's
+       data. The user row is already stored above; `finalise` stores the
+       answer. */
+    return NextResponse.json({
+      needsCloud: true,
+      message: text,
+      prompt: buildTutorPrompt(text, state, ctx),
+      ai: { source: "pending", model: null, degraded: false },
+    }, { headers: { "cache-control": "no-store" } });
   } else {
     let reply: string | null = null;
     const cloudAttempted = !!activeProvider(runtimeKeys);
-    if (cloudAttempted) {
-      const history = state.messages.slice(-10).map((m) => ({
-        role: m.role === "assistant" ? ("assistant" as const) : ("user" as const),
-        content: m.content,
-      }));
-      const systemPrompt = tutorSystemPrompt(ctx)
-        + curriculumGrounding(text, state)
-        + "\n\nAnswer the learner's question directly. If they asked you to explain something, TEACH it with a definition, how it works, one worked example, and a short recap. Do not reply with only a syllabus outline or learning-objective list.";
+    if (mode === "finalise") {
+      // The browser bridge answered. Same post-processing as a cloud reply:
+      // action extraction, replanning, persistence, fresh state.
+      reply = directReply;
+      aiMeta = {
+        source: "direct",
+        model: directModel,
+        degraded: false,
+        via: directKind === "free" ? "browser-free" : "browser-own-key",
+        leg: directLeg,
+      };
+    } else if (cloudAttempted) {
+      const prompt = buildTutorPrompt(text, state, ctx);
       const result = await callLLMDetailed(
-        systemPrompt,
-        [...history, { role: "user", content: text }],
-        2400,
-        { temperature: 0.6, keys: runtimeKeys }
+        prompt.system,
+        prompt.messages,
+        prompt.maxTokens,
+        { temperature: prompt.temperature, keys: runtimeKeys }
       );
       reply = result.text;
       if (result.text && result.provider) {
-        aiMeta = { source: result.provider, model: result.model, degraded: false };
+        aiMeta = { source: result.provider, model: result.model, degraded: false, via: "server" };
       } else {
         // Technical detail goes to the server log, where an operator (or
         // POST /api/ai-status) can act on it. The learner gets one calm
@@ -424,7 +551,7 @@ async function handleChat(req: Request, opts: { message: string; keys?: RuntimeP
       const grounded = localCurriculumReply(text, state);
       let localText = "";
       try {
-        const local = await localTutor(text, ctx, { skipCloud: cloudAttempted, keys: runtimeKeys });
+        const local = await localTutor(text, ctx, { skipCloud: cloudAttempted, keys: runtimeKeys, browserBridge: clientBridge });
         localText = local.text;
         if (local.action) action = local.action;
       } catch (error) {
@@ -449,7 +576,22 @@ async function handleChat(req: Request, opts: { message: string; keys?: RuntimeP
 
   if (state.user.id > 0) {
     try {
-      await db.insert(messages).values({ userId: state.user.id, role: "assistant", content: finalText });
+      if (replaceLast) {
+        /* This turn already wrote a fallback answer (the server chain failed
+           and the browser bridge then produced a better one). Overwrite that
+           row instead of storing two answers to a single question. */
+        const last = await db.select({ id: messages.id }).from(messages)
+          .where(and(eq(messages.userId, state.user.id), eq(messages.role, "assistant")))
+          .orderBy(desc(messages.id))
+          .limit(1);
+        if (last[0]) {
+          await db.update(messages).set({ content: finalText }).where(eq(messages.id, last[0].id));
+        } else {
+          await db.insert(messages).values({ userId: state.user.id, role: "assistant", content: finalText });
+        }
+      } else {
+        await db.insert(messages).values({ userId: state.user.id, role: "assistant", content: finalText });
+      }
       await db.execute(sql`
         delete from messages
         where user_id = ${state.user.id}
@@ -483,7 +625,11 @@ async function handleChat(req: Request, opts: { message: string; keys?: RuntimeP
       ...fresh,
       messages: appendChatTurn(fresh.messages, text, finalText, fresh.user.id),
       context: buildContext(fresh, localDate),
-      aiProvider: activeProvider(runtimeKeys),
+      // A browser-bridge answer counts as cloud: the panel should not fall
+      // back to "Local mode" just because the deployment has no env key.
+      aiProvider: mode === "finalise"
+        ? (directKind === "free" ? "browser-free" : "browser-own-key")
+        : activeProvider(runtimeKeys),
     },
     replanned,
     ai: aiMeta,

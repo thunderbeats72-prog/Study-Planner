@@ -6,12 +6,22 @@ import {
   BYOK_PROVIDERS, byokHeader, byokProviderIds, clearByokKeys, getByokKeys,
   onByokChange, setByokKey, type ByokKeys, type ByokProviderId,
 } from "@/lib/byok";
+import {
+  bridgeAvailability, bridgeCooldowns, clearBridgeFailures, freeBridgeEnabled,
+  freeBridgePreference, onBridgeChange, probeBridge, setFreeBridgeAllowedByOperator,
+  setFreeBridgePreference, type BridgeProbe,
+} from "@/lib/aiBridge";
+import { invalidateAiStatus } from "@/lib/chatClient";
 import { IconCheck, IconClose, IconSpark, IconWarn } from "./icons";
-import { Select } from "./bits";
+import { Seg, Select } from "./bits";
 
 type ServerStatus = {
   mode?: string;
   configuredProviders?: string[];
+  /** Provider ids the deployment's own environment configured (no BYOK keys). */
+  serverProviderIds?: string[];
+  /** False when the operator set AI_FREE_BRIDGE=off for every learner. */
+  freeBridgeAllowed?: boolean;
 };
 
 type ProbeResult = {
@@ -25,11 +35,18 @@ type ProbeResult = {
 /**
  * Settings → AI coach.
  *
- * The tutor needs an API key to answer open-ended questions. If this
- * deployment was never given one, every chat used to fall back to the small
- * on-device engine and the learner was told the assistant was unavailable —
- * with no way to fix it. This card lets a key be pasted here and used
- * immediately, no redeploy required.
+ * The tutor needs a model to answer open-ended questions. There are three
+ * ways one gets connected, and this card owns all three:
+ *
+ *   1. THE DEPLOYMENT — env vars (GEMINI_API_KEY, GROQ_API_KEY, …). Best for
+ *      a shared install: every learner gets cloud tutoring with no setup.
+ *   2. THIS BROWSER — paste a key below. It is kept in localStorage and used
+ *      immediately, no redeploy. Since v34 the key is also called DIRECTLY
+ *      FROM THE BROWSER (lib/aiBridge.ts) when the server cannot reach the
+ *      provider itself — which is what makes AI work on a sandboxed preview
+ *      whose host has no outbound network.
+ *   3. FREE COMMUNITY ENDPOINT — no key at all: an anonymous public relay
+ *      answers from this device. Last resort, clearly labelled, one tap off.
  *
  * The key lives in this browser's localStorage and travels to this
  * deployment (same origin, HTTPS) on the `x-ai-keys` header. The server uses
@@ -43,6 +60,12 @@ export default function AiKeyCard() {
   const [testing, setTesting] = useState(false);
   const [result, setResult] = useState<ProbeResult | null>(null);
   const [server, setServer] = useState<ServerStatus | null>(null);
+  /* Browser-side bridge state: the free-endpoint switch and the results of
+     testing the connection FROM THIS DEVICE (the only test that tells the
+     truth when the server itself has no outbound network). */
+  const [freePref, setFreePref] = useState<"on" | "off">("on");
+  const [bridgeTesting, setBridgeTesting] = useState(false);
+  const [bridgeProbes, setBridgeProbes] = useState<BridgeProbe[] | null>(null);
 
   const savedIds = useMemo(() => byokProviderIds(keys), [keys]);
 
@@ -50,56 +73,61 @@ export default function AiKeyCard() {
      in sync with saves from anywhere in the app. */
   useEffect(() => {
     let alive = true;
-    const readStored = async () => {
-      const stored = getByokKeys();
-      if (alive) setKeys(stored);
+    const readStored = () => {
+      if (!alive) return;
+      setKeys(getByokKeys());
+      setFreePref(freeBridgePreference());
     };
-    void readStored();
-    const off = onByokChange((next) => setKeys(next));
+    readStored();
+    const off = onByokChange(readStored);
+    const offBridge = onBridgeChange(readStored);
     return () => {
       alive = false;
       off();
+      offBridge();
     };
   }, []);
 
   /* Ask the server what IT already has configured, so the card can show
      "already configured on this deployment" and avoid a pointless key paste. */
-  useEffect(() => {
-    let alive = true;
-    const readServer = async () => {
-      try {
-        const res = await fetch("/api/ai-status", {
-          cache: "no-store",
-          headers: { "x-ai-keys": byokHeader(getByokKeys()) },
-        });
-        const json = (await res.json().catch(() => null)) as ServerStatus | null;
-        if (alive && json && typeof json === "object") setServer(json);
-      } catch {
-        /* offline — the saved/local state below is still accurate */
-      }
-    };
-    void readServer();
-    return () => {
-      alive = false;
-    };
-  }, [savedIds.length]);
-
-  const refreshServerStatus = useCallback(async () => {
+  const readServer = useCallback(async () => {
     try {
       const res = await fetch("/api/ai-status", {
         cache: "no-store",
         headers: { "x-ai-keys": byokHeader(getByokKeys()) },
       });
       const json = (await res.json().catch(() => null)) as ServerStatus | null;
-      if (json && typeof json === "object") setServer(json);
+      if (json && typeof json === "object") {
+        setServer(json);
+        setFreeBridgeAllowedByOperator(json.freeBridgeAllowed);
+        setFreePref(freeBridgePreference());
+      }
     } catch {
       /* offline — the saved/local state below is still accurate */
     }
   }, []);
 
-  const serverConfigured = (server?.configuredProviders || []).filter(
-    (label) => !savedIds.some((id) => BYOK_PROVIDERS.find((p) => p.id === id)?.label === label),
-  );
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      if (alive) await readServer();
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [savedIds.length, readServer]);
+
+  /* Ids, not labels: the server says "Gemini" while this card says "Google
+     Gemini", and comparing the two strings made a deployment that HAD a key
+     look unconfigured. */
+  const serverIds = server?.serverProviderIds ?? [];
+  const serverConfigured = serverIds
+    .filter((id) => !savedIds.includes(id as ByokProviderId))
+    .map((id) => BYOK_PROVIDERS.find((provider) => provider.id === id)?.label
+      || (server?.configuredProviders ?? [])[serverIds.indexOf(id)]
+      || id);
+
+  const availability = bridgeAvailability();
 
   const runTest = useCallback(async (id: ByokProviderId, key: string) => {
     setTesting(true);
@@ -135,24 +163,57 @@ export default function AiKeyCard() {
     }
   }, []);
 
+  /* Test the connection the way the tutor will actually use it: from this
+     browser. On a host with no outbound network the server-side test above
+     reports "unreachable" for a perfectly good key, and the learner has no
+     way to tell a bad key from a blocked server. This button can. */
+  const runBrowserTest = useCallback(async () => {
+    setBridgeTesting(true);
+    setBridgeProbes(null);
+    clearBridgeFailures();
+    try {
+      const probes = await probeBridge();
+      setBridgeProbes(probes);
+      const ok = probes.find((probe) => probe.ok);
+      setResult(ok
+        ? { ok: true, label: ok.label, detail: `${ok.label} answered from this browser — Shigun will use it.`, latencyMs: ok.latencyMs }
+        : probes.length
+          ? { ok: false, detail: "No provider answered from this browser. The server chain and the on-device engine still will." }
+          : { ok: false, detail: "Nothing to test yet — add a key above, or switch on the free community endpoint." });
+    } catch {
+      setResult({ ok: false, detail: "The browser test could not run. Check your connection." });
+    } finally {
+      setBridgeTesting(false);
+      void readServer();
+    }
+  }, [readServer]);
+
   const handleSave = () => {
     const cleaned = draft.trim();
     if (!cleaned) return;
     setByokKey(selected, cleaned);
     setKeys(getByokKeys());
     setDraft("");
+    invalidateAiStatus();
     void runTest(selected, cleaned);
-    void refreshServerStatus();
+    void runBrowserTest();
+    void readServer();
   };
 
   const handleRemove = (id: ByokProviderId) => {
     setByokKey(id, null);
     setKeys(getByokKeys());
     setResult(null);
-    void refreshServerStatus();
+    invalidateAiStatus();
+    clearBridgeFailures();
+    void readServer();
   };
 
-  const active = savedIds.length > 0 || (server?.configuredProviders?.length ?? 0) > 0;
+  const freeAllowed = server?.freeBridgeAllowed !== false;
+  const freeOn = freePref === "on" && freeAllowed;
+  const serverActive = serverIds.length > 0;
+  const active = serverActive || savedIds.length > 0 || freeOn;
+  const cooldowns = bridgeCooldowns();
 
   return (
     <div className="space-y-4">
@@ -172,15 +233,20 @@ export default function AiKeyCard() {
           )}
         </span>
         <p className="text-[length:var(--fs-sm)] font-semibold leading-snug" style={{ color: "var(--text-main)" }}>
-          {active ? (
+          {serverActive || savedIds.length > 0 ? (
             <>
               Cloud tutoring is <strong>connected</strong>. Shigun will answer open-ended questions in full, and falls
               back to your own syllabus whenever the network is unavailable.
             </>
+          ) : freeOn ? (
+            <>
+              Cloud tutoring runs on the <strong>free community endpoint</strong> — no key needed. Add your own key
+              below for a private, faster connection with higher limits.
+            </>
           ) : (
             <>
-              No AI key is configured, so Shigun can only answer from your study plan and syllabus. Paste a key below to
-              switch on full AI chat — it takes about a minute.
+              No AI key is configured and the free endpoint is off, so Shigun can only answer from your study plan and
+              syllabus. Paste a key below, or switch the free endpoint on — either takes about a minute.
             </>
           )}
         </p>
@@ -255,6 +321,15 @@ export default function AiKeyCard() {
         <button type="button" className="btn btn-primary" onClick={handleSave} disabled={!draft.trim() || testing}>
           <IconSpark size={15} /> {testing ? "Testing…" : "Save & test"}
         </button>
+        <button
+          type="button"
+          className="btn btn-ghost"
+          onClick={() => void runBrowserTest()}
+          disabled={bridgeTesting || !availability.canBridge}
+          title="Sends one tiny request per available provider straight from this device — the same route Shigun uses."
+        >
+          {bridgeTesting ? "Testing…" : "Test from this browser"}
+        </button>
         {savedIds.length > 0 && (
           <button
             type="button"
@@ -263,7 +338,9 @@ export default function AiKeyCard() {
               clearByokKeys();
               setKeys({});
               setResult(null);
-              void refreshServerStatus();
+              clearBridgeFailures();
+              invalidateAiStatus();
+              void readServer();
             }}
           >
             Remove all
@@ -292,6 +369,77 @@ export default function AiKeyCard() {
           )}
         </div>
       )}
+
+      {bridgeProbes && bridgeProbes.length > 0 && (
+        <div className="space-y-1.5">
+          <p className="lbl">From this browser</p>
+          {bridgeProbes.map((probe) => (
+            <div
+              key={probe.id}
+              className="flex items-start justify-between gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-2)] px-3 py-2"
+            >
+              <span className="min-w-0">
+                <span className="block text-[length:var(--fs-sm)] font-extrabold" style={{ color: "var(--text-main)" }}>
+                  {probe.label}
+                  <span className="ml-1.5 font-semibold" style={{ color: "var(--text-dim)" }}>
+                    {probe.kind === "free" ? "free endpoint" : "your key"}
+                  </span>
+                </span>
+                <span className="block text-[length:var(--fs-meta)] font-medium" style={{ color: "var(--text-dim)" }}>
+                  {probe.detail}
+                </span>
+              </span>
+              <span
+                className="mono shrink-0 text-[length:var(--fs-meta)] font-bold"
+                style={{ color: probe.ok ? "var(--success-accent)" : "var(--text-dim)" }}
+              >
+                {probe.ok ? `${probe.latencyMs} ms` : probe.error || "failed"}
+              </span>
+            </div>
+          ))}
+          {cooldowns.length > 0 && (
+            <p className="text-[length:var(--fs-meta)] font-medium" style={{ color: "var(--text-dim)" }}>
+              Skipped for now (remembered failures):{" "}
+              {cooldowns.map((entry) => `${entry.leg}${entry.model ? `/${entry.model}` : ""} (${entry.reason}, ${entry.secondsLeft}s)`).join(", ")}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* ── Free community endpoint ───────────────────────────────
+          The zero-setup path. It is a public anonymous relay, so the
+          privacy trade-off is stated in plain words next to the switch
+          and never hidden behind a tooltip. */}
+      <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-2)] p-3 space-y-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-[length:var(--fs-sm)] font-extrabold" style={{ color: "var(--text-main)" }}>
+              Free community AI endpoint
+            </p>
+            <p className="text-[length:var(--fs-meta)] font-medium" style={{ color: "var(--text-dim)" }}>
+              Answers open-ended questions with no key at all, called straight from this device.
+            </p>
+          </div>
+          <Seg<"on" | "off">
+            value={freeAllowed ? freePref : "off"}
+            onChange={(value) => {
+              if (!freeAllowed) return;
+              setFreeBridgePreference(value);
+              setFreePref(value);
+              invalidateAiStatus();
+              setResult(null);
+            }}
+            options={[{ v: "on", label: "On" }, { v: "off", label: "Off" }]}
+          />
+        </div>
+        <p className="text-[length:var(--fs-meta)] font-medium" style={{ color: "var(--text-dim)" }}>
+          {!freeAllowed
+            ? "Switched off for this deployment by its owner (AI_FREE_BRIDGE=off), so Shigun will never send a question to a public relay. Paste your own key above, or ask the owner to set one server-side."
+            : freeOn
+            ? "Used only when neither this deployment nor this browser has a key. Your question and a summary of your plan are sent to a public AI relay — OVHcloud AI Endpoints, then Kilo Gateway, then Pollinations, in that order. They are anonymous and rate-limited, they may log prompts, and they are not suitable for anything private. Switch it off any time; your own key always takes priority."
+            : "Off. Without a key, Shigun answers from your plan, syllabus and the on-device ML engine only."}
+        </p>
+      </div>
 
       {savedIds.length > 0 && (
         <div className="space-y-2">
@@ -324,7 +472,8 @@ export default function AiKeyCard() {
             );
           })}
           <p className="text-[length:var(--fs-meta)] font-medium" style={{ color: "var(--text-dim)" }}>
-            Keys stay in this browser and are sent only to this deployment. For a shared deployment, set{" "}
+            Keys stay in this browser and are sent only to this deployment — and, when this browser makes the call
+            itself, straight to the provider. For a shared deployment, set{" "}
             <span className="mono">{BYOK_PROVIDERS.find((p) => p.id === selected)?.envVar}</span> in the server
             environment instead so every learner gets cloud tutoring automatically.
           </p>
