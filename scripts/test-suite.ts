@@ -1961,6 +1961,11 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
       "The month calendar is one component sized by its container, not the viewport");
     check(/\.cal-cell\.is-empty/.test(sheets),
       "Blank month cells stay inert on every screen size");
+    const plannerSrc = strip(readFileSync(join(process.cwd(), "src/components/PlannerView.tsx"), "utf8"));
+    check(!/matchMedia\?\(\s*"\(max-width:\s*900px\)"\)/.test(plannerSrc) &&
+          !/setView\("list"\)/.test(plannerSrc) &&
+          /setOpenDay\(dateKey\)/.test(plannerSrc),
+      "A calendar day tap opens the day sheet on every width (never redirects to List)");
     check(/\.mobile-bottom-nav\s*\{\s*display: *none/.test(sheets) &&
           /\.mobile-bottom-nav\s*\{\s*display: *grid/.test(sheets) && /\.mbn-item/.test(sheets),
       "Bottom nav is off by default and a multi-slot grid on phones");

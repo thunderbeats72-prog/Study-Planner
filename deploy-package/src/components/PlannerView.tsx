@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   dayDiff,
   fmtDate,
@@ -99,9 +99,6 @@ export default function PlannerView({
   const [view, setView] = useState<View>("list");
   const [filter, setFilter] = useState("all");
   const [openDay, setOpenDay] = useState<string | null>(null);
-  /* The day block just landed on from the calendar — flashed so the
-     list/calendar switch is legible instead of a jump into a wall of days. */
-  const [pickedDay, setPickedDay] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<number | null>(null);
   const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
   /* Delete closes an editor that is still open on the same task before the
@@ -114,18 +111,10 @@ export default function PlannerView({
     : undefined;
   const [monthOff, setMonthOff] = useState(0);
   const [selDay, setSelDay] = useState<string>(today());
-  const pickedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(
-    () => () => {
-      if (pickedTimer.current) clearTimeout(pickedTimer.current);
-    },
-    [],
-  );
 
   const t = today();
   useBackClose(!!openDay, () => setOpenDay(null));
 
-  const dayRefs = useRef<Record<string, HTMLElement | null>>({});
   const briefRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     if (expanded == null) return;
@@ -230,75 +219,15 @@ export default function PlannerView({
     setSelDay(today());
   };
 
-  /** Bring the picked day's block into view. Uses rAF + retries to survive
-   *  the React commit that mounts the list after a view switch. */
-  const scrollToDayBlock = useCallback((dateKey: string) => {
-    let attempt = 0;
-    const tryScroll = () => {
-      const node = dayRefs.current[dateKey];
-      if (!node) {
-        if (attempt < 14) {
-          attempt++;
-          if (attempt === 1) {
-            window.requestAnimationFrame(() =>
-              window.requestAnimationFrame(tryScroll),
-            );
-          } else {
-            window.setTimeout(tryScroll, 60);
-          }
-        }
-        return;
-      }
-      const reduce = window.matchMedia?.(
-        "(prefers-reduced-motion: reduce)",
-      ).matches;
-      node.scrollIntoView({
-        block: "start",
-        behavior: reduce ? "auto" : "smooth",
-      });
-    };
-    tryScroll();
-  }, []);
-
-  useEffect(() => {
-    if (!pickedDay) return;
-    if (view !== "list") return;
-    const id = window.setTimeout(() => scrollToDayBlock(pickedDay), 80);
-    return () => window.clearTimeout(id);
-  }, [pickedDay, view, grouped, scrollToDayBlock]);
-
+  /* Tapping a day opens that day's plan in the day sheet on every width — the
+     same interaction a phone uses. The old desktop path switched to List view
+     and scrolled instead, gated by a VIEWPORT query (max-width: 900px) while
+     the calendar itself is laid out by a CONTAINER query (min-width: 660px),
+     so a wide window over a compact card still redirected to List — reading
+     as "the calendar is broken on desktop". */
   const pickDay = (dateKey: string) => {
     setSelDay(dateKey);
-    if (view !== "calendar") {
-      const exists = grouped.some(([k]) => k === dateKey);
-      if (!exists) {
-        setOpenDay(dateKey);
-        return;
-      }
-      setPickedDay(dateKey);
-      if (pickedTimer.current) clearTimeout(pickedTimer.current);
-      pickedTimer.current = window.setTimeout(
-        () => setPickedDay(null),
-        2400,
-      ) as unknown as ReturnType<typeof setTimeout>;
-      window.setTimeout(() => scrollToDayBlock(dateKey), 60);
-      return;
-    }
-    const dayTasks = tasksByDate.get(dateKey) || [];
-    if (
-      window.matchMedia?.("(max-width: 900px)").matches ||
-      dayTasks.length === 0
-    ) {
-      setOpenDay(dateKey);
-      return;
-    }
-    setView("list");
-    setPickedDay(dateKey);
-    if (pickedTimer.current) clearTimeout(pickedTimer.current);
-    pickedTimer.current = window.setTimeout(
-      () => setPickedDay(null),
-      2400,
-    ) as unknown as ReturnType<typeof setTimeout>;
+    setOpenDay(dateKey);
   };
 
   return (
@@ -597,13 +526,9 @@ export default function PlannerView({
             return (
               <Reveal key={dateKey} delay={Math.min(i, 6) * 45}>
                 <section
-                  ref={(node) => {
-                    dayRefs.current[dateKey] = node;
-                  }}
                   className={cn(
                     "day-block planner-day glass-panel tilt-card section-card",
                     isToday && "is-today",
-                    pickedDay === dateKey && "is-selected",
                   )}
                   aria-labelledby={`day-${dateKey}`}
                 >
