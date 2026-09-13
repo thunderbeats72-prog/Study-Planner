@@ -69,64 +69,57 @@ LOCAL DEVELOPMENT
 
 AI CONFIGURATION & DIAGNOSTICS
 ------------------------------
-SERVER KEYS (shared by every learner). Use any of CEREBRAS_API_KEY,
-GROQ_API_KEY, MISTRAL_API_KEY, SAMBANOVA_API_KEY, COHERE_API_KEY,
-GEMINI_API_KEY (alias GOOGLE_API_KEY) and/or OPENROUTER_API_KEY. Never put a
-secret in a NEXT_PUBLIC_* variable. You do NOT need all seven — one key works.
-Providers fail over inside one bounded request in priority order Cerebras →
-Gemini → Groq → Mistral → SambaNova → Cohere → OpenRouter, each with its own
-MODEL FALLBACK CHAIN because model IDs retire. The last provider/model that
-answered is remembered and tried first, and failures are benched (rejected key
-10 min, retired model 30 min, rate limit ~45 s, stall ~60 s) so the next
-message skips the broken leg. Override the order with AI_PROVIDER_ORDER.
-A 200 STATUS IS NOT AN ANSWER. Free relays — Pollinations above all — reply
-HTTP 200 with a valid OpenAI-shaped body whose content is their OWN notice
-("The API key used for this request has reached its budget … 🌸 Ad 🌸 Powered
-by Pollinations.AI"). That text used to be shown to the learner as SHIGUN's
-reply, the broken leg was remembered as the one that "worked" and promoted to
-first place, and the on-device engine never ran because a "cloud answer"
-existed. src/lib/aiAnswer.ts is now the single judge of a 200 body and is used
-by the server chain, the browser bridge AND /api/chat's finalise path (which is
-the last gate for a browser still running an older bundle): a provider notice
-counts as a FAILURE, the leg is benched, its sticky slot is dropped, and the
-chain keeps walking until something real answers or the local ML engine takes
-over. It is deliberately conservative — a cost-accounting lesson about a
-department that "has reached its budget ceiling" is teaching, not a billing
-error, and is always delivered untouched. Advertising stapled under a good
-answer is trimmed instead of being treated as a failure.
-BROWSER KEYS (one learner, no redeploy). Settings → AI coach accepts the same
-seven providers. The key stays in that browser's localStorage, travels on the
-`x-ai-keys` header, and is used for that request only — never stored, never
-logged. Since v34 the browser also calls the provider DIRECTLY when the server
-cannot (see below), which is why "Save & test" now runs two tests.
-NO KEYS AT ALL. The browser bridge falls back to free community relays
-(OVHcloud AI Endpoints → Kilo Gateway → Pollinations, all anonymous and
-per-IP rate limited). Set AI_FREE_BRIDGE=off to forbid them deployment-wide;
-the learner can also switch them off in Settings → AI coach.
+KEYS LIVE ONLY IN THE DEPLOYMENT ENVIRONMENT. Use any of GEMINI_API_KEY
+(alias GOOGLE_API_KEY), CEREBRAS_API_KEY, GROQ_API_KEY, MISTRAL_API_KEY,
+SAMBANOVA_API_KEY, COHERE_API_KEY and/or OPENROUTER_API_KEY — e.g. in Vercel
+under Project → Settings → Environment Variables. Never put a secret in a
+NEXT_PUBLIC_* variable. You do NOT need all seven — one key works, and every
+learner on the deployment shares it automatically. Learners are never asked
+for a key anywhere in the app; there is no key field, no paste box, no
+browser-stored key and no public relay.
+Providers fail over inside one bounded request in priority order Gemini →
+Cerebras → Groq → Mistral → SambaNova → Cohere → OpenRouter, each with its
+own MODEL FALLBACK CHAIN because model IDs retire. So when one provider hits
+its daily limit or goes down, the next one answers in the SAME request — a
+question is never left waiting. The last provider/model that answered is
+remembered and tried first, and failures are benched (rejected key 10 min,
+retired model 30 min, rate limit ~45 s, stall ~60 s) so the next message
+skips the broken leg. Override the order with AI_PROVIDER_ORDER.
+A 200 STATUS IS NOT AN ANSWER. Some endpoints reply HTTP 200 with a valid
+OpenAI-shaped body whose content is their OWN notice ("The API key used for
+this request has reached its budget …"). src/lib/aiAnswer.ts is the single
+judge of a 200 body: a provider notice counts as a FAILURE, the leg is
+benched, its sticky slot is dropped, and the chain keeps walking until
+something real answers or the local ML engine takes over. It is deliberately
+conservative — a cost-accounting lesson about a department that "has reached
+its budget ceiling" is teaching, not a billing error, and is always delivered
+untouched. Advertising stapled under a good answer is trimmed instead of
+being treated as a failure.
 The local ML engine (FSRS-lite, pace models, skip-risk, weekday propensity,
 focus hours, Ebbinghaus decay) answers plan/progress questions even with zero
-keys and zero network.
+keys and zero network, and it is the last-resort answerer when every cloud
+leg fails.
+SHIGUN CREDIT (Settings → AI coach) is a visibility meter only: one credit
+per cloud-answered question, rolling over daily. It never blocks, throttles
+or degrades tutoring — and a meter problem can never take the tutor down
+(the usage table self-heals, and the meter falls back to memory).
 GET  /api/health    — database status + provider names + `serverProviderIds`
-                      + `freeBridgeAllowed` + last result.
-GET  /api/ai-status — same snapshot, cache-free, and it counts the caller's
-                      browser keys as well as the deployment's.
-POST /api/ai-status — LIVE SERVER-SIDE probe: one tiny real request to every
-                      configured provider, reporting ok / latency / HTTP
-                      status / reason (rejected key, retired model, rate
-                      limit, timeout, network block). On a host with no
-                      outbound network every leg reports `network` — that is
-                      the host, not the key, which is what the browser-side
-                      "Test from this browser" button in Settings is for.
-The chat header shows Cloud AI · connected when a model answered, Cloud AI ·
-free endpoint when a public relay did, Cloud busy · local engine answered when
-the cloud failed, and Local mode only when nothing is configured and the free
-relays are off. If every cloud leg fails, the local Wikipedia-backed tutor
-answers instead of an apology, and the notice explains what to do next.
+                      + last result.
+GET  /api/ai-status — same snapshot, cache-free: what the deployment has
+                      configured and which legs are briefly benched.
+POST /api/ai-status — LIVE SERVER-SIDE probe (operator tool): one tiny real
+                      request to every configured provider, reporting ok /
+                      latency / HTTP status / reason (rejected key, retired
+                      model, rate limit, timeout, network block).
+The chat header shows Cloud AI · connected when a model answered, Cloud busy
+· local engine answered when the cloud failed, and On-device engine when the
+deployment configured no keys. If every cloud leg fails, the local
+Wikipedia-backed tutor answers instead of an apology, and the notice explains
+what happened in one calm sentence.
 Optional tuning: AI_TIMEOUT_MS (default 24000), AI_PROVIDER_ORDER (a
-comma-separated subset or reorder of the seven providers), AI_FREE_BRIDGE
-(off forbids the free relays). Per-provider model pins: CEREBRAS_MODEL,
-GROQ_MODEL, MISTRAL_MODEL, SAMBANOVA_MODEL, COHERE_MODEL, GEMINI_MODEL,
-OPENROUTER_MODEL.
+comma-separated subset or reorder of the seven providers). Per-provider model
+pins: GEMINI_MODEL, CEREBRAS_MODEL, GROQ_MODEL, MISTRAL_MODEL,
+SAMBANOVA_MODEL, COHERE_MODEL, OPENROUTER_MODEL.
 Gemini 3.1 TTS uses Google's current Interactions API and automatically falls
 back to the device voice under a shared timeout.
 
@@ -161,96 +154,30 @@ instead of stopping on a “voice model unavailable” error; the chat shows a
 clear non-error notice. One failed long-answer part switches the remaining
 parts to that local voice, so every later part keeps flowing.
 
-v34 BROWSER-DIRECT AI BRIDGE — "AI IS NOT CONNECTED", FIXED (this build)
+DEPLOYMENT-KEYS-ONLY TUTORING (this build)
 ------------------------------------------------------------------------
-The complaint survived two server-side rewrites (v9's seven-provider chain,
-v10's failure memory and hedging) because neither could fix the two situations
-that actually produce it:
+The browser-side key paste (BYOK), the browser-direct bridge and the free
+community relays were REMOVED. SHIGUN is now configured exclusively by the
+deployment environment, which is what a production deployment wants:
 
-  1. THE DEPLOYMENT HAS NO KEY. A fresh Vercel deploy, a fork, a preview. No
-     server-side code can invent one, so every open-ended question fell
-     through to the on-device engine and the chat said "Full AI chat isn't
-     connected yet".
-  2. THE HOST HAS NO OUTBOUND NETWORK. Sandboxed previews (Arena/e2b, CI)
-     allowlist egress: `api.groq.com`, `generativelanguage.googleapis.com`,
-     `text.pollinations.ai` do not resolve at all. Every leg returned
-     `network`, so EVEN A VALID KEY looked broken — and the Settings
-     "Save & test" button agreed, because it probed from the server.
+  - one place for keys — the server environment (e.g. Vercel);
+  - every learner gets the same cloud tutoring automatically;
+  - nothing to toggle, paste or switch off inside the app;
+  - no question ever leaves for an anonymous public relay.
 
-The learner's browser has neither problem: it is on the open internet, it is
-the machine that holds the pasted key, and every provider used here accepts a
-cross-origin POST. So the model call moved to the browser, while everything
-that must stay server-side stayed there.
-
-  src/lib/aiBridge.ts      NEW. The browser-side chain: seven own-key legs
-                           (same hosts and current model ids as ai.ts) plus
-                           three anonymous free relays — OVHcloud AI
-                           Endpoints (2 req/min/IP/model, EU, documents that
-                           it stores no user data), Kilo Gateway (~200
-                           req/hr/IP, `:free` routes) and Pollinations
-                           (1 req/15 s/IP, ships a React client so CORS is
-                           guaranteed). Own keys are always tried first; a
-                           free relay never receives a key. Per-tab failure
-                           memory benches a CORS-blocked or offline host for
-                           15 min, a rejected key for 10 min, a rate limit
-                           for 60 s, so one dead relay costs one request.
-                           `probeBridge()` is the honest connectivity test:
-                           one tiny real request per leg, from this device.
-  src/lib/chatClient.ts    NEW. One function decides the route:
-                           deployment keys → server chain; else the browser
-                           bridge (own key → free relay); else the on-device
-                           engine. If the server chain fails mid-conversation
-                           the browser retries the same question and the
-                           better answer REPLACES the fallback in the
-                           history, so one question never shows two answers.
-  src/app/api/chat/route.ts  One route, three modes. `prepare:true` returns
-                           the grounded prompt (identity, live ML signals,
-                           curriculum grounding, bounded history — never a
-                           key) after answering commands/greetings/status
-                           itself, so nothing needless is bridged.
-                           `directReply` finalises: same action extraction,
-                           replanning, persistence and state refresh as a
-                           server answer, with `replaceLast` overwriting the
-                           fallback row. Rate limit 18 → 36/min because one
-                           question now costs two calls.
-  src/lib/ai.ts            `envConfiguredProviderIds()` (ids, not labels —
-                           "Gemini" vs "Google Gemini" made a configured
-                           deployment read as unconfigured),
-                           `freeBridgeAllowed()` for AI_FREE_BRIDGE=off, and
-                           self-status/local-fallback wording that now knows
-                           whether the BROWSER can reach a model: "your key,
-                           called from this device" / "a free community
-                           endpoint" / "no AI is connected", instead of one
-                           misleading sentence for all three.
-  src/app/api/ai-status,   `serverProviderIds`, `serverProviders` and
-  src/app/api/health       `freeBridgeAllowed` so the client can decide
-                           without guessing.
-  src/components/ChatPanel.tsx  The header says "Cloud AI · free endpoint"
-                           when a public relay answered, and the strip below
-                           the messages is either the old "Connect AI"
-                           warning (nothing configured, relays off) or a
-                           plain statement that a free relay is answering
-                           with an "Add my key" button. A learner never
-                           discovers by accident that a public relay saw
-                           their question.
-  src/components/AiKeyCard.tsx  Settings → AI coach: "Test from this browser"
-                           beside the server-side test, a per-leg result list
-                           with latency and reason, the free-relay switch
-                           (Seg On/Off) with the privacy trade-off spelled
-                           out next to it, and a stuck-off state when the
-                           deployment banned the relays.
-  src/app/globals.css      `.ai-connect-free` — the informational variant of
-                           the existing connect strip (accent edge, dimmer
-                           copy), so it never reads as the error it replaces.
-  scripts/test-suite.ts    27 new checks (section 4d): route priority, own
-                           keys before free relays, no key ever sent to a
-                           relay, CORS-blocked legs benched and skipped,
-                           rejected key costs one request, the switch and the
-                           operator ban honoured with no reload, and the
-                           prepare/finalise contract. 365 checks total.
-
-Nothing here changes what a deployment WITH a key does: the server chain stays
-first, and the bridge only runs when the server cannot answer.
+Removed: src/lib/byok.ts, src/lib/aiBridge.ts, src/components/AiKeyCard.tsx,
+the prepare/finalise modes of /api/chat, and the x-ai-keys header.
+Added: src/components/AiCoachCard.tsx — a read-only Settings card showing the
+deployment's live connection state (configured providers, last answer,
+briefly benched legs) and the automatic-failover contract.
+Fixed: the Shigun credit meter can no longer take the tutor offline. A
+missing/stale shigun_usage table used to throw on every /api/chat request,
+which skipped the cloud chain entirely and looked exactly like "the AI
+stopped working"; the meter now self-heals the table once and degrades to
+memory, and credit is informational — it never gates a cloud answer.
+Priority order is now Gemini-first (Gemini → Cerebras → Groq → Mistral →
+SambaNova → Cohere → OpenRouter), matching the key most deployments
+configure; sticky success still promotes whichever leg actually answers.
 
 v25 CSS + RESPONSIVE UI SYSTEM (this build)
 --------------------------------------------

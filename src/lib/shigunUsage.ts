@@ -1,13 +1,15 @@
-import { db } from "@/db";
+import { db, pool } from "@/db";
 import { shigunUsage } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { demoDataEnabled } from "./demoGate";
 import { todayStr } from "./planner";
 
-/** One "credit" is one tutor question answered. A learner on the free or
- *  BYOK path gets this many per day before the cloud layer politely steps
- *  aside and the on-device engine answers instead. Generous on purpose —
- *  it exists to surface a visible meter + reset, not to ration tutoring. */
+/** One "credit" is one tutor question answered by the cloud AI layer.
+ *
+ *  THE METER IS INFORMATIONAL ONLY. It exists so the learner can SEE their
+ *  AI usage ("x% of today's credits used"); it never blocks, throttles or
+ *  degrades tutoring. Cloud answers keep flowing past the limit — the bar
+ *  simply fills up and rolls over at zero the next day. Plan, syllabus and
+ *  timer answers never touch it. */
 export const SHIGUN_DAILY_LIMIT = 100;
 
 export type ShigunUsageState = {
@@ -16,16 +18,68 @@ export type ShigunUsageState = {
   /** Date (YYYY-MM-DD) the current period started. */
   periodStart: string;
   remaining: number;
+  /** Kept for API compatibility; never used to gate cloud answers. */
   exhausted: boolean;
   /** Fraction 0..1 of the allowance consumed, for a progress bar. */
   fraction: number;
 };
 
-/* ── Preview without a database ──────────────────────────────────────────
-   Same fallback discipline as lib/state.ts: with SPP_DEMO_DATA (or a dev
-   machine with no DATABASE_URL) the counter lives in memory keyed by userId,
-   so the Settings card and reset button stay fully exercisable. */
+/* ── Graceful degradation ──────────────────────────────────────────────
+   The credit meter must NEVER take the tutor down with it. A missing or
+   stale `shigun_usage` table in the deployed database used to throw on
+   every single /api/chat request, which sent every question straight to
+   the on-device engine and looked exactly like "the AI stopped working".
+   Now the lib self-heals the table once when it can, and otherwise keeps
+   the counter in memory — a meter hiccup can never interrupt tutoring. */
+
 const demoBuckets = new Map<number, { periodStart: string; used: number }>();
+
+type HealState = "pending" | "ok" | "failed";
+const healGlobal = globalThis as typeof globalThis & { __shigunTableHeal?: HealState };
+
+/** One-time self-heal: create the table (and any later columns) when the
+ *  deployed database predates the meter. Safe to run repeatedly — every
+ *  statement is IF NOT EXISTS — and cached per server instance. */
+async function ensureShigunTable(): Promise<boolean> {
+  if (!pool) return false;
+  if (healGlobal.__shigunTableHeal === "ok") return true;
+  if (healGlobal.__shigunTableHeal === "failed") return false;
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS shigun_usage (
+        id serial PRIMARY KEY,
+        user_id integer NOT NULL,
+        period_start text NOT NULL,
+        used integer NOT NULL DEFAULT 0,
+        "limit" integer NOT NULL DEFAULT 100,
+        updated_at timestamp NOT NULL DEFAULT now()
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS shigun_usage_user_id_unique
+        ON shigun_usage (user_id);
+      ALTER TABLE shigun_usage ADD COLUMN IF NOT EXISTS "limit" integer NOT NULL DEFAULT 100;
+      ALTER TABLE shigun_usage ADD COLUMN IF NOT EXISTS updated_at timestamp NOT NULL DEFAULT now();
+    `);
+    healGlobal.__shigunTableHeal = "ok";
+    return true;
+  } catch (error) {
+    // No DDL permission, or the database itself is unreachable — the
+    // in-memory fallback keeps the meter (and the tutor) alive.
+    console.warn("Shigun usage table self-heal skipped:", error instanceof Error ? error.message : error);
+    healGlobal.__shigunTableHeal = "failed";
+    return false;
+  }
+}
+
+function memoryBucket(userId: number): { periodStart: string; used: number } {
+  const today = todayStr();
+  const rec = demoBuckets.get(userId) || { periodStart: today, used: 0 };
+  if (rec.periodStart !== today) {
+    rec.periodStart = today;
+    rec.used = 0;
+  }
+  demoBuckets.set(userId, rec);
+  return rec;
+}
 
 function shape(row: { periodStart: string; used: number; limit?: number | null }): ShigunUsageState {
   const limit = row.limit ?? SHIGUN_DAILY_LIMIT;
@@ -40,9 +94,11 @@ function shape(row: { periodStart: string; used: number; limit?: number | null }
   };
 }
 
+/** Read (and if needed initialise/roll over) today's counter.
+ *  NEVER throws: a database problem degrades to the in-memory bucket. */
 export async function getShigunUsage(userId: number): Promise<ShigunUsageState> {
   const today = todayStr();
-  try {
+  const read = async (): Promise<ShigunUsageState> => {
     let row = (await db.select().from(shigunUsage).where(eq(shigunUsage.userId, userId)).limit(1))[0];
     if (!row) {
       const inserted = await db
@@ -63,20 +119,27 @@ export async function getShigunUsage(userId: number): Promise<ShigunUsageState> 
       row = updated[0] || row;
     }
     return shape(row);
-  } catch (error) {
-    if (demoDataEnabled()) {
-      const rec = demoBuckets.get(userId) || { periodStart: today, used: 0 };
-      if (rec.periodStart !== today) {
-        rec.periodStart = today;
-        rec.used = 0;
+  };
+
+  try {
+    return await read();
+  } catch (firstError) {
+    // Most common cause: the table (or its newer columns) does not exist in
+    // the deployed database yet. Heal once, then retry.
+    if (await ensureShigunTable()) {
+      try {
+        return await read();
+      } catch (retryError) {
+        console.warn("Shigun usage read fell back to memory:", retryError instanceof Error ? retryError.message : retryError);
       }
-      demoBuckets.set(userId, rec);
-      return shape(rec);
+    } else {
+      console.warn("Shigun usage read fell back to memory:", firstError instanceof Error ? firstError.message : firstError);
     }
-    throw error;
+    return shape(memoryBucket(userId));
   }
 }
 
+/** Count one cloud-answered tutor question. NEVER throws. */
 export async function recordShigunUse(userId: number): Promise<ShigunUsageState> {
   const today = todayStr();
   try {
@@ -88,22 +151,14 @@ export async function recordShigunUse(userId: number): Promise<ShigunUsageState>
       .where(eq(shigunUsage.userId, userId))
       .returning();
     return shape(updated[0] || { periodStart: today, used, limit: current.limit });
-  } catch (error) {
-    if (demoDataEnabled()) {
-      const rec = demoBuckets.get(userId) || { periodStart: today, used: 0 };
-      if (rec.periodStart !== today) {
-        rec.periodStart = today;
-        rec.used = 0;
-      }
-      rec.used += 1;
-      demoBuckets.set(userId, rec);
-      return shape(rec);
-    }
-    throw error;
+  } catch {
+    const rec = memoryBucket(userId);
+    rec.used += 1;
+    return shape(rec);
   }
 }
 
-/** Refill the day's allowance: start a fresh period at zero. */
+/** Refill the day's allowance: start a fresh period at zero. NEVER throws. */
 export async function resetShigunUsage(userId: number): Promise<ShigunUsageState> {
   const today = todayStr();
   try {
@@ -112,11 +167,8 @@ export async function resetShigunUsage(userId: number): Promise<ShigunUsageState
       .set({ periodStart: today, used: 0, updatedAt: new Date() })
       .where(eq(shigunUsage.userId, userId));
     return getShigunUsage(userId);
-  } catch (error) {
-    if (demoDataEnabled()) {
-      demoBuckets.set(userId, { periodStart: today, used: 0 });
-      return shape(demoBuckets.get(userId)!);
-    }
-    throw error;
+  } catch {
+    demoBuckets.set(userId, { periodStart: today, used: 0 });
+    return shape(demoBuckets.get(userId)!);
   }
 }

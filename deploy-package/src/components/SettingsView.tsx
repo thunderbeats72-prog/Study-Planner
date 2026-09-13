@@ -7,7 +7,7 @@ import {
   IconRefresh, IconSpark, IconTarget, IconTrash, IconUser, IconVolume, IconWarn,
 } from "./icons";
 import { PageHead, Select } from "./bits";
-import AiKeyCard from "./AiKeyCard";
+import AiCoachCard from "./AiCoachCard";
 import ShigunCreditCard from "./ShigunCreditCard";
 import { StudioScene } from "./Illustrations";
 import { Reveal, Spot } from "@/lib/fx";
@@ -242,15 +242,16 @@ export default function SettingsView({
         </Reveal>
 
         {/* ── 2b. AI COACH / CONNECTIVITY ──
-            Without a cloud key the tutor silently degrades and learners read
-            that as "the AI is broken". This card makes the state visible and
-            lets a key be pasted and used immediately, with no redeploy. */}
+            Status only: SHIGUN runs on the deployment's own environment
+            keys with automatic provider failover. Learners never enter a
+            key — this card shows the live connection state and today's AI
+            usage meter. */}
         <Reveal delay={70}>
           <Spot className="glass-panel tilt-card section-card p-5 sm:p-6 space-y-4">
             <h3 className="flex items-center gap-2 text-[length:var(--fs-md)] font-extrabold tracking-tight" style={{ color: "var(--text-main)" }}>
               <IconSpark size={18} /> AI Coach
             </h3>
-            <AiKeyCard />
+            <AiCoachCard />
             <div className="border-t border-[var(--border-subtle)] pt-4">
               <ShigunCreditCard />
             </div>
