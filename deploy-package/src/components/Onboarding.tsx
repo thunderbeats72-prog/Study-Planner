@@ -330,7 +330,7 @@ export default function Onboarding({
   const availDays = Math.max(1, countStudyDays(start, exam, sdays));
   const capacity = availDays * (Number(hrs) || 2) * 60;
   const feasible = capacity >= estMinutes;
-  const projected = projectCompletionDate(start, Math.ceil(estMinutes / 60), Number(hrs) || 2, sdays);
+  const projected = projectCompletionDate(start, estMinutes, Number(hrs) || 2, sdays);
 
   const next = async () => {
     setErr("");
