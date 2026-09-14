@@ -3,7 +3,141 @@
 
 ---
 
-## v35 — A 200 STATUS IS NOT AN ANSWER, + THE SYLLABUS STEP WAS NEVER WIRED UP (this session)
+## v37 — PRODUCTION FIVE-KEY CHAIN + HARDENED FAILSAFE (this session)
+
+**The request.** Implement a production-ready automatic fallback in the exact
+priority `Gemini → Cerebras → Mistral → SambaNova → Cohere → local ML`, using the
+five Vercel keys (GEMINI_API_KEY, CEREBRAS_API_KEY, MISTRAL_API_KEY,
+SAMBANOVA_API_KEY, COHERE_API_KEY). Skip a provider whose key is missing, never
+expose/log a key, keep the UI responsive on any failure, and land on the local ML
+engine when every cloud leg fails.
+
+**What was already true (kept, not rebuilt).** `src/lib/ai.ts` already had the one
+consistent provider abstraction (`PROVIDERS` spec: keyEnv/models/request/extract),
+the hedged multi-provider walker, per-provider model-fallback chains, error-class
+routing (`classifyProviderError`), the 200-body sanity gate
+(`src/lib/aiAnswer.ts`), failure-memory benches, and the local ML handoff. This
+pass tightened the contract rather than rewriting it.
+
+### Changes
+- **Priority order** is now exactly the requested production chain:
+  `DEFAULT_PROVIDER_ORDER = gemini, cerebras, mistral, sambanova, cohere, groq,
+  openrouter`. Groq and OpenRouter moved BEHIND the five configured providers as
+  optional extra legs — a deployment without those keys skips them, so the five
+  real keys always walk first. `.env.example` and `README.txt` updated to match.
+- **402 → rate_limit.** `classifyProviderError` now treats HTTP 402 (exhausted
+  quota / "Payment Required") like a throttle: fall through to the next provider
+  immediately, give the leg the short transient bench + bounded second chance —
+  same as 429.
+- **New test §4g** pins the whole contract with the FIVE production keys and each
+  provider's NATIVE wire format (Gemini `candidates/parts`, the rest
+  `choices/message`): healthy Gemini answers in exactly one call; a 429 falls
+  through to Cerebras in the SAME request; two failures in a row walk to Mistral
+  and stop there; missing keys are never called; an empty 200 body is a failure,
+  not a blank answer; all-fail ends in a clean fast `null` for the local engine;
+  and no API key ever appears in a result, attempt record, or cooldown report.
+
+### Hard constraints carried forward (do not break)
+- Suite 4e static regex requires `DEFAULT_PROVIDER_ORDER` to START with
+  `"gemini", "cerebras",` — the reorder keeps that prefix.
+- No streaming today: transport is one bounded POST /api/chat (client 60 s,
+  server deadline 30 s, per-attempt 9 s, hedge after 2.5 s). A provider that
+  hangs is hedged/aborted, and `askTutor` in `page.tsx` has a `finally` that
+  clears the spinner plus a catch that answers locally — the UI cannot get stuck.
+- Never echo keys: `keyFingerprint` is a djb2 hash; logs/attempts/ai-status carry
+  provider+model+error only. `summarizeAttempts` is server-log-only, never sent to
+  the browser; the learner sees `userFacingAiNotice` wording.
+- After ANY change to `src/` or `README.txt`, re-sync the byte-exact mirror:
+  `rm -rf deploy-package/src && cp -r src deploy-package/src` and copy README.txt
+  (suite §17 enforces parity).
+
+Quality gate: `npm run check` all green — 460 tests / 0 failed, zero lint
+warnings, ui-audit within budget.
+
+---
+
+## v36 — THE CHAIN MUST NOT COLLAPSE TO ONE LEG, + THE ML ENGINE TAKES OVER
+
+**The complaint.** "The cloud engine keeps disconnecting… majority of the time it
+falls back to the local engine. If Gemini is not working it should fall to another
+AI. The fallback mechanism needs to be strong — and the ML should take over and be
+responsible when AI is not there."
+
+### 1. Chain persistence: benched legs get a bounded second chance (`src/lib/ai.ts`)
+
+**The diagnosis.** `callLLMDetailed` built its provider queue with `skipCooled`:
+when EVERY configured leg sat on a cooldown (a bad minute of free-tier 429s does
+exactly this), the request was handed **one** leg — the soonest to expire — and
+when that leg was still throttled the whole request collapsed to the local engine.
+One 429-storm and every message afterwards read "Cloud busy · local engine
+answered", even with seven keys configured.
+
+**The fix.**
+- `chainOrder()` replaces `skipCooled` at the provider level: healthy legs first
+  (priority order, unchanged), then **every** transiently-benched leg
+  (rate_limit / timeout / network / provider) in soonest-expiry order. Legs
+  benched for a DETERMINISTIC reason (auth, relay-notice "empty") are skipped for
+  the whole request — retrying a rejected key seconds later fails identically, so
+  the request returns fast and the ML engine answers instead of burning the budget.
+- Each benched leg gets `recoveryWait()` before its retry: it sleeps until the
+  bench expires, capped by `AI_RECOVERY_MS` (default 12 s, override in env, 0
+  disables) and always by the shared deadline minus 1.2 s for the attempt itself.
+  Free-tier windows roll over per minute, so a few seconds of patience routinely
+  converts "local fallback" back into a cloud answer. Healthy legs never wait.
+  GOTCHA pinned by §4f pass 2b: `Number(envValue(...))` is 0 — not NaN — when the
+  knob is unset, so the default branch must test the raw string for null FIRST.
+  A silent zero collapses the whole second chance (every benched request retries
+  instantly and the chain "keeps disconnecting"). Never write
+  `Number.isFinite(Number(env)) ? ... : default` for a knob where 0 is meaningful.
+- Default `AI_TIMEOUT_MS` raised 24 s → 30 s so one full walk plus one bounded
+  recovery fits inside the budget (client still waits 60 s).
+- `assistantStatusReply()` slow-branch copy updated to describe the second chance
+  (vendor-neutral — the "never name a vendor" check still passes).
+
+**Pinned by** `scripts/test-suite.ts` §4f: a rate-limited lone leg still ends
+request 1 locally, then request 2 waits inside the `AI_RECOVERY_MS` cap and gets
+the cloud answer; two rejected keys produce zero wasted follow-up calls and an
+instant local handoff. The §4/4b/4c/4e contracts (Gemini-first, sticky success,
+hedging, 200-gate) all still pass unchanged.
+
+### 2. The ML engine takes over — a deterministic study strategist (`src/lib/ai.ts`)
+
+The local fallback used to be: greeting/instant/percent replies, the encyclopedia,
+and otherwise "couldn't find that". Strategy questions ("am I ready for the exam?",
+"what should I revise?", "I can't focus", "how many hours should I study?") fell
+through to a generic apology whenever the cloud was down — exactly when the coach
+matters most.
+
+**The fix.** `mlStrategistReply()` — a deterministic strategist answering the whole
+strategy family from the learner's OWN logged signals (readiness projection, FSRS
+due reviews, pace EWMA, skip-risk, focus-hour profile, weekday rates, observed
+minutes). It is wired into the tail of `instantTutorReply()`, so it answers both
+when the cloud is healthy (these are live-data questions — instant beats a model
+round-trip) and, fully responsible, when every cloud leg is down. Every number
+quoted is real; with no history yet it says so instead of inventing. Concept
+questions ("explain photosynthesis") never match its patterns.
+
+### 3. The syllabus teaches verb-less concept questions (`src/app/api/chat/route.ts`)
+
+`localCurriculumReply` now teaches when the question NAMES a lesson strongly
+(full title +20, ≥4 shared significant tokens, or the subject itself +4) even
+without "explain/teach" — "dual aspect concept" no longer needs the magic word
+when the learner's own plan has that lesson. The weak fallback pick (score 2)
+still requires an explicit verb, so "capital of France" can never be answered
+with a random plan card. Pinned in §16c.
+
+**Files changed:** `src/lib/ai.ts` (chainOrder, recoveryWait, mlStrategistReply,
+deadline default, status copy), `src/app/api/chat/route.ts` (curriculum gate),
+`src/app/page.tsx` (timeout comment), `scripts/test-suite.ts` (+15 checks: §4f,
+§16c), `.env.example` (AI_RECOVERY_MS + new defaults), `deploy-package/src/**`
+(byte-exact re-sync — rule unchanged).
+
+**Gate:** `npm run check` — typecheck, zero-warning lint, 439 tests, ui-audit
+budget: ALL GREEN.
+
+---
+
+## v35 — A 200 STATUS IS NOT AN ANSWER, + THE SYLLABUS STEP WAS NEVER WIRED UP
 
 Two unrelated bugs produced one complaint each. Both are now pinned by tests.
 

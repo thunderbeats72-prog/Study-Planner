@@ -225,9 +225,9 @@ const PROVIDERS: Record<ProviderId, ProviderSpec> = {
   },
 
   /* ── Groq (LPU inference, OpenAI-compatible, free tier) ────────
-     Added as the first fallback after Cerebras: same OpenAI wire
-     format, very low latency, and a free developer tier, so a Cerebras
-     outage or a retired Cerebras model id costs milliseconds. */
+     Optional extra leg behind the five production providers: same
+     OpenAI wire format, very low latency, and a free developer tier.
+     Deployments without a GROQ_API_KEY skip it entirely. */
   groq: {
     id: "groq",
     label: "Groq",
@@ -404,8 +404,8 @@ const PROVIDERS: Record<ProviderId, ProviderSpec> = {
 
   /* ── OpenRouter (meta-provider: last cloud leg before the local ──
      engine). One key reaches many vendors, so it is the widest safety
-     net: if every direct provider is down, retired or rate-limited,
-     this is the leg that still answers. */
+     net: if every other provider is down, retired or rate-limited,
+     this is the leg that still answers. Skipped without a key. */
   openrouter: {
     id: "openrouter",
     label: "OpenRouter",
@@ -426,12 +426,14 @@ const PROVIDERS: Record<ProviderId, ProviderSpec> = {
   },
 };
 
-// Priority order: Gemini (the primary most deployments configure) → Cerebras
-// → Groq → Mistral → SambaNova → Cohere → OpenRouter (widest last cloud leg).
+// Priority order — the production fallback chain, exactly as requested:
+// Gemini → Cerebras → Mistral → SambaNova → Cohere. Groq and OpenRouter
+// stay behind them as OPTIONAL extra legs: a deployment without those keys
+// skips them entirely, so the five configured providers always walk first.
 // The local ML engine (ml.ts) always runs last if every cloud call fails.
-// Override with AI_PROVIDER_ORDER=cerebras,gemini,groq,…
+// Override with AI_PROVIDER_ORDER=mistral,cerebras,gemini,…
 const DEFAULT_PROVIDER_ORDER: ProviderId[] = [
-  "gemini", "cerebras", "groq", "mistral", "sambanova", "cohere", "openrouter",
+  "gemini", "cerebras", "mistral", "sambanova", "cohere", "groq", "openrouter",
 ];
 
 /* ── Runtime keys (internal override hook) ─────────────────────
@@ -594,7 +596,11 @@ const PARAM_ERROR_RE =
  *  model id silently took the fastest provider out of the chain. */
 export function classifyProviderError(status: number | null, detail: string): LlmAttempt["error"] {
   if (status === 401 || status === 403) return "auth";
-  if (status === 429) return "rate_limit";
+  // 429 is the standard throttle; 402 ("Payment Required") is how some hosts
+  // report an exhausted quota. Both heal like a rate limit — the request
+  // falls through to the next provider immediately and the leg gets the
+  // short transient bench plus a bounded second chance later.
+  if (status === 429 || status === 402) return "rate_limit";
   if (status === 404 || MODEL_ERROR_RE.test(detail)) return "model";
   if (/rate.?limit|quota|resource.?exhausted|too many requests|tokens per (minute|day)|tpm|rpm/i.test(detail)) return "rate_limit";
   if (/invalid.{0,20}api.?key|api.?key.{0,30}(invalid|missing|not valid|revoked|expired|incorrect)|unauthori|invalid.*credential|authentication|permission denied|forbidden/i.test(detail)) return "auth";
@@ -665,6 +671,45 @@ function skipCooled<T>(items: T[], idFor: (item: T) => string): T[] {
   return [...items].sort((a, b) => cooldownUntil(idFor(a)) - cooldownUntil(idFor(b))).slice(0, 1);
 }
 
+/** Failure families that heal on their own within about a minute — a free
+ *  tier's per-minute rate window rolling over, a host hiccup passing. These
+ *  are the benches worth WAITING out inside a single request. */
+const TRANSIENT_REASONS = new Set<NonNullable<LlmAttempt["error"]>>([
+  "rate_limit", "timeout", "network", "provider",
+]);
+
+/** Live provider-level bench for this (provider, key), or null when healthy. */
+function cooldownEntry(provider: ProviderId, key: string): Cooldown | null {
+  const entry = cooldowns.get(cooldownKey(provider, key));
+  if (!entry || entry.until <= Date.now()) return null;
+  return entry;
+}
+
+/** Order the chain for ONE request. This is the difference between "the
+ *  cloud keeps disconnecting" and a chain that survives a bad minute:
+ *  • healthy legs first, in priority order (nothing changes for them);
+ *  • then legs benched for a TRANSIENT reason (rate limit, timeout, network,
+ *    host wobble), soonest-expiry first — they get a bounded recovery wait
+ *    before their retry, because free-tier windows roll over in seconds;
+ *  • legs benched for a DETERMINISTIC reason (rejected key, host answering
+ *    billing notices) are NOT queued — the identical request would fail
+ *    identically seconds later, so the request returns fast and the local
+ *    ML engine answers instead of everyone waiting on a dead key.
+ *  The old behaviour handed an "everything benched" request exactly ONE leg
+ *  (the soonest to expire) and fell back to the local engine when that leg
+ *  was still throttled — which is precisely the failure learners saw. */
+function chainOrder(all: ProviderId[], keys: Record<ProviderId, string | null>): ProviderId[] {
+  const healthy: ProviderId[] = [];
+  const benched: { id: ProviderId; until: number }[] = [];
+  for (const id of all) {
+    const entry = cooldownEntry(id, keys[id] as string);
+    if (!entry) healthy.push(id);
+    else if (TRANSIENT_REASONS.has(entry.reason)) benched.push({ id, until: entry.until });
+  }
+  benched.sort((a, b) => a.until - b.until);
+  return [...healthy, ...benched.map((entry) => entry.id)];
+}
+
 /** Sanitised view for /api/ai-status: which legs are being skipped and why. */
 export function providerCooldowns(runtime?: RuntimeProviderKeys): { provider: string; model: string | null; reason: string; secondsLeft: number }[] {
   const keys = providerKeys(runtime);
@@ -710,7 +755,11 @@ async function requestJson(
 
 function llmDeadline(): number {
   const configured = Number(envValue("AI_TIMEOUT_MS", "NEXT_PUBLIC_AI_TIMEOUT_MS"));
-  const budget = Number.isFinite(configured) && configured > 0 ? configured : 24_000;
+  // 30 s by default: one full walk of the chain PLUS the bounded recovery
+  // wait for a throttled leg. The client waits 60 s, so this still leaves
+  // ample headroom while giving the chain room to outlast a rate-limit
+  // window instead of collapsing to the local engine.
+  const budget = Number.isFinite(configured) && configured > 0 ? configured : 30_000;
   return Date.now() + Math.max(8_000, Math.min(55_000, budget));
 }
 
@@ -759,10 +808,10 @@ export async function callLLMDetailed(
     }
   };
 
-  /* Skip legs the failure memory says are down. A provider whose KEY is on
-     cooldown (auth) is dropped entirely; a provider with only some MODELS on
-     cooldown keeps its remaining models. */
-  const providers = skipCooled(allProviders, (id) => cooldownKey(id, keys[id] as string));
+  /* Failure memory is a shortcut, never a lock-out: healthy legs walk first,
+     transiently-benched legs get a bounded second chance behind them, and
+     deterministic benches (rejected keys) are skipped for this request. */
+  const providers = chainOrder(allProviders, keys);
 
   type LegOutcome =
     | { kind: "ok"; text: string; provider: ProviderId; model: string }
@@ -878,13 +927,41 @@ export async function callLLMDetailed(
      the good case and turns a 9 s stall into a 2.5 s answer in the bad one. */
   const HEDGE_AFTER_MS = 2_500;
   const PER_ATTEMPT_MS = 9_000;
+  /* How long a transiently-benched leg may hold the chain while its cooldown
+     ticks down (override: AI_RECOVERY_MS). It is only ever spent AFTER every
+     healthy leg has failed for this request, and it is always bounded by the
+     shared deadline — but it is exactly what turns "every provider is on a
+     one-minute rate-limit window → local engine" into "the window reopens →
+     cloud answers after all". Free tiers throttle per minute, so a few
+     seconds of patience routinely buys a real answer. */
+  const recoveryCapMs = (() => {
+    // An UNSET knob means "default 12 s" — only an explicit "0" disables
+    // the second chance. Number(null) is 0, not NaN, so the distinction has
+    // to be made on the raw string or the default silently collapses to 0.
+    const raw = envValue("AI_RECOVERY_MS", "NEXT_PUBLIC_AI_RECOVERY_MS");
+    if (raw === null) return 12_000;
+    const configured = Number(raw);
+    return Math.min(30_000, Number.isFinite(configured) && configured >= 0 ? configured : 12_000);
+  })();
+  const recoveryWait = async (provider: ProviderId) => {
+    const entry = cooldownEntry(provider, keys[provider] as string);
+    if (!entry || !TRANSIENT_REASONS.has(entry.reason)) return;
+    // Leave ≥1.2 s for the attempt itself; never sleep past the deadline.
+    const wait = Math.min(entry.until - Date.now(), recoveryCapMs, deadline - Date.now() - 1_200);
+    if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+  };
   const queue = [...providers];
   const inflight = new Map<ProviderId, Promise<LegOutcome>>();
 
   const startNext = () => {
     const provider = queue.shift();
     if (!provider) return;
-    inflight.set(provider, runProvider(provider, deadline, PER_ATTEMPT_MS));
+    inflight.set(provider, (async () => {
+      // Healthy legs start instantly; a benched leg sleeps out its cooldown
+      // (bounded) first, so its retry lands after the window has reopened.
+      await recoveryWait(provider);
+      return runProvider(provider, deadline, PER_ATTEMPT_MS);
+    })());
   };
 
   startNext();
@@ -2082,6 +2159,141 @@ function localizedInstantReply(q: string, ctx: TutorContext): TutorReply | null 
   return null;
 }
 
+/* ── On-device study strategist ───────────────────────────────
+   The ML engine's job is not just to FEED the cloud layer — when
+   the cloud is rate-limited or unreachable it must TAKE OVER and
+   still be the responsible adult in the room. These deterministic
+   replies answer the strategy family of questions (readiness,
+   revision, workload, focus, how-to-study) from the learner's OWN
+   logged history: pace EWMA, skip-risk, readiness projection,
+   focus-hour profile, spaced-repetition state. Every number quoted
+   is real; when a signal has no history yet the reply says so
+   instead of inventing one. These beat a model round-trip on their
+   own turf — they are instant, and they cannot be rate-limited. */
+
+function shortestPendingTask(ctx: TutorContext) {
+  return [...ctx.today.filter((task) => task.status === "pending")].sort((a, b) => a.minutes - b.minutes)[0] || null;
+}
+
+function peakWindowLabel(ctx: TutorContext): string | null {
+  const ml = ctx.ml;
+  if (!ml || ml.peakHour === null || ml.peakHour === undefined || ml.focusSamples < 3) return null;
+  return `${hourLabel(ml.peakHour)}–${hourLabel(ml.peakHour + 2)}`;
+}
+
+export function mlStrategistReply(q: string, ctx: TutorContext): TutorReply | null {
+  const n = q.toLowerCase().trim();
+  const ml = ctx.ml;
+  const next = ctx.today.find((task) => task.status === "pending");
+  const shortTask = shortestPendingTask(ctx);
+  const peak = peakWindowLabel(ctx);
+
+  // ── Exam readiness: "am I ready?", "will I finish the syllabus?" ──
+  if (/\b(am i ready|are we ready|ready for (the |my )?(exam|test|finals?)|will i (pass|finish|make it|complete)|can i (finish|complete|cover) (the |my )?(syllabus|course|everything|topics)|on track for|enough time (left|to (finish|complete|study)))\b/.test(n)) {
+    if (ml?.readiness && ml.readiness.samples > 0) {
+      const r = ml.readiness;
+      const paceLine = ml.paceSamples >= 3 && Math.abs(ml.pace - 1) >= 0.1
+        ? ` Your pace runs **${Math.round(Math.abs(ml.pace - 1) * 100)}% ${ml.pace > 1 ? "slower" : "faster"}** than planned, which is already baked into this projection.`
+        : "";
+      return { text: r.onTrack
+        ? `**On track.** The readiness model projects you finish in about **${r.likelyDays} days** (worst case ${r.pessimisticDays}) against **${ctx.daysLeft} days** left — roughly **${r.loadPct}%** of the remaining time is spoken for.${paceLine} Keep the current daily load; resist adding extra work now.`
+        : `**Behind, but fixable.** Remaining work needs about **${r.loadPct}%** of your remaining **${ctx.daysLeft} days** (likely ${r.likelyDays} days, worst case ${r.pessimisticDays}).${paceLine} The model's advice: prioritise rather than add — say *“replan”* and I'll rebalance around your highest-weight topics.` };
+    }
+    return { text: `I don't have enough logged history to project exam readiness yet — the model starts speaking after a few completed tasks. What I know now: **${ctx.progressPct}%** of the syllabus is done with **${ctx.daysLeft} days** left${next ? `, and your best next move is **${next.title}** (${next.minutes} min)` : ""}.` };
+  }
+
+  // ── Revision: "what should I revise?" ──
+  if (/\b(what should i (revise|review)|(revise|review|revision) (plan|strategy|list)|help me (revise|review)|what to (revise|review))\b/.test(n)) {
+    if (ml && ml.dueReviews.length) {
+      const due = ml.dueReviews.slice(0, 4)
+        .map((d) => `- **${d.title}**${d.overdueDays > 0 ? ` — ${d.overdueDays} day${d.overdueDays === 1 ? "" : "s"} overdue` : " — due now"}`)
+        .join("\n");
+      const memoryLine = ml.memory.tracked
+        ? `Memory health: **${ml.memory.strong}** topics strong, **${ml.memory.fading}** fading, **${ml.memory.atRisk}** at risk of ${ml.memory.tracked} tracked.`
+        : "";
+      return { text: `Your spaced-repetition schedule says work these first:\n\n${due}\n\n${memoryLine}\n\nDo them as active recall — close the notes, answer aloud, then check${peak ? ` — ideally inside your learned focus window (**${peak}**)` : ""}.` };
+    }
+    if (ml && ml.memory.tracked > 0) {
+      return { text: `No reviews are due right now — **${ml.memory.strong}** of your tracked topics are holding strong. Use the spare recall time on ${next ? `**${next.title}**` : "your next lesson"} instead.` };
+    }
+    return { text: `Nothing is tracked for spaced repetition yet — reviews appear once you complete a few lessons. Until then, the highest-value revision is ${next ? `**${next.title}** (${next.minutes} min)` : "your next pending lesson"}: study it once, then re-test yourself without notes.` };
+  }
+
+  // ── Focus, motivation, procrastination — the micro-plan reply ──
+  if (/\b(can'?t|cannot|unable to) (focus|concentrate|study)|no motivation|not motivated|losing motivation|procrastinat|keep procrastinating|too tired|feeling (burnt|tired|lazy|overwhelmed)|burn(ed|t) ?out|overwhelmed|too distracted|distracted easily|don'?t feel like studying\b/.test(n)) {
+    const micro = shortTask || next;
+    const trim = ml?.tomorrowSkipRisk !== null && ml?.tomorrowSkipRisk !== undefined && ml.tomorrowSkipRisk >= 0.5
+      ? `Tomorrow is over-booked relative to your recent completion rate (skip risk **${Math.round(ml.tomorrowSkipRisk * 100)}%**) — say *“replan”* and I'll trim it down to a day you can actually finish.`
+      : "";
+    return { text: [
+      micro
+        ? `Lower the barrier: start with **${micro.title}** — only **${micro.minutes} min** — and give yourself permission to stop after it. Starting is the expensive part; your own data shows momentum protects the streak.`
+        : `Your plan has nothing pending right now, so take a real break guilt-free — the schedule already covers you.`,
+      peak ? `Schedule the hard lesson inside your learned focus window (**${peak}**) and keep only light revision for the rest of the day.` : "",
+      ml && ml.activeDays > 0 ? `You've studied on **${ml.activeDays}** active days recently (~${ml.effectiveDailyMinutes} min per active day) — the habit exists; today is a low-traction day, not a broken system.` : "",
+      trim,
+    ].filter(Boolean).join("\n\n") };
+  }
+
+  // ── Workload: "how many hours should I study?", "is my plan too heavy?" ──
+  if (/\bhow (many|much) (hours?|time|minutes?) (should|do|can) i stud|is my (plan|schedule|load|workload) too (much|heavy|hard|big)|reduce (my )?(workload|load)|lighten (my )?(load|plan)|too much (to study|on my plate)\b/.test(n)) {
+    const targetHours = Math.round(ctx.dailyHours * 10) / 10;
+    const observed = ml && ml.activeDays > 0 ? ml.effectiveDailyMinutes : null;
+    const risk = ml?.tomorrowSkipRisk ?? null;
+    return { text: [
+      observed !== null
+        ? `Your plan targets **${targetHours} h/day**, but your last **${ml!.activeDays}** active study days averaged **${observed} min**. The readiness projection is built on the observed number — plan around ~${Math.max(20, Math.round(observed))} focused minutes a day and let the streak compound from there.`
+        : `Your plan targets **${targetHours} h/day**. Log a few sessions with the study clock and I'll recalibrate the target to what you actually sustain — the model learns your real capacity within about a week.`,
+      risk !== null
+        ? (risk >= 0.5
+          ? `Tomorrow's skip risk is **${Math.round(risk * 100)}%** — the load is heavy relative to your recent completion rate; a *replan* would trim it.`
+          : risk >= 0.3
+            ? `Tomorrow's skip risk is moderate (**${Math.round(risk * 100)}%**) — doable if you start with the shortest lesson.`
+            : `Tomorrow's skip risk is low (**${Math.round(risk * 100)}%**) — the current load is realistic for you.`)
+        : "",
+    ].filter(Boolean).join("\n\n") };
+  }
+
+  // ── Time management / consistency strategy ──
+  if (/\b(time management|manage my time|manage time better|stop wasting time|stop procrastinating|study routine|best routine|how to be (consistent|disciplined)|consistency tips|build (a )?(study )?habit)\b/.test(n)) {
+    const rates = ml?.weekdayRates ?? null;
+    const dayLine = rates
+      ? (() => {
+          const ranked = rates.map((rate, i) => ({ rate, i })).sort((a, b) => b.rate - a.rate);
+          return `Your completion rate peaks on **${DAY_NAMES[ranked[0].i]}** (${Math.round(ranked[0].rate * 100)}%) and dips on **${DAY_NAMES[ranked[6].i]}** (${Math.round(ranked[6].rate * 100)}%) — anchor the hardest lesson to your strong day.`;
+        })()
+      : "";
+    return { text: [
+      `Three rules, tuned to your own data:`,
+      `1. **Anchor the hardest lesson** ${peak ? `to your learned focus window (**${peak}**)` : "to the same time each day — the focus model learns your peak window after a few logged sessions"}.`,
+      `2. **Keep tomorrow small.** The skip-risk model rewards days that actually finish: a 2-lesson day that completes beats a 5-lesson day that doesn't${ml?.tomorrowSkipRisk !== null && ml?.tomorrowSkipRisk !== undefined && ml.tomorrowSkipRisk >= 0.5 ? " — and tomorrow is currently over-booked, so say *replan*" : ""}.`,
+      dayLine || `3. **Protect the streak** — ${ctx.streak} day${ctx.streak === 1 ? "" : "s"} and counting. One short session on a weak day keeps the momentum the models rely on.`,
+    ].join("\n") };
+  }
+
+  // ── General strategy: "how should I study / prepare?" ──
+  if (/\bhow (should|do|can) i (study|prepare|start|begin|approach)|how to (study|prepare|start studying|begin studying)|study (strategy|tips|smart)|best way to (study|prepare)\b/.test(n)) {
+    const paceLine = ml && ml.paceSamples >= 3
+      ? (ml.pace > 1.1
+        ? `Your pace model says lessons run **${Math.round((ml.pace - 1) * 100)}% slower** than planned${ml.slowSubjects[0] ? ` (slowest: ${ml.slowSubjects[0].name})` : ""} — start earlier than feels necessary and don't stack two heavy lessons back-to-back.`
+        : ml.pace < 0.9
+          ? `You run **${Math.round((1 - ml.pace) * 100)}% faster** than planned — there is real slack for recall and practice, not just coverage.`
+          : `Your pace is right on plan — keep the current rhythm.`)
+      : "";
+    return { text: [
+      next
+        ? `**Start here:** ${next.title} (${next.minutes} min) — the highest-priority pending lesson in your plan.`
+        : `Nothing is pending today — run a short recall session instead of adding new work.`,
+      peak ? `**When:** your focus profile peaks around **${peak}** — put the hardest material inside that window.` : "",
+      paceLine,
+      ml?.dueReviews.length ? `**Don't skip recall:** ${ml.dueReviews.length} spaced-repetition review${ml.dueReviews.length === 1 ? " is" : "s are"} due${ml.dueReviews[0] ? ` — start with *${ml.dueReviews[0].title}*` : ""}.` : "",
+      `**How:** read → close the notes → explain it aloud or on paper → check. Two recall passes beat two re-reads.`,
+    ].filter(Boolean).join("\n\n") };
+  }
+
+  return null;
+}
+
 export function instantTutorReply(q: string, ctx: TutorContext): TutorReply | null {
   const localized = localizedInstantReply(q, ctx);
   if (localized) return localized;
@@ -2152,6 +2364,13 @@ export function instantTutorReply(q: string, ctx: TutorContext): TutorReply | nu
       ? { text: `You have **${ctx.overdue} overdue task${ctx.overdue === 1 ? "" : "s"}**. Use **Rebalance schedule** once; it will move unfinished work forward without touching completed lessons.` }
       : { text: "You have no overdue tasks. Stay with today's plan rather than adding extra work." };
   }
+  /* Strategy family (readiness / revision / workload / focus / how-to-study):
+     answered deterministically from the learner's own ML signals. This runs
+     BEFORE the cloud on purpose — it is instant and grounded in live data,
+     and it is also what takes over, fully responsible, whenever every cloud
+     leg is down. Concept questions never match these patterns. */
+  const strategy = mlStrategistReply(q, ctx);
+  if (strategy) return strategy;
   return null;
 }
 
@@ -2391,7 +2610,7 @@ export function assistantStatusReply(
     health,
   ];
   if (slow) {
-    lines.push(`If a reply was slow or repeated, the first provider in the chain was probably rate-limited (free tiers throttle per minute) and I waited for it before falling through. That wait is now capped at a couple of seconds and a second provider is started in parallel, so it shouldn't happen again. You can also check each provider in **Settings → AI coach → Test connection**.`);
+    lines.push(`If a reply was slow or repeated, the first provider in the chain was probably rate-limited (free tiers throttle per minute). The chain now starts a second provider in parallel after a couple of seconds of silence, and a throttled provider gets one bounded second chance once its window reopens — so a busy minute no longer pushes you onto the local engine. You can check each provider in **Settings → AI coach → Test connection**.`);
   }
   if (identity) {
     lines.push(`I'm **SHIGUN**, Study Planner Pro's coach — not a person. I don't expose which vendor answered a given message, but every reply is grounded in your plan.`);

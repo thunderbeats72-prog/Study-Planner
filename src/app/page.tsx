@@ -1094,10 +1094,11 @@ export default function Home() {
            the on-device engine only when every cloud leg failed. Learners
            never enter a key — the deployment's keys work for everyone.
 
-           The server may walk several providers (AI_TIMEOUT_MS, default
-           24 s) plus two database round trips, so the ceiling stays
-           generous: a slow-but-successful answer must never be aborted
-           into the "didn't get through" fallback. */
+           The server may walk several providers — including a bounded
+           second chance for a throttled one (AI_TIMEOUT_MS, default 30 s)
+           — plus two database round trips, so the ceiling stays generous:
+           a slow-but-successful answer must never be aborted into the
+           "didn't get through" fallback. */
         const r = await askTutorMessage(message, { timeoutMs: 60_000 });
         const reply =
           (r.reply || "").trim() ||

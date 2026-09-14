@@ -15,6 +15,7 @@ import {
   assistantStatusReply,
   looksLikeConceptQuestion,
   mlSignalLines,
+  envConfiguredProviderIds,
   type TutorContext,
 } from "../src/lib/ai";
 import { detectLanguage } from "../src/lib/language";
@@ -37,7 +38,7 @@ import {
   spreadAcrossDays, suggestedRecovery, todayOverload, GENTLE_EXTRA_PER_DAY,
 } from "../src/lib/recovery";
 import { validateQuickAdd, QUICK_ADD_KINDS } from "../src/lib/quickAdd";
-import { summarizeAttempts, userFacingAiNotice } from "../src/app/api/chat/route";
+import { summarizeAttempts, userFacingAiNotice, localCurriculumReply } from "../src/app/api/chat/route";
 import type { TaskRow } from "../src/lib/client";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, relative } from "node:path";
@@ -757,6 +758,289 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
       "The server chain judges every 200 body with the shared aiAnswer gate");
     check(/const DEFAULT_PROVIDER_ORDER: ProviderId\[\] = \[\s*"gemini", "cerebras",/.test(aiSrc),
       "Gemini is the primary leg and Cerebras the very next, as documented in .env.example");
+  }
+
+  /* ── 4f · The chain never collapses to one leg ──────────────────────────
+     Pins the fix for "the cloud keeps disconnecting": when every leg sits
+     on a cooldown, the request must NOT try exactly one leg and then fall
+     back to the local engine. Transient benches (rate limit, timeout,
+     network, host wobble) queue behind healthy legs and get a BOUNDED
+     recovery wait (AI_RECOVERY_MS, always inside the shared deadline), so a
+     throttled free-tier window that reopens seconds later still produces a
+     cloud answer. Deterministic benches (rejected keys) are skipped for the
+     whole request — retrying them seconds later fails identically — which
+     hands the question to the local ML engine fast instead of burning the
+     budget on a dead key. */
+  console.log("\n--- 4f. Chain persistence: benched legs get a bounded second chance ---");
+  {
+    const originalFetch = globalThis.fetch;
+    const savedKeys: Record<string, string | undefined> = {};
+    for (const name of ["GEMINI_API_KEY", "CEREBRAS_API_KEY", "GROQ_API_KEY", "MISTRAL_API_KEY", "SAMBANOVA_API_KEY", "COHERE_API_KEY", "OPENROUTER_API_KEY", "AI_TIMEOUT_MS", "AI_RECOVERY_MS"]) {
+      savedKeys[name] = process.env[name];
+      delete process.env[name];
+    }
+    process.env.CEREBRAS_API_KEY = "test-cerebras-recover";
+    process.env.AI_TIMEOUT_MS = "12000";
+    process.env.AI_RECOVERY_MS = "600";
+    const stickyGlobal = globalThis as { __studyPlannerPreferred?: { provider: string; model: string } };
+    delete stickyGlobal.__studyPlannerPreferred;
+    resetAiCooldowns();
+
+    let mode = "throttled";
+    const hits: string[] = [];
+    globalThis.fetch = (async (input: string | URL | Request) => {
+      hits.push(String(input));
+      if (mode === "throttled") {
+        return new Response(JSON.stringify({ error: { message: "Rate limit reached for models" } }), { status: 429, headers: { "content-type": "application/json" } });
+      }
+      return new Response(JSON.stringify({ choices: [{ message: { content: "Recovered answer" } }] }), { status: 200, headers: { "content-type": "application/json" } });
+    }) as typeof fetch;
+
+    // Pass 1: the only configured leg answers 429 → benched as rate_limit.
+    const first = await callLLMDetailed("Tutor", [{ role: "user", content: "explain demand" }], 150);
+    check(first.text === null, "A lone rate-limited leg still ends the first request in the local handoff");
+    check(providerCooldowns().some((entry) => entry.provider === "Cerebras" && entry.reason === "rate_limit"),
+      "The 429 is remembered as a rate-limit bench");
+
+    // Pass 2: the throttle clears server-side. The next request must wait
+    // out the bench (capped by AI_RECOVERY_MS) and answer from the cloud
+    // instead of instantly falling back to the local engine.
+    mode = "live";
+    const started = Date.now();
+    const second = await callLLMDetailed("Tutor", [{ role: "user", content: "explain supply" }], 150);
+    const elapsed = Date.now() - started;
+    check(second.text === "Recovered answer" && second.provider === "cerebras",
+      "A rate-limited leg gets its bounded second chance and answers the NEXT request",
+      `${second.provider} after ${elapsed} ms`);
+    check(elapsed < 5_000, `The recovery wait stayed inside the AI_RECOVERY_MS cap (${elapsed} ms)`);
+
+    // Pass 2b: an UNSET AI_RECOVERY_MS must fall back to its 12 s default —
+    // Number(null) is 0, not NaN, and a silent zero once collapsed the whole
+    // second chance, so every benched request retried instantly and the
+    // chain "kept disconnecting" in production even though the tests (which
+    // set the knob explicitly) stayed green.
+    delete process.env.AI_RECOVERY_MS;
+    process.env.AI_TIMEOUT_MS = "4000";
+    mode = "throttled";
+    await callLLMDetailed("Tutor", [{ role: "user", content: "explain price" }], 150); // re-bench as rate_limit
+    check(providerCooldowns().some((entry) => entry.provider === "Cerebras" && entry.reason === "rate_limit"),
+      "The re-throttle is remembered before the default-wait pass");
+    mode = "live";
+    const defaultStart = Date.now();
+    const defaultSecond = await callLLMDetailed("Tutor", [{ role: "user", content: "explain output" }], 150);
+    const defaultElapsed = Date.now() - defaultStart;
+    check(defaultSecond.text === "Recovered answer" && defaultSecond.provider === "cerebras",
+      "An unset AI_RECOVERY_MS still grants the bounded second chance",
+      `after ${defaultElapsed} ms`);
+    check(defaultElapsed >= 2_000,
+      `The default recovery wait is actually applied when the knob is unset (${defaultElapsed} ms — instant would mean the default collapsed to 0)`);
+    process.env.AI_RECOVERY_MS = "600"; // restore for the remaining phases
+
+    // Deterministic benches are never re-paid: two rejected keys produce ZERO
+    // follow-up network calls, and the request returns fast for the local
+    // engine instead of burning the whole budget on dead keys.
+    resetAiCooldowns();
+    delete stickyGlobal.__studyPlannerPreferred;
+    process.env.GEMINI_API_KEY = "test-gemini-dead";
+    hits.length = 0;
+    mode = "dead";
+    globalThis.fetch = (async (input: string | URL | Request) => {
+      hits.push(String(input));
+      return new Response(JSON.stringify({ error: { message: "Invalid API key" } }), { status: 401, headers: { "content-type": "application/json" } });
+    }) as typeof fetch;
+    await callLLMDetailed("Tutor", [{ role: "user", content: "q" }], 100);
+    const authCalls = hits.length;
+    check(authCalls >= 2, "Both configured legs were tried once before the first request gave up");
+    const fastStart = Date.now();
+    const third = await callLLMDetailed("Tutor", [{ role: "user", content: "q2" }], 100);
+    check(third.text === null && hits.length === authCalls && Date.now() - fastStart < 1_500,
+      "Rejected keys are skipped entirely on the next request — zero wasted calls, instant local handoff");
+
+    globalThis.fetch = originalFetch;
+    resetAiCooldowns();
+    delete stickyGlobal.__studyPlannerPreferred;
+    for (const [name, value] of Object.entries(savedKeys)) {
+      if (value === undefined) delete process.env[name]; else process.env[name] = value;
+    }
+  }
+
+  /* ── 4g · The five production keys walk the exact requested priority ────
+     Pins the deployment contract for the Vercel environment keys
+     GEMINI_API_KEY, CEREBRAS_API_KEY, MISTRAL_API_KEY, SAMBANOVA_API_KEY,
+     COHERE_API_KEY: Gemini → Cerebras → Mistral → SambaNova → Cohere →
+     local engine. A healthy primary answers alone; a 429 falls through in
+     the SAME request; two failures in a row keep walking; providers with
+     no key are skipped and never called; an empty/invalid body is treated
+     as a failure and the chain moves on; and when every leg fails the
+     result is a clean null that the route hands to the local ML engine. */
+  console.log("\n--- 4g. Production five-key chain walks the exact requested priority ---");
+  {
+    const originalFetch = globalThis.fetch;
+    const savedKeys: Record<string, string | undefined> = {};
+    for (const name of ["GEMINI_API_KEY", "CEREBRAS_API_KEY", "GROQ_API_KEY", "MISTRAL_API_KEY", "SAMBANOVA_API_KEY", "COHERE_API_KEY", "OPENROUTER_API_KEY", "AI_TIMEOUT_MS", "AI_RECOVERY_MS", "AI_PROVIDER_ORDER"]) {
+      savedKeys[name] = process.env[name];
+      delete process.env[name];
+    }
+    process.env.GEMINI_API_KEY = "prod-gemini-key";
+    process.env.CEREBRAS_API_KEY = "prod-cerebras-key";
+    process.env.MISTRAL_API_KEY = "prod-mistral-key";
+    process.env.SAMBANOVA_API_KEY = "prod-sambanova-key";
+    process.env.COHERE_API_KEY = "prod-cohere-key";
+    const stickyGlobal = globalThis as { __studyPlannerPreferred?: { provider: string; model: string } };
+    delete stickyGlobal.__studyPlannerPreferred;
+    resetAiCooldowns();
+
+    const hostOf = (url: string) =>
+      url.includes("generativelanguage") ? "gemini"
+      : url.includes("cerebras") ? "cerebras"
+      : url.includes("mistral") ? "mistral"
+      : url.includes("sambanova") ? "sambanova"
+      : url.includes("cohere") ? "cohere"
+      : "other";
+    // Each provider gets its OWN native wire format — exactly like the real
+    // hosts (Gemini answers with candidates/parts, the rest with choices).
+    const ok = (host: string, content: string) => new Response(
+      host === "gemini"
+        ? JSON.stringify({ candidates: [{ content: { parts: [{ text: content }] }, finishReason: "STOP" }] })
+        : JSON.stringify({ choices: [{ message: { content } }] }),
+      { status: 200, headers: { "content-type": "application/json" } },
+    );
+    const fail = (status: number, message: string) => new Response(
+      JSON.stringify({ error: { message } }),
+      { status, headers: { "content-type": "application/json" } },
+    );
+
+    // The configured chain IS the requested priority, and providers whose
+    // key is missing (Groq / OpenRouter here) simply never appear in it.
+    check(JSON.stringify(envConfiguredProviderIds()) === JSON.stringify(["gemini", "cerebras", "mistral", "sambanova", "cohere"]),
+      "The five configured keys walk in the exact requested priority; keyless providers are skipped");
+
+    // Scenario 1: a healthy Gemini answers alone — nothing else is touched.
+    let hits: string[] = [];
+    globalThis.fetch = (async (input: string | URL | Request) => {
+      const host = hostOf(String(input));
+      hits.push(host);
+      return ok(host, "Gemini answer");
+    }) as typeof fetch;
+    const healthy = await callLLMDetailed("Tutor", [{ role: "user", content: "explain demand" }], 150);
+    check(healthy.text === "Gemini answer" && healthy.provider === "gemini",
+      "Gemini healthy → the answer comes from Gemini");
+    check(hits.length === 1 && hits[0] === "gemini",
+      "A healthy primary costs exactly one call — no speculative fan-out");
+
+    // Scenario 5: Gemini throttled (429) → Cerebras answers the SAME request.
+    resetAiCooldowns();
+    delete stickyGlobal.__studyPlannerPreferred;
+    hits = [];
+    globalThis.fetch = (async (input: string | URL | Request) => {
+      const host = hostOf(String(input));
+      hits.push(host);
+      return host === "gemini" ? fail(429, "Rate limit reached for models") : ok(host, "Cerebras answer");
+    }) as typeof fetch;
+    const throttled = await callLLMDetailed("Tutor", [{ role: "user", content: "explain supply" }], 150);
+    check(throttled.text === "Cerebras answer" && throttled.provider === "cerebras",
+      "A 429 on Gemini falls through to Cerebras within the same request");
+    check(!hits.includes("mistral") && !hits.includes("sambanova") && !hits.includes("cohere"),
+      "The chain stops at the first provider that answers");
+
+    // Scenario 3: two failures in a row keep walking — Gemini 503, Cerebras
+    // 429 → Mistral answers; the legs behind the winner are never spent.
+    resetAiCooldowns();
+    delete stickyGlobal.__studyPlannerPreferred;
+    hits = [];
+    globalThis.fetch = (async (input: string | URL | Request) => {
+      const host = hostOf(String(input));
+      hits.push(host);
+      if (host === "gemini") return fail(503, "upstream overloaded");
+      if (host === "cerebras") return fail(429, "Too many requests");
+      return ok(host, "Mistral answer");
+    }) as typeof fetch;
+    const walked = await callLLMDetailed("Tutor", [{ role: "user", content: "explain elasticity" }], 150);
+    check(walked.text === "Mistral answer" && walked.provider === "mistral",
+      "Two failed providers in a row fall through to the third");
+    check(walked.attempts.some((attempt) => attempt.provider === "gemini" && attempt.error === "provider")
+      && walked.attempts.some((attempt) => attempt.provider === "cerebras" && attempt.error === "rate_limit"),
+      "Every failed leg is recorded for diagnosis");
+    check(!hits.includes("sambanova") && !hits.includes("cohere"),
+      "Once Mistral answers, the remaining legs are not spent");
+
+    // Scenario 4: missing keys are skipped — with only Mistral + Cohere
+    // configured, no request is ever sent to the other three hosts.
+    resetAiCooldowns();
+    delete stickyGlobal.__studyPlannerPreferred;
+    delete process.env.GEMINI_API_KEY;
+    delete process.env.CEREBRAS_API_KEY;
+    delete process.env.SAMBANOVA_API_KEY;
+    hits = [];
+    globalThis.fetch = (async (input: string | URL | Request) => {
+      const host = hostOf(String(input));
+      hits.push(host);
+      return ok(host, "Keyless-chain answer");
+    }) as typeof fetch;
+    check(JSON.stringify(envConfiguredProviderIds()) === JSON.stringify(["mistral", "cohere"]),
+      "The configured order only ever contains providers whose keys exist");
+    const skipped = await callLLMDetailed("Tutor", [{ role: "user", content: "explain output" }], 150);
+    check(skipped.text === "Keyless-chain answer" && skipped.provider === "mistral",
+      "A smaller key set still answers from its first configured leg");
+    check(hits.every((host) => host === "mistral" || host === "cohere"),
+      "Missing keys are skipped — no call reaches an unconfigured host");
+    process.env.GEMINI_API_KEY = "prod-gemini-key";
+    process.env.CEREBRAS_API_KEY = "prod-cerebras-key";
+    process.env.SAMBANOVA_API_KEY = "prod-sambanova-key";
+
+    // An empty / invalid 200 body is a FAILURE, not an answer: the model
+    // leg is benched and the chain moves on instead of showing a blank.
+    resetAiCooldowns();
+    delete stickyGlobal.__studyPlannerPreferred;
+    hits = [];
+    globalThis.fetch = (async (input: string | URL | Request) => {
+      const host = hostOf(String(input));
+      hits.push(host);
+      if (host === "gemini") {
+        return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: "" }] } }] }),
+          { status: 200, headers: { "content-type": "application/json" } });
+      }
+      return ok(host, "Recovered from an empty body");
+    }) as typeof fetch;
+    const emptyBody = await callLLMDetailed("Tutor", [{ role: "user", content: "explain price" }], 150);
+    check(emptyBody.text === "Recovered from an empty body" && emptyBody.provider === "cerebras",
+      "An empty/invalid response is treated as a failure and the next provider answers");
+
+    // Scenario 7: every leg fails → clean null handoff to the local engine,
+    // all five legs walked, and fast enough that the learner is not left waiting.
+    resetAiCooldowns();
+    delete stickyGlobal.__studyPlannerPreferred;
+    hits = [];
+    globalThis.fetch = (async (input: string | URL | Request) => {
+      hits.push(hostOf(String(input)));
+      return fail(503, "service unavailable");
+    }) as typeof fetch;
+    const allFailedStart = Date.now();
+    const allFailed = await callLLMDetailed("Tutor", [{ role: "user", content: "explain rent" }], 150);
+    const allFailedElapsed = Date.now() - allFailedStart;
+    check(allFailed.text === null && allFailed.provider === null,
+      "All cloud legs failing ends in a clean null handoff to the local engine");
+    check(["gemini", "cerebras", "mistral", "sambanova", "cohere"].every((host) => hits.includes(host)),
+      "The whole chain was walked before giving up");
+    check(allFailed.attempts.length >= 5
+      && allFailed.attempts.some((attempt) => attempt.provider === "cohere"),
+      "Every failing provider is recorded, including the last one");
+    check(allFailedElapsed < 15_000, `All-fail returns quickly for the local engine (${allFailedElapsed} ms)`);
+
+    // Key hygiene across the whole section: no raw key ever appears in a
+    // result, an attempt record, or the cooldown report.
+    const leaked = [healthy, throttled, walked, skipped, emptyBody, allFailed].some((result) =>
+      /prod-(gemini|cerebras|mistral|sambanova|cohere)-key/.test(JSON.stringify(result)));
+    check(!leaked, "Chain results and attempt records never contain an API key");
+    check(providerCooldowns().every((entry) => !JSON.stringify(entry).includes("prod-")),
+      "The cooldown report never contains an API key");
+
+    globalThis.fetch = originalFetch;
+    resetAiCooldowns();
+    delete stickyGlobal.__studyPlannerPreferred;
+    for (const [name, value] of Object.entries(savedKeys)) {
+      if (value === undefined) delete process.env[name]; else process.env[name] = value;
+    }
   }
 
   console.log("\n--- 5. Study Clock Accounting ---");
@@ -2251,6 +2535,81 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
       "The meter self-heals a missing table and degrades to memory — it can never take the tutor down");
     check(/ShigunCreditCard/.test(settingsSrc) && /AiCoachCard/.test(settingsSrc),
       "Settings surfaces the deployment AI status and the usage meter — and nothing asks for a key");
+  }
+
+  /* ── 16c · When every cloud leg is down, the on-device ML engine takes
+     over and is the responsible adult ──────────────────────────────────────
+     The learner complaint this pins: "it keeps falling back to the local
+     engine" — but the old local engine then answered a strategy question
+     with "couldn't find that in your plan". Now the deterministic study
+     strategist answers the whole strategy family (readiness, revision,
+     workload, focus, how-to-study) from the learner's OWN logged signals,
+     instantly and unrate-limitable, and the syllabus card teaches a concept
+     the plan actually contains even without the word "explain". */
+  console.log("\n--- 16c. Local ML engine: the fallback that actually answers ---\n");
+  {
+    const strategistCtx: TutorContext = {
+      name: "Lakshit", courseName: "MBA", level: "pg", examDate: "2026-12-01", daysLeft: 79, dailyHours: 3,
+      subjects: [{ id: 1, name: "Financial Accounting", difficulty: "Hard", done: 2, total: 10 }],
+      today: [
+        { title: "Balance sheet basics", kind: "learn", minutes: 45, status: "pending" },
+        { title: "Journal entries", kind: "learn", minutes: 25, status: "pending" },
+      ],
+      progressPct: 20, streak: 4, hoursThisWeek: 5, overdue: 1,
+      ml: {
+        pace: 1.3, paceSamples: 12, slowSubjects: [{ name: "Financial Accounting", pace: 1.42 }], fastSubjects: [],
+        tomorrowSkipRisk: 0.62, peakHour: 21, focusSamples: 9,
+        readiness: { onTrack: false, loadPct: 118, likelyDays: 93, pessimisticDays: 110, samples: 12 },
+        effectiveDailyMinutes: 95, activeDays: 14, dueReviews: [{ title: "Ratios", overdueDays: 2 }],
+        memory: { strong: 5, fading: 2, atRisk: 1, tracked: 8 }, weekdayRates: null, weakestSubject: "Financial Accounting",
+      },
+    };
+
+    const ready = instantTutorReply("Am I ready for the exam?", strategistCtx);
+    check(!!ready && /Behind|fixable/.test(ready.text) && /replan|priorit/i.test(ready.text),
+      "Readiness question is answered from the projection, with a next step");
+    const revise = instantTutorReply("what should I revise?", strategistCtx);
+    check(!!revise && /Ratios/.test(revise.text) && /spaced-repetition|recall/i.test(revise.text),
+      "Revision question lists the due spaced-repetition reviews");
+    const focus = instantTutorReply("I can't focus today", strategistCtx);
+    check(!!focus && /Balance sheet basics|25 min/.test(focus.text) && /9pm–11pm|focus window/.test(focus.text),
+      "A focus/motivation dip gets a concrete micro-plan from the live signals");
+    const hours = instantTutorReply("how many hours should I study?", strategistCtx);
+    check(!!hours && /95 min|observed/i.test(hours.text) && /3 h\/day/.test(hours.text),
+      "Workload question reconciles the plan target with observed minutes");
+    const strategy = instantTutorReply("how should I study?", strategistCtx);
+    check(!!strategy && /Balance sheet basics/.test(strategy.text) && /30% slower|recall/i.test(strategy.text),
+      "How-to-study question starts from the plan's own next lesson");
+
+    // No ML history yet: the strategist degrades honestly instead of inventing numbers.
+    const bareCtx: TutorContext = { ...strategistCtx, ml: undefined };
+    const bareReady = instantTutorReply("am I ready for the exam?", bareCtx);
+    check(!!bareReady && /don't have enough logged history/i.test(bareReady.text),
+      "Without history the strategist says so rather than fabricating a projection");
+
+    // Concept questions must NOT be swallowed by the strategist — they still
+    // belong to the encyclopedia / syllabus path.
+    check(instantTutorReply("explain the accounting equation", strategistCtx) === null,
+      "A concept question is not hijacked by the strategist");
+
+    // The syllabus card teaches a lesson the plan contains, even without a
+    // teach verb — this is the on-device answer when the cloud is silent.
+    const syllabusState = {
+      tasks: [],
+      subjects: [{ id: 1, name: "Financial Accounting" }],
+      topics: [{
+        id: 11, subjectId: 1, unit: "Unit 1", position: 0, status: "pending",
+        title: "Accounting equation", summary: "Assets equal liabilities plus equity.",
+        keyConcepts: ["Assets", "Liabilities", "Equity"], objectives: ["State the equation"],
+        prerequisites: [], practice: "Classify five balances.", sources: [],
+      }],
+    } as unknown as Parameters<typeof localCurriculumReply>[1];
+    const named = localCurriculumReply("accounting equation", syllabusState);
+    check(!!named && /Accounting equation/.test(named) && /Assets equal liabilities/.test(named),
+      "Naming a lesson in the plan teaches it even without the word 'explain'");
+    const unrelated = localCurriculumReply("what is the capital of France", syllabusState);
+    check(unrelated === null,
+      "An unrelated question is never answered with a random plan card");
   }
 
   console.log("\n--- 17. Repository shape: one source of truth ---\n");
