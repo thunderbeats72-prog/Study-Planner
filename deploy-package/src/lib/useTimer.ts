@@ -235,7 +235,7 @@ export function useStudyClock(
     const available = pendingLogMs.current;
     const emitMs = fullMinutesOnly
       ? Math.floor(available / 60_000) * 60_000
-      : available >= 1_000 ? available : 0;
+      : available;
     pendingLogMs.current = Math.max(0, available - emitMs);
     setPendingSeconds(Math.floor(pendingLogMs.current / 1000));
     if (emitMs <= 0) return;

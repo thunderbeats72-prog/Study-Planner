@@ -77,7 +77,7 @@ async function postSessions(req: Request) {
     }
 
     let completedTask: CompletedTaskInfo | null = null;
-    if (minutes > 0.01) {
+    if (minutes > 0) {
       demoAddSession({ subjectId, taskId, date, minutes, mode, eventId, createdAt: new Date().toISOString() });
       if (taskId) {
         const task = stateBefore.tasks.find((t) => t.id === taskId);
@@ -124,7 +124,7 @@ async function postSessions(req: Request) {
 
   // Auto-completed by time: the task whose logged minutes met its plan.
   let completedTask: CompletedTaskInfo | null = null;
-  if (minutes > 0.01) {
+  if (minutes > 0) {
     await db.transaction(async (tx) => {
       await tx
         .insert(sessions)
