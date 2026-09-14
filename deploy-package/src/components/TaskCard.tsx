@@ -2,6 +2,7 @@
 
 import React from "react";
 import { cn } from "@/lib/cn";
+import { formatMinutes, remainingMinutes } from "@/lib/studyTime";
 import { mmss } from "@/lib/useTimer";
 import {
   dayDiff,
@@ -86,13 +87,6 @@ const isCheckpoint = (task: TaskRow) =>
   task.kind === "checkpoint" ||
   (!!task.title && task.title.toLowerCase().startsWith("checkpoint:"));
 
-/** "12m" / "12.5m" — whole minutes stay integer, fractional sessions keep
- *  one decimal so a 90-second clock-out reads "1.5m", not "2m". */
-function formatLoggedMinutes(minutes: number): string {
-  const rounded = Math.round(minutes * 10) / 10;
-  return Number.isInteger(rounded) ? `${rounded}m` : `${rounded.toFixed(1)}m`;
-}
-
 /** "Today" / "Tomorrow" / "Yesterday" / "in 3 days" — short, so the chip
  *  fits on a 320px screen without wrapping the whole meta row. */
 function dueLabel(date: string) {
@@ -157,6 +151,7 @@ export default function TaskCard({
   const persistedLoggedSeconds = Math.round(loggedMinutes * 60);
   const totalLoggedSeconds = persistedLoggedSeconds + liveExtraSeconds;
   const totalLoggedMinutes = totalLoggedSeconds / 60;
+  const remaining = remainingMinutes(task.plannedMinutes, totalLoggedMinutes);
   const showLogged = live ? totalLoggedSeconds > 0 : loggedMinutes > 0;
 
   return (
@@ -224,6 +219,13 @@ export default function TaskCard({
             <IconClock size={11} aria-hidden="true" />
             <span>{task.plannedMinutes}m planned</span>
           </li>
+          <li
+            className="task-meta-item is-remaining"
+            title="Planned duration minus actual logged study time"
+          >
+            <IconTarget size={11} aria-hidden="true" />
+            <span>{formatMinutes(remaining)} remaining</span>
+          </li>
           {topic?.unit && (
             <li
               className="task-meta-item task-meta-extra"
@@ -261,7 +263,7 @@ export default function TaskCard({
                 </span>
                 ) : (
                 <span className="task-logged-value">
-                  {formatLoggedMinutes(totalLoggedMinutes)} logged
+                  {formatMinutes(totalLoggedMinutes)} logged
                 </span>
               )}
             </li>

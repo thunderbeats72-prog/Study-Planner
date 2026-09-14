@@ -5,7 +5,6 @@ import {
   api,
   addDays,
   dayDiff,
-  fmtDate,
   prettyDate,
   prettyLong,
   today,
@@ -28,13 +27,25 @@ import { PageHead, WeekBars } from "./bits";
 import { InsightsScene } from "./Illustrations";
 import Heatmap from "./Heatmap";
 import { cn } from "@/lib/cn";
+import {
+  formatHoursMinutes,
+  loggedMinutesForDate,
+} from "@/lib/studyTime";
 
 export default function AnalyticsView({
   state,
+  activeTaskId,
+  activeSubjectId,
+  clockSessionActive = false,
+  clockPendingSeconds = 0,
   onAskTutor,
   onStartFocus,
 }: {
   state: AppState;
+  activeTaskId?: number | null;
+  activeSubjectId?: number | null;
+  clockSessionActive?: boolean;
+  clockPendingSeconds?: number;
   onAskTutor?: (q: string) => void;
   onStartFocus?: () => void;
 }) {
@@ -98,9 +109,22 @@ export default function AnalyticsView({
     };
   }, [state.tasks.length]);
 
+  const activeLoggedSeconds = clockSessionActive
+    ? Math.max(0, clockPendingSeconds)
+    : 0;
+  const liveSubjectId =
+    activeSubjectId ??
+    (activeTaskId == null
+      ? null
+      : state.tasks.find((task) => task.id === activeTaskId)?.subjectId ?? null);
   const totalMin = useMemo(
-    () => state.sessions.reduce((a, b) => a + b.minutes, 0),
-    [state.sessions],
+    () =>
+      state.sessions.reduce((total, session) => total + Math.max(0, session.minutes), 0) +
+      activeLoggedSeconds / 60,
+    [state.sessions, activeLoggedSeconds],
+  );
+  const totalLoggedLabel = formatHoursMinutes(
+    Math.round(totalMin * 60),
   );
   const doneTasks = useMemo(
     () => state.tasks.filter((x) => x.status === "done").length,
@@ -117,10 +141,11 @@ export default function AnalyticsView({
     const dates = new Set(state.sessions.map((s) => s.date));
     let count = 0;
     for (let i = 0; i < 14; i++) {
-      if (dates.has(addDays(t, -i))) count++;
+      const date = addDays(t, -i);
+      if (dates.has(date) || (date === t && activeLoggedSeconds > 0)) count++;
     }
     return count;
-  }, [state.sessions, t]);
+  }, [state.sessions, t, activeLoggedSeconds]);
 
   const consistency = Math.round((active14 / 14) * 100);
   const ringCircumference = 2 * Math.PI * 34;
@@ -130,9 +155,8 @@ export default function AnalyticsView({
     const arr: { key: string; label: string; minutes: number }[] = [];
     for (let i = 6; i >= 0; i--) {
       const d = addDays(t, -i);
-      const mins = state.sessions
-        .filter((s) => s.date === d)
-        .reduce((a, s) => a + s.minutes, 0);
+      const persisted = loggedMinutesForDate(state.sessions, d);
+      const mins = persisted + (d === t ? activeLoggedSeconds / 60 : 0);
       arr.push({
         key: d,
         label: new Date(d)
@@ -142,7 +166,7 @@ export default function AnalyticsView({
       });
     }
     return arr;
-  }, [state.sessions, t]);
+  }, [state.sessions, t, activeLoggedSeconds]);
 
   const weekMin = useMemo(
     () => week.reduce((a, b) => a + b.minutes, 0),
@@ -160,9 +184,13 @@ export default function AnalyticsView({
       const pendingMins = tasks
         .filter((tk) => tk.status === "pending")
         .reduce((a, b) => a + b.plannedMinutes, 0);
-      const loggedMins = state.sessions
-        .filter((sn) => sn.subjectId === sb.id)
-        .reduce((a, b) => a + b.minutes, 0);
+      const loggedMins =
+        state.sessions
+          .filter((sn) => sn.subjectId === sb.id)
+          .reduce((a, b) => a + b.minutes, 0) +
+        (clockSessionActive && liveSubjectId === sb.id
+          ? activeLoggedSeconds / 60
+          : 0);
       const pct = topics.length
         ? Math.round((doneTopics / topics.length) * 100)
         : 0;
@@ -176,7 +204,15 @@ export default function AnalyticsView({
         pct,
       };
     });
-  }, [state.subjects, state.topics, state.tasks, state.sessions]);
+  }, [
+    state.subjects,
+    state.topics,
+    state.tasks,
+    state.sessions,
+    liveSubjectId,
+    clockSessionActive,
+    activeLoggedSeconds,
+  ]);
 
   // Productivity metrics
   const productivity = useMemo(() => {
@@ -246,7 +282,7 @@ export default function AnalyticsView({
       {
         icon: <IconChart size={13} />,
         label: "Total logged",
-        value: `${Math.round(totalMin / 60)}h`,
+        value: totalLoggedLabel,
       },
       {
         icon: <IconCheck size={13} />,
@@ -278,7 +314,7 @@ export default function AnalyticsView({
   }, [
     state.user.streak,
     weekMin,
-    totalMin,
+    totalLoggedLabel,
     doneTasks,
     overdueTasks,
     consistency,
@@ -411,7 +447,10 @@ export default function AnalyticsView({
 
       {/* 12-Week Study Heatmap */}
       <Reveal delay={80}>
-        <Heatmap state={state} />
+        <Heatmap
+          state={state}
+          activeSeconds={clockSessionActive ? activeLoggedSeconds : 0}
+        />
       </Reveal>
 
       {/* Subject Mastery & Productivity Analytics */}
@@ -574,8 +613,8 @@ export default function AnalyticsView({
                 Recorded study events and real clocked minutes
               </p>
             </div>
-            <span className="cycle-chip mono">
-              {state.sessions.length} sessions total
+            <span className="cycle-chip mono" title="Includes the active session">
+              {totalLoggedLabel} total logged
             </span>
           </div>
 
