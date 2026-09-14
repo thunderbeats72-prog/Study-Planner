@@ -67,7 +67,17 @@ export function localCurriculumReply(question: string, state: GroundingState): s
       || state.topics[0];
     if (topic) selected = { topic, score: 2 };
   }
-  if (!selected || selected.score < 2 || (!asksPractice && !asksTeaching)) return null;
+  if (!selected || selected.score < 2) return null;
+  // A teach/practice verb is the usual trigger, but a STRONG name match —
+  // the question contains the full lesson title (+20), shares ≥4 significant
+  // tokens with it, or names the subject itself (+4) — teaches even without
+  // one. "dual aspect concept" should not need the word "explain" when the
+  // learner's OWN plan has exactly that lesson: this is the on-device
+  // engine's answer to concept questions whenever the cloud is silent. The
+  // weak fallback pick (score 2, a generic curriculum ask) still requires an
+  // explicit verb, so an unrelated question can never be answered with a
+  // random plan card.
+  if (!asksPractice && !asksTeaching && selected.score < 4) return null;
 
   const topic = selected.topic;
   const subject = subjectById.get(topic.subjectId);

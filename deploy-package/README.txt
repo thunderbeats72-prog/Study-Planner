@@ -84,7 +84,13 @@ its daily limit or goes down, the next one answers in the SAME request — a
 question is never left waiting. The last provider/model that answered is
 remembered and tried first, and failures are benched (rejected key 10 min,
 retired model 30 min, rate limit ~45 s, stall ~60 s) so the next message
-skips the broken leg. Override the order with AI_PROVIDER_ORDER.
+skips the broken leg. A bench is a shortcut, never a lock-out: once every
+healthy leg has been tried, the chain gives each throttled leg one bounded
+second chance (AI_RECOVERY_MS) once its window reopens — free tiers
+throttle per minute, so a few seconds of patience routinely buys a real
+cloud answer instead of a local fallback. Only rejected keys are skipped
+for the whole request, because retrying them seconds later fails
+identically. Override the order with AI_PROVIDER_ORDER.
 A 200 STATUS IS NOT AN ANSWER. Some endpoints reply HTTP 200 with a valid
 OpenAI-shaped body whose content is their OWN notice ("The API key used for
 this request has reached its budget …"). src/lib/aiAnswer.ts is the single
@@ -96,9 +102,14 @@ its budget ceiling" is teaching, not a billing error, and is always delivered
 untouched. Advertising stapled under a good answer is trimmed instead of
 being treated as a failure.
 The local ML engine (FSRS-lite, pace models, skip-risk, weekday propensity,
-focus hours, Ebbinghaus decay) answers plan/progress questions even with zero
-keys and zero network, and it is the last-resort answerer when every cloud
-leg fails.
+focus hours, Ebbinghaus decay, readiness projection) answers plan/progress
+questions even with zero keys and zero network, and it is the last-resort
+answerer when every cloud leg fails. It does not just feed the cloud layer —
+when the cloud is down it TAKES OVER: a deterministic study strategist
+answers the whole strategy family (am I ready for the exam, what should I
+revise, how many hours should I study, I can't focus, how should I study)
+from the learner's own logged signals, instantly and unrate-limitable. When
+a signal has no history yet it says so instead of inventing a number.
 SHIGUN CREDIT (Settings → AI coach) is a visibility meter only: one credit
 per cloud-answered question, rolling over daily. It never blocks, throttles
 or degrades tutoring — and a meter problem can never take the tutor down
@@ -116,8 +127,10 @@ The chat header shows Cloud AI · connected when a model answered, Cloud busy
 deployment configured no keys. If every cloud leg fails, the local
 Wikipedia-backed tutor answers instead of an apology, and the notice explains
 what happened in one calm sentence.
-Optional tuning: AI_TIMEOUT_MS (default 24000), AI_PROVIDER_ORDER (a
-comma-separated subset or reorder of the seven providers). Per-provider model
+Optional tuning: AI_TIMEOUT_MS (default 30000), AI_RECOVERY_MS (default
+12000; the cap on waiting for a throttled leg's window to reopen — set 0 to
+disable the second chance), AI_PROVIDER_ORDER (a comma-separated subset or
+reorder of the seven providers). Per-provider model
 pins: GEMINI_MODEL, CEREBRAS_MODEL, GROQ_MODEL, MISTRAL_MODEL,
 SAMBANOVA_MODEL, COHERE_MODEL, OPENROUTER_MODEL.
 Gemini 3.1 TTS uses Google's current Interactions API and automatically falls
