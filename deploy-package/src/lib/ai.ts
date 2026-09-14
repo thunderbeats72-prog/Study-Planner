@@ -225,9 +225,9 @@ const PROVIDERS: Record<ProviderId, ProviderSpec> = {
   },
 
   /* ── Groq (LPU inference, OpenAI-compatible, free tier) ────────
-     Added as the first fallback after Cerebras: same OpenAI wire
-     format, very low latency, and a free developer tier, so a Cerebras
-     outage or a retired Cerebras model id costs milliseconds. */
+     Optional extra leg behind the five production providers: same
+     OpenAI wire format, very low latency, and a free developer tier.
+     Deployments without a GROQ_API_KEY skip it entirely. */
   groq: {
     id: "groq",
     label: "Groq",
@@ -404,8 +404,8 @@ const PROVIDERS: Record<ProviderId, ProviderSpec> = {
 
   /* ── OpenRouter (meta-provider: last cloud leg before the local ──
      engine). One key reaches many vendors, so it is the widest safety
-     net: if every direct provider is down, retired or rate-limited,
-     this is the leg that still answers. */
+     net: if every other provider is down, retired or rate-limited,
+     this is the leg that still answers. Skipped without a key. */
   openrouter: {
     id: "openrouter",
     label: "OpenRouter",
@@ -426,12 +426,14 @@ const PROVIDERS: Record<ProviderId, ProviderSpec> = {
   },
 };
 
-// Priority order: Gemini (the primary most deployments configure) → Cerebras
-// → Groq → Mistral → SambaNova → Cohere → OpenRouter (widest last cloud leg).
+// Priority order — the production fallback chain, exactly as requested:
+// Gemini → Cerebras → Mistral → SambaNova → Cohere. Groq and OpenRouter
+// stay behind them as OPTIONAL extra legs: a deployment without those keys
+// skips them entirely, so the five configured providers always walk first.
 // The local ML engine (ml.ts) always runs last if every cloud call fails.
-// Override with AI_PROVIDER_ORDER=cerebras,gemini,groq,…
+// Override with AI_PROVIDER_ORDER=mistral,cerebras,gemini,…
 const DEFAULT_PROVIDER_ORDER: ProviderId[] = [
-  "gemini", "cerebras", "groq", "mistral", "sambanova", "cohere", "openrouter",
+  "gemini", "cerebras", "mistral", "sambanova", "cohere", "groq", "openrouter",
 ];
 
 /* ── Runtime keys (internal override hook) ─────────────────────
@@ -594,7 +596,11 @@ const PARAM_ERROR_RE =
  *  model id silently took the fastest provider out of the chain. */
 export function classifyProviderError(status: number | null, detail: string): LlmAttempt["error"] {
   if (status === 401 || status === 403) return "auth";
-  if (status === 429) return "rate_limit";
+  // 429 is the standard throttle; 402 ("Payment Required") is how some hosts
+  // report an exhausted quota. Both heal like a rate limit — the request
+  // falls through to the next provider immediately and the leg gets the
+  // short transient bench plus a bounded second chance later.
+  if (status === 429 || status === 402) return "rate_limit";
   if (status === 404 || MODEL_ERROR_RE.test(detail)) return "model";
   if (/rate.?limit|quota|resource.?exhausted|too many requests|tokens per (minute|day)|tpm|rpm/i.test(detail)) return "rate_limit";
   if (/invalid.{0,20}api.?key|api.?key.{0,30}(invalid|missing|not valid|revoked|expired|incorrect)|unauthori|invalid.*credential|authentication|permission denied|forbidden/i.test(detail)) return "auth";

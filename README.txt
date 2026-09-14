@@ -18,7 +18,7 @@ Everything the app actually runs lives in `src/`:
   src/lib/ml.ts               on-device ML (pace, weekdays, FSRS-lite,
                               decay, skip-risk, focus hours)
   src/lib/planner.ts          the mathematical scheduler
-  src/lib/ai.ts               Gemini/Groq/OpenRouter chain + local engine
+  src/lib/ai.ts               provider fallback chain + local engine
   src/db/schema.ts            tables + performance indexes
   src/app/api/**              every API route
 
@@ -78,8 +78,9 @@ learner on the deployment shares it automatically. Learners are never asked
 for a key anywhere in the app; there is no key field, no paste box, no
 browser-stored key and no public relay.
 Providers fail over inside one bounded request in priority order Gemini →
-Cerebras → Groq → Mistral → SambaNova → Cohere → OpenRouter, each with its
-own MODEL FALLBACK CHAIN because model IDs retire. So when one provider hits
+Cerebras → Mistral → SambaNova → Cohere (with Groq and OpenRouter as
+optional extra legs when those keys exist), each with its own MODEL
+FALLBACK CHAIN because model IDs retire. So when one provider hits
 its daily limit or goes down, the next one answers in the SAME request — a
 question is never left waiting. The last provider/model that answered is
 remembered and tried first, and failures are benched (rejected key 10 min,

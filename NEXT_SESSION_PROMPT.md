@@ -3,7 +3,60 @@
 
 ---
 
-## v36 — THE CHAIN MUST NOT COLLAPSE TO ONE LEG, + THE ML ENGINE TAKES OVER (this session)
+## v37 — PRODUCTION FIVE-KEY CHAIN + HARDENED FAILSAFE (this session)
+
+**The request.** Implement a production-ready automatic fallback in the exact
+priority `Gemini → Cerebras → Mistral → SambaNova → Cohere → local ML`, using the
+five Vercel keys (GEMINI_API_KEY, CEREBRAS_API_KEY, MISTRAL_API_KEY,
+SAMBANOVA_API_KEY, COHERE_API_KEY). Skip a provider whose key is missing, never
+expose/log a key, keep the UI responsive on any failure, and land on the local ML
+engine when every cloud leg fails.
+
+**What was already true (kept, not rebuilt).** `src/lib/ai.ts` already had the one
+consistent provider abstraction (`PROVIDERS` spec: keyEnv/models/request/extract),
+the hedged multi-provider walker, per-provider model-fallback chains, error-class
+routing (`classifyProviderError`), the 200-body sanity gate
+(`src/lib/aiAnswer.ts`), failure-memory benches, and the local ML handoff. This
+pass tightened the contract rather than rewriting it.
+
+### Changes
+- **Priority order** is now exactly the requested production chain:
+  `DEFAULT_PROVIDER_ORDER = gemini, cerebras, mistral, sambanova, cohere, groq,
+  openrouter`. Groq and OpenRouter moved BEHIND the five configured providers as
+  optional extra legs — a deployment without those keys skips them, so the five
+  real keys always walk first. `.env.example` and `README.txt` updated to match.
+- **402 → rate_limit.** `classifyProviderError` now treats HTTP 402 (exhausted
+  quota / "Payment Required") like a throttle: fall through to the next provider
+  immediately, give the leg the short transient bench + bounded second chance —
+  same as 429.
+- **New test §4g** pins the whole contract with the FIVE production keys and each
+  provider's NATIVE wire format (Gemini `candidates/parts`, the rest
+  `choices/message`): healthy Gemini answers in exactly one call; a 429 falls
+  through to Cerebras in the SAME request; two failures in a row walk to Mistral
+  and stop there; missing keys are never called; an empty 200 body is a failure,
+  not a blank answer; all-fail ends in a clean fast `null` for the local engine;
+  and no API key ever appears in a result, attempt record, or cooldown report.
+
+### Hard constraints carried forward (do not break)
+- Suite 4e static regex requires `DEFAULT_PROVIDER_ORDER` to START with
+  `"gemini", "cerebras",` — the reorder keeps that prefix.
+- No streaming today: transport is one bounded POST /api/chat (client 60 s,
+  server deadline 30 s, per-attempt 9 s, hedge after 2.5 s). A provider that
+  hangs is hedged/aborted, and `askTutor` in `page.tsx` has a `finally` that
+  clears the spinner plus a catch that answers locally — the UI cannot get stuck.
+- Never echo keys: `keyFingerprint` is a djb2 hash; logs/attempts/ai-status carry
+  provider+model+error only. `summarizeAttempts` is server-log-only, never sent to
+  the browser; the learner sees `userFacingAiNotice` wording.
+- After ANY change to `src/` or `README.txt`, re-sync the byte-exact mirror:
+  `rm -rf deploy-package/src && cp -r src deploy-package/src` and copy README.txt
+  (suite §17 enforces parity).
+
+Quality gate: `npm run check` all green — 460 tests / 0 failed, zero lint
+warnings, ui-audit within budget.
+
+---
+
+## v36 — THE CHAIN MUST NOT COLLAPSE TO ONE LEG, + THE ML ENGINE TAKES OVER
 
 **The complaint.** "The cloud engine keeps disconnecting… majority of the time it
 falls back to the local engine. If Gemini is not working it should fall to another

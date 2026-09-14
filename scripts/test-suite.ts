@@ -15,6 +15,7 @@ import {
   assistantStatusReply,
   looksLikeConceptQuestion,
   mlSignalLines,
+  envConfiguredProviderIds,
   type TutorContext,
 } from "../src/lib/ai";
 import { detectLanguage } from "../src/lib/language";
@@ -854,6 +855,185 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
     const third = await callLLMDetailed("Tutor", [{ role: "user", content: "q2" }], 100);
     check(third.text === null && hits.length === authCalls && Date.now() - fastStart < 1_500,
       "Rejected keys are skipped entirely on the next request — zero wasted calls, instant local handoff");
+
+    globalThis.fetch = originalFetch;
+    resetAiCooldowns();
+    delete stickyGlobal.__studyPlannerPreferred;
+    for (const [name, value] of Object.entries(savedKeys)) {
+      if (value === undefined) delete process.env[name]; else process.env[name] = value;
+    }
+  }
+
+  /* ── 4g · The five production keys walk the exact requested priority ────
+     Pins the deployment contract for the Vercel environment keys
+     GEMINI_API_KEY, CEREBRAS_API_KEY, MISTRAL_API_KEY, SAMBANOVA_API_KEY,
+     COHERE_API_KEY: Gemini → Cerebras → Mistral → SambaNova → Cohere →
+     local engine. A healthy primary answers alone; a 429 falls through in
+     the SAME request; two failures in a row keep walking; providers with
+     no key are skipped and never called; an empty/invalid body is treated
+     as a failure and the chain moves on; and when every leg fails the
+     result is a clean null that the route hands to the local ML engine. */
+  console.log("\n--- 4g. Production five-key chain walks the exact requested priority ---");
+  {
+    const originalFetch = globalThis.fetch;
+    const savedKeys: Record<string, string | undefined> = {};
+    for (const name of ["GEMINI_API_KEY", "CEREBRAS_API_KEY", "GROQ_API_KEY", "MISTRAL_API_KEY", "SAMBANOVA_API_KEY", "COHERE_API_KEY", "OPENROUTER_API_KEY", "AI_TIMEOUT_MS", "AI_RECOVERY_MS", "AI_PROVIDER_ORDER"]) {
+      savedKeys[name] = process.env[name];
+      delete process.env[name];
+    }
+    process.env.GEMINI_API_KEY = "prod-gemini-key";
+    process.env.CEREBRAS_API_KEY = "prod-cerebras-key";
+    process.env.MISTRAL_API_KEY = "prod-mistral-key";
+    process.env.SAMBANOVA_API_KEY = "prod-sambanova-key";
+    process.env.COHERE_API_KEY = "prod-cohere-key";
+    const stickyGlobal = globalThis as { __studyPlannerPreferred?: { provider: string; model: string } };
+    delete stickyGlobal.__studyPlannerPreferred;
+    resetAiCooldowns();
+
+    const hostOf = (url: string) =>
+      url.includes("generativelanguage") ? "gemini"
+      : url.includes("cerebras") ? "cerebras"
+      : url.includes("mistral") ? "mistral"
+      : url.includes("sambanova") ? "sambanova"
+      : url.includes("cohere") ? "cohere"
+      : "other";
+    // Each provider gets its OWN native wire format — exactly like the real
+    // hosts (Gemini answers with candidates/parts, the rest with choices).
+    const ok = (host: string, content: string) => new Response(
+      host === "gemini"
+        ? JSON.stringify({ candidates: [{ content: { parts: [{ text: content }] }, finishReason: "STOP" }] })
+        : JSON.stringify({ choices: [{ message: { content } }] }),
+      { status: 200, headers: { "content-type": "application/json" } },
+    );
+    const fail = (status: number, message: string) => new Response(
+      JSON.stringify({ error: { message } }),
+      { status, headers: { "content-type": "application/json" } },
+    );
+
+    // The configured chain IS the requested priority, and providers whose
+    // key is missing (Groq / OpenRouter here) simply never appear in it.
+    check(JSON.stringify(envConfiguredProviderIds()) === JSON.stringify(["gemini", "cerebras", "mistral", "sambanova", "cohere"]),
+      "The five configured keys walk in the exact requested priority; keyless providers are skipped");
+
+    // Scenario 1: a healthy Gemini answers alone — nothing else is touched.
+    let hits: string[] = [];
+    globalThis.fetch = (async (input: string | URL | Request) => {
+      const host = hostOf(String(input));
+      hits.push(host);
+      return ok(host, "Gemini answer");
+    }) as typeof fetch;
+    const healthy = await callLLMDetailed("Tutor", [{ role: "user", content: "explain demand" }], 150);
+    check(healthy.text === "Gemini answer" && healthy.provider === "gemini",
+      "Gemini healthy → the answer comes from Gemini");
+    check(hits.length === 1 && hits[0] === "gemini",
+      "A healthy primary costs exactly one call — no speculative fan-out");
+
+    // Scenario 5: Gemini throttled (429) → Cerebras answers the SAME request.
+    resetAiCooldowns();
+    delete stickyGlobal.__studyPlannerPreferred;
+    hits = [];
+    globalThis.fetch = (async (input: string | URL | Request) => {
+      const host = hostOf(String(input));
+      hits.push(host);
+      return host === "gemini" ? fail(429, "Rate limit reached for models") : ok(host, "Cerebras answer");
+    }) as typeof fetch;
+    const throttled = await callLLMDetailed("Tutor", [{ role: "user", content: "explain supply" }], 150);
+    check(throttled.text === "Cerebras answer" && throttled.provider === "cerebras",
+      "A 429 on Gemini falls through to Cerebras within the same request");
+    check(!hits.includes("mistral") && !hits.includes("sambanova") && !hits.includes("cohere"),
+      "The chain stops at the first provider that answers");
+
+    // Scenario 3: two failures in a row keep walking — Gemini 503, Cerebras
+    // 429 → Mistral answers; the legs behind the winner are never spent.
+    resetAiCooldowns();
+    delete stickyGlobal.__studyPlannerPreferred;
+    hits = [];
+    globalThis.fetch = (async (input: string | URL | Request) => {
+      const host = hostOf(String(input));
+      hits.push(host);
+      if (host === "gemini") return fail(503, "upstream overloaded");
+      if (host === "cerebras") return fail(429, "Too many requests");
+      return ok(host, "Mistral answer");
+    }) as typeof fetch;
+    const walked = await callLLMDetailed("Tutor", [{ role: "user", content: "explain elasticity" }], 150);
+    check(walked.text === "Mistral answer" && walked.provider === "mistral",
+      "Two failed providers in a row fall through to the third");
+    check(walked.attempts.some((attempt) => attempt.provider === "gemini" && attempt.error === "provider")
+      && walked.attempts.some((attempt) => attempt.provider === "cerebras" && attempt.error === "rate_limit"),
+      "Every failed leg is recorded for diagnosis");
+    check(!hits.includes("sambanova") && !hits.includes("cohere"),
+      "Once Mistral answers, the remaining legs are not spent");
+
+    // Scenario 4: missing keys are skipped — with only Mistral + Cohere
+    // configured, no request is ever sent to the other three hosts.
+    resetAiCooldowns();
+    delete stickyGlobal.__studyPlannerPreferred;
+    delete process.env.GEMINI_API_KEY;
+    delete process.env.CEREBRAS_API_KEY;
+    delete process.env.SAMBANOVA_API_KEY;
+    hits = [];
+    globalThis.fetch = (async (input: string | URL | Request) => {
+      const host = hostOf(String(input));
+      hits.push(host);
+      return ok(host, "Keyless-chain answer");
+    }) as typeof fetch;
+    check(JSON.stringify(envConfiguredProviderIds()) === JSON.stringify(["mistral", "cohere"]),
+      "The configured order only ever contains providers whose keys exist");
+    const skipped = await callLLMDetailed("Tutor", [{ role: "user", content: "explain output" }], 150);
+    check(skipped.text === "Keyless-chain answer" && skipped.provider === "mistral",
+      "A smaller key set still answers from its first configured leg");
+    check(hits.every((host) => host === "mistral" || host === "cohere"),
+      "Missing keys are skipped — no call reaches an unconfigured host");
+    process.env.GEMINI_API_KEY = "prod-gemini-key";
+    process.env.CEREBRAS_API_KEY = "prod-cerebras-key";
+    process.env.SAMBANOVA_API_KEY = "prod-sambanova-key";
+
+    // An empty / invalid 200 body is a FAILURE, not an answer: the model
+    // leg is benched and the chain moves on instead of showing a blank.
+    resetAiCooldowns();
+    delete stickyGlobal.__studyPlannerPreferred;
+    hits = [];
+    globalThis.fetch = (async (input: string | URL | Request) => {
+      const host = hostOf(String(input));
+      hits.push(host);
+      if (host === "gemini") {
+        return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: "" }] } }] }),
+          { status: 200, headers: { "content-type": "application/json" } });
+      }
+      return ok(host, "Recovered from an empty body");
+    }) as typeof fetch;
+    const emptyBody = await callLLMDetailed("Tutor", [{ role: "user", content: "explain price" }], 150);
+    check(emptyBody.text === "Recovered from an empty body" && emptyBody.provider === "cerebras",
+      "An empty/invalid response is treated as a failure and the next provider answers");
+
+    // Scenario 7: every leg fails → clean null handoff to the local engine,
+    // all five legs walked, and fast enough that the learner is not left waiting.
+    resetAiCooldowns();
+    delete stickyGlobal.__studyPlannerPreferred;
+    hits = [];
+    globalThis.fetch = (async (input: string | URL | Request) => {
+      hits.push(hostOf(String(input)));
+      return fail(503, "service unavailable");
+    }) as typeof fetch;
+    const allFailedStart = Date.now();
+    const allFailed = await callLLMDetailed("Tutor", [{ role: "user", content: "explain rent" }], 150);
+    const allFailedElapsed = Date.now() - allFailedStart;
+    check(allFailed.text === null && allFailed.provider === null,
+      "All cloud legs failing ends in a clean null handoff to the local engine");
+    check(["gemini", "cerebras", "mistral", "sambanova", "cohere"].every((host) => hits.includes(host)),
+      "The whole chain was walked before giving up");
+    check(allFailed.attempts.length >= 5
+      && allFailed.attempts.some((attempt) => attempt.provider === "cohere"),
+      "Every failing provider is recorded, including the last one");
+    check(allFailedElapsed < 15_000, `All-fail returns quickly for the local engine (${allFailedElapsed} ms)`);
+
+    // Key hygiene across the whole section: no raw key ever appears in a
+    // result, an attempt record, or the cooldown report.
+    const leaked = [healthy, throttled, walked, skipped, emptyBody, allFailed].some((result) =>
+      /prod-(gemini|cerebras|mistral|sambanova|cohere)-key/.test(JSON.stringify(result)));
+    check(!leaked, "Chain results and attempt records never contain an API key");
+    check(providerCooldowns().every((entry) => !JSON.stringify(entry).includes("prod-")),
+      "The cooldown report never contains an API key");
 
     globalThis.fetch = originalFetch;
     resetAiCooldowns();
