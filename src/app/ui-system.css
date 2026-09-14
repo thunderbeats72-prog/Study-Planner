@@ -7998,3 +7998,60 @@ img, svg, video, canvas { max-width: 100%; height: auto; }
   }
   .zen .zen-actions .zen-primary { min-width: 96px; }
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   v36 · THEME-AWARE CLOCK-OUT DANGER TOKEN
+   Clock Out is a destructive/end-session action, but it is not a global
+   bright-red badge. The token is intentionally different per theme: dark
+   surfaces get a subdued red wash and a readable rose ink; light surfaces
+   get the lighter red treatment. Components only consume the semantic token.
+   ══════════════════════════════════════════════════════════════════════ */
+body.theme-default {
+  --danger-accent: #c74d4d;
+  --danger-ink: #b23d43;
+}
+body.theme-silver-lavender {
+  --danger-accent: #bd5260;
+  --danger-ink: #a84654;
+}
+body.theme-mint {
+  --danger-accent: #bd5558;
+  --danger-ink: #a9454b;
+}
+body.theme-sunset {
+  --danger-accent: #bd5545;
+  --danger-ink: #a34539;
+}
+body.theme-dark {
+  --danger-accent: #9f3f4a;
+  --danger-ink: #eca0a7;
+}
+body.theme-obsidian {
+  --danger-accent: #aa4a57;
+  --danger-ink: #eda2aa;
+}
+body.theme-nebula {
+  --danger-accent: #ad4d68;
+  --danger-ink: #efa0b8;
+}
+
+.btn-danger {
+  background: color-mix(in srgb, var(--danger-accent) 18%, var(--surface-solid)) !important;
+  color: var(--danger-ink, var(--danger-accent)) !important;
+  border: 1px solid color-mix(in srgb, var(--danger-accent) 42%, var(--glass-border)) !important;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 13%, transparent),
+    0 2px 8px color-mix(in srgb, var(--danger-accent) 12%, transparent);
+}
+.btn-danger:hover {
+  background: color-mix(in srgb, var(--danger-accent) 26%, var(--surface-solid)) !important;
+  border-color: color-mix(in srgb, var(--danger-accent) 58%, var(--glass-border)) !important;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 16%, transparent),
+    0 5px 14px color-mix(in srgb, var(--danger-accent) 18%, transparent);
+}
+
+/* End-of-session controls in Zen use the same semantic red while retaining
+   Zen's translucent material rather than becoming a second, unrelated red. */
+.zen-actions .zen-clock-out {
+  border-color: color-mix(in srgb, var(--danger-accent) 46%, var(--zen-line)) !important;
+  color: color-mix(in srgb, var(--danger-ink, var(--danger-accent)) 78%, var(--zen-ink)) !important;
+}

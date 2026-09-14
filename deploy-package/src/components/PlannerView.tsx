@@ -32,6 +32,13 @@ import { Reveal } from "@/lib/fx";
 import { useBackClose } from "@/lib/useBackClose";
 import type { QuickAddPayload } from "@/lib/quickAdd";
 import { cn } from "@/lib/cn";
+import {
+  formatHoursMinutes,
+  formatMinutes,
+  loggedMinutesForDate,
+  loggedMinutesForTask,
+  remainingMinutes,
+} from "@/lib/studyTime";
 
 /* Two focused views — the Kanban board was retired in favour of the
    List + Calendar pair; kind is now communicated by icon, not column. */
@@ -151,12 +158,8 @@ export default function PlannerView({
     state.topics.find((x) => x.id === task.topicId);
   const subjFor = (task: TaskRow) =>
     state.subjects.find((s) => s.id === task.subjectId);
-  const taskLogged = (taskId: number) => {
-    const sum = state.sessions
-      .filter((x) => x.taskId === taskId)
-      .reduce((a, x) => a + x.minutes, 0);
-    return Math.round(sum * 100) / 100;
-  };
+  const taskLogged = (taskId: number) =>
+    loggedMinutesForTask(state.sessions, taskId);
   /* ── Calendar geometry: the real month, always 7 columns ───────────── */
   const anchor = new Date();
   const mDate = new Date(anchor.getFullYear(), anchor.getMonth() + monthOff, 1);
@@ -519,6 +522,20 @@ export default function PlannerView({
           {grouped.map(([dateKey, dayTasks], i) => {
             const isToday = dateKey === t;
             const dayMins = dayTasks.reduce((a, b) => a + b.plannedMinutes, 0);
+            const dayLoggedSeconds =
+              Math.round(loggedMinutesForDate(state.sessions, dateKey) * 60) +
+              (isToday && clockSessionActive ? Math.max(0, clockPendingSeconds ?? 0) : 0);
+            const dayRemainingMinutes = dayTasks.reduce(
+              (total, task) =>
+                total + remainingMinutes(
+                  task.plannedMinutes,
+                  taskLogged(task.id) +
+                    (isToday && activeTaskId === task.id
+                      ? Math.max(0, clockPendingSeconds ?? 0) / 60
+                      : 0),
+                ),
+              0,
+            );
             const doneCount = dayTasks.filter(
               (tk) => tk.status === "done",
             ).length;
@@ -560,6 +577,22 @@ export default function PlannerView({
                         <span className="day-meta-item">
                           <IconClock size={11} aria-hidden="true" />
                           <span className="mono">{dayMins}</span> min
+                        </span>
+                        <span className="day-meta-sep" aria-hidden="true" />
+                        <span
+                          className="day-meta-item day-meta-item--logged"
+                          title="Actual study time logged for this day"
+                        >
+                          <IconCheck size={11} aria-hidden="true" />
+                          <span className="mono">{formatHoursMinutes(dayLoggedSeconds)}</span> logged
+                        </span>
+                        <span className="day-meta-sep" aria-hidden="true" />
+                        <span
+                          className="day-meta-item day-meta-item--remaining"
+                          title="Planned time still remaining across these tasks"
+                        >
+                          <IconTarget size={11} aria-hidden="true" />
+                          <span className="mono">{formatMinutes(dayRemainingMinutes)}</span> left
                         </span>
                         <span className="day-meta-sep" aria-hidden="true" />
                         <span

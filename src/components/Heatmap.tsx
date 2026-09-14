@@ -2,13 +2,21 @@
 
 import React, { useMemo } from "react";
 import { addDays, today, type AppState } from "@/lib/client";
+import { formatHoursMinutes } from "@/lib/studyTime";
 
 /** GitHub-style 12-week study consistency heatmap driven by logged sessions. */
-export default function Heatmap({ state }: { state: AppState }) {
+export default function Heatmap({
+  state,
+  activeSeconds = 0,
+}: {
+  state: AppState;
+  activeSeconds?: number;
+}) {
   const { weeks, max, totalMin, activeDays } = useMemo(() => {
     const t = today();
     const perDay = new Map<string, number>();
     for (const s of state.sessions) perDay.set(s.date, (perDay.get(s.date) || 0) + s.minutes);
+    if (activeSeconds > 0) perDay.set(t, (perDay.get(t) || 0) + activeSeconds / 60);
 
     const WEEKS = 12;
     const end = new Date(t);
@@ -36,7 +44,7 @@ export default function Heatmap({ state }: { state: AppState }) {
       cols.push(col);
     }
     return { weeks: cols, max: maxV, totalMin: total, activeDays: active };
-  }, [state.sessions]);
+  }, [state.sessions, activeSeconds]);
 
   const level = (min: number) => {
     if (min <= 0) return 0;
@@ -59,7 +67,7 @@ export default function Heatmap({ state }: { state: AppState }) {
     <div className="glass-panel tilt-card dash-card section-card">
       <div className="day-head">
         <h3 className="section-title">Study Consistency</h3>
-        <span className="day-meta">{activeDays} active days · {Math.round(totalMin / 60)}h in 12 weeks</span>
+        <span className="day-meta">{activeDays} active days · {formatHoursMinutes(Math.round(totalMin * 60))} in 12 weeks</span>
       </div>
       <div className="heatmap-scroll">
         <div className="heatmap">

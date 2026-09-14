@@ -34,7 +34,10 @@ async function postSessions(req: Request) {
   let eventId: string | null;
   try {
     minutes = finiteNumber(body.minutes, "minutes", { min: 0, max: 720 });
-    minutes = Math.round(minutes * 100) / 100;
+    // Session rows are the timestamp-derived ledger. Keep enough precision
+    // for an exact clock-out instead of turning every sub-minute segment into
+    // a coarse hundredth-minute estimate.
+    minutes = Math.round(minutes * 10_000) / 10_000;
     requestedTaskId = positiveId(body.taskId, "taskId", true);
     requestedSubjectId = positiveId(body.subjectId, "subjectId", true);
     mode = enumValue(body.mode, "mode", SESSION_MODES, "focus");
@@ -74,7 +77,7 @@ async function postSessions(req: Request) {
     }
 
     let completedTask: CompletedTaskInfo | null = null;
-    if (minutes > 0.01) {
+    if (minutes > 0) {
       demoAddSession({ subjectId, taskId, date, minutes, mode, eventId, createdAt: new Date().toISOString() });
       if (taskId) {
         const task = stateBefore.tasks.find((t) => t.id === taskId);
@@ -121,7 +124,7 @@ async function postSessions(req: Request) {
 
   // Auto-completed by time: the task whose logged minutes met its plan.
   let completedTask: CompletedTaskInfo | null = null;
-  if (minutes > 0.01) {
+  if (minutes > 0) {
     await db.transaction(async (tx) => {
       await tx
         .insert(sessions)

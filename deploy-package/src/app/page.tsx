@@ -36,6 +36,7 @@ import { onSoundChange, stopSound } from "@/lib/sound";
 import { haptic } from "@/lib/haptics";
 import { useBackClose } from "@/lib/useBackClose";
 import { cn } from "@/lib/cn";
+import { formatHoursMinutes, loggedMinutesForDate } from "@/lib/studyTime";
 import type { TaskPatch } from "@/components/TaskEditor";
 import {
   IconBolt,
@@ -165,6 +166,35 @@ function savedSessionQueue(raw: string | null): PendingSessionLog[] {
   } catch {
     return [];
   }
+}
+
+/** Keep locally queued ledger rows visible after a refresh/offline load. */
+function mergeQueuedSessionLogs(
+  fresh: AppState,
+  queued: PendingSessionLog[],
+): AppState {
+  if (!queued.length) return fresh;
+  const existing = new Set(
+    fresh.sessions
+      .map((session) => session.eventId)
+      .filter((eventId): eventId is string => !!eventId),
+  );
+  const extra = queued
+    .filter((entry) => !existing.has(entry.eventId))
+    .map((entry, index) => ({
+      id: -Date.now() - index - Math.random(),
+      userId: fresh.user.id,
+      subjectId: entry.subjectId,
+      taskId: entry.taskId,
+      date: entry.date,
+      minutes: entry.minutes,
+      mode: entry.mode,
+      eventId: entry.eventId,
+      createdAt: new Date().toISOString(),
+    }));
+  return extra.length
+    ? { ...fresh, sessions: [...fresh.sessions, ...extra] }
+    : fresh;
 }
 
 export default function Home() {
@@ -333,7 +363,18 @@ export default function Home() {
   const loadInitialState = useCallback(() => {
     setLoading(true);
     api<AppState>("/api/state", { timeoutMs: 20_000 })
-      .then(setState)
+      .then((fresh) => {
+        if (sessionQueueRef.current == null) {
+          try {
+            sessionQueueRef.current = savedSessionQueue(
+              localStorage.getItem(SESSION_QUEUE_KEY),
+            );
+          } catch {
+            sessionQueueRef.current = [];
+          }
+        }
+        setState(mergeQueuedSessionLogs(fresh, sessionQueueRef.current));
+      })
       .catch((error) =>
         notify(
           error instanceof ApiError
@@ -532,7 +573,7 @@ export default function Home() {
           });
           sessionQueueRef.current.shift();
           persistSessionQueue();
-          setState(fresh);
+          setState(mergeQueuedSessionLogs(fresh, sessionQueueRef.current));
           if (fresh.completedTask) {
             autoCompleteRef.current(fresh, fresh.completedTask, entry.date);
           }
@@ -574,15 +615,44 @@ export default function Home() {
         typeof crypto.randomUUID === "function"
           ? crypto.randomUUID()
           : `${Date.now()}_${Math.random().toString(36).slice(2)}`;
-      sessionQueueRef.current.push({
-        eventId: `session_${random}`,
+      const eventId = `session_${random}`;
+      const date = today();
+      const entry: PendingSessionLog = {
+        eventId,
         minutes,
         subjectId,
         taskId,
         mode,
         // Send the CLIENT's local date: server timezone must not move a
         // session into a different day than the learner sees.
-        date: today(),
+        date,
+      };
+      sessionQueueRef.current.push(entry);
+
+      // Reflect the same ledger entry immediately. This keeps Planner,
+      // Dashboard, Focus and Analytics consistent even while the request is
+      // in flight or the device is temporarily offline. The POST response
+      // replaces this optimistic row with the durable server state.
+      setState((previous) => {
+        if (!previous || previous.sessions.some((session) => session.eventId === eventId))
+          return previous;
+        return {
+          ...previous,
+          sessions: [
+            ...previous.sessions,
+            {
+              id: -Date.now() - Math.random(),
+              userId: previous.user.id,
+              subjectId,
+              taskId,
+              date,
+              minutes,
+              mode,
+              eventId,
+              createdAt: new Date().toISOString(),
+            },
+          ],
+        };
       });
       // Keep a hard bound if a device stays offline for a very long time.
       if (sessionQueueRef.current.length > 200)
@@ -594,11 +664,15 @@ export default function Home() {
   );
 
   useEffect(() => {
+    // Let the initial state load merge locally queued rows first. Starting a
+    // drain before that request resolves could let its response race the
+    // initial snapshot and briefly overwrite newer ledger data.
+    if (!state) return;
     void drainSessionQueue();
     const onOnline = () => void drainSessionQueue();
     window.addEventListener("online", onOnline);
     return () => window.removeEventListener("online", onOnline);
-  }, [drainSessionQueue]);
+  }, [drainSessionQueue, state]);
 
   // 1) The study clock — tracks actual studied time
   const clock = useStudyClock(logSession);
@@ -1287,6 +1361,16 @@ export default function Home() {
     (x) => x.date === t && x.status === "done",
   ).length;
   const todayTotal = state.tasks.filter((x) => x.date === t).length;
+  // The server ledger plus the active session's unflushed seconds is the one
+  // total shown by the header and passed to every view. `pendingSeconds` is
+  // deliberately only the part not already represented by `state.sessions`.
+  const persistedLoggedTodaySeconds = Math.round(loggedMinutesForDate(state.sessions, t) * 60);
+  const activeLoggedTodaySeconds = clock.sessionActive
+    ? Math.max(0, clock.pendingSeconds)
+    : 0;
+  const totalLoggedTodaySeconds =
+    persistedLoggedTodaySeconds + activeLoggedTodaySeconds;
+  const totalLoggedTodayLabel = formatHoursMinutes(totalLoggedTodaySeconds);
   const allMsgs = [...state.messages, ...pendingMsgs];
 
   // Zen ring progress: countdown modes deplete over the block (start full,
@@ -1805,6 +1889,13 @@ export default function Home() {
               </div>
             )}
             <div className="tracker-actions">
+              <span
+                className="chip chip-kind tracker-logged-today"
+                title="Total study time logged today, including the active session"
+              >
+                <IconClock size={12} aria-hidden="true" />
+                {totalLoggedTodayLabel} logged today
+              </span>
               <span className="chip chip-kind">
                 {todayDone}/{todayTotal} today
               </span>
@@ -2095,6 +2186,10 @@ export default function Home() {
           {page === "analytics" && (
             <AnalyticsView
               state={state}
+              activeTaskId={clock.taskId}
+              activeSubjectId={clock.subjectId}
+              clockSessionActive={clock.sessionActive}
+              clockPendingSeconds={clock.pendingSeconds}
               onAskTutor={askTutor}
               onStartFocus={startFocusSession}
             />

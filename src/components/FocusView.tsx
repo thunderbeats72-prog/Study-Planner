@@ -22,6 +22,13 @@ import { ClockScene } from "./Illustrations";
 import { PageHead, Select } from "./bits";
 import { Reveal, Spot } from "@/lib/fx";
 import { cn } from "@/lib/cn";
+import {
+  formatHoursMinutes,
+  formatMinutes,
+  loggedMinutesForDate,
+  loggedMinutesForTask,
+  remainingMinutes,
+} from "@/lib/studyTime";
 
 const SOUNDS = [
   { id: "none", label: "Sound off" },
@@ -114,25 +121,21 @@ export default function FocusView({
   const livePendingSeconds = clock.sessionActive
     ? Math.max(0, clock.pendingSeconds)
     : 0;
-  const loggedTodayRaw =
-    state.sessions
-      .filter((x) => x.date === t)
-      .reduce((a, x) => a + x.minutes, 0) + livePendingSeconds / 60;
-  const loggedToday = Math.round(loggedTodayRaw * 10) / 10;
-  const loggedTodayLabel = Number.isInteger(loggedToday)
-    ? String(loggedToday)
-    : loggedToday.toFixed(1);
+  const loggedTodaySeconds =
+    Math.round(loggedMinutesForDate(state.sessions, t) * 60) + livePendingSeconds;
+  const loggedTodayLabel = formatHoursMinutes(loggedTodaySeconds);
 
   const clockTaskLive = !!clockTask && clock.sessionActive && clock.taskId === clockTask.id;
   const clockTaskLoggedRaw = clockTask
-    ? state.sessions
-        .filter((x) => x.taskId === clockTask.id)
-        .reduce((a, x) => a + x.minutes, 0)
+    ? loggedMinutesForTask(state.sessions, clockTask.id)
     : 0;
   const clockTaskLoggedSec =
     Math.round(clockTaskLoggedRaw * 60) +
     (clockTaskLive ? livePendingSeconds : 0);
   const clockTaskLoggedMin = Math.round((clockTaskLoggedSec / 60) * 10) / 10;
+  const clockTaskRemainingMin = clockTask
+    ? remainingMinutes(clockTask.plannedMinutes, clockTaskLoggedSec / 60)
+    : 0;
   const clockTaskLoggedLabel = clockTaskLive
     ? mmss(clockTaskLoggedSec)
     : Number.isInteger(clockTaskLoggedMin)
@@ -231,8 +234,8 @@ export default function FocusView({
               </span>
               <p className="focus-clock-digits mono">{mmss(clock.elapsed)}</p>
               <p className="focus-clock-logged">
-                {loggedToday > 0
-                  ? `${loggedTodayLabel} min logged today${clock.sessionActive ? " · recording now" : ""}`
+                {loggedTodaySeconds > 0
+                  ? `${loggedTodayLabel} logged today${clock.sessionActive ? " · recording now" : ""}`
                   : clock.sessionActive
                     ? "Logging your first minute…"
                     : "Nothing logged today yet"}
@@ -363,7 +366,8 @@ export default function FocusView({
                   <IconCheck size={11} aria-hidden="true" />{" "}
                   {clockTaskLoggedLabel}
                   {clockTaskLive ? "" : "m"} logged ·{" "}
-                  {clockTask.plannedMinutes}m planned
+                  {clockTask.plannedMinutes}m planned ·{" "}
+                  {formatMinutes(clockTaskRemainingMin)} remaining
                 </span>
                 <button
                   type="button"

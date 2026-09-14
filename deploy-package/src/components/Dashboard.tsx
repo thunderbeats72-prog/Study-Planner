@@ -51,6 +51,12 @@ import {
 } from "@/lib/recovery";
 import type { QuickAddPayload } from "@/lib/quickAdd";
 import { cn } from "@/lib/cn";
+import {
+  formatHoursMinutes,
+  loggedMinutesForDate,
+  loggedMinutesForTask,
+  remainingMinutes,
+} from "@/lib/studyTime";
 
 /* One line per day, deterministic from the date key so a refresh never
    reshuffles the card and two tabs on the same day always agree. `tag` is the
@@ -161,18 +167,20 @@ export default function Dashboard({
   );
   const doneToday = todayTasks.filter((x) => x.status === "done").length;
   const totalPlannedMin = todayTasks.reduce((a, x) => a + x.plannedMinutes, 0);
-  const loggedTodayMin = state.sessions
-    .filter((s) => s.date === t)
-    .reduce((a, s) => a + s.minutes, 0);
+  const loggedTodaySeconds =
+    Math.round(loggedMinutesForDate(state.sessions, t) * 60) +
+    (clockSessionActive ? Math.max(0, clockPendingSeconds ?? 0) : 0);
 
   // Weekly study bars
   const week = useMemo(() => {
     const arr: { key: string; label: string; minutes: number }[] = [];
     for (let i = 6; i >= 0; i--) {
       const d = addDays(t, -i);
-      const mins = state.sessions
+      const persisted = state.sessions
         .filter((s) => s.date === d)
         .reduce((a, s) => a + s.minutes, 0);
+      const mins = persisted +
+        (d === t && clockSessionActive ? Math.max(0, clockPendingSeconds ?? 0) / 60 : 0);
       arr.push({
         key: d,
         label: new Date(d)
@@ -182,7 +190,7 @@ export default function Dashboard({
       });
     }
     return arr;
-  }, [state.sessions, t]);
+  }, [state.sessions, t, clockSessionActive, clockPendingSeconds]);
 
   const weekMin = useMemo(
     () => week.reduce((a, b) => a + b.minutes, 0),
@@ -195,6 +203,8 @@ export default function Dashboard({
     const perDay = new Map<string, number>();
     for (const s of state.sessions)
       perDay.set(s.date, (perDay.get(s.date) || 0) + s.minutes);
+    if (clockSessionActive && (clockPendingSeconds ?? 0) > 0)
+      perDay.set(t, (perDay.get(t) || 0) + Math.max(0, clockPendingSeconds ?? 0) / 60);
     const days = new Set(
       [...perDay.entries()].filter(([, m]) => m >= 1).map(([d]) => d),
     );
@@ -205,7 +215,7 @@ export default function Dashboard({
     let hit = 0;
     for (let i = 0; i < span; i++) if (days.has(addDays(t, -i))) hit++;
     return Math.round((hit / span) * 100);
-  }, [state.sessions, state.settings.startDate, t]);
+  }, [state.sessions, state.settings.startDate, t, clockSessionActive, clockPendingSeconds]);
 
   // "What should I do now?" - priority ranking
   const capacity = dailyCapacityMinutes(state.settings);
@@ -282,12 +292,8 @@ export default function Dashboard({
     return set.size;
   }, [state.tasks]);
 
-  const taskLogged = (taskId: number) => {
-    const sum = state.sessions
-      .filter((x) => x.taskId === taskId)
-      .reduce((a, x) => a + x.minutes, 0);
-    return Math.round(sum * 100) / 100;
-  };
+  const taskLogged = (taskId: number) =>
+    loggedMinutesForTask(state.sessions, taskId);
   const fmtMin = (m: number) => {
     const r = Math.round(m * 10) / 10;
     return `${Number.isInteger(r) ? r : r.toFixed(1)}m`;
@@ -298,6 +304,9 @@ export default function Dashboard({
   const heroLoggedSeconds = top
     ? Math.round(taskLogged(top.id) * 60) +
       (heroLive ? Math.max(0, clockPendingSeconds ?? 0) : 0)
+    : 0;
+  const heroRemainingMinutes = top
+    ? remainingMinutes(top.plannedMinutes, heroLoggedSeconds / 60)
     : 0;
 
   const stats = [
@@ -325,7 +334,7 @@ export default function Dashboard({
       value: weekMin / 60,
       decimals: 1,
       suffix: "",
-      sub: `Goal: ${state.settings.dailyHours * 7}h · ${fmtMin(loggedTodayMin)} today`,
+      sub: `Goal: ${state.settings.dailyHours * 7}h · ${formatHoursMinutes(loggedTodaySeconds)} logged today`,
       icon: <IconClock size={18} />,
       color: "var(--text-main)",
     },
@@ -377,6 +386,12 @@ export default function Dashboard({
                     title="Planned duration"
                   >
                     <IconClock size={14} /> {top.plannedMinutes}m planned
+                  </span>
+                  <span
+                    className="meta-item is-remaining"
+                    title="Planned duration minus actual logged study time"
+                  >
+                    <IconTarget size={13} aria-hidden="true" /> {fmtMin(heroRemainingMinutes)} remaining
                   </span>
                   {topSubject && (
                     <span className="meta-item">
