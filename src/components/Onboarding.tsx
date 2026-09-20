@@ -291,6 +291,10 @@ export default function Onboarding({
     try {
       const d = await api<{ subjects: SeedSubject[]; source: string; sources?: CurriculumSource[] }>("/api/course-suggest", {
         method: "POST",
+        /* /api/course-suggest sets maxDuration=60: the AI subject assessment
+           walks the provider chain, so the default 30 s client timeout could
+           abort it mid-flight with the same "took too long" error. */
+        timeoutMs: 65_000,
         body: JSON.stringify({
           // `/api/course-suggest` reads the title from `courseName`. It was
           // only ever sent as `query`, so every assessment came back 400
@@ -406,7 +410,17 @@ export default function Onboarding({
         })(),
         revisionWeeks: Number(revision) || 1,
       };
-      const res = await api<AppState>("/api/onboard", { method: "POST", body: JSON.stringify(payload) });
+      /* Plan build is the app's most expensive request: /api/onboard sets
+         maxDuration=120 and generates every subject's curriculum with the AI
+         pipeline (5 subjects × LLM call, 3 in parallel), which routinely takes
+         30–100 s. api()'s default 30 s client timeout used to abort the
+         in-flight build with "The request took too long." — wait out the
+         server's full budget (plus margin) instead. */
+      const res = await api<AppState>("/api/onboard", {
+        method: "POST",
+        body: JSON.stringify(payload),
+        timeoutMs: 130_000,
+      });
       onDone(res);
     } catch (e: unknown) {
       setErr(e instanceof Error ? e.message : "Failed to generate schedule");
@@ -1000,7 +1014,7 @@ export default function Onboarding({
 
                 {busy && (
                   <div className="ob-review-loading">
-                    SHIGUN is analysing your syllabus and sequencing {totalUnits} lessons… this takes a few seconds.
+                    SHIGUN is analysing your syllabus and sequencing {totalUnits} lessons… this can take up to a couple of minutes — please keep this tab open.
                   </div>
                 )}
               </div>
