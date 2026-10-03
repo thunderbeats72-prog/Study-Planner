@@ -2,7 +2,6 @@ import { db } from "@/db";
 import { demoDataEnabled } from "./demoGate";
 import { users, settings, subjects, topics, tasks, sessions, messages } from "@/db/schema";
 import { and, eq, desc, asc, sql } from "drizzle-orm";
-import { createHash } from "node:crypto";
 import { addDays, diffDays, todayStr } from "./planner";
 import type { TutorContext } from "./ai";
 import { advancedTopicMetadata } from "./curriculum";
@@ -18,20 +17,13 @@ import { prioritizeTasks, weakestSubjectIds } from "./prioritization";
 /** Transaction handle type as produced by `db.transaction(cb)`. */
 export type DbTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
-const USER_KEY_RE = /^u_[A-Za-z0-9_-]{12,120}$/;
-
-export function keyFrom(req: Request): string {
-  const supplied = req.headers.get("x-user-key")?.trim() || "";
-  if (USER_KEY_RE.test(supplied)) return supplied;
-
-  // Never put every header-less request into one shared "anon-default"
-  // account. A bounded one-way fingerprint provides isolation for legacy or
-  // non-browser clients without storing raw IP/User-Agent data.
-  const forwarded = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
-  const agent = req.headers.get("user-agent")?.slice(0, 300) || "unknown";
-  const seed = `${supplied}\0${forwarded}\0${agent}`;
-  return `u_fallback_${createHash("sha256").update(seed).digest("hex").slice(0, 32)}`;
-}
+/**
+ * The device key a request carries. Identity itself now comes from the
+ * signed-in account (`requireUser` in src/lib/auth.ts); this is re-exported
+ * here only because the rate limiter, the preview learner and the sign-up
+ * "claim my existing plan" path still need the browser's own handle.
+ */
+export { keyFrom } from "./identity";
 
 export function dateFrom(req: Request): string {
   const serverDate = todayStr();

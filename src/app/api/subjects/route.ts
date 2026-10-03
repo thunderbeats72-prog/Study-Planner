@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { subjects, tasks, topics } from "@/db/schema";
 import { and, asc, eq, gt } from "drizzle-orm";
-import { buildContext, dateFrom, fullState, getOrCreateUser, getSettings, keyFrom } from "@/lib/state";
+import { buildContext, dateFrom, fullState, getSettings } from "@/lib/state";
+import { requireUser } from "@/lib/auth";
 import { regeneratePlan } from "@/lib/generate";
 import { aiGenerateTopics, type GeneratedTopic } from "@/lib/ai";
 import {
@@ -79,7 +80,8 @@ async function postSubjects(req: Request) {
     return NextResponse.json({ error: payload.error, code: payload.code }, { status: payload.status });
   }
 
-  const key = keyFrom(req);
+  const user = await requireUser(req);
+  const key = user.userKey;
 
   // ── Preview without a database: add to the in-memory demo curriculum. ────
   if (demoDataEnabled()) {
@@ -94,7 +96,6 @@ async function postSubjects(req: Request) {
   }
   // ── End of preview branch ────────────────────────────────────────────────
 
-  const user = await getOrCreateUser(key);
   const existing = await db.select().from(subjects).where(eq(subjects.userId, user.id));
   if (existing.length >= 12) return NextResponse.json({ error: "A plan can contain at most 12 subjects." }, { status: 400 });
   if (existing.some((subject) => subject.name.toLocaleLowerCase() === name.toLocaleLowerCase())) {
@@ -141,7 +142,8 @@ async function patchSubjects(req: Request) {
     return NextResponse.json({ error: payload.error, code: payload.code }, { status: payload.status });
   }
 
-  const key = keyFrom(req);
+  const user = await requireUser(req);
+  const key = user.userKey;
   let id: number;
   try { id = positiveId(body.id, "id") as number; }
   catch (error) {
@@ -149,7 +151,6 @@ async function patchSubjects(req: Request) {
     return NextResponse.json({ error: payload.error, code: payload.code }, { status: payload.status });
   }
 
-  const user = await getOrCreateUser(key);
   let previous: typeof subjects.$inferSelect;
   if (demoDataEnabled()) {
     // Preview without a database: read the subject from the demo curriculum.
@@ -244,8 +245,8 @@ async function patchSubjects(req: Request) {
 export const DELETE = withDbGuard(deleteSubjects);
 
 async function deleteSubjects(req: Request) {
-  const key = keyFrom(req);
-  const user = await getOrCreateUser(key);
+  const user = await requireUser(req);
+  const key = user.userKey;
   let id: number;
   try { id = positiveId(new URL(req.url).searchParams.get("id"), "id") as number; }
   catch (error) {

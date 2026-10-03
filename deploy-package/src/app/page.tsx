@@ -4,9 +4,12 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   api,
   ApiError,
+  isAuthError,
+  onUnauthorized,
   prettyDate,
   prettyLong,
   today,
+  type AccountInfo,
   type AppState,
   type MessageRow,
 } from "@/lib/client";
@@ -22,6 +25,7 @@ import { useStudySession, type StudySessionApi } from "@/lib/studySession";
 import { nextPendingTask, type CompletedTaskInfo } from "@/lib/completion";
 import { nextAction } from "@/lib/prioritization";
 import type { QuickAddPayload } from "@/lib/quickAdd";
+import AuthGate from "@/components/AuthGate";
 import Onboarding from "@/components/Onboarding";
 import Dashboard from "@/components/Dashboard";
 import PlannerView from "@/components/PlannerView";
@@ -199,7 +203,18 @@ function mergeQueuedSessionLogs(
 
 export default function Home() {
   const [state, setState] = useState<AppState | null>(null);
+  /* Who is signed in, kept beside the plan rather than inside it: every
+     mutation route answers with the whole state, but only the boot and auth
+     routes repeat the account, so holding it separately means a settings
+     save or a clock-out can never make Settings → Account forget the
+     learner's own username. */
+  const [account, setAccount] = useState<AccountInfo | null>(null);
   const [loading, setLoading] = useState(true);
+  /* Accounts: until /api/state answers, we do not know whether anybody is
+     signed in on this device. `authRequired` is set by the 401 that answer
+     carries — and by any later 401, e.g. after this device was signed out
+     from another one — and it is the ONLY thing that paints the front door. */
+  const [authRequired, setAuthRequired] = useState(false);
   /* v14 — the page and the direction it was entered from are one piece of
      state, written together by the nav action. The first painted frame of a
      new view therefore already knows which way to slide in, and the state
@@ -362,7 +377,7 @@ export default function Home() {
 
   const loadInitialState = useCallback(() => {
     setLoading(true);
-    api<AppState>("/api/state", { timeoutMs: 20_000 })
+    api<AppState>("/api/state", { timeoutMs: 20_000, skipAuthRedirect: true })
       .then((fresh) => {
         if (sessionQueueRef.current == null) {
           try {
@@ -373,18 +388,71 @@ export default function Home() {
             sessionQueueRef.current = [];
           }
         }
+        setAuthRequired(false);
+        if (fresh.account !== undefined) setAccount(fresh.account ?? null);
         setState(mergeQueuedSessionLogs(fresh, sessionQueueRef.current));
       })
-      .catch((error) =>
+      .catch((error) => {
+        // Nobody is signed in on this device: that is not an error, it is
+        // the sign-in screen.
+        if (isAuthError(error)) {
+          setState(null);
+          setAuthRequired(true);
+          return;
+        }
         notify(
           error instanceof ApiError
             ? error.message
             : "Could not reach the server.",
           "error",
-        ),
-      )
+        );
+      })
       .finally(() => setLoading(false));
   }, [notify]);
+
+  /**
+   * A 401 from ANY later request means the session ended elsewhere — it
+   * expired, or this device was signed out from another one. Returning to
+   * the front door beats letting every tap fail silently.
+   */
+  useEffect(() => {
+    onUnauthorized(() => {
+      setState(null);
+      setAuthRequired(true);
+      setLoading(false);
+    });
+    return () => onUnauthorized(null);
+  }, []);
+
+  /** Sign out of this device. The plan stays with the account. */
+  const signOut = useCallback(
+    async (everywhere = false) => {
+      try {
+        await api("/api/auth/logout", {
+          method: "POST",
+          body: JSON.stringify({ everywhere }),
+          timeoutMs: 12_000,
+          skipAuthRedirect: true,
+        });
+      } catch {
+        /* the cookie is cleared server-side even when the reply is lost */
+      }
+      // Queued offline minutes belong to the account that logged them —
+      // never replay them into whoever signs in on this device next.
+      try {
+        localStorage.removeItem(SESSION_QUEUE_KEY);
+      } catch {
+        /* private mode */
+      }
+      sessionQueueRef.current = [];
+      setPendingMsgs([]);
+      setAccount(null);
+      setState(null);
+      setAuthRequired(true);
+      setLoading(false);
+    },
+    [],
+  );
 
   useEffect(() => {
     const timer = window.setTimeout(loadInitialState, 0);
@@ -1321,6 +1389,27 @@ export default function Home() {
     );
   }
 
+  if (authRequired) {
+    return (
+      <AuthGate
+        onAuthenticated={(fresh, info) => {
+          setAuthRequired(false);
+          setAccount(fresh.account ?? null);
+          setState(fresh);
+          goPage("dashboard");
+          notify(
+            info.claimedExistingPlan
+              ? "Account created — the plan already on this device came with you. Sign in anywhere to see it."
+              : info.mode === "signup"
+                ? `Welcome, ${fresh.account?.username || fresh.user.name}! Your plan now follows you to every device.`
+                : `Signed in as ${fresh.account?.username || fresh.user.name}.`,
+            "success",
+          );
+        }}
+      />
+    );
+  }
+
   if (!state) {
     return (
       <div className="loader-screen">
@@ -2197,8 +2286,10 @@ export default function Home() {
           {page === "settings" && (
             <SettingsView
               state={state}
+              account={account}
               onPatch={patchSettings}
               onRestart={requestWizardRestart}
+              onSignOut={signOut}
               busy={busy}
             />
           )}

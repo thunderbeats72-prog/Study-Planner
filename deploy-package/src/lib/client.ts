@@ -121,6 +121,24 @@ export type Ctx = {
   }[];
   today: { title: string; kind: string; minutes: number; status: string }[];
 };
+/** The signed-in account, as the client is allowed to see it. Never carries
+ *  the password hash or the session token — only what the UI greets the
+ *  learner with and shows in Settings → Account. */
+export type AccountInfo = {
+  username: string;
+  usernameKey: string;
+  name: string;
+  createdAt: string | null;
+  lastLoginAt: string | null;
+  hasAccount: boolean;
+};
+export type DeviceInfo = {
+  id: number;
+  device: string;
+  createdAt: string;
+  lastSeenAt: string;
+  current: boolean;
+};
 export type AppState = {
   user: UserRow;
   settings: SettingsRow;
@@ -132,6 +150,10 @@ export type AppState = {
   context: Ctx;
   aiProvider?: string | null;
   stats?: PlanStats | null;
+  account?: AccountInfo | null;
+  /** Set by POST /api/auth/signup when the new account adopted the plan this
+   *  browser had already built anonymously. */
+  claimedExistingPlan?: boolean;
 };
 export type PlanStats = {
   studyDays: number;
@@ -151,6 +173,18 @@ const USER_KEY_STORAGE = "spp-user-key";
 const USER_KEY_COOKIE = "spp_user_key";
 const USER_KEY_RE = /^u_[A-Za-z0-9_-]{12,120}$/;
 let volatileUserKey = "";
+
+/**
+ * WHO THE DEVICE KEY IS NOW
+ * ─────────────────────────
+ * Identity belongs to the ACCOUNT (username + password, carried by an
+ * HttpOnly session cookie the browser cannot read). The random `u_…` key
+ * below is no longer an identity: it is this browser's handle, sent so that
+ *   • the rate limiter can tell devices apart, and
+ *   • a brand-new account can claim the plan this device built before it
+ *     signed up (POST /api/auth/signup).
+ * The server never serves anybody's data on the strength of this header.
+ */
 
 function generatedUserKey(): string {
   const random =
@@ -215,13 +249,41 @@ export class ApiError extends Error {
   }
 }
 
-export type ApiRequestInit = RequestInit & { timeoutMs?: number };
+/** True when the server said "sign in first" — the app answers this by
+ *  showing the sign-in screen, never a red error toast. */
+export function isAuthError(error: unknown): boolean {
+  return error instanceof ApiError && (error.status === 401 || error.code === "AUTH_REQUIRED");
+}
+
+type UnauthorizedHandler = () => void;
+let unauthorizedHandler: UnauthorizedHandler | null = null;
+
+/**
+ * Register what should happen when ANY request comes back unauthenticated —
+ * an expired session, or this device being signed out from another one. The
+ * app registers a handler that returns it to the sign-in screen with the
+ * work-in-progress intact, so a learner never keeps tapping into a void.
+ */
+export function onUnauthorized(handler: UnauthorizedHandler | null): void {
+  unauthorizedHandler = handler;
+}
+
+export type ApiRequestInit = RequestInit & {
+  timeoutMs?: number;
+  /** Opt out of the global sign-in bounce (the auth screen's own calls). */
+  skipAuthRedirect?: boolean;
+};
 
 export async function api<T>(
   path: string,
   init: ApiRequestInit = {},
 ): Promise<T> {
-  const { timeoutMs = 30_000, signal: callerSignal, ...requestInit } = init;
+  const {
+    timeoutMs = 30_000,
+    signal: callerSignal,
+    skipAuthRedirect = false,
+    ...requestInit
+  } = init;
   const controller = new AbortController();
   const abortFromCaller = () => controller.abort(callerSignal?.reason);
   if (callerSignal?.aborted) abortFromCaller();
@@ -251,6 +313,9 @@ export async function api<T>(
     const res = await fetch(path, {
       ...requestInit,
       headers,
+      // The session cookie IS the identity. Being explicit keeps that true
+      // even if this helper is ever called from a different context.
+      credentials: "same-origin",
       signal: controller.signal,
     });
     const raw = await res.text();
@@ -273,12 +338,14 @@ export async function api<T>(
           : typeof body?.message === "string"
             ? body.message
             : `Request failed (${res.status}).`;
-      throw new ApiError(
+      const apiError = new ApiError(
         message,
         res.status,
         typeof body?.code === "string" ? body.code : undefined,
         res.status === 408 || res.status === 429 || res.status >= 500,
       );
+      if (!skipAuthRedirect && isAuthError(apiError)) unauthorizedHandler?.();
+      throw apiError;
     }
     return payload as T;
   } catch (error) {

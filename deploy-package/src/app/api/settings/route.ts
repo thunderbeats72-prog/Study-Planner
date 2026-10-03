@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { settings, subjects, users } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
-import { buildContext, dateFrom, fullState, getOrCreateUser, getSettings, keyFrom } from "@/lib/state";
+import { buildContext, dateFrom, fullState, getSettings } from "@/lib/state";
+import { requireUser } from "@/lib/auth";
 import { regeneratePlan } from "@/lib/generate";
 import { demoDataEnabled, demoPatchSettings, demoPatchUser } from "@/lib/demoState";
 import {
@@ -29,9 +30,9 @@ async function patchSettings(req: Request) {
     return NextResponse.json({ error: payload.error, code: payload.code }, { status: payload.status });
   }
 
-  const key = keyFrom(req);
+  const user = await requireUser(req);
+  const key = user.userKey;
   const localDate = dateFrom(req);
-  const user = await getOrCreateUser(key);
   const current = await getSettings(user.id);
   const patch: Record<string, unknown> = {};
   let newName: string | null = null;

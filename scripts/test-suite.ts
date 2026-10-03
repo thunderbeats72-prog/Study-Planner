@@ -34,6 +34,14 @@ import {
 import { nextAction, prioritizeTasks, weakestSubjectIds } from "../src/lib/prioritization";
 import { demoDataEnabled } from "../src/lib/demoGate";
 import {
+  displayUsername, normalizeUsername, passwordProblem, passwordStrength, usernameProblem,
+} from "../src/lib/authRules";
+import {
+  clearSessionCookie, hashPassword, SESSION_COOKIE, sessionCookie, sessionTokenFrom,
+  sessionTokenHash, verifyPassword,
+} from "../src/lib/auth";
+import { deviceLabel, keyFrom, newUserKey, USER_KEY_RE } from "../src/lib/identity";
+import {
   backlogFor, backlogToDate, canFitToday, dailyCapacityMinutes, pendingOnDate,
   spreadAcrossDays, suggestedRecovery, todayOverload, GENTLE_EXTRA_PER_DAY,
 } from "../src/lib/recovery";
@@ -49,6 +57,7 @@ import {
   effectKinds, isBreakMode, planSession,
   type SessionCommand, type SessionSnapshot,
 } from "../src/lib/studySession";
+import AuthGate from "../src/components/AuthGate";
 import TaskActions from "../src/components/TaskActions";
 import TaskCard from "../src/components/TaskCard";
 import type { SubjectRow } from "../src/lib/client";
@@ -2610,6 +2619,217 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
     const unrelated = localCurriculumReply("what is the capital of France", syllabusState);
     check(unrelated === null,
       "An unrelated question is never answered with a random plan card");
+  }
+
+  /* ── Accounts: one identity, every device ───────────────────────────────
+     The whole feature rests on three things being true:
+       • the rules the sign-in form enforces are the rules the API enforces
+         (one shared module, so a browser can never promise what the server
+         rejects);
+       • a password is never recoverable from what is stored; and
+       • the cookie that carries a session is HttpOnly and never leaves the
+         token lying around where a script could read it.
+     Each of those is pinned below. */
+  console.log("\n--- 18. Accounts: credentials, hashing, sessions ---\n");
+  {
+    // Usernames — comparable in lower case, so the phone and the laptop
+    // agree about who "Arjun.R" is.
+    check(normalizeUsername("  Arjun.R  ") === "arjun.r", "Username normalises to a single comparable form");
+    check(usernameProblem("arjun.r") === null, "A sensible username is accepted");
+    check(usernameProblem("ab") !== null, "Two characters is too short");
+    check(usernameProblem("a".repeat(30)) !== null, "Thirty characters is too long");
+    check(usernameProblem("arjun r") !== null, "Spaces are rejected");
+    check(usernameProblem("arjun@r") !== null, "Unsupported symbols are rejected");
+    check(usernameProblem(".arjun") !== null, "A leading separator is rejected");
+    check(usernameProblem("arjun..r") !== null, "Two separators in a row are rejected");
+    check(usernameProblem("admin") !== null, "Reserved names cannot be registered");
+    check(usernameProblem("ADMIN") !== null, "Reserved names are caught after normalisation");
+    check(displayUsername("Arjun.R") === "Arjun.R", "The casing the learner typed is kept for display");
+
+    // Passwords — strong but humane: a passphrase is as welcome as a
+    // symbol soup, and nothing that would lock a learner out silently.
+    check(passwordProblem("StudyHard2026", "arjun.r") === null, "A strong password is accepted");
+    check(passwordProblem("the quiet morning library", "arjun.r") === null, "A long passphrase is accepted");
+    check(passwordProblem("short1A") !== null, "Under eight characters is rejected");
+    check(passwordProblem("password123") !== null, "A well-known password is rejected");
+    check(passwordProblem("arjun.r2026x", "arjun.r") !== null, "A password containing the username is rejected");
+    check(passwordProblem(" Study2026 ") !== null, "Leading/trailing spaces are rejected (invisible typo)");
+    check(passwordProblem("aaaaaaaaaa") !== null, "A single repeated character is rejected");
+    check(passwordProblem("lowercaseab") !== null, "Eleven lower-case letters need a number or a capital");
+    check(passwordStrength("StudyHard2026", "arjun.r").score >= 3, "A strong password scores at least 3");
+    check(passwordStrength("abc", "arjun.r").score <= 1, "A weak password scores at most 1");
+    check(passwordStrength("", "arjun.r").hint !== null, "An empty password still explains what to do");
+
+    // Hashing — the stored value must be useless to whoever reads the
+    // database, and must still recognise the real password.
+    const hash = await hashPassword("StudyHard2026");
+    check(hash.startsWith("scrypt$"), "Passwords are stored as self-describing scrypt hashes");
+    check(!hash.includes("StudyHard2026"), "The plain password never appears in what is stored");
+    const second = await hashPassword("StudyHard2026");
+    check(hash !== second, "The same password hashes differently twice (per-password salt)");
+    check(await verifyPassword("StudyHard2026", hash), "The correct password verifies");
+    check(!(await verifyPassword("StudyHard2027", hash)), "A near-miss password does not verify");
+    check(!(await verifyPassword("StudyHard2026", null)), "A missing hash never verifies");
+    check(!(await verifyPassword("StudyHard2026", "garbage")), "A corrupted hash never verifies (and never throws)");
+    check(!(await verifyPassword("x", "scrypt$99999999$8$1$YWJj$YWJj")), "Absurd scrypt parameters are refused, not allocated");
+
+    // Session cookies — HttpOnly, SameSite, and Secure only where Secure works.
+    const httpsReq = new Request("https://plan.example/api/state", {
+      headers: { "x-forwarded-proto": "https" },
+    });
+    const cookie = sessionCookie(httpsReq, "token-value");
+    check(cookie.startsWith(`${SESSION_COOKIE}=token-value`), "The session cookie carries the token");
+    check(/HttpOnly/.test(cookie), "The session cookie is HttpOnly (no script can read it)");
+    check(/SameSite=Lax/.test(cookie), "The session cookie is SameSite=Lax");
+    check(/Secure/.test(cookie), "Over https the cookie is Secure");
+    check(/Max-Age=\d{5,}/.test(cookie), "The cookie lives long enough to keep a phone signed in");
+    const localReq = new Request("http://localhost:3000/api/state");
+    check(!/Secure/.test(sessionCookie(localReq, "t")), "On plain-http localhost the cookie is NOT Secure (or it would be dropped)");
+    check(/Max-Age=0/.test(clearSessionCookie(httpsReq)), "Signing out expires the cookie immediately");
+
+    /* The embedded-preview escape hatch: a Lax cookie is never sent to an
+       iframe on another origin, so an embedded demo could never stay signed
+       in. `none` is opt-in, and always carries Secure with it. */
+    process.env.SPP_COOKIE_SAMESITE = "none";
+    const embedded = sessionCookie(localReq, "t");
+    check(/SameSite=None/.test(embedded) && /Secure/.test(embedded),
+      "SPP_COOKIE_SAMESITE=none yields SameSite=None; Secure (embedded previews)");
+    delete process.env.SPP_COOKIE_SAMESITE;
+    check(/SameSite=Lax/.test(sessionCookie(localReq, "t")),
+      "Without the override the cookie is back to SameSite=Lax");
+
+    // Reading the token back out of a request.
+    const withCookie = new Request("https://plan.example/api/state", {
+      headers: { cookie: `other=1; ${SESSION_COOKIE}=abc123; last=2` },
+    });
+    check(sessionTokenFrom(withCookie) === "abc123", "The session token is read from the cookie header");
+    check(sessionTokenFrom(new Request("https://plan.example/")) === null, "No cookie means no session");
+    check(sessionTokenHash("abc123") === sessionTokenHash("abc123"), "Token hashing is stable");
+    check(sessionTokenHash("abc123") !== sessionTokenHash("abc124"), "Different tokens hash differently");
+    check(!sessionTokenHash("abc123").includes("abc123"), "The database stores a hash, never the token itself");
+
+    // Device keys stay what they now are: a handle, never an identity.
+    check(USER_KEY_RE.test(newUserKey()), "A minted account handle matches the stored shape");
+    check(newUserKey() !== newUserKey(), "Account handles are unguessable and unique");
+    const keyed = keyFrom(new Request("https://plan.example/", {
+      headers: { "x-user-key": "u_laptopdevicekey123456" },
+    }));
+    check(keyed === "u_laptopdevicekey123456", "A browser's own device key is read back");
+    const anonA = keyFrom(new Request("https://plan.example/", { headers: { "user-agent": "A" } }));
+    const anonB = keyFrom(new Request("https://plan.example/", { headers: { "user-agent": "B" } }));
+    check(anonA !== anonB, "Header-less clients are not funnelled into one shared bucket");
+
+    // Device labels for the signed-in list in Settings.
+    check(deviceLabel("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Version/18.0 Mobile Safari/604") === "iPhone · Safari",
+      "An iPhone reads as 'iPhone · Safari'");
+    check(deviceLabel("Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/130 Safari/537") === "Windows · Chrome",
+      "A Windows laptop reads as 'Windows · Chrome'");
+    check(deviceLabel("Mozilla/5.0 (Windows NT 10.0) Chrome/130 Edg/130") === "Windows · Edge",
+      "Edge is not reported as Chrome");
+    check(deviceLabel(null) === "Unknown device", "A missing user agent is labelled, not crashed");
+  }
+
+  console.log("\n--- 18c. The sign-in screen, rendered ---\n");
+  {
+    /* The front door is the one screen EVERY learner meets, including on a
+       phone with a password manager. What is pinned here is what makes it
+       usable: the right autocomplete hints, a confirm field that only
+       exists while creating an account, and live, honest validation. */
+    const originalConsoleError = console.error;
+    console.error = () => {};
+    let renderer!: TestRenderer.ReactTestRenderer;
+    await act(async () => {
+      renderer = TestRenderer.create(
+        React.createElement(AuthGate, { onAuthenticated: () => {} }),
+      );
+    });
+    console.error = originalConsoleError;
+
+    const inputs = () => renderer.root.findAll((node) => node.type === "input");
+    const byName = (name: string) => inputs().find((node) => node.props.name === name);
+    const text = () => JSON.stringify(renderer.toJSON());
+
+    check(!!byName("username") && !!byName("password"), "Sign-up starts with a username and a password field");
+    check(byName("username")?.props.autoComplete === "username",
+      "The username field is marked up for password managers");
+    check(byName("password")?.props.autoComplete === "new-password",
+      "Creating an account asks the manager for a NEW password");
+    check(byName("username")?.props.autoCapitalize === "none",
+      "Phone keyboards do not capitalise the username");
+    check(!!byName("confirm-password"), "Creating an account asks for the password twice");
+    check(/every device/i.test(text()), "The screen explains that the account syncs across devices");
+
+    // Live validation: a weak password is named before anything is sent.
+    await act(async () => {
+      byName("password")?.props.onChange({ target: { value: "abc" } });
+    });
+    check(/Passwords need at least 8 characters/.test(text()),
+      "A too-short password is called out while typing");
+    await act(async () => {
+      byName("password")?.props.onChange({ target: { value: "StudyHard2026" } });
+    });
+    check(!/Passwords need at least 8 characters/.test(text()),
+      "The warning clears once the password is strong");
+
+    // Switching to sign-in drops the extra fields and flips the autocomplete.
+    const signInTab = renderer.root
+      .findAll((node) => node.type === "button")
+      .find((node) => JSON.stringify(node.props.children) === '"Sign in"');
+    await act(async () => {
+      signInTab?.props.onClick();
+    });
+    check(!byName("confirm-password"), "Signing in does not ask for a confirmation password");
+    check(byName("password")?.props.autoComplete === "current-password",
+      "Signing in asks the manager for the EXISTING password");
+    check(!byName("name"), "Signing in does not ask for a display name");
+    await act(async () => {
+      renderer.unmount();
+    });
+  }
+
+  console.log("\n--- 18b. Every data route is behind the account ---\n");
+  {
+    /* The regression this prevents: ONE route left reading identity from the
+       `x-user-key` header would serve a stranger's plan to anybody who sent
+       that header. Routes must resolve the learner through `requireUser`. */
+    const apiDir = join(process.cwd(), "src/app/api");
+    const dataRoutes = [
+      "state", "tasks", "subjects", "sessions", "settings", "analytics",
+      "insights", "replan", "onboard", "chat", "shigun-usage",
+    ];
+    const offenders = dataRoutes.filter((route) => {
+      const file = join(apiDir, route, "route.ts");
+      if (!existsSync(file)) return true;
+      const body = readFileSync(file, "utf8");
+      return !/requireUser\(/.test(body);
+    });
+    check(offenders.length === 0,
+      `Every data route resolves the learner with requireUser (${dataRoutes.length} routes)`,
+      offenders.join(", "));
+
+    const identityByHeader = dataRoutes.filter((route) => {
+      const file = join(apiDir, route, "route.ts");
+      if (!existsSync(file)) return false;
+      const body = readFileSync(file, "utf8");
+      // `keyFrom` may still be used for rate limiting / preview fallbacks,
+      // but never to look an account up: that is getOrCreateUser(key).
+      return /getOrCreateUser\(\s*key/.test(body);
+    });
+    check(identityByHeader.length === 0,
+      "No data route still resolves an account from the device header",
+      identityByHeader.join(", "));
+
+    const authDir = join(process.cwd(), "src/app/api/auth");
+    for (const route of ["signup", "login", "logout", "me", "password", "devices"]) {
+      check(existsSync(join(authDir, route, "route.ts")), `POST/GET /api/auth/${route} exists`);
+    }
+
+    // The client must never be able to read the session token.
+    const clientSource = readFileSync(join(process.cwd(), "src/lib/client.ts"), "utf8");
+    check(!/spp_session/.test(clientSource),
+      "The browser bundle never touches the session cookie (it is HttpOnly)");
+    check(/credentials: "same-origin"/.test(clientSource),
+      "Every API call sends the session cookie");
   }
 
   console.log("\n--- 17. Repository shape: one source of truth ---\n");

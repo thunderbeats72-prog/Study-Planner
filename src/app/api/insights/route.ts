@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { buildContext, dateFrom, fullState, keyFrom } from "@/lib/state";
+import { buildContext, dateFrom, fullState } from "@/lib/state";
+import { requireUser } from "@/lib/auth";
+import { withDbGuard } from "@/lib/routeGuard";
 import { callLLM, activeProvider } from "@/lib/ai";
 import { diffDays } from "@/lib/planner";
 import { checkRateLimit } from "@/lib/rateLimit";
@@ -19,7 +21,9 @@ const insightInflight = insightGlobal.__studyPlannerInsightInflight ?? new Map<s
 insightGlobal.__studyPlannerInsightCache = insightCache;
 insightGlobal.__studyPlannerInsightInflight = insightInflight;
 
-export async function GET(req: Request) {
+export const GET = withDbGuard(getInsights);
+
+async function getInsights(req: Request) {
   const limit = checkRateLimit(req, "insights", 12, 60_000);
   if (!limit.allowed) {
     return NextResponse.json(
@@ -28,7 +32,8 @@ export async function GET(req: Request) {
     );
   }
 
-  const state = await fullState(keyFrom(req));
+  const user = await requireUser(req);
+  const state = await fullState(user.userKey);
   const today = dateFrom(req);
   const context = buildContext(state, today);
   const overdue = context.overdue;

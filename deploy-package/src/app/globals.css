@@ -643,6 +643,77 @@ body.theme-dark .tracker-bar,body.theme-obsidian .tracker-bar,body.theme-nebula 
 .loader-title{font-size:1.05rem;font-weight:800}
 .loader-sub{font-size:.8rem;color:var(--text-muted);font-weight:600}
 
+/* ============ ACCOUNTS — the sign-in / sign-up front door ============
+   Same material language as the onboarding wizard (one soft card floating
+   on the themed background) because it is the step BEFORE it: create
+   credentials, then build the plan. Everything is centred in a single
+   column so the phone layout is the desktop layout, minus the padding. */
+.auth-screen{position:fixed;inset:0;z-index:600;overflow-y:auto;display:flex;align-items:center;justify-content:center;background:var(--app-bg);background-image:var(--bg-gradient);padding:28px 18px calc(28px + env(safe-area-inset-bottom))}
+.auth-aura{position:absolute;inset:0;pointer-events:none;background:
+  radial-gradient(60% 45% at 50% 0%,var(--accent-glow),transparent 70%),
+  radial-gradient(45% 40% at 85% 100%,color-mix(in srgb,var(--accent) 14%,transparent),transparent 70%);
+  opacity:.9}
+.auth-shell{position:relative;width:min(460px,100%);display:flex;flex-direction:column;gap:18px;margin:auto}
+.auth-brand{display:flex;align-items:center;gap:12px}
+.auth-brand-mark{width:42px;height:42px;border-radius:14px;flex:0 0 42px;display:flex;align-items:center;justify-content:center;color:#fff;background:var(--accent-gradient);box-shadow:0 8px 22px -10px var(--accent-glow),inset 0 1px 0 rgba(255,255,255,.25)}
+.auth-brand-name{font-size:1rem;font-weight:850;letter-spacing:-.4px;color:var(--text-main)}
+.auth-brand-tag{font-size:.72rem;font-weight:700;color:var(--text-muted);letter-spacing:.2px}
+.auth-card{background:var(--surface);border:1px solid var(--glass-border);border-radius:24px;box-shadow:var(--shadow-lg),0 0 120px -56px var(--accent-glow);padding:26px 24px}
+.auth-tabs{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;border-radius:14px;background:var(--row-bg);border:1px solid var(--glass-border);margin-bottom:18px}
+.auth-tab{appearance:none;border:0;background:transparent;border-radius:11px;padding:9px 10px;font-family:inherit;font-size:.8rem;font-weight:750;color:var(--text-muted);cursor:pointer;transition:background .18s ease,color .18s ease,box-shadow .18s ease}
+.auth-tab:hover{color:var(--text-main)}
+.auth-tab.active{background:var(--surface-solid);color:var(--text-main);box-shadow:0 1px 2px rgba(26,25,48,.08)}
+.auth-title{margin:0 0 6px;font-size:1.3rem;font-weight:850;letter-spacing:-.7px;color:var(--text-main);text-wrap:balance}
+.auth-lead{margin:0 0 18px;font-size:.82rem;line-height:1.6;font-weight:550;color:var(--text-muted);text-wrap:pretty}
+.auth-form{display:flex;flex-direction:column;gap:14px}
+.auth-field{display:flex;flex-direction:column;gap:6px}
+.auth-optional{font-weight:650;font-size:.66rem;text-transform:uppercase;letter-spacing:.6px;color:var(--text-dim);margin-left:6px}
+.auth-input-wrap{position:relative;display:flex;align-items:center}
+.auth-input-icon{position:absolute;left:12px;display:flex;color:var(--text-dim);pointer-events:none}
+.auth-input{padding-left:36px}
+.auth-input-password{padding-right:62px}
+.auth-reveal{position:absolute;right:8px;appearance:none;border:0;background:transparent;font-family:inherit;font-size:.72rem;font-weight:750;color:var(--text-muted);cursor:pointer;padding:6px 8px;border-radius:8px}
+.auth-reveal:hover{color:var(--accent);background:var(--row-hover)}
+.auth-hint{margin:0;font-size:.72rem;font-weight:600;line-height:1.5;color:var(--text-dim)}
+.auth-hint-bad{color:var(--status-skipped-text,#b4232a)}
+.auth-strength{display:flex;align-items:center;gap:10px}
+.auth-meter{display:flex;gap:4px;flex:1}
+.auth-meter-bar{height:4px;flex:1;border-radius:99px;background:var(--glass-border);transition:background .25s ease}
+.auth-meter[data-score="1"] .auth-meter-bar.on{background:#e0574f}
+.auth-meter[data-score="2"] .auth-meter-bar.on{background:#e0a23f}
+.auth-meter[data-score="3"] .auth-meter-bar.on{background:color-mix(in srgb,var(--success-accent) 80%,var(--accent))}
+.auth-meter[data-score="4"] .auth-meter-bar.on{background:var(--success-accent)}
+.auth-strength-label{font-size:.7rem;font-weight:800;color:var(--text-muted);min-width:62px;text-align:right}
+.auth-banner{display:flex;align-items:flex-start;gap:9px;padding:10px 12px;border-radius:13px;margin-bottom:14px;font-size:.76rem;font-weight:650;line-height:1.5;color:var(--text-muted);background:var(--row-bg);border:1px solid var(--glass-border)}
+.auth-banner svg{flex:0 0 auto;margin-top:1px;color:var(--accent)}
+.auth-banner-warn{background:var(--status-skipped-bg);border-color:transparent;color:var(--status-skipped-text)}
+.auth-banner-warn svg{color:inherit}
+.auth-error{display:flex;align-items:flex-start;gap:9px;padding:10px 12px;border-radius:13px;font-size:.78rem;font-weight:700;line-height:1.5;background:var(--status-skipped-bg);color:var(--status-skipped-text)}
+.auth-error svg{flex:0 0 auto;margin-top:1px}
+.auth-submit{width:100%;margin-top:2px}
+.auth-spinner{width:14px;height:14px;border-radius:50%;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;animation:authSpin .7s linear infinite}
+@keyframes authSpin{to{transform:rotate(360deg)}}
+.auth-switch{margin-top:16px;text-align:center;font-size:.78rem;font-weight:600;color:var(--text-muted)}
+.auth-link{appearance:none;border:0;background:transparent;padding:0;font-family:inherit;font-size:inherit;font-weight:800;color:var(--accent);cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+.auth-points{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:9px}
+.auth-points li{display:flex;align-items:flex-start;gap:9px;font-size:.76rem;font-weight:600;line-height:1.5;color:var(--text-muted)}
+.auth-point-icon{flex:0 0 20px;width:20px;height:20px;border-radius:7px;display:flex;align-items:center;justify-content:center;color:var(--accent);background:var(--accent-glow)}
+@media(max-width:480px){
+  .auth-card{padding:22px 18px;border-radius:20px}
+  .auth-title{font-size:1.18rem}
+  /* 16px stops iOS Safari zooming the whole page on focus. */
+  .auth-input,.auth-form .input-field{font-size:16px}
+}
+
+/* Settings → Account: the same credentials, managed from inside the app. */
+.acct-row{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:14px;background:var(--row-bg);border:1px solid var(--glass-border)}
+.acct-avatar{width:38px;height:38px;flex:0 0 38px;border-radius:12px;display:flex;align-items:center;justify-content:center;color:#fff;background:var(--accent-gradient);font-weight:850;font-size:.95rem}
+.acct-name{font-weight:800;font-size:.9rem;color:var(--text-main);word-break:break-word}
+.acct-meta{font-size:.72rem;font-weight:650;color:var(--text-muted)}
+.acct-devices{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.acct-devices li{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:.75rem;font-weight:650;color:var(--text-muted);padding:8px 11px;border-radius:11px;background:var(--row-bg)}
+.acct-devices .acct-current{font-weight:850;color:var(--accent)}
+
 .mobile-header{display:none}
 
 /* ============ RESPONSIVE ============ */

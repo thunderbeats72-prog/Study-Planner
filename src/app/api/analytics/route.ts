@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { tasks, sessions, topics, subjects } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { dateFrom, fullState, getOrCreateUser, getSettings, keyFrom } from "@/lib/state";
+import { dateFrom, fullState, getSettings } from "@/lib/state";
+import { requireUser } from "@/lib/auth";
 import { demoDataEnabled } from "@/lib/demoState";
 import { diffDays } from "@/lib/planner";
 import {
@@ -29,7 +30,8 @@ async function getAnalytics(req: Request) {
       { status: 429, headers: { "retry-after": String(limit.retryAfterSeconds) } }
     );
   }
-  const key = keyFrom(req);
+  const account = await requireUser(req);
+  const key = account.userKey;
   const today = dateFrom(req);
 
   // Rows used by the ML models below — the fields both the database rows and
@@ -65,7 +67,7 @@ async function getAnalytics(req: Request) {
     }));
     allSubjects = demo.subjects;
   } else {
-    const dbUser = await getOrCreateUser(key);
+    const dbUser = account;
     const dbSettings = await getSettings(dbUser.id);
     user = dbUser;
     st = dbSettings;

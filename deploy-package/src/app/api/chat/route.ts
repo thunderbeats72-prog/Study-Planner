@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { messages } from "@/db/schema";
 import { desc, eq, sql } from "drizzle-orm";
-import { buildContext, dateFrom, fullState, getOrCreateUser, getSettings, keyFrom, defaultFallbackState } from "@/lib/state";
+import { buildContext, dateFrom, fullState, getSettings, keyFrom, defaultFallbackState } from "@/lib/state";
+import { requireUser } from "@/lib/auth";
+import { guardResponse } from "@/lib/routeGuard";
 import {
   callLLMDetailed, localTutor, parseCommand, tutorSystemPrompt, activeProvider,
   extractLlmAction, languageCapabilityReply, instantTutorReply, commandReply,
@@ -276,6 +278,10 @@ export async function POST(req: Request) {
   try {
     return await handleChat(req, { message: rawText, keys: runtimeKeys });
   } catch (error) {
+    // A learner who is not signed in gets the sign-in screen, not a tutor
+    // reply written against an empty plan.
+    const guarded = guardResponse(error);
+    if (guarded) return guarded;
     console.error("Chat route handleChat failed, using local tutor fallback:", error instanceof Error ? error.message : error);
     const key = keyFrom(req);
     const localDate = dateFrom(req);
@@ -354,7 +360,8 @@ type HandleChatOptions = {
 
 async function handleChat(req: Request, opts: HandleChatOptions) {
   const { message: rawText, keys: runtimeKeys } = opts;
-  const key = keyFrom(req);
+  const account = await requireUser(req);
+  const key = account.userKey;
   const text = rawText;
 
   const state = await fullState(key);
@@ -548,11 +555,12 @@ async function handleChat(req: Request, opts: HandleChatOptions) {
 
 export async function DELETE(req: Request) {
   try {
-    const key = keyFrom(req);
-    const user = await getOrCreateUser(key);
+    const user = await requireUser(req);
     await db.delete(messages).where(eq(messages.userId, user.id));
     return NextResponse.json({ ok: true });
   } catch (error) {
+    const guarded = guardResponse(error);
+    if (guarded) return guarded;
     console.error("Chat clear failed:", error instanceof Error ? error.message : error);
     return NextResponse.json(
       { error: "Could not clear the chat right now. Please try again shortly.", code: "CHAT_CLEAR_FAILED" },

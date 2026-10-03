@@ -3,7 +3,9 @@ import { demoDataEnabled } from "@/lib/demoGate";
 import { db } from "@/db";
 import { users, settings, subjects, topics, tasks, sessions, messages } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
-import { buildContext, dateFrom, fullState, getOrCreateUser, keyFrom } from "@/lib/state";
+import { buildContext, dateFrom, fullState } from "@/lib/state";
+import { requireUser } from "@/lib/auth";
+import { withDbGuard } from "@/lib/routeGuard";
 import { demoResetMutations } from "@/lib/demoState";
 import { aiGenerateTopics, type GeneratedTopic } from "@/lib/ai";
 import { buildPlan, type PlanSettings } from "@/lib/planner";
@@ -39,7 +41,9 @@ async function mapWithConcurrency<T, R>(values: T[], concurrency: number, worker
   return results;
 }
 
-export async function POST(req: Request) {
+export const POST = withDbGuard(postOnboard);
+
+async function postOnboard(req: Request) {
   const limit = checkRateLimit(req, "onboard", 5, 10 * 60_000);
   if (!limit.allowed) {
     return NextResponse.json(
@@ -118,7 +122,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: payload.error, code: payload.code }, { status: payload.status });
   }
 
-  const key = keyFrom(req);
+  const account = await requireUser(req);
+  const key = account.userKey;
 
   // ── Preview without a database: completing the wizard simply resets the
   // in-memory demo plan (the "hard reset" the real route performs). ─────────
@@ -144,7 +149,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const user = await getOrCreateUser(key);
+  const user = account;
   let stats: ReturnType<typeof buildPlan>["stats"];
 
   await db.transaction(async (tx) => {

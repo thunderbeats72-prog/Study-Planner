@@ -26,6 +26,56 @@ Root-level config files (package.json, tsconfig.json, next.config.ts,
 postcss.config.mjs, eslint.config.mjs, drizzle.config.ts) are real and
 used by the build.
 
+ACCOUNTS — ONE SIGN-IN, EVERY DEVICE
+------------------------------------
+A learner creates a username and password, and that account OWNS the plan.
+Sign in on a phone, a tablet or another laptop and the same lessons, logged
+hours, streak, settings and tutor history are there; every change made on
+one device is what the next device loads.
+
+  Front door       src/components/AuthGate.tsx   (create account / sign in)
+  Shared rules     src/lib/authRules.ts          (username + password rules;
+                                                  the browser and the API
+                                                  import the SAME functions)
+  Server core      src/lib/auth.ts               (scrypt hashing, sessions,
+                                                  requireUser, lockout)
+  Endpoints        src/app/api/auth/{signup,login,logout,me,password,devices}
+  Tables           users.username / username_display / password_hash …
+                   auth_sessions (one row per signed-in device)
+  Management       Settings → Account & Sync (devices, password, sign-out)
+
+How identity works now:
+
+  * The session lives in an HttpOnly, SameSite=Lax, Secure cookie. The
+    browser cannot read it, and the database stores only its SHA-256, so a
+    database dump cannot be replayed as a login.
+  * EVERY data route resolves the learner with `requireUser(req)`. The old
+    `x-user-key` header is no longer an identity — it survives only for
+    rate-limit fingerprinting and for the sign-up claim below. A test in
+    `npm test` fails if any data route ever reads identity from it again.
+  * Passwords are salted scrypt (16 MB cost), never recoverable. Eight
+    consecutive wrong passwords pause that account for 15 minutes, and the
+    per-device rate limiter bounds attempts independently.
+  * Sessions last 180 days and slide forward while the account is in use.
+    Changing the password signs out every other device; Settings can do the
+    same on demand.
+  * Signing out deletes nothing: the plan waits with the account.
+
+Upgrading an existing deployment:
+
+  * The new columns and the `auth_sessions` table are applied by
+    `npm run db:push` (or `npm run build`, which pushes then builds). If a
+    deployment builds with plain `next build`, the first auth request also
+    applies them itself — `ensureAuthSchema()` in src/lib/auth.ts runs
+    idempotent `ADD COLUMN IF NOT EXISTS` / `CREATE TABLE IF NOT EXISTS`
+    statements once per server process, so "deploy and sign up" works
+    without a manual migration step.
+  * Plans built BEFORE accounts existed are not lost. They were keyed to a
+    browser; when that same browser creates the first account, the sign-up
+    CLAIMS that row — the new credentials are attached to the existing plan
+    instead of starting an empty one, and the response says
+    `claimedExistingPlan: true` so the UI can say so.
+
 DEPLOYMENT
 ----------
 Vercel auto-deploys `main` straight from this repository. The deploy path is
@@ -192,6 +242,40 @@ memory, and credit is informational — it never gates a cloud answer.
 Priority order is now Gemini-first (Gemini → Cerebras → Groq → Mistral →
 SambaNova → Cohere → OpenRouter), matching the key most deployments
 configure; sticky success still promotes whichever leg actually answers.
+
+v35 ACCOUNTS — ONE SIGN-IN, EVERY DEVICE (this build)
+------------------------------------------------------
+ - THE PLAN BELONGS TO A PERSON, NOT A BROWSER. Study Planner Pro now opens
+   on a front door (src/components/AuthGate.tsx): create a username and
+   password, or sign in. Everything behind it — subjects, lessons, schedule,
+   logged minutes, streak, settings and tutor history — hangs off that
+   account, so signing in on a phone shows exactly what the laptop shows,
+   and a change on either is what the other loads next.
+ - IDENTITY MOVED FROM A HEADER TO A SESSION. Every data route resolves the
+   learner with `requireUser(req)` (src/lib/auth.ts) against an HttpOnly,
+   SameSite=Lax, Secure cookie whose SHA-256 — never the token — is stored
+   in the new `auth_sessions` table. The old `x-user-key` device header can
+   no longer fetch anybody's data; it survives only for rate-limit
+   fingerprinting and for the sign-up claim below. `npm test` fails if a
+   data route ever reads identity from it again.
+ - NOTHING WAS LOST ON THE WAY IN. A plan built on this device BEFORE
+   accounts existed is claimed by the first account created on it: the
+   credentials attach to the existing row, so months of lessons, logs and
+   streak survive the upgrade and become portable the moment they exist.
+ - CREDENTIALS DONE PROPERLY. Salted scrypt (16 MB cost) hashes, one shared
+   rule module (src/lib/authRules.ts) used by BOTH the form and the API so
+   validation can never drift, identical wording for "unknown username" and
+   "wrong password", eight-strike per-account lockout on top of the existing
+   per-device rate limiter, 180-day sliding sessions, a live strength meter,
+   Caps-Lock warning, and password-manager-correct autocomplete hints.
+ - SETTINGS → ACCOUNT & SYNC. See which devices are signed in and when each
+   was last active, sign the others out, change the password (which signs
+   every other device out), or sign out here. Signing out deletes nothing.
+ - DEPLOYS WITHOUT A MIGRATION STEP. `npm run db:push` applies the new
+   columns and table; if a deployment builds with plain `next build`, the
+   first auth request applies them itself via idempotent DDL
+   (`ensureAuthSchema`). The database-less preview is untouched: it still
+   serves the sample plan to a preview learner instead of a sign-in wall.
 
 v25 CSS + RESPONSIVE UI SYSTEM (this build)
 --------------------------------------------
