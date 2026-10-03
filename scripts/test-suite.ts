@@ -3074,9 +3074,11 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
     check(digestSubject(restInput).includes("rest day") && !/fail|shame/i.test(digestText(restInput)),
       "A rest day is named as one and says nothing shaming");
 
-    // The HTML is structured but quiet: one card, no images, no trackers.
+    // The HTML is structured, branded and still free of tracking pixels.
     check(html.includes("href=") && html.length > 200, "The HTML render is a real linked page");
-    check(!/<img|px\.gif|track|open\.php/i.test(html), "No image pixels or tracking URLs in the HTML");
+    check(/<img[^>]+\/email\/(study-planner-logo|email-digest-hero)\.png/i.test(html),
+      "The HTML uses static app-hosted artwork for the branded template");
+    check(!/px\.gif|track|open\.php|utm_/i.test(html), "No tracking pixels or tracking URLs in the HTML");
 
     // The MIME envelope carries the one-click-unsubscribe machine headers.
     const mime = buildMimeMessage({
@@ -3093,6 +3095,10 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
       "RFC 8058 one-click POST ships too, so Gmail shows the button");
     check(/Content-Type: text\/plain/i.test(mime) && /Content-Type: text\/html/i.test(mime),
       "Every mail carries both the plain-text and the HTML alternative");
+    check(/Content-Transfer-Encoding: quoted-printable/i.test(mime) && !/Content-Transfer-Encoding: base64/i.test(mime),
+      "Bodies stay readable as quoted-printable instead of opaque base64");
+    check(/Reply-To: Study Planner Pro <digest@planner\.example\.com>/.test(mime) && /Auto-Submitted: auto-generated/.test(mime),
+      "Deliverability headers make the sender identity and automation clear");
 
     // The Sunday review totals the week honestly.
     const weeklyInput: WeeklyInput = {

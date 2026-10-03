@@ -20,6 +20,19 @@ import type { TaskRow } from "./client";
 import { addDays, diffDays } from "./planner";
 import { nextAction, reasonLabel } from "./prioritization";
 import { backlogFor, dailyCapacityMinutes, suggestedRecovery, todayOverload } from "./recovery";
+import {
+  EMAIL,
+  emailAssetBaseFromUrl,
+  emailEscape,
+  emailFooter,
+  emailHeader,
+  heroCard,
+  illustration,
+  infoCard,
+  metric,
+  primaryButton,
+  shell,
+} from "./emailTheme";
 
 export type DigestInput = {
   /** The learner's display name ("Nila"). */
@@ -69,14 +82,6 @@ const ENCOURAGEMENT = [
 export function encouragementFor(dateStr: string): string {
   const days = Math.floor(new Date(`${dateStr}T12:00:00Z`).getTime() / 86_400_000);
   return ENCOURAGEMENT[Math.abs(days) % ENCOURAGEMENT.length];
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
 }
 
 function minLabel(minutes: number): string {
@@ -183,77 +188,133 @@ export function digestText(input: DigestInput): string {
 
 /* ── html rendering ────────────────────────────────────────────────── */
 
-const S = {
-  body: "margin:0;padding:0;background:#f6f5fa;",
-  wrap: "max-width:560px;margin:0 auto;padding:24px 16px;",
-  card: "background:#ffffff;border:1px solid #e6e3f0;border-radius:12px;padding:20px 22px;",
-  h1: "margin:0 0 4px;font-size:18px;line-height:1.3;color:#18161f;",
-  sub: "margin:0 0 16px;font-size:13px;color:#6d6a7c;",
-  h2: "margin:18px 0 6px;font-size:12px;letter-spacing:0.06em;text-transform:uppercase;color:#6d6a7c;",
-  item: "margin:4px 0;font-size:14px;line-height:1.5;color:#2a2733;",
-  strong: "color:#18161f;font-weight:600;",
-  footer: "margin-top:20px;font-size:12px;line-height:1.6;color:#8a8796;",
-  link: "color:#5b4bd5;text-decoration:underline;",
-} as const;
+function circleIcon(label: string, tone: "purple" | "red" | "blue" = "purple"): string {
+  const color = tone === "red" ? "#ef476f" : tone === "blue" ? "#4b7bec" : "#6253eb";
+  const bg = tone === "red" ? "#ffe8ee" : tone === "blue" ? "#eaf1ff" : "#eeeaff";
+  return `<div style="width:48px;height:48px;border-radius:999px;background:${bg};color:${color};text-align:center;line-height:48px;font-size:22px;font-weight:900">${emailEscape(label)}</div>`;
+}
+
+function taskListHtml(input: DigestInput): string {
+  const esc = emailEscape;
+  const f = digestFacts(input);
+  if (!f.todays.length) {
+    return `<p style="${EMAIL.p}">No lessons planned - a rest day or a catch-up day.</p>`;
+  }
+  return (
+    `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse">` +
+    f.todays
+      .map((task, index) => {
+        const subject = subjectName(input, task.subjectId);
+        const border = index === 0 ? "" : "border-top:1px solid #eeeaf8;";
+        return (
+          `<tr>` +
+          `<td style="${border}padding:12px 8px 12px 0;width:38px;vertical-align:top">` +
+          `<div style="width:30px;height:30px;border-radius:999px;background:#efecff;color:#6253eb;text-align:center;line-height:30px;font-size:13px;font-weight:900">${index + 1}</div>` +
+          `</td>` +
+          `<td style="${border}padding:12px 8px;vertical-align:top">` +
+          `<div style="font-size:14px;line-height:1.45;color:#171a38;font-weight:800">${esc(task.title)}</div>` +
+          (subject ? `<div style="font-size:12px;line-height:1.45;color:#777b9a;margin-top:2px">${esc(subject)}</div>` : "") +
+          `</td>` +
+          `<td align="right" style="${border}padding:12px 0 12px 8px;vertical-align:top;width:82px">` +
+          `<span style="display:inline-block;border-radius:11px;background:#f0edff;color:#6253eb;padding:7px 10px;font-size:12px;line-height:1;font-weight:900;white-space:nowrap">${esc(minLabel(task.plannedMinutes))}</span>` +
+          `</td>` +
+          `</tr>`
+        );
+      })
+      .join("") +
+    `</table>`
+  );
+}
 
 export function digestHtml(input: DigestInput): string {
   const f = digestFacts(input);
   const subject = digestSubject(input);
-  const esc = escapeHtml;
-  const rows: string[] = [];
+  const assetBase = emailAssetBaseFromUrl(input.appUrl);
+  const esc = emailEscape;
+  const firstSubject = f.now ? subjectName(input, f.now.subjectId) : "";
+  const todayCount = f.todays.length;
+  const todayLabel = `${todayCount} lesson${todayCount === 1 ? "" : "s"}`;
+  const statusParts = [
+    `${input.streak} day${input.streak === 1 ? "" : "s"} streak`,
+    f.yesterdayMinutes > 0 ? minLabel(f.yesterdayMinutes) : "nothing logged",
+    f.daysLeft != null && f.daysLeft >= 0 ? `${f.daysLeft} day${f.daysLeft === 1 ? "" : "s"}` : "exam date unset",
+  ];
 
-  const startBlock = f.now
-    ? `<p style="${S.item}"><span style="${S.strong}">Start here:</span> ${esc(f.now.title)}` +
-      `${subjectName(input, f.now.subjectId) ? ` <span style="color:#6d6a7c">(${esc(subjectName(input, f.now.subjectId))})</span>` : ""}` +
-      ` - ${esc(minLabel(f.now.plannedMinutes))}, ${esc(reasonLabel(f.now.reason).toLowerCase())}.</p>`
-    : `<p style="${S.item}">Nothing is due right now. The plan is clear.</p>`;
+  const hero = heroCard(
+    `For ${input.name} - ${input.today}`,
+    esc(subject),
+    "Your best next step, today's lessons and recovery status in one calm note.",
+    illustration("digest", assetBase),
+  );
 
-  const todayBlock = f.todays.length
-    ? `<h2 style="${S.h2}">Today - ${f.todays.length} lesson${f.todays.length === 1 ? "" : "s"}, ${minLabel(f.plannedMinutes)} planned</h2>` +
-      f.todays
-        .map((task) => {
-          const subject = subjectName(input, task.subjectId);
-          return `<p style="${S.item}">${esc(task.title)}${subject ? ` <span style="color:#6d6a7c">- ${esc(subject)}</span>` : ""}, ${esc(minLabel(task.plannedMinutes))}</p>`;
-        })
-        .join("")
-    : `<h2 style="${S.h2}">Today</h2><p style="${S.item}">No lessons planned - a rest day or a catch-up day.</p>`;
+  const startBlock = infoCard(
+    `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse"><tr>` +
+      `<td style="width:62px;vertical-align:top;padding-right:14px">${circleIcon("▶")}</td>` +
+      `<td style="vertical-align:top">` +
+      (f.now
+        ? `<p style="${EMAIL.p}"><span style="font-weight:900;color:#101334">Start here:</span> <span style="color:#5b4bd5;font-weight:900">${esc(f.now.title)}</span>` +
+          `${firstSubject ? ` <span style="color:#676b8a">(${esc(firstSubject)})</span>` : ""}` +
+          ` - ${esc(minLabel(f.now.plannedMinutes))}, ${esc(reasonLabel(f.now.reason).toLowerCase())}.</p>`
+        : `<p style="${EMAIL.p}"><span style="font-weight:900;color:#101334">Start here:</span> Nothing is due right now. The plan is clear.</p>`) +
+      `</td></tr></table>`,
+    "soft",
+  );
+
+  const todayBlock = infoCard(
+    `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;margin-bottom:8px"><tr>` +
+      `<td style="vertical-align:middle;width:52px;padding-right:12px">${circleIcon("✓")}</td>` +
+      `<td style="vertical-align:middle">` +
+      `<div style="${EMAIL.h2}">Today</div>` +
+      `<div style="font-size:16px;line-height:1.35;font-weight:900;color:#101334">${esc(todayLabel)}, ${esc(minLabel(f.plannedMinutes))} planned</div>` +
+      `</td>` +
+      `<td align="right" style="vertical-align:middle"><span style="display:inline-block;border-radius:12px;background:#f0edff;color:#6253eb;padding:8px 11px;font-size:12px;line-height:1;font-weight:900">${esc(minLabel(f.plannedMinutes))}</span></td>` +
+      `</tr></table>` +
+      taskListHtml(input),
+  );
 
   const backlogBlock =
     f.backlog.count > 0
-      ? `<h2 style="${S.h2}">Overdue</h2>` +
-        `<p style="${S.item}">${f.backlog.count} unfinished task${f.backlog.count === 1 ? "" : "s"} (${minLabel(f.backlog.minutes)}).` +
-        (f.recovery
-          ? `<br/><span style="color:#6d6a7c">Suggested recovery: +${f.recovery.minutesPerDay} min/day for ${f.recovery.days} day${f.recovery.days === 1 ? "" : "s"}, no cramming.</span>`
-          : `<br/><span style="color:#6d6a7c">They fit with today's plan - no extra pace needed.</span>`) +
-        `</p>`
+      ? infoCard(
+          `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse"><tr>` +
+            `<td style="width:62px;vertical-align:top;padding-right:14px">${circleIcon("!", "red")}</td>` +
+            `<td style="vertical-align:top">` +
+            `<div style="${EMAIL.h2};color:#a84358">Overdue</div>` +
+            `<p style="${EMAIL.p}"><span style="font-size:18px;font-weight:900;color:#c8324f">${f.backlog.count} unfinished task${f.backlog.count === 1 ? "" : "s"} (${esc(minLabel(f.backlog.minutes))}).</span><br/>` +
+            `<span style="color:#6f738e">${
+              f.recovery
+                ? `Suggested recovery: +${f.recovery.minutesPerDay} min/day for ${f.recovery.days} day${f.recovery.days === 1 ? "" : "s"}, no cramming.`
+                : "They fit with today's plan - no extra pace needed."
+            }</span></p>` +
+            `</td>` +
+            `<td align="right" style="vertical-align:middle;width:142px">${illustration("overdue", assetBase)}</td>` +
+            `</tr></table>`,
+          "danger",
+        )
       : "";
 
-  const statusParts = [
-    `Streak: ${input.streak} day${input.streak === 1 ? "" : "s"}`,
-    `Yesterday: ${f.yesterdayMinutes > 0 ? minLabel(f.yesterdayMinutes) : "nothing logged"}`,
-  ];
-  if (f.daysLeft != null && f.daysLeft >= 0) {
-    statusParts.push(`${f.daysLeft} day${f.daysLeft === 1 ? "" : "s"} to the exam`);
-  }
-
-  rows.push(
-    `<!DOCTYPE html><html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>`,
-    `<title>${esc(subject)}</title></head>`,
-    `<body style="${S.body}"><div style="${S.wrap}"><div style="${S.card}">`,
-    `<h1 style="${S.h1}">${esc(subject)}</h1>`,
-    `<p style="${S.sub}">For ${esc(input.name)} - ${esc(input.today)}</p>`,
-    startBlock,
-    todayBlock,
-    backlogBlock,
-    `<h2 style="${S.h2}">Where you stand</h2>`,
-    `<p style="${S.item}">${esc(statusParts.join("  ·  "))}</p>`,
-    `<p style="${S.item}"><span style="color:#6d6a7c">${esc(encouragementFor(input.today))}</span></p>`,
-    `<p style="${S.item}"><a style="${S.link}" href="${esc(input.appUrl)}">Open the planner</a></p>`,
-    `<p style="${S.footer}">You receive this once a day because the daily digest is on for your account.<br/>` +
-      `<a style="${S.link}" href="${esc(input.unsubscribeUrl)}">Unsubscribe from these emails</a></p>`,
-    `</div></div></body></html>`,
+  const metricsBlock = infoCard(
+    `<div style="${EMAIL.h2}">Where you stand</div>` +
+      `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;margin:0 -6px">` +
+      `<tr>` +
+      metric("Streak", `${input.streak} day${input.streak === 1 ? "" : "s"}`) +
+      metric("Yesterday", f.yesterdayMinutes > 0 ? minLabel(f.yesterdayMinutes) : "none", "#4b7bec") +
+      metric("Exam", f.daysLeft != null && f.daysLeft >= 0 ? `${f.daysLeft} day${f.daysLeft === 1 ? "" : "s"}` : "not set", "#5b4bd5") +
+      `</tr></table>` +
+      `<p style="${EMAIL.p};margin-top:12px;color:#676b8a">${esc(encouragementFor(input.today))}</p>`,
+    "blue",
   );
-  return rows.join("");
+
+  const content =
+    emailHeader(assetBase) +
+    hero +
+    startBlock +
+    todayBlock +
+    backlogBlock +
+    metricsBlock +
+    `<div style="padding:4px 28px 24px">${primaryButton(input.appUrl, "Open the planner", "→")}</div>` +
+    emailFooter("You receive this once a day because the daily digest is on for your account.", input.unsubscribeUrl, assetBase);
+
+  return shell(subject, `For ${input.name}: ${statusParts.join(" · ")}`, content);
 }
 
 /* ── the weekly summary (Sunday evening, separate opt-in) ──────────── */
@@ -305,34 +366,78 @@ export function weeklyHtml(input: WeeklyInput): string {
     .sort((a, b) => a.date.localeCompare(b.date) || a.position - b.position)
     .slice(0, 3);
   const f = digestFacts(input);
-  const esc = escapeHtml;
+  const assetBase = emailAssetBaseFromUrl(input.appUrl);
+  const esc = emailEscape;
   const subject = weeklySubject(input);
+
   const upcoming = pendingNext.length
-    ? `<h2 style="${S.h2}">Coming up</h2>` +
-      pendingNext
-        .map((task) => `<p style="${S.item}">${esc(task.date)} - ${esc(task.title)}, ${esc(minLabel(task.plannedMinutes))}</p>`)
-        .join("")
+    ? infoCard(
+        `<div style="${EMAIL.h2}">Coming up</div>` +
+          `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse">` +
+          pendingNext
+            .map((task, index) => {
+              const border = index === 0 ? "" : "border-top:1px solid #eeeaf8;";
+              return (
+                `<tr>` +
+                `<td style="${border}padding:11px 10px 11px 0;width:92px;vertical-align:top;color:#6253eb;font-size:12px;line-height:1.4;font-weight:900">${esc(task.date)}</td>` +
+                `<td style="${border}padding:11px 10px;vertical-align:top;color:#171a38;font-size:14px;line-height:1.45;font-weight:800">${esc(task.title)}</td>` +
+                `<td align="right" style="${border}padding:11px 0 11px 10px;width:82px;vertical-align:top"><span style="display:inline-block;border-radius:11px;background:#f0edff;color:#6253eb;padding:7px 10px;font-size:12px;line-height:1;font-weight:900;white-space:nowrap">${esc(minLabel(task.plannedMinutes))}</span></td>` +
+                `</tr>`
+              );
+            })
+            .join("") +
+          `</table>`,
+      )
     : "";
-  return (
-    `<!DOCTYPE html><html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>` +
-    `<title>${esc(subject)}</title></head>` +
-    `<body style="${S.body}"><div style="${S.wrap}"><div style="${S.card}">` +
-    `<h1 style="${S.h1}">${esc(subject)}</h1>` +
-    `<p style="${S.sub}">For ${esc(input.name)}</p>` +
-    `<p style="${S.item}"><span style="${S.strong}">Logged:</span> ${esc(minLabel(minutes))} across ${days} study day${days === 1 ? "" : "s"}.</p>` +
-    `<p style="${S.item}"><span style="${S.strong}">Finished:</span> ${done} task${done === 1 ? "" : "s"}. Streak: ${input.streak} day${input.streak === 1 ? "" : "s"}.` +
-    (f.daysLeft != null && f.daysLeft >= 0 ? ` ${f.daysLeft} days to the exam.` : "") +
-    `</p>` +
-    (f.backlog.count > 0
-      ? `<h2 style="${S.h2}">Still overdue</h2><p style="${S.item}">${f.backlog.count} task${f.backlog.count === 1 ? "" : "s"} (${minLabel(f.backlog.minutes)}).` +
-        (f.recovery ? `<br/><span style="color:#6d6a7c">Suggested recovery: +${f.recovery.minutesPerDay} min/day for ${f.recovery.days} day${f.recovery.days === 1 ? "" : "s"}.</span>` : "") +
-        `</p>`
-      : "") +
-    upcoming +
-    `<p style="${S.item}"><span style="color:#6d6a7c">${esc(encouragementFor(input.today))}</span></p>` +
-    `<p style="${S.item}"><a style="${S.link}" href="${esc(input.appUrl)}">Open the planner</a></p>` +
-    `<p style="${S.footer}">You receive this on Sunday evenings because the weekly summary is on for your account.<br/>` +
-    `<a style="${S.link}" href="${esc(input.unsubscribeUrl)}">Unsubscribe from these emails</a></p>` +
-    `</div></div></body></html>`
+
+  const backlog =
+    f.backlog.count > 0
+      ? infoCard(
+          `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse"><tr>` +
+            `<td style="width:62px;vertical-align:top;padding-right:14px">${circleIcon("!", "red")}</td>` +
+            `<td style="vertical-align:top">` +
+            `<div style="${EMAIL.h2};color:#a84358">Still overdue</div>` +
+            `<p style="${EMAIL.p}"><span style="font-weight:900;color:#c8324f">${f.backlog.count} task${f.backlog.count === 1 ? "" : "s"} (${esc(minLabel(f.backlog.minutes))}).</span>` +
+            (f.recovery
+              ? `<br/><span style="color:#6f738e">Suggested recovery: +${f.recovery.minutesPerDay} min/day for ${f.recovery.days} day${f.recovery.days === 1 ? "" : "s"}.</span>`
+              : "") +
+            `</p></td></tr></table>`,
+          "danger",
+        )
+      : "";
+
+  const daysToExam = f.daysLeft != null && f.daysLeft >= 0 ? `${f.daysLeft} day${f.daysLeft === 1 ? "" : "s"}` : "not set";
+  const hero = heroCard(
+    `${input.weekStart} to ${input.weekEnd}`,
+    esc(subject),
+    "A clean recap of study time, finished tasks, backlog and what comes next.",
+    illustration("weekly", assetBase),
   );
+
+  const metricsBlock = infoCard(
+    `<div style="${EMAIL.h2}">Week scorecard</div>` +
+      `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;margin:0 -6px">` +
+      `<tr>` +
+      metric("Logged", minLabel(minutes)) +
+      metric("Study days", `${days}`) +
+      metric("Finished", `${done}`) +
+      `</tr><tr>` +
+      metric("Streak", `${input.streak} day${input.streak === 1 ? "" : "s"}`, "#4b7bec") +
+      metric("Exam", daysToExam, "#5b4bd5") +
+      metric("Backlog", `${f.backlog.count}`, f.backlog.count > 0 ? "#c8324f" : "#2f9e72") +
+      `</tr></table>` +
+      `<p style="${EMAIL.p};margin-top:12px;color:#676b8a">${esc(encouragementFor(input.today))}</p>`,
+    "blue",
+  );
+
+  const content =
+    emailHeader(assetBase) +
+    hero +
+    metricsBlock +
+    backlog +
+    upcoming +
+    `<div style="padding:4px 28px 24px">${primaryButton(input.appUrl, "Open the planner", "→")}</div>` +
+    emailFooter("You receive this on Sunday evenings because the weekly summary is on for your account.", input.unsubscribeUrl, assetBase);
+
+  return shell(subject, `Logged ${minLabel(minutes)} across ${days} study day${days === 1 ? "" : "s"}.`, content);
 }

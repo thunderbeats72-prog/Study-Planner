@@ -124,7 +124,7 @@ export default function SettingsView({
         }
       />
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="settings-cards-grid grid gap-5 lg:grid-cols-2">
         {/* ── 1. PROFILE & TARGET CARD ── */}
         <Reveal>
           <Spot className="glass-panel tilt-card section-card p-5 sm:p-6 space-y-4">
@@ -142,7 +142,7 @@ export default function SettingsView({
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <label className="lbl" htmlFor="set-start">Start Date</label>
                 <input
@@ -165,7 +165,7 @@ export default function SettingsView({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <label className="lbl" htmlFor="set-hours">Daily Target (Hours)</label>
                 <input
@@ -217,7 +217,9 @@ export default function SettingsView({
         {/* ── 1c. NOTIFICATIONS ──
             Email + digest schedule + per-type toggles + quiet hours, on one
             card - everything the app volunteers at you, and only that. */}
-        <NotificationsCard account={account} onAccountChange={onAccountChange} />
+        <div className="lg:col-span-2">
+          <NotificationsCard account={account} onAccountChange={onAccountChange} />
+        </div>
 
         {/* ── 2. APPEARANCE & THEMES CARD ── */}
         <Reveal delay={60}>
@@ -226,7 +228,7 @@ export default function SettingsView({
               <IconPalette size={18} /> Studio Appearance
             </h3>
 
-            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
               {THEMES.map((th) => {
                 const info = THEME_SWATCH[th.id] || { bg: "#f2f0f9", accent: "#6366f1", sub: th.label };
                 const isCurrent = s.theme === th.id;
@@ -388,7 +390,7 @@ export default function SettingsView({
           <p className="text-[length:var(--fs-sm)] font-medium" style={{ color: "var(--text-dim)" }}>
             Your syllabus, schedule, logged study minutes, and preferences reside securely on this device.
           </p>
-          <div className="flex flex-wrap gap-2.5 pt-2">
+          <div className="settings-actions flex flex-wrap gap-2.5 pt-2">
             <button
               type="button"
               className="btn btn-secondary"
