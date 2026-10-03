@@ -1,0 +1,51 @@
+# Hourly digest trigger.
+#
+# Vercel's free plan allows one cron execution per day (see vercel.json),
+# which is not granular enough for "send at the learner's chosen local hour".
+# This workflow is the real worker: every hour it calls the digest endpoint
+# on the live deployment, and the endpoint itself decides - per account, in
+# that account's local time - whose email is due (and whose is not). The
+# vercel.json run stays as a daily backstop in case this schedule is paused
+# (GitHub disables schedules on public repos after 60 days of inactivity -
+# re-enable it from the Actions tab if that ever happens).
+#
+# Setup lives in SETUP.md step 6. Two repository secrets:
+#   DIGEST_URL   - full https URL of /api/cron/digest on the live deployment
+#   CRON_SECRET  - the same random value the deployment knows
+# With either secret missing this job exits 0 and does nothing, so forks and
+# previews never error out.
+name: Digest cron
+
+on:
+  schedule:
+    # Top of every hour. GitHub may run it a few minutes late under load -
+    # the endpoint catches late runs up, exactness is not required.
+    - cron: "0 * * * *"
+  # Manual button in the Actions tab, handy when testing SETUP.md.
+  workflow_dispatch:
+
+jobs:
+  call-digest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call the digest endpoint
+        env:
+          DIGEST_URL: ${{ secrets.DIGEST_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -e
+          if [ -z "$DIGEST_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "DIGEST_URL or CRON_SECRET secret missing; skipping (this is fine for forks)."
+            exit 0
+          fi
+          code=$(curl -sS -o /tmp/digest.json -w "%{http_code}" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            -H "User-Agent: study-planner-digest-cron/1.0" \
+            "$DIGEST_URL")
+          echo "HTTP $code"
+          cat /tmp/digest.json || true
+          echo
+          if [ "$code" -ge 400 ]; then
+            echo "Digest endpoint rejected the call - check CRON_SECRET matches the deployment env."
+            exit 1
+          fi

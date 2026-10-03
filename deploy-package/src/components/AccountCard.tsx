@@ -2,8 +2,8 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import { api, ApiError, type AccountInfo, type DeviceInfo } from "@/lib/client";
-import { passwordProblem, passwordStrength } from "@/lib/authRules";
-import { IconCheck, IconLock, IconRefresh, IconShield, IconUser, IconWarn } from "./icons";
+import { passwordProblem, passwordStrength, usernameProblem } from "@/lib/authRules";
+import { IconCheck, IconGoogle, IconLock, IconMail, IconRefresh, IconShield, IconUser, IconWarn } from "./icons";
 import { Reveal, Spot } from "@/lib/fx";
 import { cn } from "@/lib/cn";
 
@@ -33,9 +33,11 @@ function sinceLabel(iso: string): string {
 export default function AccountCard({
   account,
   onSignOut,
+  onAccountChange,
 }: {
   account?: AccountInfo | null;
   onSignOut: (everywhere?: boolean) => void | Promise<void>;
+  onAccountChange?: (account: AccountInfo) => void;
 }) {
   const [devices, setDevices] = useState<DeviceInfo[] | null>(null);
   const [devicesBusy, setDevicesBusy] = useState(false);
@@ -47,6 +49,10 @@ export default function AccountCard({
   const [passwordBusy, setPasswordBusy] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordDone, setPasswordDone] = useState<string | null>(null);
+  const [renaming, setRenaming] = useState(false);
+  const [usernameDraft, setUsernameDraft] = useState("");
+  const [renameBusy, setRenameBusy] = useState(false);
+  const [renameMessage, setRenameMessage] = useState<string | null>(null);
 
   const loadDevices = useCallback(async () => {
     setDevicesBusy(true);
@@ -100,17 +106,27 @@ export default function AccountCard({
     setPasswordBusy(true);
     setPasswordError(null);
     setPasswordDone(null);
+    /* Accounts created with "Continue with Google" have no password yet: the
+       first time is a set, not a change - no current-password check then. */
+    const setting = account?.hasAccount === true && account.hasPassword === false;
     try {
       const res = await api<{ signedOutDevices: number }>("/api/auth/password", {
         method: "POST",
-        body: JSON.stringify({ currentPassword, newPassword }),
+        body: JSON.stringify(setting
+          ? { setPassword: true, newPassword }
+          : { currentPassword, newPassword }),
         timeoutMs: 20_000,
       });
-      setPasswordDone(
-        res.signedOutDevices > 0
-          ? `Password changed. ${res.signedOutDevices} other device${res.signedOutDevices === 1 ? " was" : "s were"} signed out.`
-          : "Password changed.",
-      );
+      if (setting) {
+        setPasswordDone("Password set. You can now also sign in with it.");
+        if (account && onAccountChange) onAccountChange({ ...account, hasPassword: true });
+      } else {
+        setPasswordDone(
+          res.signedOutDevices > 0
+            ? `Password changed. ${res.signedOutDevices} other device${res.signedOutDevices === 1 ? " was" : "s were"} signed out.`
+            : "Password changed.",
+        );
+      }
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
@@ -148,7 +164,36 @@ export default function AccountCard({
     }
   };
 
+  const renameAccount = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (renameBusy) return;
+    const issue = usernameProblem(usernameDraft);
+    if (issue) {
+      setRenameMessage(issue);
+      return;
+    }
+    setRenameBusy(true);
+    setRenameMessage(null);
+    try {
+      const res = await api<{ ok: boolean; account: AccountInfo }>("/api/auth/username", {
+        method: "POST",
+        body: JSON.stringify({ username: usernameDraft }),
+        timeoutMs: 15_000,
+      });
+      onAccountChange?.(res.account);
+      setRenaming(false);
+      setRenameMessage(null);
+    } catch (error) {
+      setRenameMessage(
+        error instanceof ApiError ? error.message : "Could not change the username.",
+      );
+    } finally {
+      setRenameBusy(false);
+    }
+  };
+
   const username = account?.username || "";
+  const noPasswordYet = account?.hasAccount === true && account.hasPassword === false;
   const strength = newPassword ? passwordStrength(newPassword, account?.usernameKey || "") : null;
 
   return (
@@ -183,6 +228,49 @@ export default function AccountCard({
               </div>
             </div>
 
+            {/* ── Email: the verification target and where digests go ── */}
+            <div className="acct-email">
+              <IconMail size={15} />
+              <div className="min-w-0 flex-1">
+                {account.email ? (
+                  <>
+                    <span className="acct-email-address">{account.email}</span>
+                    {account.emailVerified ? (
+                      <span className="acct-chip acct-chip-ok">
+                        <IconCheck size={11} /> Verified
+                      </span>
+                    ) : (
+                      <span className="acct-chip acct-chip-warn">
+                        <IconWarn size={11} /> Not verified yet
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  <span className="acct-email-address acct-email-none">
+                    No email on this account yet
+                  </span>
+                )}
+              </div>
+              <a className="notif-linkbtn" href="#settings-notifications">
+                {account.email ? "Change" : "Add your email"}
+              </a>
+            </div>
+            {account.googleLinked && (
+              <div className="acct-google">
+                <IconGoogle size={14} /> Also signs in with the Google account above
+              </div>
+            )}
+            {!account.emailVerified && (
+              <p
+                className="text-[length:var(--fs-meta)] font-semibold leading-relaxed"
+                style={{ color: "var(--text-dim)" }}
+              >
+                {account.email
+                  ? "Plan emails stay switched off until this address is verified - resend the link from the Notifications card below."
+                  : "Add your email to get a reminder when the plan moves or an exam closes in. Username-only sign-in keeps working either way."}
+              </p>
+            )}
+
             <p
               className="text-[length:var(--fs-meta)] font-semibold leading-relaxed"
               style={{ color: "var(--text-dim)" }}
@@ -190,6 +278,59 @@ export default function AccountCard({
               Sign in with these credentials on a phone, tablet or another laptop and you will see
               exactly this plan - every change lands on all of them.
             </p>
+
+            {/* ── Username ── */}
+            {renaming ? (
+              <form className="acct-rename" onSubmit={renameAccount}>
+                <input
+                  aria-label="New username"
+                  className="input-field"
+                  type="text"
+                  autoComplete="username"
+                  placeholder="New username"
+                  value={usernameDraft}
+                  onChange={(e) => setUsernameDraft(e.target.value.slice(0, 32))}
+                  disabled={renameBusy}
+                  autoFocus
+                />
+                <button type="submit" className="btn btn-primary btn-sm" disabled={renameBusy}>
+                  {renameBusy ? "Saving…" : "Save"}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  disabled={renameBusy}
+                  onClick={() => {
+                    setRenaming(false);
+                    setRenameMessage(null);
+                  }}
+                >
+                  Cancel
+                </button>
+              </form>
+            ) : (
+              <div>
+                <button
+                  type="button"
+                  className="notif-linkbtn"
+                  onClick={() => {
+                    setUsernameDraft(username);
+                    setRenaming(true);
+                    setRenameMessage(null);
+                  }}
+                >
+                  Change username
+                </button>
+              </div>
+            )}
+            {renameMessage && (
+              <p
+                className="text-[length:var(--fs-meta)] font-bold"
+                style={{ color: "var(--danger-accent)" }}
+              >
+                {renameMessage}
+              </p>
+            )}
 
             {/* ── Signed-in devices ── */}
             <div className="space-y-2">
@@ -239,20 +380,30 @@ export default function AccountCard({
             {/* ── Password ── */}
             {changing ? (
               <form className="space-y-3" onSubmit={submitPassword}>
-                <div>
-                  <label className="lbl" htmlFor="acct-current">
-                    Current password
-                  </label>
-                  <input
-                    id="acct-current"
-                    className="input-field"
-                    type="password"
-                    autoComplete="current-password"
-                    value={currentPassword}
-                    onChange={(e) => setCurrentPassword(e.target.value)}
-                    disabled={passwordBusy}
-                  />
-                </div>
+                {!noPasswordYet && (
+                  <div>
+                    <label className="lbl" htmlFor="acct-current">
+                      Current password
+                    </label>
+                    <input
+                      id="acct-current"
+                      className="input-field"
+                      type="password"
+                      autoComplete="current-password"
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                      disabled={passwordBusy}
+                    />
+                  </div>
+                )}
+                {noPasswordYet && (
+                  <p
+                    className="text-[length:var(--fs-meta)] font-semibold leading-relaxed"
+                    style={{ color: "var(--text-dim)" }}
+                  >
+                    This account has no password yet - it was created with Google sign-in.
+                  </p>
+                )}
                 <div>
                   <label className="lbl" htmlFor="acct-new">
                     New password
@@ -304,11 +455,14 @@ export default function AccountCard({
                   className="text-[length:var(--fs-meta)] font-semibold"
                   style={{ color: "var(--text-dim)" }}
                 >
-                  Changing your password signs out every other device.
+                  {noPasswordYet
+                    ? "After this, Google sign-in and password sign-in both work on this account."
+                    : "Changing your password signs out every other device."}
                 </p>
                 <div className="flex gap-2">
                   <button type="submit" className="btn btn-primary btn-sm" disabled={passwordBusy}>
-                    <IconCheck size={14} /> {passwordBusy ? "Saving…" : "Change password"}
+                    <IconCheck size={14} />{" "}
+                    {passwordBusy ? "Saving…" : noPasswordYet ? "Set password" : "Change password"}
                   </button>
                   <button
                     type="button"
@@ -333,7 +487,7 @@ export default function AccountCard({
                     setPasswordDone(null);
                   }}
                 >
-                  <IconLock size={14} /> Change password
+                  <IconLock size={14} /> {noPasswordYet ? "Set a password" : "Change password"}
                 </button>
                 <button
                   type="button"

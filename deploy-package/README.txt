@@ -85,6 +85,50 @@ Upgrading an existing deployment:
     instead of starting an empty one, and the response says
     `claimedExistingPlan: true` so the UI can say so.
 
+NOTIFICATIONS - THE APP SPEAKS FIRST, POLITELY
+----------------------------------------------
+The planner now tells the learner what changed instead of waiting to be
+opened. Two surfaces, one brain:
+
+  * THE BELL: a header bell with an unread count opens the notification
+    centre - "plan ready", "task overdue", "streak at risk", exam
+    milestones (30/14/7/3/1 days), session summaries after clock-out and
+    the weekly summary. Every notice exists ONCE in the database per
+    account, so read state on the phone and the laptop always agree; the
+    feed is cross-device by construction.
+  * THE DIGEST: one email per day at the learner's chosen hour, in their
+    own timezone, with the same best-next-task/recovery logic the
+    dashboard uses (never a re-implementation). Subject changes daily
+    ("Monday: 3 lessons, start with Costing"), plain-text and HTML parts,
+    RFC 8058 one-click unsubscribe headers, no images, no pixels, no
+    marketing. A separate Sunday-evening weekly email is its own opt-in.
+
+Rules that keep it polite and reliable:
+
+  * Quiet hours (default 22:00-07:00) block toasts AND email.
+  * Email only ever goes to a VERIFIED address. Verification links are
+    one-time, 24-hour, and re-issued on every address change; nothing is
+    ever sent to an unverified inbox.
+  * One-click unsubscribe from any email stops all email forevermore
+    without a sign-in (HMAC-signed link, timing-safe checked).
+  * Sends are idempotent: a `notifications_sent` row per
+    (account, kind, local date) means overlapping cron runs, retries and
+    the Vercel-daily + GitHub-hourly double trigger can never duplicate
+    a digest.
+  * Gmail SMTP with an App Password is the default transport; Brevo is
+    the only alternative, behind exactly one variable (BREVO_API_KEY).
+    With neither configured, mail is written to `.spp-mail-outbox/` - the
+    app says "dry run" everywhere it matters and zero changes are needed
+    to add real mail later.
+  * "Continue with Google" appears only when the OAuth pair is configured;
+    the flow is authorization-code + PKCE with server-side ID-token
+    verification (kid-checked against Google's live JWKS), and only
+    Google-verified emails are trusted.
+
+Everything a maintainer needs to set this up lives in SETUP.md - numbered,
+screenshot-style steps with exact page and button names, aimed at someone
+who has never opened Google Cloud Console.
+
 DEPLOYMENT
 ----------
 Vercel auto-deploys `main` straight from this repository. The deploy path is
@@ -251,6 +295,63 @@ memory, and credit is informational - it never gates a cloud answer.
 Priority order is now Gemini-first (Gemini → Cerebras → Groq → Mistral →
 SambaNova → Cohere → OpenRouter), matching the key most deployments
 configure; sticky success still promotes whichever leg actually answers.
+
+v36 EMAIL + GOOGLE SIGN-IN + NOTIFICATIONS (this build)
+---------------------------------------------------
+ - EMAIL ON ACCOUNTS: sign-up now asks for an email alongside the
+   username (which stays the display identity). Addresses are stored
+   lower-cased and unique, proven with a one-time 24-hour link, and
+   re-verified on every change before mail goes to the new address.
+   Unverified accounts keep FULL app access - they simply receive no
+   email, and Settings -> Account shows the state with a resend path.
+   Sign-in accepts username OR email plus password.
+ - GOOGLE SIGN-IN: "Continue with Google" on the front door, behind
+   GOOGLE_OAUTH_CLIENT_ID / GOOGLE_OAUTH_CLIENT_SECRET only - no new npm
+   dependency. Full authorization-code flow with state + PKCE, ID token
+   verified server-side against Google's rotating JWKS (kid lookup with
+   one refresh retry), only email_verified claims are trusted. Verified
+   Gmail matching an existing password account LINKS the two instead of
+   duplicating anything; a fresh learner gets a suggested username from
+   their email and can rename it later. Setting a password afterwards
+   (Settings -> Account) just works. With the pair unset, the button is
+   hidden and nothing in the codebase so much as notices.
+ - DAILY DIGEST: one calm email per day at the learner's hour in the
+   learner's IANA timezone - first task and reason (prioritization.ts),
+   overdue count plus the CATCH-UP THE PLAN ITSELF SUGGESTS (recovery.ts),
+   today's lessons and minutes, streak, yesterday's logged minutes, days
+   to the exam, one encouragement line. Deliverability: daily-changing
+   subject, text + HTML alternatives, List-Unsubscribe and RFC 8058
+   List-Unsubscribe-Post, consistent From, no images or pixels. Separate
+   Sunday-evening weekly opt-in. "Send me a test digest now" renders the
+   real digest for the current moment and shows the exact subject and
+   text back in Settings.
+ - TRANSPORT: Gmail SMTP App Password by default (Vercel-safe port 465,
+   messages awaited before the response returns), Brevo via exactly one
+   BREVO_API_KEY, local outbox file as the honest dry run. Nothing else
+   exists.
+ - CRON: hourly GitHub Actions workflow (.github/workflows/digest-cron.yml)
+   calls /api/cron/digest with the CRON_SECRET bearer; the Vercel cron in
+   vercel.json fires the same endpoint once a day as backstop. The
+   endpoint's own catch-up rule ("at or past the chosen hour, not yet sent
+   today") makes late or repeated runs harmless, and the
+   notifications_sent (account, kind, local date) ledger makes a second
+   same-day send structurally impossible.
+ - IN-APP NOTIFICATIONS: bell + unread badge in the header, panel with
+   what happened and deep links, stored per account in the database so
+   every device reads the same truth. Per-type toggles (plan ready,
+   overdue with recover action, streak at risk, exam milestones, session
+   summary, weekly progress), quiet hours 22:00-07:00 by default blocking
+   both toasts and mail, live toasts through the existing notify()
+   system. No web push - the write path is shaped for it later.
+ - SETTINGS: one Notifications card collects email + verification state,
+   digest toggle and hour, timezone (Asia/Kolkata default), weekly
+   summary, per-type toggles, quiet hours, test-digest button, and
+   unsubscribe-all, next to the Account card's email prompt, Google link
+   chip, rename and set-a-password flows.
+ - HARDENING: the shared state payload (login/both state routes) no
+   longer echoes passwordHash, googleSub or the lockout counters into the
+   browser - strip once, centrally, in fullState.
+ - Setup for a non-technical maintainer: SETUP.md at the repository root.
 
 v35 ACCOUNTS - ONE SIGN-IN, EVERY DEVICE (this build)
 ------------------------------------------------------

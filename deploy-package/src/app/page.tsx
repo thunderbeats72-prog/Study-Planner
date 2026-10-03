@@ -28,6 +28,7 @@ import type { QuickAddPayload } from "@/lib/quickAdd";
 import AuthGate from "@/components/AuthGate";
 import Onboarding from "@/components/Onboarding";
 import Dashboard from "@/components/Dashboard";
+import NotificationCentre from "@/components/NotificationCentre";
 import PlannerView from "@/components/PlannerView";
 import FocusView from "@/components/FocusView";
 import SubjectsView from "@/components/SubjectsView";
@@ -44,7 +45,6 @@ import { formatHoursMinutes, loggedMinutesForDate } from "@/lib/studyTime";
 import type { TaskPatch } from "@/components/TaskEditor";
 import {
   IconBolt,
-  IconBell,
   IconChart,
   IconBook,
   IconCalendar,
@@ -263,15 +263,14 @@ export default function Home() {
      over a scrim instead of living in the bottom dock. */
   const [drawerOpen, setDrawerOpen] = useState(false);
   useBackClose(drawerOpen, () => setDrawerOpen(false));
-  /* Quick controls: notifications + theme popovers in the tracker bar. */
-  const [notifOpen, setNotifOpen] = useState(false);
+  /* Quick controls: the theme popover in the tracker bar (the bell owns its
+     own open state inside NotificationCentre). */
   const [themeOpen, setThemeOpen] = useState(false);
   const [zenMinimal, setZenMinimal] = useState(false);
   const zenRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
-    if (!notifOpen && !themeOpen) return;
+    if (!themeOpen) return;
     const close = () => {
-      setNotifOpen(false);
       setThemeOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
@@ -283,7 +282,7 @@ export default function Home() {
       window.removeEventListener("click", close);
       window.removeEventListener("keydown", onKey);
     };
-  }, [notifOpen, themeOpen]);
+  }, [themeOpen]);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     // restore the user's sidebar preference (desktop only; harmless on mobile)
     try {
@@ -1645,76 +1644,7 @@ export default function Home() {
           {/* Quick controls mirror the tracker bar's trio for phones, where
               the tracker hides them below 640px - same popovers, same state. */}
           <span className="mh-quick">
-            <span className="quick-popover-wrap">
-              <button
-                type="button"
-                className="icon-quick-btn mh-qbtn"
-                aria-label="Notifications"
-                aria-expanded={notifOpen}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setThemeOpen(false);
-                  setNotifOpen((v) => !v);
-                }}
-              >
-                <IconBell size={15} />
-                <span className="icon-quick-dot" aria-hidden="true" />
-              </button>
-              {notifOpen && (
-                <div className="quick-popover notif-popover" role="menu">
-                  <div className="quick-popover-title">Notifications</div>
-                  <div className="notif-row">
-                    <span className="notif-dot notif-dot--orange" />
-                    <div>
-                      <strong>
-                        {ctx.overdue > 0
-                          ? `${ctx.overdue} unfinished task${ctx.overdue > 1 ? "s" : ""}`
-                          : "Nothing unfinished"}
-                      </strong>
-                      <span>
-                        {ctx.overdue > 0
-                          ? "Let's recover them - spread them out or re-plan."
-                          : "You're up to date."}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="notif-row">
-                    <span className="notif-dot notif-dot--green" />
-                    <div>
-                      <strong>
-                        {todayDone}/{todayTotal} lessons done today
-                      </strong>
-                      <span>
-                        {todayTotal
-                          ? `${Math.round((todayDone / Math.max(1, todayTotal)) * 100)}% of today's plan`
-                          : "Rest day or no plan yet"}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="notif-row">
-                    <span className="notif-dot notif-dot--violet" />
-                    <div>
-                      <strong>{state.user.streak} day streak</strong>
-                      <span>
-                        {state.user.streak > 0
-                          ? "Your progress is still here, even on days you miss."
-                          : "Start today and it will build itself."}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="notif-row">
-                    <span className="notif-dot notif-dot--blue" />
-                    <div>
-                      <strong>
-                        {ctx.daysLeft} days to{" "}
-                        {prettyLong(state.settings.examDate)}
-                      </strong>
-                      <span>{ctx.progressPct}% of the syllabus complete.</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </span>
+            <NotificationCentre onNavigate={goPage} onToast={notify} />
             <span className="quick-popover-wrap">
               <button
                 type="button"
@@ -1723,7 +1653,6 @@ export default function Home() {
                 aria-expanded={themeOpen}
                 onClick={(e) => {
                   e.stopPropagation();
-                  setNotifOpen(false);
                   setThemeOpen((v) => !v);
                 }}
               >
@@ -2092,75 +2021,7 @@ export default function Home() {
                   className="quick-popover-wrap"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <button
-                    className="icon-quick-btn"
-                    aria-label="Notifications"
-                    aria-expanded={notifOpen}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setThemeOpen(false);
-                      setNotifOpen((v) => !v);
-                    }}
-                  >
-                    <IconBell size={15} />
-                    <span className="icon-quick-dot" aria-hidden="true" />
-                  </button>
-                  {notifOpen && (
-                    <div className="quick-popover notif-popover" role="menu">
-                      <div className="quick-popover-title">Notifications</div>
-                      <div className="notif-row">
-                        <span className="notif-dot notif-dot--orange" />
-                        <div>
-                          <strong>
-                            {ctx.overdue > 0
-                              ? `${ctx.overdue} unfinished task${ctx.overdue > 1 ? "s" : ""}`
-                              : "Nothing unfinished"}
-                          </strong>
-                          <span>
-                            {ctx.overdue > 0
-                              ? "Let's recover them - spread them out or re-plan."
-                              : "You're up to date."}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="notif-row">
-                        <span className="notif-dot notif-dot--green" />
-                        <div>
-                          <strong>
-                            {todayDone}/{todayTotal} lessons done today
-                          </strong>
-                          <span>
-                            {todayTotal
-                              ? `${Math.round((todayDone / Math.max(1, todayTotal)) * 100)}% of today's plan`
-                              : "Rest day or no plan yet"}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="notif-row">
-                        <span className="notif-dot notif-dot--violet" />
-                        <div>
-                          <strong>{state.user.streak} day streak</strong>
-                          <span>
-                            {state.user.streak > 0
-                              ? "Your progress is still here, even on days you miss."
-                              : "Start today and it will build itself."}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="notif-row">
-                        <span className="notif-dot notif-dot--blue" />
-                        <div>
-                          <strong>
-                            {ctx.daysLeft} days to{" "}
-                            {prettyLong(state.settings.examDate)}
-                          </strong>
-                          <span>
-                            {ctx.progressPct}% of the syllabus complete.
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                  <NotificationCentre onNavigate={goPage} onToast={notify} />
                 </div>
                 <div
                   className="quick-popover-wrap"
@@ -2172,8 +2033,7 @@ export default function Home() {
                     aria-expanded={themeOpen}
                     onClick={(e) => {
                       e.stopPropagation();
-                      setNotifOpen(false);
-                      setThemeOpen((v) => !v);
+                          setThemeOpen((v) => !v);
                     }}
                   >
                     <IconPalette size={15} />
@@ -2292,6 +2152,7 @@ export default function Home() {
               onPatch={patchSettings}
               onRestart={requestWizardRestart}
               onSignOut={signOut}
+              onAccountChange={(info) => setAccount(info)}
               busy={busy}
             />
           )}

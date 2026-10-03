@@ -201,7 +201,15 @@ export async function fullState(userKey: string) {
       };
     });
 
-    return { user, ...rest, topics: enrichedTopics };
+    /* The learner's own row goes to their browser for the UI, but its
+       credential columns (password hash, lockout counters, Google id, ...)
+       must never leave the server - every API payload that includes the
+       user row comes from here, so strip once, centrally. */
+    const userRow = { ...(user as unknown as Record<string, unknown>) };
+    for (const secret of ["passwordHash", "lockedUntil", "failedLogins", "googleSub"]) {
+      delete userRow[secret];
+    }
+    return { user: userRow as typeof user, ...rest, topics: enrichedTopics };
   } catch (error) {
     console.warn("DB unavailable during fullState; using fallback state:", error instanceof Error ? error.message : error);
     // Sandbox/preview escape hatch: with no database, the UI is served a
