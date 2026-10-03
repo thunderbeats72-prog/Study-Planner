@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { authenticate, publicAccount, sessionCookie, SESSION_TTL_DAYS } from "@/lib/auth";
 import { demoDataEnabled } from "@/lib/demoGate";
+import { googleSignInEnabled } from "@/lib/google";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +18,7 @@ export async function GET(req: Request) {
     const auth = await authenticate(req);
     if (!auth) {
       return NextResponse.json(
-        { authenticated: false, account: null, preview: demoDataEnabled(), accountsReady: true },
+        { authenticated: false, account: null, preview: demoDataEnabled(), accountsReady: true, googleSignIn: googleSignInEnabled() },
         { headers: { "cache-control": "no-store" } },
       );
     }
@@ -28,7 +29,7 @@ export async function GET(req: Request) {
       headers["set-cookie"] = sessionCookie(req, auth.refreshedToken, SESSION_TTL_DAYS * 86_400);
     }
     return NextResponse.json(
-      { authenticated: true, account: publicAccount(auth.user), preview: false, accountsReady: true },
+      { authenticated: true, account: publicAccount(auth.user), preview: false, accountsReady: true, googleSignIn: googleSignInEnabled() },
       { headers },
     );
   } catch (error) {

@@ -2,10 +2,11 @@ import { createHash, randomBytes, randomUUID, scrypt as scryptCb, timingSafeEqua
 import { promisify } from "node:util";
 import { and, eq, isNull, lt, ne, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { authSessions, settings, users, type User } from "@/db/schema";
+import { authEmailTokens, authSessions, settings, users, type User } from "@/db/schema";
 import { demoDataEnabled } from "./demoGate";
 import { deviceLabel, keyFrom, newUserKey, USER_KEY_RE } from "./identity";
 import { normalizeUsername, passwordProblem, usernameProblem, displayUsername } from "./authRules";
+import { emailProblem, loginLooksLikeEmail, normalizeEmail } from "./emailRules";
 import { addDays, todayStr } from "./planner";
 
 const scrypt = promisify(scryptCb) as (
@@ -240,6 +241,45 @@ export async function ensureAuthSchema(): Promise<void> {
         sql`create unique index if not exists auth_sessions_token_hash_unique on auth_sessions (token_hash)`,
         sql`create index if not exists auth_sessions_user_id_idx on auth_sessions (user_id)`,
         sql`create index if not exists auth_sessions_expires_at_idx on auth_sessions (expires_at)`,
+        /* ── Email, Google sign-in and notifications ── */
+        sql`alter table users add column if not exists email text`,
+        sql`alter table users add column if not exists email_verified_at timestamp`,
+        sql`alter table users add column if not exists google_sub text`,
+        sql`alter table users add column if not exists email_unsubscribed boolean not null default false`,
+        sql`alter table users add column if not exists notify_prefs jsonb`,
+        sql`create unique index if not exists users_email_unique on users (email) where email is not null`,
+        sql`create unique index if not exists users_google_sub_unique on users (google_sub) where google_sub is not null`,
+        sql`create table if not exists auth_email_tokens (
+              id serial primary key,
+              user_id integer not null,
+              email text not null,
+              token_hash text not null,
+              created_at timestamp not null default now(),
+              expires_at timestamp not null
+            )`,
+        sql`create unique index if not exists auth_email_tokens_token_hash_unique on auth_email_tokens (token_hash)`,
+        sql`create index if not exists auth_email_tokens_user_id_idx on auth_email_tokens (user_id)`,
+        sql`create table if not exists notifications (
+              id serial primary key,
+              user_id integer not null,
+              kind text not null,
+              title text not null,
+              body text not null default '',
+              href text not null default 'dashboard',
+              read_at timestamp,
+              dedup_key text not null,
+              created_at timestamp not null default now()
+            )`,
+        sql`create unique index if not exists notifications_user_dedup_unique on notifications (user_id, dedup_key)`,
+        sql`create index if not exists notifications_user_id_idx on notifications (user_id, created_at)`,
+        sql`create table if not exists notifications_sent (
+              id serial primary key,
+              user_id integer not null,
+              kind text not null,
+              date text not null,
+              created_at timestamp not null default now()
+            )`,
+        sql`create unique index if not exists notifications_sent_user_kind_date_unique on notifications_sent (user_id, kind, date)`,
       ];
       let firstFailure: unknown = null;
       for (const statement of statements) {
@@ -410,6 +450,36 @@ export type AccountResult = { user: User; token: string; claimedExistingPlan: bo
 /** Sign-up deliberately stops short of a session - see createAccount. */
 export type NewAccountResult = { user: User; claimedExistingPlan: boolean };
 
+/** The single friendly 409 for a taken username, checked before every write. */
+async function assertUsernameFree(username: string): Promise<void> {
+  const rows = await db.select({ id: users.id }).from(users).where(eq(users.username, username)).limit(1);
+  if (rows.length) {
+    throw new AuthError("That username is already taken. Try another one.", "USERNAME_TAKEN", 409);
+  }
+}
+
+/** One address, one account - verified or not. */
+async function assertEmailFree(email: string): Promise<void> {
+  if (!email) return;
+  const rows = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
+  if (rows.length) {
+    throw new AuthError("That email address is already on another account.", "EMAIL_TAKEN", 409);
+  }
+}
+
+/** Translate a raced unique write (two tabs signing up at once) into the
+ *  same friendly 409 the pre-checks produce. */
+function rethrowUniqueViolation(error: unknown): never {
+  const message = error instanceof Error ? error.message : String(error);
+  if (message.includes("users_username_unique")) {
+    throw new AuthError("That username is already taken. Try another one.", "USERNAME_TAKEN", 409);
+  }
+  if (message.includes("users_email_unique")) {
+    throw new AuthError("That email address is already on another account.", "EMAIL_TAKEN", 409);
+  }
+  throw error;
+}
+
 /**
  * Create an account - and nothing more.
  *
@@ -426,7 +496,7 @@ export type NewAccountResult = { user: User; claimedExistingPlan: boolean };
  */
 export async function createAccount(
   req: Request,
-  input: { username: unknown; password: unknown; name?: unknown },
+  input: { username: unknown; password: unknown; name?: unknown; email?: unknown },
 ): Promise<NewAccountResult> {
   await ensureAuthSchema();
 
@@ -441,15 +511,15 @@ export async function createAccount(
     typeof input.name === "string" && input.name.trim()
       ? input.name.trim().slice(0, 100)
       : display;
+  /* Every new account carries an email from day one. It is what makes digest
+     mail and password-less recovery possible later; unverified addresses are
+     stored (the learner keeps using the app) but receive nothing. */
+  const emailIssue = emailProblem(input.email);
+  if (emailIssue) throw new AuthError(emailIssue, "INVALID_EMAIL");
+  const email = normalizeEmail(input.email);
 
-  const taken = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(eq(users.username, username))
-    .limit(1);
-  if (taken.length) {
-    throw new AuthError("That username is already taken. Try another one.", "USERNAME_TAKEN", 409);
-  }
+  await assertUsernameFree(username);
+  await assertEmailFree(email);
 
   const passwordHash = await hashPassword(password);
   const now = new Date();
@@ -461,6 +531,8 @@ export async function createAccount(
     lastLoginAt: now,
     failedLogins: 0,
     lockedUntil: null,
+    email,
+    emailVerifiedAt: null,
   };
 
   // ── Claim the plan this device built while it was anonymous ──────────
@@ -476,21 +548,30 @@ export async function createAccount(
     // Only an un-credentialed row can be claimed, and only by the device
     // that holds its key - an account is never silently taken over.
     if (candidate && !candidate.passwordHash) {
-      const updated = await db
-        .update(users)
-        .set({ ...credentials, name: candidate.onboarded ? candidate.name : name })
-        .where(and(eq(users.id, candidate.id), isNull(users.username)))
-        .returning();
-      claimed = updated[0] || null;
+      try {
+        const updated = await db
+          .update(users)
+          .set({ ...credentials, name: candidate.onboarded ? candidate.name : name })
+          .where(and(eq(users.id, candidate.id), isNull(users.username)))
+          .returning();
+        claimed = updated[0] || null;
+      } catch (error) {
+        rethrowUniqueViolation(error);
+      }
     }
   }
 
   let user = claimed;
   if (!user) {
-    const inserted = await db
-      .insert(users)
-      .values({ userKey: newUserKey(), name, ...credentials })
-      .returning();
+    let inserted: User[];
+    try {
+      inserted = await db
+        .insert(users)
+        .values({ userKey: newUserKey(), name, ...credentials })
+        .returning();
+    } catch (error) {
+      rethrowUniqueViolation(error);
+    }
     user = inserted[0];
     if (!user) throw new AuthError("Could not create the account. Please try again.", "SIGNUP_FAILED", 500);
     await db
@@ -513,12 +594,21 @@ export async function signIn(
 ): Promise<AccountResult> {
   await ensureAuthSchema();
 
-  const username = normalizeUsername(input.username);
+  /* The box on the sign-in form accepts the username OR the email address.
+     Usernames cannot contain @ (authRules), so the identifier decides its
+     own lookup column unambiguously. The failure message is the same for a
+     wrong username, a wrong email and a wrong password, so the form never
+     confirms which accounts exist. */
+  const identifier = loginLooksLikeEmail(input.username)
+    ? normalizeEmail(input.username)
+    : normalizeUsername(input.username);
   const password = typeof input.password === "string" ? input.password : "";
   const generic = new AuthError("Incorrect username or password.", "INVALID_CREDENTIALS", 401);
-  if (!username || !password) throw generic;
+  if (!identifier || !password) throw generic;
 
-  const rows = await db.select().from(users).where(eq(users.username, username)).limit(1);
+  const rows = loginLooksLikeEmail(input.username)
+    ? await db.select().from(users).where(eq(users.email, identifier)).limit(1)
+    : await db.select().from(users).where(eq(users.username, identifier)).limit(1);
   const user = rows[0];
   if (!user || !user.passwordHash) {
     // Spend a comparable amount of time so a missing account is not
@@ -610,7 +700,289 @@ export function publicAccount(user: User) {
     createdAt: user.createdAt instanceof Date ? user.createdAt.toISOString() : null,
     lastLoginAt: user.lastLoginAt instanceof Date ? user.lastLoginAt.toISOString() : null,
     hasAccount: !!user.username,
+    /* The account's own address is private to the learner: it is only ever
+       returned over their own authenticated session. */
+    email: user.email || null,
+    emailVerified: !!user.emailVerifiedAt,
+    /* Google-created accounts have no password: Settings offers "Set a
+       password" instead of "Change password". */
+    hasPassword: !!user.passwordHash,
+    googleLinked: !!user.googleSub,
+    emailUnsubscribed: !!user.emailUnsubscribed,
   };
+}
+
+/* ── Email addresses ───────────────────────────────────────────────── */
+
+/** How long a verification link stays valid (spec: 24 hours). */
+export const EMAIL_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
+
+/** The browser-facing random string inside a verification link. */
+function newEmailToken(): string {
+  return randomBytes(32).toString("base64url");
+}
+
+/** What the database stores about a verification link (never the token). */
+export function emailTokenHash(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+/**
+ * Add the first email, or change the one already there. The new address is
+ * stored lower-cased and immediately marked UNVERIFIED, and a fresh single-
+ * use token is minted for the mail it triggers. Any older pending tokens are
+ * deleted, so a stale link always dies instead of flipping the address back.
+ */
+export async function setAccountEmail(user: User, input: unknown): Promise<{ email: string; token: string }> {
+  await ensureAuthSchema();
+  const issue = emailProblem(input);
+  if (issue) throw new AuthError(issue, "INVALID_EMAIL");
+  const email = normalizeEmail(input);
+  if (email === user.email && user.emailVerifiedAt) {
+    throw new AuthError("That email address is already verified on this account.", "EMAIL_UNCHANGED");
+  }
+  const holder = user.email === email ? [] : await db
+    .select({ id: users.id })
+    .from(users)
+    .where(and(eq(users.email, email), ne(users.id, user.id)))
+    .limit(1);
+  if (holder.length) {
+    throw new AuthError("That email address is already on another account.", "EMAIL_TAKEN", 409);
+  }
+  await db.update(users).set({ email, emailVerifiedAt: null }).where(eq(users.id, user.id));
+  return { email, token: await issueEmailToken(user.id, email) };
+}
+
+/**
+ * Mint a fresh verification token for (user, address): delete the old ones,
+ * insert the new hash, hand the RAW token to the mailer - and nowhere else.
+ */
+export async function issueEmailToken(userId: number, email: string): Promise<string> {
+  const token = newEmailToken();
+  await db.delete(authEmailTokens).where(eq(authEmailTokens.userId, userId));
+  await db.insert(authEmailTokens).values({
+    userId,
+    email,
+    tokenHash: emailTokenHash(token),
+    expiresAt: new Date(Date.now() + EMAIL_TOKEN_TTL_MS),
+  });
+  // Housekeeping on the same round trip: nobody else's expired rows matter,
+  // but letting them pile up forever is not an option either.
+  try {
+    await db.delete(authEmailTokens).where(lt(authEmailTokens.expiresAt, new Date()));
+  } catch {
+    /* expired rows are harmless if this sweep loses a race */
+  }
+  return token;
+}
+
+/**
+ * Spend a verification token. Single-use: the row is deleted the moment it
+ * is read, so a double-click of the email link lands on "already used"
+ * instead of re-verifying, and a copied link is worthless to anyone else.
+ * Returns the now-verified user, or null for an unknown/expired token.
+ */
+export async function consumeEmailToken(rawToken: string): Promise<User | null> {
+  await ensureAuthSchema();
+  const token = String(rawToken || "").trim();
+  if (!token || token.length > 256) return null;
+  const rows = await db
+    .select()
+    .from(authEmailTokens)
+    .where(eq(authEmailTokens.tokenHash, emailTokenHash(token)))
+    .limit(1);
+  const row = rows[0];
+  if (!row) return null;
+  await db.delete(authEmailTokens).where(eq(authEmailTokens.id, row.id));
+  if (row.expiresAt.getTime() <= Date.now()) return null;
+  const updated = await db
+    .update(users)
+    .set({ email: row.email, emailVerifiedAt: new Date() })
+    .where(eq(users.id, row.userId))
+    .returning();
+  return updated[0] || null;
+}
+
+/* ── Username changes (Google accounts get a suggested one first) ──── */
+
+/** Rename an account. Sessions are keyed by user id, so every signed-in
+ *  device stays signed in and simply starts greeting the new name. */
+export async function changeUsername(user: User, input: unknown): Promise<User> {
+  await ensureAuthSchema();
+  const issue = usernameProblem(input);
+  if (issue) throw new AuthError(issue, "INVALID_USERNAME");
+  const username = normalizeUsername(input);
+  if (username === user.username) {
+    throw new AuthError("That is already your username.", "USERNAME_UNCHANGED");
+  }
+  await assertUsernameFree(username);
+  let updated: User[];
+  try {
+    updated = await db
+      .update(users)
+      .set({ username, usernameDisplay: displayUsername(input, username) })
+      .where(eq(users.id, user.id))
+      .returning();
+  } catch (error) {
+    rethrowUniqueViolation(error);
+  }
+  if (!updated[0]) throw new AuthError("Could not change the username. Please try again.", "USERNAME_FAILED", 500);
+  return updated[0];
+}
+
+/* ── Password-less accounts (created by Google sign-in) ────────────── */
+
+/**
+ * Give a password to an account that has none. Only usable while
+ * passwordHash is NULL - an account WITH a password goes through
+ * changePassword (which demands the current one). Nothing is signed out:
+ * the point is to add a second way in, not to revoke the first.
+ */
+export async function setFirstPassword(user: User, input: unknown): Promise<void> {
+  await ensureAuthSchema();
+  if (user.passwordHash) {
+    throw new AuthError("This account already has a password. Use Change password instead.", "PASSWORD_EXISTS");
+  }
+  const issue = passwordProblem(input, user.username || "");
+  if (issue) throw new AuthError(issue, "WEAK_PASSWORD");
+  await db
+    .update(users)
+    .set({ passwordHash: await hashPassword(String(input)), passwordUpdatedAt: new Date(), failedLogins: 0, lockedUntil: null })
+    .where(eq(users.id, user.id));
+}
+
+/* ── Google sign-in ────────────────────────────────────────────────── */
+
+export type GoogleIdentity = {
+  /** The stable "sub" claim: the one thing that identifies a Google person. */
+  sub: string;
+  email: string;
+  emailVerified: boolean;
+  displayName?: string;
+};
+
+/**
+ * Derive a valid, free username from an email address ("priya.nair91@...
+ * becomes "priya.nair91"). Runs through the SAME rules a typed username
+ * does; falls back to numbered variants when the first idea is taken.
+ */
+export async function suggestUsername(email: string): Promise<string> {
+  const local = normalizeEmail(email).split("@")[0] || "";
+  const base = local
+    .replace(/[^a-z0-9._-]+/g, ".")
+    .replace(/[._-]{2,}/g, ".")
+    .replace(/^[._-]+|[._-]+$/g, "");
+  const candidates = [base];
+  for (let i = 0; i < 6; i++) {
+    candidates.push(`${base}.${100 + Math.floor(Math.random() * 900)}`);
+    candidates.push(`${base}${10 + Math.floor(Math.random() * 90)}`);
+  }
+  for (const candidate of candidates) {
+    if (!candidate || usernameProblem(candidate)) continue;
+    const rows = await db.select({ id: users.id }).from(users).where(eq(users.username, candidate)).limit(1);
+    if (!rows.length) return candidate;
+  }
+  // A guaranteed-legal, guaranteed-unguessable last resort.
+  return `learner${randomBytes(3).toString("hex")}`;
+}
+
+/**
+ * Sign in with a verified Google identity - or become a new account.
+ *
+ * Matching order (an account is never duplicated):
+ *   1. google_sub  → the same Google person as last time: sign them in.
+ *   2. email       → the address is already on an account: Google is itself
+ *      vouching for it (email_verified true), so link it, verify it and
+ *      sign in. This holds even if the address was never verified locally,
+ *      because a Google-verified email is exactly the proof the app asks for.
+ *   3. no match   → create a fresh account with a suggested username, the
+ *      email already verified, and NO password (Settings can set one later).
+ */
+export async function signInWithGoogle(
+  req: Request,
+  identity: GoogleIdentity,
+): Promise<{ user: User; token: string; created: boolean }> {
+  await ensureAuthSchema();
+
+  const sub = String(identity.sub || "").trim();
+  const email = normalizeEmail(identity.email);
+  if (!sub) throw new AuthError("Google did not return an account id.", "GOOGLE_IDENTITY", 400);
+  const emailIssue = emailProblem(email);
+  if (emailIssue) throw new AuthError("Google did not return a usable email address.", "GOOGLE_IDENTITY", 400);
+  if (identity.emailVerified !== true) {
+    throw new AuthError(
+      "Google could not confirm that you own this email address, so it cannot be used to sign in.",
+      "GOOGLE_EMAIL_UNVERIFIED",
+      403,
+    );
+  }
+
+  const now = new Date();
+  const finish = async (user: User, created: boolean) => {
+    await db.update(users).set({ lastLoginAt: now, failedLogins: 0, lockedUntil: null }).where(eq(users.id, user.id));
+    await db
+      .insert(settings)
+      .values({ userId: user.id, startDate: todayStr(), examDate: addDays(todayStr(), 90) })
+      .onConflictDoNothing({ target: settings.userId });
+    const token = await createSession(user.id, req);
+    return { user: { ...user, googleSub: sub }, token, created };
+  };
+
+  // 1. The Google person we have seen before.
+  const bySub = await db.select().from(users).where(eq(users.googleSub, sub)).limit(1);
+  if (bySub[0]) {
+    /* Keep local verification fresh if the address changed on Google's side. */
+    if (bySub[0].email !== email && !(await db.select({ id: users.id }).from(users).where(and(eq(users.email, email), ne(users.id, bySub[0].id))).limit(1))[0]) {
+      await db.update(users).set({ email, emailVerifiedAt: now }).where(eq(users.id, bySub[0].id));
+    }
+    return finish(bySub[0], false);
+  }
+
+  // 2. The email already belongs to an account here.
+  const byEmail = await db.select().from(users).where(eq(users.email, email)).limit(1);
+  if (byEmail[0]) {
+    await db
+      .update(users)
+      .set({ googleSub: sub, emailVerifiedAt: byEmail[0].emailVerifiedAt || now })
+      .where(eq(users.id, byEmail[0].id));
+    return finish({ ...byEmail[0], googleSub: sub }, false);
+  }
+
+  // 3. A brand new account.
+  const username = await suggestUsername(email);
+  const name =
+    typeof identity.displayName === "string" && identity.displayName.trim()
+      ? identity.displayName.trim().slice(0, 100)
+      : username;
+  let inserted: User[];
+  try {
+    inserted = await db
+      .insert(users)
+      .values({
+        userKey: newUserKey(),
+        username,
+        usernameDisplay: username,
+        passwordHash: null,
+        passwordUpdatedAt: null,
+        lastLoginAt: now,
+        failedLogins: 0,
+        lockedUntil: null,
+        email,
+        emailVerifiedAt: now,
+        googleSub: sub,
+        name,
+      })
+      .returning();
+  } catch (error) {
+    rethrowUniqueViolation(error);
+  }
+  const user = inserted[0];
+  if (!user) throw new AuthError("Could not create the account. Please try again.", "GOOGLE_SIGNUP_FAILED", 500);
+  await db
+    .insert(settings)
+    .values({ userId: user.id, startDate: todayStr(), examDate: addDays(todayStr(), 90) })
+    .onConflictDoNothing({ target: settings.userId });
+  return finish(user, true);
 }
 
 /** A stable id for logging a sign-in attempt without storing the username. */

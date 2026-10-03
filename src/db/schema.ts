@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   pgTable,
   serial,
@@ -37,6 +38,24 @@ export const users = pgTable(
     lastLoginAt: timestamp("last_login_at"),
     failedLogins: integer("failed_logins").notNull().default(0),
     lockedUntil: timestamp("locked_until"),
+    /** The account email, lower-cased on write (EMAIL RULES, src/lib/emailRules.ts).
+     *  NULL until the learner adds one - pre-email accounts keep working with
+     *  zero friction, they just receive no mail. */
+    email: text("email"),
+    /** When the CURRENT address was proven. Any mail about the plan goes out
+     *  only while this is set; changing the address clears it. */
+    emailVerifiedAt: timestamp("email_verified_at"),
+    /** The stable subject id Google returned for this person's account.
+     *  Presence is what makes "Continue with Google" a sign-in, not a sign-up. */
+    googleSub: text("google_sub"),
+    /** True after the one-click unsubscribe link is used (or the Settings
+     *  master switch). No email of any kind is sent while it is set. */
+    emailUnsubscribed: boolean("email_unsubscribed").notNull().default(false),
+    /** Notification preferences (digest schedule, timezone, quiet hours,
+     *  per-type toggles). Defaults live in src/lib/notifications.ts and are
+     *  merged onto whatever is stored, so old rows keep their meaning as new
+     *  options appear. */
+    notifyPrefs: jsonb("notify_prefs").$type<Record<string, unknown>>(),
     name: text("name").notNull().default("Learner"),
     level: text("level").notNull().default("ug"),
     course: text("course").notNull().default("custom"),
@@ -47,7 +66,85 @@ export const users = pgTable(
     lastStudyDate: text("last_study_date"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
-  (t) => [uniqueIndex("users_username_unique").on(t.username)]
+  (t) => [
+    uniqueIndex("users_username_unique").on(t.username),
+    // One address, one account. NULLs (accounts without mail yet) do not
+    // take part in uniqueness, so the index stays cheap and correct.
+    uniqueIndex("users_email_unique").on(t.email).where(sql`${t.email} is not null`),
+    uniqueIndex("users_google_sub_unique").on(t.googleSub).where(sql`${t.googleSub} is not null`),
+  ]
+);
+
+/**
+ * One live verification link per email change. The browser only ever sees
+ * the raw 256-bit token in the email itself; the database stores its
+ * SHA-256, so a table dump cannot be used to "verify" someone else's
+ * address. A row is deleted the moment it is spent, so a used link is dead
+ * forever, and a new request replaces the old one.
+ */
+export const authEmailTokens = pgTable(
+  "auth_email_tokens",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id").notNull(),
+    /** The address this token proves. Verification writes THIS value back to
+     *  users.email, so a click always confirms the address it was mailed to. */
+    email: text("email").notNull(),
+    tokenHash: text("token_hash").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    expiresAt: timestamp("expires_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("auth_email_tokens_token_hash_unique").on(t.tokenHash),
+    index("auth_email_tokens_user_id_idx").on(t.userId),
+  ]
+);
+
+/**
+ * An in-app notification: one row per event, stored against the account so
+ * the bell shows the SAME list on the phone and the laptop. `dedupKey`
+ * (e.g. "overdue:2026-10-03") is what makes "one plan-ready notice per
+ * morning" a database fact rather than a polite intention.
+ */
+export const notifications = pgTable(
+  "notifications",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id").notNull(),
+    kind: text("kind").notNull(),
+    title: text("title").notNull(),
+    body: text("body").notNull().default(""),
+    /** The page the notification is about ("dashboard", "planner", ...), so
+     *  tapping it lands the learner exactly where the problem lives. */
+    href: text("href").notNull().default("dashboard"),
+    readAt: timestamp("read_at"),
+    dedupKey: text("dedup_key").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("notifications_user_dedup_unique").on(t.userId, t.dedupKey),
+    index("notifications_user_id_idx").on(t.userId, t.createdAt),
+  ]
+);
+
+/**
+ * The email idempotency ledger: (user, kind, local-date) is unique, so a
+ * retried cron run, a double GitHub Actions trigger or a Vercel + GitHub
+ * overlap can never produce the same digest twice in one day.
+ */
+export const notificationsSent = pgTable(
+  "notifications_sent",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id").notNull(),
+    kind: text("kind").notNull(),
+    /** The date IN THE LEARNER'S TIMEZONE the email belongs to, not the
+     *  send timestamp - two servers in different zones must still agree on
+     *  whether "Monday's digest" went out. */
+    date: text("date").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("notifications_sent_user_kind_date_unique").on(t.userId, t.kind, t.date)]
 );
 
 /**
@@ -261,6 +358,9 @@ export const shigunUsage = pgTable(
 
 export type User = typeof users.$inferSelect;
 export type AuthSession = typeof authSessions.$inferSelect;
+export type AuthEmailToken = typeof authEmailTokens.$inferSelect;
+export type AppNotification = typeof notifications.$inferSelect;
+export type NotificationSent = typeof notificationsSent.$inferSelect;
 export type Settings = typeof settings.$inferSelect;
 export type Subject = typeof subjects.$inferSelect;
 export type Topic = typeof topics.$inferSelect;

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { changePassword, publicAccount, requireUser } from "@/lib/auth";
+import { changePassword, publicAccount, requireUser, setFirstPassword } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/rateLimit";
 import { readJsonObject, validationPayload } from "@/lib/validation";
 import { guardResponse, unauthorizedResponse } from "@/lib/routeGuard";
@@ -7,11 +7,15 @@ import { guardResponse, unauthorizedResponse } from "@/lib/routeGuard";
 export const dynamic = "force-dynamic";
 
 /**
- * POST /api/auth/password - change the password of the signed-in account.
+ * POST /api/auth/password - manage the password of the signed-in account.
  *
- * Succeeding here signs out every OTHER device: changing a password is how
- * a learner takes access back, so the old password must stop working
- * everywhere, immediately.
+ * Two shapes, one route:
+ *   • setPassword: an account created via Google has NO password - this
+ *     adds the first one (no "current password" to ask for), so both sign-in
+ *     routes work from then on.
+ *   • change: every other request. Succeeding signs out every OTHER device:
+ *     changing a password is how a learner takes access back, so the old
+ *     password must stop working everywhere, immediately.
  */
 export async function POST(req: Request) {
   const limit = checkRateLimit(req, "auth-password", 10, 60 * 60_000);
@@ -32,7 +36,21 @@ export async function POST(req: Request) {
 
   try {
     const user = await requireUser(req);
-    if (!user.username || !user.passwordHash) return unauthorizedResponse();
+    if (!user.username) return unauthorizedResponse();
+    if (body.setPassword === true) {
+      if (!user.passwordHash && user.username) {
+        await setFirstPassword(user, body.newPassword);
+        return NextResponse.json(
+          { ok: true, set: true, signedOutDevices: 0, account: publicAccount({ ...user, passwordHash: "set" }) },
+          { headers: { "cache-control": "no-store" } },
+        );
+      }
+      return NextResponse.json(
+        { error: "This account already has a password. Use Change password instead.", code: "PASSWORD_EXISTS" },
+        { status: 400 },
+      );
+    }
+    if (!user.passwordHash) return unauthorizedResponse();
     const { signedOutDevices } = await changePassword(req, user, {
       currentPassword: body.currentPassword,
       newPassword: body.newPassword,
