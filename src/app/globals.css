@@ -5635,3 +5635,79 @@ body.theme-nebula .spot::before {
   .toast{flex-wrap:wrap}
   .toast-action{margin-inline-start:0}
 }
+
+/* ── Email / Google on the front door + the notification surfaces ───────
+   New selectors only, so nothing above is overridden; tokens come from the
+   shared ramps (--fs-*, --text-*, --surface-*, --accent-*). */
+.auth-google{margin-top:14px}
+.auth-divider{display:flex;align-items:center;gap:10px;margin:2px 0 12px}
+.auth-divider::before,.auth-divider::after{content:"";flex:1;height:1px;background:var(--glass-border)}
+.auth-divider span{font-size:var(--fs-micro);font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--text-dim)}
+.auth-google-btn{width:100%;display:inline-flex;align-items:center;justify-content:center;gap:9px;text-decoration:none;font-weight:700}
+.auth-google-btn svg{flex:0 0 auto}
+.auth-google-hint{text-align:center;margin-top:8px}
+
+/* The unread badge pinned on the bell (both header mounts). */
+.notif-badge{position:absolute;top:-4px;right:-4px;min-width:16px;height:16px;padding:0 4px;border-radius:99px;display:flex;align-items:center;justify-content:center;background:var(--danger-accent);color:#fff;border:2px solid var(--surface);font-size:var(--fs-micro);font-weight:800;line-height:1;pointer-events:none}
+
+/* Notification centre panel (rides the shared .quick-popover base). */
+.notif-panel{width:min(320px,calc(100vw - 24px));max-width:calc(100vw - 24px);max-height:min(480px,70dvh);display:flex;flex-direction:column}
+.notif-panel-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 9px 8px}
+.notif-markall{appearance:none;border:0;background:transparent;display:inline-flex;align-items:center;gap:4px;font-family:inherit;font-size:var(--fs-micro);font-weight:800;color:var(--accent);cursor:pointer;padding:3px 6px;border-radius:8px}
+.notif-markall:hover{background:var(--accent-glow)}
+.notif-markall:disabled{opacity:.5;cursor:default}
+.notif-empty{padding:14px 12px;font-size:var(--fs-xs);font-weight:550;line-height:1.55;color:var(--text-muted)}
+.notif-list{list-style:none;margin:0;padding:0;overflow-y:auto;overscroll-behavior:contain}
+.notif-item{width:100%;text-align:left;appearance:none;border:0;background:transparent;font-family:inherit;cursor:pointer;align-items:flex-start}
+.notif-item .notif-dot{margin-top:6px}
+.notif-item.unread .notif-dot{box-shadow:0 0 0 4px var(--accent-glow)}
+.notif-item-text{flex:1;min-width:0}
+.notif-new{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:99px;background:var(--accent-glow);color:var(--accent);font-size:var(--fs-micro);font-weight:800;vertical-align:2px}
+.notif-item-meta{display:flex !important;align-items:center;gap:8px;margin-top:3px !important;font-size:var(--fs-micro)}
+.notif-item-meta em{font-style:normal;font-weight:800;color:var(--accent)}
+
+/* Notifications settings card. */
+.nt-block{display:flex;flex-direction:column;gap:12px;padding:12px;border-radius:14px;background:var(--row-bg);border:1px solid var(--glass-border)}
+.nt-head-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.notif-linkbtn{appearance:none;border:0;background:transparent;padding:2px 6px;font-family:inherit;font-size:var(--fs-meta);font-weight:800;color:var(--accent);cursor:pointer;border-radius:8px}
+.notif-linkbtn:hover{background:var(--accent-glow)}
+.nt-email-row{padding:10px 0 2px}
+.nt-mail-avatar{flex:0 0 34px;width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:var(--accent-glow);color:var(--accent)}
+.nt-email-form{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.nt-email-form .input-field{flex:1;min-width:180px}
+.nt-photo-hint{margin:0;font-size:var(--fs-meta);font-weight:550;line-height:1.5;color:var(--text-dim)}
+.nt-row{display:flex;align-items:center;justify-content:space-between;gap:14px}
+.nt-row-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.nt-row-text strong{font-size:var(--fs-sm);font-weight:700;color:var(--text-main)}
+.nt-row-text span{font-size:var(--fs-meta);font-weight:550;line-height:1.5;color:var(--text-muted)}
+.nt-blocked-note{font-style:normal;font-size:var(--fs-meta);font-weight:700;color:var(--warning-accent)}
+.nt-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.nt-row-btns{justify-content:flex-start}
+.nt-note{margin:0;font-size:var(--fs-meta);font-weight:700;color:var(--success-accent)}
+.nt-warn-text{color:var(--warning-accent) !important}
+.nt-unsub-banner{margin-top:4px}
+.nt-test-outcome{padding:10px 12px;border-radius:12px;font-size:var(--fs-meta);font-weight:650;line-height:1.55}
+.nt-ok{background:var(--status-done-bg);color:var(--status-done-text)}
+.nt-bad{background:var(--status-skipped-bg);color:var(--status-skipped-text)}
+.nt-preview summary{cursor:pointer;font-size:var(--fs-sm);font-weight:800;color:var(--accent);padding:4px 0}
+.nt-preview pre{max-height:260px;overflow:auto;margin:8px 0 0;padding:12px;border-radius:12px;background:var(--row-bg);border:1px solid var(--glass-border);font-size:var(--fs-meta);line-height:1.55;color:var(--text-muted);white-space:pre-wrap;word-break:break-word}
+
+/* The switch shared by every toggle on the card. */
+.nt-switch{flex:0 0 auto;width:40px;height:23px;border-radius:99px;border:1px solid var(--glass-border-hover);background:var(--glass-border);padding:2px;cursor:pointer;transition:background .18s ease,border-color .18s ease;position:relative}
+.nt-switch .nt-switch-knob{display:block;width:17px;height:17px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(26,25,48,.25);transition:transform .18s cubic-bezier(.22,1,.36,1)}
+.nt-switch.on{background:var(--accent);border-color:var(--accent)}
+.nt-switch.on .nt-switch-knob{transform:translateX(17px)}
+.nt-switch:disabled{opacity:.45;cursor:default}
+.nt-switch:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media(max-width:520px){.nt-grid-2{grid-template-columns:1fr}.notif-panel{width:calc(100vw - 40px)}}
+
+/* Account card: email chip row, Google chip, inline username rename. */
+.acct-email{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:14px;background:var(--row-bg);border:1px solid var(--glass-border);color:var(--text-muted)}
+.acct-email-address{display:block;font-size:var(--fs-sm);font-weight:700;color:var(--text-main);overflow-wrap:anywhere}
+.acct-email-none{font-weight:550;color:var(--text-muted)}
+.acct-chip{display:inline-flex;align-items:center;gap:4px;margin-top:3px;padding:2px 8px;border-radius:99px;font-size:var(--fs-micro);font-weight:800}
+.acct-chip-ok{background:var(--status-done-bg);color:var(--status-done-text)}
+.acct-chip-warn{background:var(--status-pending-bg);color:var(--status-pending-text)}
+.acct-google{display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:14px;border:1px solid var(--glass-border);font-size:var(--fs-meta);font-weight:700;color:var(--text-muted)}
+.acct-rename{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.acct-rename .input-field{flex:1;min-width:160px}
