@@ -206,7 +206,7 @@ export async function fullState(userKey: string) {
     console.warn("DB unavailable during fullState; using fallback state:", error instanceof Error ? error.message : error);
     // Sandbox/preview escape hatch: with no database, the UI is served a
     // deterministic sample plan so the interface can be reviewed. This MUST
-    // use the same predicate the write routes use — if reads fall back to the
+    // use the same predicate the write routes use - if reads fall back to the
     // sample plan while writes fall through to the database, the app renders
     // a plan that cannot be changed (every clock-out and Done tap 503s).
     // Never active in a normal deployment.
@@ -242,7 +242,7 @@ export function buildContext(s: St, today = todayStr()): TutorContext {
     .reduce((a, x) => a + x.minutes, 0) / 60;
   const hoursThisWeek = Math.round(hoursRaw * 100) / 100;
   // The AI sees the SAME priority order the Dashboard hero shows, so
-  // "what should I do next?" is answered by one shared utility — never
+  // "what should I do next?" is answered by one shared utility - never
   // two competing rankings. Done tasks stay in the list (marked done)
   // so the tutor can report on the whole day; they sort after pending.
   const weakIds = weakestSubjectIds(subs);
@@ -295,7 +295,7 @@ export function buildContext(s: St, today = todayStr()): TutorContext {
 
 /**
  * The ML engine's read of this learner, in the shape the coach consumes.
- * Same models, same inputs as GET /api/analytics — so what the tutor says
+ * Same models, same inputs as GET /api/analytics - so what the tutor says
  * about pace, risk or readiness is exactly what the Intelligence card shows.
  * Pure and synchronous: it runs on every chat turn, on data already loaded.
  */
@@ -401,7 +401,7 @@ function mlSignals(
 
 /**
  * Recompute the study streak. Aggregated in SQL (one row per day, via
- * db.execute — no result-mapper involved) and windowed to the last
+ * db.execute - no result-mapper involved) and windowed to the last
  * ~2.7 years, so the every-minute clock flush stays cheap no matter how
  * large the user's session history grows.
  */

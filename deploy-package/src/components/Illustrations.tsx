@@ -226,7 +226,7 @@ export function LampScene({
   );
 }
 
-/* ---------- desk calendar scene (planner) — shows the REAL month & date ---------- */
+/* ---------- desk calendar scene (planner) - shows the REAL month & date ---------- */
 export function CalendarScene({ className }: { className?: string }) {
   const d = new Date();
   const month = d.toLocaleDateString("en-US", { month: "long" }).toUpperCase();
@@ -369,7 +369,7 @@ export function CalendarScene({ className }: { className?: string }) {
   );
 }
 
-/* ---------- wall clock scene (focus) — hands show REAL time via CSS sweep ---------- */
+/* ---------- wall clock scene (focus) - hands show REAL time via CSS sweep ---------- */
 export function ClockScene({ className }: { className?: string }) {
   const d = new Date();
   const ms = d.getMilliseconds() / 1000;
@@ -378,7 +378,7 @@ export function ClockScene({ className }: { className?: string }) {
   const hr = (d.getHours() % 12) + min / 60;
   /* Each hand carries BOTH a static rotate() of the real time (so the
      scene is truthful even with animations off / reduced motion) and the
-     `sweep` animation whose negative delay starts exactly there — the
+     `sweep` animation whose negative delay starts exactly there - the
      hands then advance live, one continuous turn per period. */
   const sweep = (dur: number, deg: number) =>
     ({
@@ -492,7 +492,7 @@ export function ClockScene({ className }: { className?: string }) {
 }
 
 /* ══════════════════════════════════════════════════════════════════════
-   LIVE DATA SCENES — subjects · analytics · settings
+   LIVE DATA SCENES - subjects · analytics · settings
 
    The three scenes below extend the same system as the lamp / calendar /
    clock above: one 560×340 canvas, the shared desk, plant, book stack and
@@ -503,7 +503,7 @@ export function ClockScene({ className }: { className?: string }) {
    Each takes the numbers its page already computes (subject mastery, the
    last seven days of logged minutes, the configured pomodoro and toggles)
    and paints them, so the header visual is a second read-out of the page
-   rather than a picture next to it. Motion is deliberately cheap — one
+   rather than a picture next to it. Motion is deliberately cheap - one
    mount flip plus CSS transitions/keyframes on transform, opacity and
    stroke-dashoffset (compositor-friendly, no per-frame React work), and
    every loop is switched off by the reduced-motion guard in ui-system.css.
@@ -527,7 +527,7 @@ const dashFor = (r: number, pct: number, on: boolean) => {
   return { c, offset: on ? c * (1 - Math.max(0, Math.min(100, pct)) / 100) : c };
 };
 
-/* ---------- curriculum board (subjects) — reads real subject progress ---------- */
+/* ---------- curriculum board (subjects) - reads real subject progress ---------- */
 export type CurriculumRow = {
   id: number;
   name: string;
@@ -729,7 +729,7 @@ export function CurriculumScene({
           </text>
         )}
 
-        {/* mastery dial — the same number the page headline shows */}
+        {/* mastery dial - the same number the page headline shows */}
         <g>
           <circle
             className="cur-spin"
@@ -849,7 +849,7 @@ export function CurriculumScene({
           </text>
         </g>
 
-        {/* slow scan down the board — the only looping motion here */}
+        {/* slow scan down the board - the only looping motion here */}
         <g clipPath="url(#curClip)">
           <rect
             className="cur-scan"
@@ -868,7 +868,7 @@ export function CurriculumScene({
   );
 }
 
-/* ---------- insights monitor (analytics) — the real last 7 days ---------- */
+/* ---------- insights monitor (analytics) - the real last 7 days ---------- */
 export function InsightsScene({
   week = [],
   goal = 120,
@@ -879,7 +879,7 @@ export function InsightsScene({
 }: {
   /** Last 7 days of logged minutes, oldest → today. */
   week?: number[];
-  /** Daily goal in minutes — drawn as the dashed target line. */
+  /** Daily goal in minutes - drawn as the dashed target line. */
   goal?: number;
   consistency?: number;
   streak?: number;
@@ -1225,7 +1225,7 @@ export function InsightsScene({
   );
 }
 
-/* ---------- studio console (settings) — mirrors the live app state ---------- */
+/* ---------- studio console (settings) - mirrors the live app state ---------- */
 const THEME_DOTS = [
   { id: "default", c: "#6C5CE7" },
   { id: "silver-lavender", c: "#6f63d8" },
@@ -1443,7 +1443,7 @@ export function StudioScene({
         >
           STUDIO SYSTEM
         </text>
-        {/* status LED — pulses faster while a save or re-plan is running */}
+        {/* status LED - pulses faster while a save or re-plan is running */}
         <circle
           className={busy ? "anim-glow studio-led--busy" : "anim-glow"}
           cx="404"
@@ -1468,7 +1468,7 @@ export function StudioScene({
           </g>
         )}
 
-        {/* gears — speed follows the configured daily hours */}
+        {/* gears - speed follows the configured daily hours */}
         <Gear cx={196} cy={168} r={32} teeth={9} />
         <Gear cx={250} cy={132} r={18} teeth={7} reverse />
         <text
@@ -1537,7 +1537,7 @@ export function StudioScene({
           </text>
         </g>
 
-        {/* theme strip — the active theme is lifted and ringed */}
+        {/* theme strip - the active theme is lifted and ringed */}
         <text
           x="160"
           y="222"

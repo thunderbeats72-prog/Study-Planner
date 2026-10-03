@@ -8,7 +8,7 @@ import { demoDataEnabled } from "@/lib/demoGate";
 export const dynamic = "force-dynamic";
 
 /**
- * POST /api/auth/signup — create the account that owns a study plan.
+ * POST /api/auth/signup - create the account that owns a study plan.
  *
  * It creates the account and stops: NO session cookie is set. The learner
  * then signs in with the credentials they just chose, which proves they

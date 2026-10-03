@@ -1,7 +1,7 @@
 "use client";
 
 /* ============================================================
-   CHAT TRANSPORT — one route, decided entirely by the deployment
+   CHAT TRANSPORT - one route, decided entirely by the deployment
    ─────────────────────────────────────────────────────────────
    Every message goes to POST /api/chat. The server walks the
    deployment's OWN provider chain (GEMINI_API_KEY, CEREBRAS_API_KEY,
@@ -11,7 +11,7 @@
 
    Learners never enter a key anywhere: whatever the deployment
    configured works for every user automatically. No browser-side
-   model calls, no public relays, no extra hops — the server owns
+   model calls, no public relays, no extra hops - the server owns
    grounding, actions, replanning and persistence.
 ============================================================ */
 

@@ -7,9 +7,9 @@ export const dynamic = "force-dynamic";
 /**
  * The signed-in devices of one account.
  *
- * GET    — list them ("iPhone · Safari, active 2 minutes ago"), so a learner
+ * GET    - list them ("iPhone · Safari, active 2 minutes ago"), so a learner
  *          can see every window that is currently open on their plan.
- * DELETE — sign out of all the others, keeping the device asking. This is
+ * DELETE - sign out of all the others, keeping the device asking. This is
  *          the recovery path for a lost or borrowed phone.
  */
 export async function GET(req: Request) {

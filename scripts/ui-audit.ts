@@ -1,5 +1,5 @@
 /**
- * ui-audit — a static, repeatable design-system check over the shipped CSS.
+ * ui-audit - a static, repeatable design-system check over the shipped CSS.
  *
  * Study Planner Pro styles its UI from two files that grew by accretion
  * (`globals.css` owns components, `ui-system.css` is the merged refinement
@@ -13,14 +13,14 @@
  * This script turns that intuition into numbers. It parses the real
  * stylesheets with the project's own PostCSS and reports:
  *
- *   1. conflicts     — same selector + property declared more than once with
+ *   1. conflicts     - same selector + property declared more than once with
  *                      different values in the *same* scope. The earlier one
  *                      is dead code that only misleads the next reader.
- *   2. overflow-mask — `overflow-x: hidden|clip` on the document, i.e. content
+ *   2. overflow-mask - `overflow-x: hidden|clip` on the document, i.e. content
  *                      being *clipped* instead of *fitted*.
- *   3. fixed-width   — literal `width`/`min-width` large enough to overflow a
+ *   3. fixed-width   - literal `width`/`min-width` large enough to overflow a
  *                      small viewport.
- *   4. type-literals — component `font-size` written as a raw rem/px value
+ *   4. type-literals - component `font-size` written as a raw rem/px value
  *                      instead of a `--fs-*` token (per-page type drift).
  *
  * Usage:
@@ -173,7 +173,7 @@ function line(label: string, value: number, budget: number) {
 }
 
 console.log("==================================================");
-console.log("STUDY PLANNER PRO — DESIGN-SYSTEM AUDIT");
+console.log("STUDY PLANNER PRO - DESIGN-SYSTEM AUDIT");
 console.log("==================================================");
 console.log("");
 console.log("Totals");

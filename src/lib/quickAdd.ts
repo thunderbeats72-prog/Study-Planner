@@ -1,5 +1,5 @@
 // ============================================================
-//  STUDY PLANNER PRO — src/lib/quickAdd.ts
+//  STUDY PLANNER PRO - src/lib/quickAdd.ts
 //  Validation for the lightweight Quick Add workflow. Pure and
 //  shared between the component and the test suite so the rules
 //  never drift apart. Mirrors the server-side limits in

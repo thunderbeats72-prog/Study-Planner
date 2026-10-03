@@ -6,7 +6,7 @@ import { createHash, randomBytes } from "node:crypto";
  * Before accounts existed, a learner WAS their browser: the client minted a
  * random `u_…` key, stored it in localStorage, and every row in the database
  * hung off it. That is why the laptop and the phone used to show two
- * different plans — they were, quite literally, two different learners.
+ * different plans - they were, quite literally, two different learners.
  *
  * Identity now comes from the signed-in account (see `src/lib/auth.ts`), and
  * `users.user_key` survives for two jobs only:
@@ -32,7 +32,7 @@ export function newUserKey(): string {
  * The device key a request carries, if any.
  *
  * Used for the sign-up "claim my existing plan" path and for rate-limit
- * fingerprinting — NEVER on its own to decide whose data to serve. A
+ * fingerprinting - NEVER on its own to decide whose data to serve. A
  * header-less client gets a bounded one-way fingerprint rather than being
  * dropped into one shared account.
  */
@@ -53,7 +53,7 @@ export function hasDeviceKey(req: Request): boolean {
 
 /**
  * A short, human label for a sign-in ("iPhone · Safari"), shown in the
- * device list in Settings so a learner can recognise — and revoke — the
+ * device list in Settings so a learner can recognise - and revoke - the
  * places their account is signed in. Derived from the User-Agent only: no
  * IP address, no fingerprinting, nothing that outlives the session row.
  */

@@ -1,5 +1,5 @@
 // ============================================================
-//  STUDY PLANNER PRO — src/lib/planner.ts
+//  STUDY PLANNER PRO - src/lib/planner.ts
 //  Complete rewrite: fair-share time division + canonical
 //  projected-finish date that is mathematically guaranteed to
 //  match the last lesson in the generated schedule.
@@ -130,7 +130,7 @@ function netMinutes(topics: PlanTopic[], styleMul: number): number {
  *
  * This is the CANONICAL projected-completion formula used everywhere
  * in the app (Onboarding estimate, Dashboard KPI, schedule generator).
- * Feed it the same inputs and you always get the same answer — the
+ * Feed it the same inputs and you always get the same answer - the
  * two previously-desynced display figures now share this one function.
  */
 export function projectCompletionDate(
@@ -259,7 +259,7 @@ export function buildPlan(
   const styleMul = st.studyStyle === "theory" ? 1.1 : st.studyStyle === "practice" ? 0.9 : 1;
   const requiredMinutes = netMinutes(topics, styleMul);
 
-  // Canonical projected finish — same formula as Onboarding.tsx.
+  // Canonical projected finish - same formula as Onboarding.tsx.
   const projectedFinish =
     topics.length > 0
       ? projectCompletionDate(st.startDate, requiredMinutes, st.dailyHours, st.studyDays)
@@ -287,7 +287,7 @@ export function buildPlan(
   const loadRatio = availableMinutes > 0 ? requiredMinutes / availableMinutes : 99;
 
   // If we are overloaded, compress every lesson proportionally so all
-  // lessons still appear — none get silently dropped.
+  // lessons still appear - none get silently dropped.
   const compress = loadRatio > 1 ? Math.max(0.4, 1 / loadRatio) : 1;
 
   // ── 6. Daily learn budget ──────────────────────────────────
@@ -380,13 +380,13 @@ export function buildPlan(
         });
       }
 
-      // ── 8c. NEW LESSONS — fair-share time division ─────────
+      // ── 8c. NEW LESSONS - fair-share time division ─────────
       //
       // This is the fix for Bug A.
       //
       // Previous code: gave each subject a "slot" = its share of
       // the day's budget, but lessons could spill past the slot and
-      // eat time meant for later subjects — so with 4 subjects on a
+      // eat time meant for later subjects - so with 4 subjects on a
       // 2-hour day the first subject got most of the time and the last
       // ones got nothing.
       //
@@ -407,14 +407,14 @@ export function buildPlan(
       // every day and the top `subjectsPerDay` win the day's slots:
       //
       //   score = difficultyWeight            (Hard 1.3 > Medium 1 > Easy 0.8)
-      //         × staleness                   (days since last studied — nothing
+      //         × staleness                   (days since last studied - nothing
       //                                        is allowed to go cold)
       //         × backlogRatio                (subjects with more unfinished
       //                                        lessons get pulled forward)
       //
       // Effect: HARD subjects (e.g. Quantitative Methods, Financial
-      // Accounting) resurface on a visibly tighter cycle — roughly every
-      // 1–2 study days — while easier ones cycle every 2–3 days, yet the
+      // Accounting) resurface on a visibly tighter cycle - roughly every
+      // 1–2 study days - while easier ones cycle every 2–3 days, yet the
       // staleness term guarantees no subject is ever starved. The chosen
       // subjects are then ordered hardest-first so the toughest material
       // lands at the start of the session, when focus is highest.
@@ -443,7 +443,7 @@ export function buildPlan(
         // Hardest first within the day: peak focus → toughest material
         .sort((a, b) => (subjWeight.get(b.id) || 1) - (subjWeight.get(a.id) || 1));
       // NOTE: lastTouchedDay is updated only when a lesson is actually
-      // placed (inside the loop below) — merely being "chosen" on a day
+      // placed (inside the loop below) - merely being "chosen" on a day
       // too full to fit a lesson must not reset a subject's staleness.
 
       const learnBudget = Math.max(15, remaining);
@@ -550,7 +550,7 @@ export function buildPlan(
             subjectId: topic.subjectId,
             topicId: topic.id,
             kind: "practice",
-            title: `Apply — ${subjectName}: ${topic.title}`,
+            title: `Apply - ${subjectName}: ${topic.title}`,
             detail: topic.practice || "Immediate transfer practice: 6–10 graded questions, followed by a short error-log entry for every hesitation.",
             plannedMinutes: minutes,
             position: pos++,
@@ -575,7 +575,7 @@ export function buildPlan(
       }
     }
 
-    // ── 8e. GUARANTEED SWEEP — no lesson is ever silently dropped ──
+    // ── 8e. GUARANTEED SWEEP - no lesson is ever silently dropped ──
     //
     // Slot mechanics, spaced-review overhead and ML day-factors can leave
     // a handful of lessons unplaced at the end of the main loop. Rather
@@ -659,7 +659,7 @@ export function buildPlan(
         remaining -= mins;
         tasks.push({
           date, subjectId: t.subjectId, topicId: t.id, kind: "revise",
-          title: `Revise — ${s ? s.name + ": " : ""}${t.title}`,
+          title: `Revise - ${s ? s.name + ": " : ""}${t.title}`,
           detail: "Active recall + previous-year questions. Aim for speed and accuracy, not re-reading.",
           plannedMinutes: mins, position: pos++,
         });
@@ -686,7 +686,7 @@ export function buildPlan(
     const last = i === bufferDates.length - 1;
     tasks.push({
       date, subjectId: null, topicId: null, kind: "buffer",
-      title: last ? "Light review & rest before exam" : `Buffer day ${i + 1} — catch-up & weak areas`,
+      title: last ? "Light review & rest before exam" : `Buffer day ${i + 1} - catch-up & weak areas`,
       detail: last
         ? "No new material. Skim your recall sheets, sleep early, prepare documents."
         : "Use this slack to finish anything you skipped, or drill your weakest topic list.",

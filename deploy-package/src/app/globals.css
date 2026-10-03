@@ -1,14 +1,14 @@
 /* Tailwind scans for utility classes from the whole project by default. This
    repo carries two stale mirror trees (`/components`, `/lib`, `/api` at the
    root and `/deploy-package`) that README.txt explicitly says are NOT the
-   source of truth — `src/` is. They were still being scanned, so utilities
+   source of truth - `src/` is. They were still being scanned, so utilities
    for markup nothing renders (`.text-[17px]`, and the rest of the hardcoded
    sizes this pass removed) kept shipping in the bundle. Scope the scan to the
    tree that actually runs. */
 
 /* Restore the Tailwind engine entry point. The `@tailwindcss/postcss` plugin
    is wired up in postcss.config.mjs, but without this import no utility class
-   is ever emitted — every `flex`, `grid`, `gap-4`, `space-y-6`, `p-5`,
+   is ever emitted - every `flex`, `grid`, `gap-4`, `space-y-6`, `p-5`,
    `max-w-md`, `text-[length:var(--fs-lg)]` … in the components was a dead
    class, which is what broke the Subjects, Settings and onboarding layouts.
    `@source` keeps the scan on `src/**` so the deploy-package mirror never
@@ -20,7 +20,7 @@
    DESIGN TOKENS & THEMES
 ================================================== */
 :root {
-  /* ═══ Study Planner Pro — Master Brand Tokens (v10 “Task Planner” restyle) ═══
+  /* ═══ Study Planner Pro - Master Brand Tokens (v10 “Task Planner” restyle) ═══
      Clean, modern productivity language: warm light canvas, violet-iris accent,
      layered soft shadows, larger radii, crisper hairline borders. */
   --color-primary:#6C5CE7; --color-primary-hover:#5A48D6; --color-primary-soft:#F0EEFE;
@@ -55,8 +55,8 @@
   --font-display:var(--font-inter),-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
 
   /* ══ ONE typeface ══════════════════════════════════════════════════════
-     Everything — headings, body, nav, buttons, forms, planner, focus, Zen,
-     analytics, onboarding, modals, tooltips — resolves through these two
+     Everything - headings, body, nav, buttons, forms, planner, focus, Zen,
+     analytics, onboarding, modals, tooltips - resolves through these two
      aliases, and both are Inter. `.mono` used to pull a second family
      (JetBrains Mono) into ~40 spots; numerals now get tabular figures from
      the same face, so columns align without a second voice in the product. */
@@ -70,7 +70,7 @@
   --pad-card-sm:clamp(13px,.9vw + 7px,17px);
   --pad-tight:clamp(10px,.6vw + 7px,14px);
   /* Page gutter. Must only ever GROW with the viewport: a narrower phone gets
-     a narrower gutter, never a wider one. `--pad-shell` cannot express this —
+     a narrower gutter, never a wider one. `--pad-shell` cannot express this -
      its clamp floors at 16px, so a 320px phone was getting wider gutters than
      a 390px one (and a 414px phone less content width than a 412px phone). */
   --pad-gutter:clamp(10px,3vw,20px);
@@ -83,7 +83,7 @@
   /* ══ ONE control metric ═══════════════════════════════════════════════
      Every button, chip and nav row in the product shares these four numbers.
      Icons are sized from the same ramp as the text beside them, so an icon
-     can never be "a bit big" or "a bit high" relative to its label — the
+     can never be "a bit big" or "a bit high" relative to its label - the
      gap and the box come from the token, not from the component. */
   --btn-h:44px;          /* default control height: buttons, selects, seg bar */
   --btn-h-sm:34px;       /* small-control height (tracker verbs); .btn-sm itself is 32px */
@@ -91,7 +91,7 @@
   --icon-gap:8px;        /* space between an icon and the word beside it */
   --icon-xs:11px; --icon-sm:13px; --icon-md:15px; --icon-lg:18px;
   /* The phone dock puts the icon ABOVE its label, so it is deliberately one
-     step larger than an inline icon — but it is still one token, not the same
+     step larger than an inline icon - but it is still one token, not the same
      number restated in three media queries. */
   --icon-dock:22px;
   /* Icon boxes are square and centred so glyphs of different optical weight
@@ -112,7 +112,7 @@
      The AI coach floats at the right edge. This is the width it actually
      resolves to on a desktop viewport (the `min(400px, 100vw - 40px)` rule
      late in globals.css wins above 641px), and the workspace reads the same
-     token when it reserves the column — so the two can never disagree. */
+     token when it reserves the column - so the two can never disagree. */
   --ai-panel-w:400px;
   --ai-panel-gap:32px;
 
@@ -147,8 +147,8 @@ body.theme-nebula{--color-ai:#BF7DFA;--color-ai-soft:rgba(191,125,250,.13);--ai-
 body.theme-mint{--color-ai:#10B389;--color-ai-soft:#E3F6F0;--ai-rgb:16,179,137;--color-ai-bright:#2DD4A8;--app-bg:#F4FAF7;--bg-gradient:radial-gradient(1100px 460px at 50% -12%,rgba(16,163,127,.06),transparent 70%);--surface:#FFFFFF;--surface-solid:#FFFFFF;--surface-hover:#F8FCFA;--glass-border:#E2EDE7;--glass-border-hover:#CFE2D8;--glass-shadow:0 1px 3px rgba(6,78,59,.05);--glass-shadow-hover:0 4px 16px rgba(6,78,59,.08);--text-main:#0E2A20;--text-muted:#5B7268;--text-dim:#93A8A0;--accent:#0FA37F;--accent-hover:#0C8A6B;--accent-light:#34D399;--accent-glow:rgba(15,163,127,.13);--accent-gradient:linear-gradient(180deg,#16B08A,#0FA37F);--nav-active-bg:#E5F5EF;--nav-active-text:#0C7A60;--nav-active-border:rgba(15,163,127,.22);--row-bg:#F4FAF7;--row-hover:#EAF5F0;--chart-bar:rgba(15,163,127,.55);--input-bg:#FFFFFF}
 body.theme-sunset{--color-ai:#EE7118;--color-ai-soft:#FBEFE2;--ai-rgb:238,113,24;--color-ai-bright:#FB923C;--app-bg:#FBF6F1;--bg-gradient:radial-gradient(1100px 460px at 50% -12%,rgba(234,88,12,.05),transparent 70%);--surface:#FFFFFF;--surface-solid:#FFFFFF;--surface-hover:#FDF9F5;--glass-border:#F0E5DC;--glass-border-hover:#E4D2C4;--glass-shadow:0 1px 3px rgba(67,20,7,.05);--glass-shadow-hover:0 4px 16px rgba(67,20,7,.08);--text-main:#2D1A10;--text-muted:#77604F;--text-dim:#AE9C8D;--accent:#E1620F;--accent-hover:#C4540C;--accent-light:#FB923C;--accent-glow:rgba(225,98,15,.13);--accent-gradient:linear-gradient(180deg,#EE6F1B,#DC5E0C);--nav-active-bg:#FBEDE0;--nav-active-text:#B34E0A;--nav-active-border:rgba(225,98,15,.22);--row-bg:#FBF6F1;--row-hover:#F6EDE3;--chart-bar:rgba(225,98,15,.55);--input-bg:#FFFFFF}
 
-/* Native controls — the calendar that opens from a `<input type="date">`
-   (onboarding Start/Exam dates), select dropdowns and scrollbars — are drawn
+/* Native controls - the calendar that opens from a `<input type="date">`
+   (onboarding Start/Exam dates), select dropdowns and scrollbars - are drawn
    by the OS, not by our tokens. Without `color-scheme` a dark page still gets
    a blinding white calendar whose own glyph is drawn dark-on-dark (invisible
    against a dark input), which is exactly the "I can pick the month and date
@@ -196,7 +196,7 @@ body{
 .brand-text{flex:1;min-width:0}
 .brand-logo-icon{width:var(--brand-mark);height:var(--brand-mark);border-radius:12px;background:var(--accent-gradient);color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 2px 8px rgba(93,77,224,.35),inset 0 1px 0 rgba(255,255,255,.25)}
 .brand-title{font-family:var(--font-display);font-size:var(--fs-md);line-height:var(--lh-heading)}
-/* Full course name ALWAYS visible — wraps to as many lines as needed
+/* Full course name ALWAYS visible - wraps to as many lines as needed
    ("B.Com (Honours) (Marketing and Banking)" never gets chopped). */
 .nav-list{display:flex;flex-direction:column;gap:5px;margin-top:14px}
 .nav-item{display:flex;align-items:center;gap:var(--nav-gap);padding:0 12px;min-height:var(--nav-h);border-radius:12px;font-size:var(--fs-sm);color:var(--text-muted);cursor:pointer;border:1px solid transparent;transition:background .15s ease,color .15s ease,box-shadow .15s ease;user-select:none}
@@ -212,7 +212,7 @@ body{
 }
 /* (v25) ONE owner for heading type: the `--fs-*` ramp further down. Every
    other `.page-title` size in this file and in `ui-system.css` was a later
-   redesign re-tuning the same H1 — six of them, four with `!important`, which
+   redesign re-tuning the same H1 - six of them, four with `!important`, which
    is why the heading read differently per page and per breakpoint. Family,
    weight and colour stay here; size, leading, tracking and `text-wrap` come
    from the single rule at the type scale. */
@@ -230,7 +230,7 @@ body{
   30%{transform:rotate(14deg)}40%{transform:rotate(-6deg)}
   50%{transform:rotate(10deg)}60%{transform:rotate(0)}
 }
-/* `margin` is the only voice this layer keeps — size/weight/leading/colour are
+/* `margin` is the only voice this layer keeps - size/weight/leading/colour are
    read once from the ramp in ui-system.css §32 so the subtitle cannot drift. */
 .page-subtitle{margin:var(--sp-1) 0 0}
 
@@ -283,7 +283,7 @@ select.input-field{appearance:none;background-image:linear-gradient(45deg,transp
 .vtab.active{background:var(--surface-solid);color:var(--accent);box-shadow:0 2px 8px rgba(0,0,0,.06)}
 
 /* calendar */
-/* The month is ROWS of seven cells (`.cal-row`), not 35 direct children —
+/* The month is ROWS of seven cells (`.cal-row`), not 35 direct children -
    a 7-column template here would lay the header + week rows side by side as
    seven crushed strips. Rows own their own columns; the grid only stacks. */
 .cal-grid{display:grid;gap:8px}
@@ -296,7 +296,7 @@ select.input-field{appearance:none;background-image:linear-gradient(45deg,transp
 #t-label{text-transform:uppercase;color:var(--text-muted)}
 .ob-shell{margin-top:auto;margin-bottom:auto}
 
-/* Labeled step rail — “You · Level · Course · …” with connectors */
+/* Labeled step rail - “You · Level · Course · …” with connectors */
 .ob-progress{width:min(100%,680px);display:flex;align-items:flex-start;margin-bottom:18px}
 .ob-step{position:relative;flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:5px;text-align:center}
 .ob-step + .ob-step::before{content:"";position:absolute;top:13px;left:-50%;right:50%;margin:0 15px;height:2px;border-radius:99px;background:var(--glass-border);transition:background .3s ease}
@@ -343,7 +343,7 @@ select.input-field{appearance:none;background-image:linear-gradient(45deg,transp
 }
 .ob-card h1{font-weight:800;letter-spacing:-.9px;margin:0 0 10px;text-wrap:balance}
 .ob-card p{color:var(--text-muted);font-weight:550;margin:0 0 22px;line-height:1.65;max-width:60ch;text-wrap:pretty}
-/* Warm feature checklist — mirrors the reference product's hero bullets */
+/* Warm feature checklist - mirrors the reference product's hero bullets */
 .ob-feature-list{display:flex;flex-direction:column;gap:9px;margin:0 0 22px}
 .ob-feature{
   display:flex;align-items:flex-start;gap:12px;padding:12px 14px;
@@ -361,7 +361,7 @@ select.input-field{appearance:none;background-image:linear-gradient(45deg,transp
   background:var(--accent-glow);color:var(--accent);display:flex;align-items:center;justify-content:center;
 }
 .ob-feature strong{display:block;font-size:.86rem;font-weight:800;margin-bottom:2px;color:var(--text-main)}
-/* Text only: scoped past the icon tile (also a span) — a bare ".ob-feature span"
+/* Text only: scoped past the icon tile (also a span) - a bare ".ob-feature span"
    out-specified ".ob-feature-icon" and forced display:block, which killed the
    tile's flex centering and pinned each icon to its top-left corner. */
 .ob-feature div span{display:block;font-size:.78rem;line-height:1.5;color:var(--text-muted);font-weight:600}
@@ -387,7 +387,7 @@ select.input-field{appearance:none;background-image:linear-gradient(45deg,transp
 .ob-sub-row{display:flex;align-items:center;gap:9px;border-radius:var(--radius-md);background:var(--row-bg)}
 /* Every field in a syllabus row is an input the learner can click into. The
    name field used to be borderless, padding-less and outline-less on a
-   transparent background — visually identical to a static label, so
+   transparent background - visually identical to a static label, so
    "click to edit the subject" produced no visible response whatsoever and
    read as a dead UI. It now looks like a field, glows on focus, and the
    whole row lights up while any of its fields has the caret. */
@@ -594,8 +594,8 @@ body.theme-dark .ai-quick button:hover,body.theme-obsidian .ai-quick button:hove
 .ai-connect-btn:active{transform:scale(.96)}
 body.theme-dark .ai-connect-btn,body.theme-obsidian .ai-connect-btn,body.theme-nebula .ai-connect-btn{background:rgba(var(--ai-rgb),.14)}
 /* Variant of the same strip for the free community endpoint: the AI IS
-   connected, it just isn't private, so this reads as information — one
-   accent edge and dimmer copy — never as the "not connected" warning. */
+   connected, it just isn't private, so this reads as information - one
+   accent edge and dimmer copy - never as the "not connected" warning. */
 .ai-connect-free{border-left:2px solid rgba(var(--ai-rgb),.45)}
 .ai-connect-free .ai-connect-text{color:var(--text-dim)}
 @keyframes blink{0%,80%,100%{opacity:.25}40%{opacity:1}}
@@ -643,7 +643,7 @@ body.theme-dark .tracker-bar,body.theme-obsidian .tracker-bar,body.theme-nebula 
 .loader-title{font-size:1.05rem;font-weight:800}
 .loader-sub{font-size:.8rem;color:var(--text-muted);font-weight:600}
 
-/* ============ ACCOUNTS — the sign-in / sign-up front door ============
+/* ============ ACCOUNTS - the sign-in / sign-up front door ============
    Same material language as the onboarding wizard (one soft card floating
    on the themed background) because it is the step BEFORE it: create
    credentials, then build the plan. Everything is centred in a single
@@ -721,7 +721,7 @@ body.theme-dark .tracker-bar,body.theme-obsidian .tracker-bar,body.theme-nebula 
 /* ============ RESPONSIVE ============ */
 @media(max-width:860px){
   .app-wrapper{flex-direction:column}
-  /* CANONICAL mobile dock — the ONLY .sidebar rule at <=860px.
+  /* CANONICAL mobile dock - the ONLY .sidebar rule at <=860px.
      Floating capsule, near-opaque, safe-area aware. */
   .sidebar{top:auto;bottom:max(10px,env(safe-area-inset-bottom));
     left:10px;right:10px;
@@ -913,12 +913,12 @@ body.theme-dark .cmdk,body.theme-obsidian .cmdk,body.theme-nebula .cmdk {
 }
 
 /* ==================================================
-   LIQUID GLASS LAYER — Apple-style glass morphism
+   LIQUID GLASS LAYER - Apple-style glass morphism
    Rim light + specular highlight + saturated refraction
    blur + iOS spring physics. Fully theme-aware.
 ================================================== */
 :root{
-  /* Motion: fast, precise, barely-there overshoot — Linear/Things feel */
+  /* Motion: fast, precise, barely-there overshoot - Linear/Things feel */
   --spring: cubic-bezier(.32,1.25,.6,1);
   --spring-soft: cubic-bezier(.25,1,.4,1);
   --lg-rim: rgba(255,255,255,.85);
@@ -931,10 +931,10 @@ body.theme-dark,body.theme-obsidian,body.theme-nebula{
   --lg-shine: linear-gradient(115deg,rgba(255,255,255,.05) 0%,rgba(255,255,255,.015) 30%,transparent 48%);
 }
 
-/* ── Surfaces: quiet glass — one crisp hairline + soft layered depth.
+/* ── Surfaces: quiet glass - one crisp hairline + soft layered depth.
    The premium read comes from SHADOW LAYERING, not blur intensity. ── */
 /* Blur belongs only to genuinely floating layers (guideline §51:
-   "no unnecessary glassmorphism") — static cards are solid surfaces. */
+   "no unnecessary glassmorphism") - static cards are solid surfaces. */
 .cmdk{
   backdrop-filter: blur(14px) saturate(140%);
   -webkit-backdrop-filter: blur(14px) saturate(140%);
@@ -1055,7 +1055,7 @@ select.input-field{cursor:pointer}
 button{-webkit-tap-highlight-color:transparent}
 
 /* ==================================================
-   TOUCH DEVICES — hover doesn't exist; press is king.
+   TOUCH DEVICES - hover doesn't exist; press is king.
    Slightly larger tap targets, stronger active states.
 ================================================== */
 @media (hover: none) and (pointer: coarse){
@@ -1115,7 +1115,7 @@ button{-webkit-tap-highlight-color:transparent}
 
 /* ── Premium micro-choreography ─────────────────────────────── */
 
-/* Task rows cascade in — 30ms stagger, first 8 rows */
+/* Task rows cascade in - 30ms stagger, first 8 rows */
 .day-block .task-row,.modal-box .task-row{animation:rowIn .32s var(--spring-soft) backwards}
 .day-block .task-row:nth-child(2),.modal-box .task-row:nth-child(2){animation-delay:.03s}
 .day-block .task-row:nth-child(3),.modal-box .task-row:nth-child(3){animation-delay:.06s}
@@ -1144,7 +1144,7 @@ button{-webkit-tap-highlight-color:transparent}
 /* Buttons: focus ring only for keyboard, subtle ripple-free press */
 .btn:focus:not(:focus-visible){outline:none}
 
-/* ═══ AI IDENTITY (guideline §6, §25) — violet, scoped to AI only ═══ */
+/* ═══ AI IDENTITY (guideline §6, §25) - violet, scoped to AI only ═══ */
 .ai-fab{transition:background .4s ease,transform .25s var(--spring)}
 .ai-panel .brand-logo-icon{background:linear-gradient(180deg,var(--color-ai-bright),var(--color-ai)) !important;box-shadow:none;transition:background .4s ease}
 
@@ -1152,7 +1152,7 @@ button{-webkit-tap-highlight-color:transparent}
    The same product serves a 5-year-old (nursery) and a 35-year-old
    (PG/professional). Density, type size, radius and touch comfort
    adapt via a body class set from the user's education level.
-   Functionality identical — presentation only.
+   Functionality identical - presentation only.
 
    mode-young   → nursery/school: larger type, rounder, roomier,
                   bigger touch targets, friendlier progress
@@ -1188,8 +1188,8 @@ body.mode-focused .page-title{font-size:calc(var(--fs-h1) * .94)}
 body.mode-focused .kpi-value{font-size:calc(var(--fs-kpi) * .94)}
 body.mode-focused .day-block{padding:13px 15px;margin-bottom:10px}
 body.mode-focused .glass-panel{border-radius:var(--radius-lg)}
-/* Focused mode: entrance choreography off — instant, professional */
-/* mode-focused is a DENSITY mode — tighter padding, smaller type, smaller
+/* Focused mode: entrance choreography off - instant, professional */
+/* mode-focused is a DENSITY mode - tighter padding, smaller type, smaller
    radii. It is not a motion preference: stripping entrance choreography here
    meant any learner who onboarded as PG / PhD / professional silently lost
    every animation in the product, with no way to turn it back on. Motion
@@ -1214,7 +1214,7 @@ body.mode-young .empty-state-title{font-size:1.05rem}
 
 /* §35 Loading: soft shimmer skeletons, never blank screens */
 .skeleton{position:relative;overflow:hidden;background:var(--row-bg);border-radius:var(--radius-sm)}
-/* On the app canvas (loader screen) row-bg is invisible — use a
+/* On the app canvas (loader screen) row-bg is invisible - use a
    bordered surface tone so skeleton bodies always read as shapes. */
 .skeleton-strong{background:var(--surface);border:1px solid var(--glass-border);box-shadow:var(--shadow-sm)}
 body.theme-dark .skeleton-strong,body.theme-obsidian .skeleton-strong,body.theme-nebula .skeleton-strong{background:var(--surface-hover)}
@@ -1252,7 +1252,7 @@ body.mode-young .day-complete{font-size:.95rem;padding:15px 18px}
 .streak-badge svg{animation:flicker 1.2s ease .5s 1}
 @keyframes flicker{0%,100%{transform:none}30%{transform:scale(1.15) rotate(-3deg)}60%{transform:scale(1.05) rotate(2deg)}}
 
-/* Card hover: border ink deepens — no jumping */
+/* Card hover: border ink deepens - no jumping */
 .glass-panel:hover{border-color:var(--glass-border-hover)}
 
 /* Modal close affordance */
@@ -1266,15 +1266,15 @@ body.mode-young .day-complete{font-size:.95rem;padding:15px 18px}
    notched phones and high-DPI screens.
 ═══════════════════════════════════════════════════════════════ */
 
-/* 1. Overflow guards — horizontal scroll becomes impossible.
+/* 1. Overflow guards - horizontal scroll becomes impossible.
    `overflow-x:clip` (not `hidden`) is deliberate: `hidden` turns <body> into a
    scroll container, and every `position:sticky` descendant then sticks to
-   that never-scrolling box instead of the viewport — which is exactly why the
+   that never-scrolling box instead of the viewport - which is exactly why the
    sidebar rail and the session bar stopped pinning on desktop. `clip` cuts
    the same overflow without creating a scroller, so sticky keeps working.
    It is also a *safety net*, not the fix: components are fitted to their
    container (`min-width:0` below, fluid tracks in the grids), so nothing
-   should ever reach this edge. `max-width:100vw` is gone on purpose — `100vw`
+   should ever reach this edge. `max-width:100vw` is gone on purpose - `100vw`
    includes the gutter reserved by `scrollbar-gutter:stable`, so it let the
    document box sit one scrollbar wider than the space actually available and
    was the direct cause of content being shaved off the right edge. */
@@ -1284,7 +1284,7 @@ img,svg,video,canvas{max-width:100%;height:auto}
 .glass-panel,.day-block,.modal-box,.task-row{overflow-wrap:break-word}
 .task-title,.day-date,.kpi-label{overflow-wrap:break-word;word-break:normal;hyphens:auto}
 
-/* 2. Fluid type — (v25) these duplicated clamps are retired; `--fs-h1` and
+/* 2. Fluid type - (v25) these duplicated clamps are retired; `--fs-h1` and
    `--fs-kpi` in the ramp above are the only size owners. */
 .zen .zen-digits{font-size:clamp(3.5rem,20vw,10rem)}
 .tracker-bar .mono{font-size:clamp(1rem,3.4vw,1.2rem)}
@@ -1341,7 +1341,7 @@ img,svg,video,canvas{max-width:100%;height:auto}
 /* 10. Dynamic viewport units: URL bars that collapse (Chrome/Safari) */
 @supports (height:100dvh){
   /* Desktop-only: at <=860px the sidebar IS the floating dock and must
-     keep height:auto — an unscoped dvh height here previously stretched
+     keep height:auto - an unscoped dvh height here previously stretched
      the dock into a full-screen pillar on phones. */
   @media(min-width:861px){
     .sidebar{height:calc(100dvh - 44px)}
@@ -1361,7 +1361,7 @@ img,svg,video,canvas{max-width:100%;height:auto}
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   SIGNATURE POLISH LAYER — the details that make it feel expensive
+   SIGNATURE POLISH LAYER - the details that make it feel expensive
 ═══════════════════════════════════════════════════════════════ */
 
 /* 1. Progress bars: shimmering highlight rides the fill */
@@ -1398,7 +1398,7 @@ img,svg,video,canvas{max-width:100%;height:auto}
 }
 .btn:active::after{opacity:1;transition:opacity .06s ease}
 
-/* 5. Task completion: row exhales — brief lift then settle */
+/* 5. Task completion: row exhales - brief lift then settle */
 .task-row.done{animation:taskSettle .5s var(--spring-soft)}
 @keyframes taskSettle{0%{transform:scale(1)}30%{transform:scale(1.008)}100%{transform:scale(1)}}
 
@@ -1420,12 +1420,12 @@ img,svg,video,canvas{max-width:100%;height:auto}
 .cal-cell.today::after{content:"";position:absolute;inset:-1px;border-radius:inherit;border:1px solid var(--accent);opacity:0;animation:todayPulse 3.2s ease-in-out infinite;pointer-events:none}
 @keyframes todayPulse{0%,100%{opacity:0;transform:scale(1)}45%{opacity:.5;transform:scale(1.015)}}
 
-/* 10. Modal: content stagger — header, body, actions arrive in order */
+/* 10. Modal: content stagger - header, body, actions arrive in order */
 .modal-box > *:nth-child(1){animation:rowIn .3s var(--spring-soft) .05s backwards}
 .modal-box > *:nth-child(2){animation:rowIn .3s var(--spring-soft) .1s backwards}
 .modal-box > *:nth-child(3){animation:rowIn .3s var(--spring-soft) .15s backwards}
 
-/* 11. Scrollbar: accent tint on hover only — invisible until needed */
+/* 11. Scrollbar: accent tint on hover only - invisible until needed */
 ::-webkit-scrollbar-thumb{background:color-mix(in srgb,var(--text-dim) 30%,transparent)}
 ::-webkit-scrollbar-thumb:hover{background:var(--accent)}
 
@@ -1443,7 +1443,7 @@ body.mode-focused .brand-logo-icon::before,body.mode-focused .cal-cell.today::af
 /* reduced motion: everything above respects the global kill switch */
 
 /* ═══════════════════════════════════════════════════════════════
-   ENHANCEMENT LAYER v3 — deeper animation + device coverage
+   ENHANCEMENT LAYER v3 - deeper animation + device coverage
 ═══════════════════════════════════════════════════════════════ */
 
 /* ── A. View transitions: each page arrives with soft depth ── */
@@ -1674,7 +1674,7 @@ body.theme-nebula .ai-panel,body.theme-nebula .cmdk,body.theme-nebula .modal-box
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   PREMIUM INTERACTION PACK — clickable, running & ambient effects
+   PREMIUM INTERACTION PACK - clickable, running & ambient effects
 ═══════════════════════════════════════════════════════════════ */
 
 /* 1. Click feedback everywhere: unified press physics */
@@ -1747,7 +1747,7 @@ body.theme-switching{animation:themeBlink .3s ease}
   .glass-panel::after{display:none}
 }
 
-/* ═══ CHAT ON MOBILE — full usability pass ═══ */
+/* ═══ CHAT ON MOBILE - full usability pass ═══ */
 @media(max-width:640px){
   .ai-panel::before{content:"";width:38px;height:4px;border-radius:99px;background:var(--text-dim);opacity:.4;margin:10px auto 0}
   .ai-msg{max-width:94%;font-size:.88rem;padding:11px 14px}
@@ -1766,7 +1766,7 @@ body.theme-switching{animation:themeBlink .3s ease}
 
 /* Extra polish: title clamps to 2 lines with ellipsis on very small screens */
 
-/* ═══ POSITIONING HARDENING — desktop anchors are explicit ═══════
+/* ═══ POSITIONING HARDENING - desktop anchors are explicit ═══════
    The AI panel and FAB are anchored bottom-RIGHT on desktop with a
    min-width guard, so no mobile sheet rule (left:0/width:100%) can
    ever leak upward regardless of cascade order. */
@@ -1785,15 +1785,15 @@ body.theme-switching{animation:themeBlink .3s ease}
 .modal-overlay{z-index:300}
 .cmdk-overlay{z-index:400}
 
-/* ═══ AI IDENTITY COHESION — every chat element follows the theme ═══ */
+/* ═══ AI IDENTITY COHESION - every chat element follows the theme ═══ */
 .ai-msg.user{background:linear-gradient(135deg,var(--color-ai-bright),var(--color-ai)) !important;box-shadow:0 2px 10px rgba(var(--ai-rgb),.25)}
 .ai-input-row .btn-primary{background:linear-gradient(180deg,var(--color-ai-bright),var(--color-ai)) !important;border-color:transparent}
 
 /* ═══════════════════════════════════════════════════════════════
-   SIGNATURE DELIGHT LAYER — universally engaging, 5 to 35 years old
+   SIGNATURE DELIGHT LAYER - universally engaging, 5 to 35 years old
 ═══════════════════════════════════════════════════════════════ */
 
-/* 1. THE GLOSS — the shine you loved, everywhere it belongs.
+/* 1. THE GLOSS - the shine you loved, everywhere it belongs.
    KPI cards, buttons, chips, onboarding cards, day blocks. */
 @media(hover:hover) and (pointer:fine){
   .kpi-card,.btn-primary,.day-block,.ob-level-btn,.streak-badge,.nav-item.active{position:relative;overflow:hidden}
@@ -1808,7 +1808,7 @@ body.theme-switching{animation:themeBlink .3s ease}
   @keyframes navGloss{0%{left:-75%}35%,100%{left:120%}}
 }
 
-/* 2. AURORA CANVAS — a living, slowly-drifting light behind everything.
+/* 2. AURORA CANVAS - a living, slowly-drifting light behind everything.
    Imperceptibly slow: alive, never distracting. */
 body::before{
   content:"";position:fixed;inset:-20%;z-index:-1;pointer-events:none;
@@ -1863,13 +1863,13 @@ body.mode-focused::before{opacity:.4}
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   SIMPLICITY BLUEPRINT LAYER — 3-tap workflows, icon-first mobile
+   SIMPLICITY BLUEPRINT LAYER - 3-tap workflows, icon-first mobile
 ═══════════════════════════════════════════════════════════════ */
 
 /* Icon-first mobile nav: bigger icons, labels stay for 5-year-olds
    but icons lead (44px+ targets already enforced) */
 
-/* Blueprint: component uniformity — one card language everywhere */
+/* Blueprint: component uniformity - one card language everywhere */
 .task-row,.kpi-card,.day-block{border-radius:var(--radius-md)}
 
 /* ═══════════════════════════════════════════════════════════════
@@ -1879,14 +1879,14 @@ body.mode-focused::before{opacity:.4}
 ═══════════════════════════════════════════════════════════════ */
 
 @media(max-width:640px){
-  /* Task cards: ONE action row — Done (primary), Clock in, then "..."
+  /* Task cards: ONE action row - Done (primary), Clock in, then "..."
      which reveals Edit / Skip subject / Skip on tap */
   .task-row-actions > .btn,.task-row > .chip{display:none}
   .task-row > .chip.chip-kind{display:inline-flex}
   .task-row-actions > .btn.task-primary,.task-row-actions > .btn.task-clock,.task-row-actions > .btn.task-more{display:inline-flex}
   .task-row.expanded-actions .task-row-actions > .btn{display:inline-flex}
   .task-row.expanded-actions > .chip{display:inline-flex}
-  /* PENDING chip hidden on phones — the card state already says it */
+  /* PENDING chip hidden on phones - the card state already says it */
   .task-row > .chip.chip-pending{display:none !important}
   .task-row.expanded-actions > .chip.chip-pending{display:inline-flex !important}
 
@@ -1920,7 +1920,7 @@ body.mode-focused::before{opacity:.4}
 .intel-dot.ok{background:var(--success-accent);box-shadow:0 0 0 3px rgba(22,163,122,.14)}
 .intel-dot.warn{background:var(--danger-accent);box-shadow:0 0 0 3px rgba(224,82,82,.14)}
 
-/* ═══ CALENDAR DAY MODAL — fix clipped buttons + polish ═══════════
+/* ═══ CALENDAR DAY MODAL - fix clipped buttons + polish ═══════════
    Screenshot bug: desktop modal used the mobile action-hiding rules'
    sibling layout, letting Done/Skip overflow the card edge. Inside
    the modal, rows get a dedicated two-line layout with contained,
@@ -1945,7 +1945,7 @@ body.mode-focused::before{opacity:.4}
 .cal-cell{position:relative;transition:background .18s ease,border-color .18s ease,box-shadow .22s ease}
 .cal-cell:hover{box-shadow:var(--shadow-md);z-index:2}
 .cal-cell:hover .cal-pill{transform:translateX(1.5px)}
-/* Weekend headers slightly dimmed — visual rhythm */
+/* Weekend headers slightly dimmed - visual rhythm */
 .cal-grid > .cal-dow:first-child,.cal-grid > .cal-dow:last-child{opacity:.6}
 /* Month cells cascade in */
 .cal-grid .cal-cell{animation:calIn .35s var(--spring-soft) backwards}
@@ -1975,7 +1975,7 @@ body.mode-focused::before{opacity:.4}
 .voice-replay.active{color:var(--color-ai);background:var(--color-ai-soft);border-color:rgba(var(--ai-rgb),.42)}
 
 /* ═══════════════════════════════════════════════════════════════
-   MOBILE DENSITY PASS — smaller, calmer, less scrolling
+   MOBILE DENSITY PASS - smaller, calmer, less scrolling
 ═══════════════════════════════════════════════════════════════ */
 @media(max-width:640px){
   html{font-size:15px}                       /* global 6% type scale-down */
@@ -1995,7 +1995,7 @@ body.mode-focused::before{opacity:.4}
 }
 
 /* ═══ SHIGUN PREMIUM PASS ═══ */
-/* Identity gradient border on the panel — subtle, expensive */
+/* Identity gradient border on the panel - subtle, expensive */
 .ai-panel{position:fixed;border:none;
   background:
     linear-gradient(var(--surface-elevated),var(--surface-elevated)) padding-box,
@@ -2028,7 +2028,7 @@ html{scroll-behavior:smooth}
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   COMPANION LAYER — Shigun as assistant, not chatbot
+   COMPANION LAYER - Shigun as assistant, not chatbot
 ═══════════════════════════════════════════════════════════════ */
 
 /* Hero greeting: centered orb + personal status, replaces bot bubble */
@@ -2058,7 +2058,7 @@ html{scroll-behavior:smooth}
 
 /* ═══ ULTRA-CLEAN MOBILE POLISH ═══ */
 @media(max-width:640px){
-  /* Cards lose borders where background contrast is enough — cleaner */
+  /* Cards lose borders where background contrast is enough - cleaner */
   .day-block{border-color:transparent;box-shadow:var(--shadow-sm)}
   .kpi-card{border-color:transparent;box-shadow:var(--shadow-sm)}
   /* Chat companion greeting scales nicely */
@@ -2075,13 +2075,13 @@ html{scroll-behavior:smooth}
 .ambient-pill{color:var(--accent) !important;border-color:var(--nav-active-border) !important}
 @media (prefers-reduced-motion: reduce){.ambient-bars i{animation:none}}
 
-/* ═══ TRACKER BAR — definitive layout (desktop + mobile) ═══════════
+/* ═══ TRACKER BAR - definitive layout (desktop + mobile) ═══════════
    Base typography now lives in classes (no inline styles), so mobile
    rules can actually win. */
 .tracker-status{gap:10px;min-width:0;flex:1 1 auto;flex-wrap:nowrap;overflow:hidden}
 .tracker-labels{min-width:0;overflow:hidden;flex:1}
 .tracker-state{font-weight:800}
-/* FULL task title — wraps instead of being sliced ("Principles of
+/* FULL task title - wraps instead of being sliced ("Principles of
    Marketing: Introduction to Marketing Principles" shows in full). */
 .tracker-task{color:var(--text-muted);font-weight:650;line-height:1.35;
   white-space:normal;overflow-wrap:anywhere;
@@ -2096,14 +2096,14 @@ html{scroll-behavior:smooth}
   .tracker-status{gap:8px}
   .tracker-status .pulse-dot{width:8px;height:8px}
   .tracker-state{white-space:nowrap}
-  /* single line, ellipsis — the pill is tiny on phones, and the full
+  /* single line, ellipsis - the pill is tiny on phones, and the full
      title is always available on the Focus/Planner pages */
   .tracker-task{-webkit-line-clamp:1}
   .tracker-time{font-size:.95rem}
   .tracker-actions{gap:5px;flex-wrap:nowrap}
   .tracker-actions .chip{display:none}
   .tracker-actions .btn-xs{flex:0 0 auto;min-width:0;padding:6px 11px;font-size:.68rem;min-height:30px;white-space:nowrap}
-  /* Zen: icon-only on phones — the bolt says it */
+  /* Zen: icon-only on phones - the bolt says it */
   .tracker-actions .btn-xs:last-child svg{width:14px;height:14px}
   /* Ambient stop pill: bars-only */
   .tracker-actions .ambient-pill{font-size:0;gap:0;padding:6px 9px}
@@ -2119,7 +2119,7 @@ html{scroll-behavior:smooth}
 /* Collapsible sidebar (desktop) */
 @media(min-width:861px){.sidebar{position:sticky}}
 
-/* Focus-live: ambient cue while clocked in — accent hairline atop the app */
+/* Focus-live: ambient cue while clocked in - accent hairline atop the app */
 body.focus-live::after{
   content:"";position:fixed;top:0;left:0;right:0;height:2.5px;z-index:1000;
   background:linear-gradient(90deg,transparent,var(--success-accent),transparent);
@@ -2131,7 +2131,7 @@ body.focus-live .tracker-bar{border-color:rgba(22,163,122,.3)}
 /* Live timer emphasis while running */
 body.focus-live .tracker-time{color:var(--success-accent)}
 
-/* Mobile: clocked-in actions compress — Pause/Break icon-size, Clock Out stays worded */
+/* Mobile: clocked-in actions compress - Pause/Break icon-size, Clock Out stays worded */
 @media(max-width:640px){
   .tracker-actions .act-pause,.tracker-actions .act-break{padding:6px 9px;font-size:.62rem}
   .tracker-actions .act-out{font-size:.62rem;padding:6px 9px}
@@ -2167,7 +2167,7 @@ button,a,.nav-item,.vtab,.cal-cell,.chip,.task-row,.rate-btn,input,select{touch-
 .nav-item:focus-visible,.vtab:focus-visible,.cal-cell:focus-visible,.rate-btn:focus-visible{
   outline:2px solid var(--accent);outline-offset:2px;
 }
-/* Priority color coding on difficulty (doc §4) — chips only, subtle */
+/* Priority color coding on difficulty (doc §4) - chips only, subtle */
 .chip[data-diff="Hard"]{background:var(--status-skipped-bg);color:var(--status-skipped-text)}
 .chip[data-diff="Easy"]{background:var(--status-done-bg);color:var(--status-done-text)}
 .up-next .btn{flex-shrink:0}
@@ -2177,7 +2177,7 @@ button,a,.nav-item,.vtab,.cal-cell,.chip,.task-row,.rate-btn,input,select{touch-
 
 /* ═══ STATUS BAR PINNED TO TOP (mobile) ═══════════════════════════
    The session strip sticks to the absolute top of the viewport on
-   phones — always visible, never floating mid-content. */
+   phones - always visible, never floating mid-content. */
 @media(max-width:860px){
   .tracker-bar{
     position:sticky;top:calc(58px + env(safe-area-inset-top));
@@ -2188,7 +2188,7 @@ button,a,.nav-item,.vtab,.cal-cell,.chip,.task-row,.rate-btn,input,select{touch-
   .tracker-bar{top:calc(56px + env(safe-area-inset-top))}
 }
 
-/* ═══ TIMER STRICT BOUNDING — can never clip or overlap ═══ */
+/* ═══ TIMER STRICT BOUNDING - can never clip or overlap ═══ */
 .tracker-time{
   flex:0 0 auto;min-width:0;max-width:30vw;overflow:visible;
   font-variant-numeric:tabular-nums;white-space:nowrap;
@@ -2196,7 +2196,7 @@ button,a,.nav-item,.vtab,.cal-cell,.chip,.task-row,.rate-btn,input,select{touch-
 .tracker-status{overflow:hidden}
 .tracker-actions{flex-shrink:0;min-width:0}
 
-/* ═══ CLOCKED-IN MOBILE LAYOUT v2 — overlap structurally impossible ═══
+/* ═══ CLOCKED-IN MOBILE LAYOUT v2 - overlap structurally impossible ═══
    (Re-instated after regression; now covered by the package guard.) */
 @media(max-width:640px){
   body.focus-live .tracker-labels{display:none}
@@ -2205,7 +2205,7 @@ button,a,.nav-item,.vtab,.cal-cell,.chip,.task-row,.rate-btn,input,select{touch-
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   COLLAPSIBLE SIDEBAR — properly sized toggle + smooth icon-rail state
+   COLLAPSIBLE SIDEBAR - properly sized toggle + smooth icon-rail state
 ═══════════════════════════════════════════════════════════════ */
 .sidebar{overflow:hidden;transition:width .32s var(--spring-soft),padding .32s var(--spring-soft)}
 /* Toggle: 40px round button, pinned top-right of the brand header.
@@ -2223,10 +2223,10 @@ button,a,.nav-item,.vtab,.cal-cell,.chip,.task-row,.rate-btn,input,select{touch-
 .sb-toggle:active{transform:scale(.92)}
 .sb-toggle svg{transition:transform .3s var(--spring-soft)}
 
-/* ── Collapsed rail: icons only — DESKTOP ONLY.
+/* ── Collapsed rail: icons only - DESKTOP ONLY.
    On phones the sidebar IS the bottom dock; the collapse preference
    (saved from a desktop session) must never strip the dock labels or
-   resize its icons — that read as misaligned bare icons on mobile. ── */
+   resize its icons - that read as misaligned bare icons on mobile. ── */
 @media(min-width:861px){
   .app-wrapper.sb-collapsed .sb-toggle svg{transform:rotate(180deg)}
   .app-wrapper.sb-collapsed .brand-text{display:none}
@@ -2240,7 +2240,7 @@ button,a,.nav-item,.vtab,.cal-cell,.chip,.task-row,.rate-btn,input,select{touch-
     .app-wrapper.sb-collapsed .sidebar{width:68px}
   }
 }
-/* On mobile the sidebar IS the bottom dock — the collapse toggle is hidden */
+/* On mobile the sidebar IS the bottom dock - the collapse toggle is hidden */
 @media(max-width:860px){
   .sb-toggle{display:none}
   .brand-header{padding-right:6px}
@@ -2275,7 +2275,7 @@ button,a,.nav-item,.vtab,.cal-cell,.chip,.task-row,.rate-btn,input,select{touch-
 }
 
 /* Big desktop / smart TV (1080p→4K): more air, capped width, bigger
-   type rhythm — nothing stretches or breaks on huge canvases */
+   type rhythm - nothing stretches or breaks on huge canvases */
 @media(min-width:1800px){
   :root{--sidebar-w:280px}
   .app-wrapper{width:100%;gap:26px;padding:28px}
@@ -2304,7 +2304,7 @@ button,a,.nav-item,.vtab,.cal-cell,.chip,.task-row,.rate-btn,input,select{touch-
 /* Nav keyboard affordance */
 .nav-item:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
-/* Wizard cancel link (re-run mode) — available on every step */
+/* Wizard cancel link (re-run mode) - available on every step */
 .ob-cancel-link{
   display:block;margin:14px auto 0;background:none;border:none;cursor:pointer;
   font-family:inherit;font-size:.8rem;font-weight:650;color:var(--text-muted);
@@ -2336,21 +2336,21 @@ button,a,.nav-item,.vtab,.cal-cell,.chip,.task-row,.rate-btn,input,select{touch-
 .lesson-source-list.compact{margin:10px 0}
 @media(max-width:640px){
   .curriculum-source{grid-template-columns:1fr}.curriculum-source-type{width:max-content}
-  /* Brief goes full-width inside phone cards / the calendar day sheet —
+  /* Brief goes full-width inside phone cards / the calendar day sheet -
      the old 22px desktop indent wasted width and looked misaligned. */
   .planner-lesson-brief{margin:8px 0 12px 0;padding:14px 13px}
   .lesson-detail-block.compact{align-items:flex-start;flex-direction:column;gap:3px}
 }
 
-/* ═══ SHIGUN MOBILE CONVERSATION — definitive final layer ═══ */
+/* ═══ SHIGUN MOBILE CONVERSATION - definitive final layer ═══ */
 .ai-scrim{
   position:fixed;inset:0;z-index:198;border:0;padding:0;background:rgba(12,14,28,.2);
   backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);animation:aiScrimIn .22s ease both;
 }
-/* Desktop: the panel floats — no scrim, the page stays fully interactive. */
+/* Desktop: the panel floats - no scrim, the page stays fully interactive. */
 @media(min-width:861px){.ai-scrim{display:none}}
 @keyframes aiScrimIn{from{opacity:0}to{opacity:1}}
-/* ── Shigun premium avatar — replaces old .ai-avatar ── */
+/* ── Shigun premium avatar - replaces old .ai-avatar ── */
 .shigun-avatar{
   position:relative;flex:0 0 36px;border-radius:12px;
   background:linear-gradient(145deg,var(--color-ai-bright),var(--color-ai));
@@ -2430,7 +2430,7 @@ button,a,.nav-item,.vtab,.cal-cell,.chip,.task-row,.rate-btn,input,select{touch-
 @media(prefers-reduced-motion:reduce){.voice-btn.preparing svg,.ai-panel.is-preparing .ai-head::after{animation:none!important}}
 
 /* ═══════════════════════════════════════════════════════════════
-   LIVE SESSION LAYER — "Start" becomes "Clock Out" in the same
+   LIVE SESSION LAYER - "Start" becomes "Clock Out" in the same
    place you started (up-next card + every task row), the clock
    survives Pause, and the tracker bar always offers a way out.
    Added for the clock-out visibility fix + mobile polish build.
@@ -2489,7 +2489,7 @@ button,a,.nav-item,.vtab,.cal-cell,.chip,.task-row,.rate-btn,input,select{touch-
 }
 
 /* ════════════════════════════════════════════════════════════════
-   v8 — CONNECTIVITY VISIBILITY + CROSS-DEVICE UX POLISH
+   v8 - CONNECTIVITY VISIBILITY + CROSS-DEVICE UX POLISH
    (appended last so it wins the cascade over the sections above)
 ════════════════════════════════════════════════════════════════ */
 
@@ -2498,8 +2498,8 @@ button,a,.nav-item,.vtab,.cal-cell,.chip,.task-row,.rate-btn,input,select{touch-
 .btn:focus-visible,.nav-item:focus-visible,.ai-quick button:focus-visible{outline-offset:2px}
 .input-field:focus-visible{outline:none} /* keeps its box-shadow ring */
 
-/* ── 2. Fluid type scale — titles scale with the viewport ────── */
-/* (v25) retired — the ramp owns the H1, so no breakpoint patch is needed. */
+/* ── 2. Fluid type scale - titles scale with the viewport ────── */
+/* (v25) retired - the ramp owns the H1, so no breakpoint patch is needed. */
 
 /* ── 3. Chat panel: roomier on desktop, taller sheet on phones ── */
 @media(min-width:861px){
@@ -2771,7 +2771,7 @@ body.theme-dark .ob-card,body.theme-obsidian .ob-card,body.theme-nebula .ob-card
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   v9 — ICON ALIGNMENT + MOBILE COMPATIBILITY PASS
+   v9 - ICON ALIGNMENT + MOBILE COMPATIBILITY PASS
    (appended last so it wins the cascade over the sections above)
 ═══════════════════════════════════════════════════════════════ */
 
@@ -2825,7 +2825,7 @@ svg{flex-shrink:0;vertical-align:middle}
 .tracker-actions .btn-xs{display:inline-flex;align-items:center;justify-content:center}
 .tracker-actions .btn-xs svg{width:14px;height:14px}
 @media(max-width:640px){
-  /* Zen becomes a true square icon button — no leftover text gap */
+  /* Zen becomes a true square icon button - no leftover text gap */
   .tracker-actions .btn-xs:last-child{width:34px;min-width:34px;aspect-ratio:1/1;padding:0;gap:0;font-size:0}
 }
 .subject-lesson-row .task-actions .btn{flex:0 0 auto}
@@ -2855,34 +2855,34 @@ svg{flex-shrink:0;vertical-align:middle}
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
-   v11 — PREMIUM RESPONSIVE SYSTEM
+   v11 - PREMIUM RESPONSIVE SYSTEM
    Appended last, so it wins the cascade over every section above.
 
    Nothing above is deleted: every existing custom-property name and every
    DOM class is preserved. This layer only re-times, re-scales and
    re-materials what is already there.
 
-     0  Motion primitives — weighted physics, overshoot removed
+     0  Motion primitives - weighted physics, overshoot removed
      1  Fluid type + fluid spacing via clamp()
      2  Deep glassmorphism (.glass-panel / .cmdk) + sub-pixel inset hairlines
-     3  Luminous accents — OLED canvas, calibrated accent emission
-     4  App-like mobile dock — safe-area aware, thumb-reachable
+     3  Luminous accents - OLED canvas, calibrated accent emission
+     4  App-like mobile dock - safe-area aware, thumb-reachable
      5  44px touch-target floor + hit-area expansion
-     6  Pointer vs touch — hover can never stick; :active is king
-     7  Device calibration — Galaxy S24 · V15-class laptop · high-DPI desktop
-     8  Install readiness — display-mode: standalone
+     6  Pointer vs touch - hover can never stick; :active is king
+     7  Device calibration - Galaxy S24 · V15-class laptop · high-DPI desktop
+     8  Install readiness - display-mode: standalone
 ═══════════════════════════════════════════════════════════════════════ */
 
 /* ──────────────────────────────────────────────────────────────────────
    0 · MOTION PRIMITIVES
    Redefining --spring / --spring-soft here re-times EVERY rule above that
-   already references them — no selector rewrites, no duplication.
+   already references them - no selector rewrites, no duplication.
    The previous --spring was cubic-bezier(.32,1.25,.6,1): that 1.25 control
    point is a 25% overshoot, which is exactly the "cheap bounce" to avoid.
    Expo-out curves decelerate hard and land dead on the value.
 ────────────────────────────────────────────────────────────────────── */
 :root{
-  --spring:cubic-bezier(.22,1,.36,1);        /* primary settle — zero overshoot */
+  --spring:cubic-bezier(.22,1,.36,1);        /* primary settle - zero overshoot */
   --spring-soft:cubic-bezier(.16,1,.3,1);    /* long glide: panels & cascades   */
   --spring-press:cubic-bezier(.4,0,.2,1);    /* press/release: in fast, out soft */
   --spring-enter:cubic-bezier(.32,.72,0,1);  /* entries: gentle in, fast out     */
@@ -2948,7 +2948,7 @@ svg{flex-shrink:0;vertical-align:middle}
   --fs-h2:clamp(1.06rem,.96rem + .48vw,1.4rem);
   --fs-h3:clamp(.92rem,.86rem + .28vw,1.1rem);
   --fs-kpi:clamp(1.45rem,1.1rem + 1.2vw,1.85rem);
-  /* A number that lives INSIDE a card (a subject's %, a hero clock) — louder
+  /* A number that lives INSIDE a card (a subject's %, a hero clock) - louder
      than body, quieter than a page KPI. Subjects/Dashboard/Settings were each
      hardcoding this as 26px / 22px / 17px, which is how the same idea ended up
      three different sizes on three pages. */
@@ -3011,7 +3011,7 @@ h3{font-size:var(--fs-h3);line-height:1.25;letter-spacing:-.01em;text-wrap:balan
 .ob-card h1{font-size:var(--fs-lg)}
 .ob-card p{font-size:var(--fs-sm)}
 
-/* Spacing rhythm — one scale, applied consistently */
+/* Spacing rhythm - one scale, applied consistently */
 .kpi-card,.dash-card{padding:var(--sp-4)}
 .day-block{padding:var(--sp-3)}
 .kpi-grid,.dash-grid-2,.focus-grid-2,.kanban{gap:var(--gap-grid)}
@@ -3031,15 +3031,15 @@ h3{font-size:var(--fs-h3);line-height:1.25;letter-spacing:-.01em;text-wrap:balan
 }
 
 /* ──────────────────────────────────────────────────────────────────────
-   2 · CARD MATERIAL — solid surface, real depth
+   2 · CARD MATERIAL - solid surface, real depth
 
    This block used to frost EVERY card in the product: `.glass-panel`
-   (≈39 usages — every dashboard card, planner card, KPI, analytics panel,
+   (≈39 usages - every dashboard card, planner card, KPI, analytics panel,
    quote card) carried `backdrop-filter:blur(26px) saturate(180%)` under a
    translucent gradient. Two things followed from that:
 
    (a) Body copy at 12–13px sat on a refracted, saturated backdrop, which is
-       the "the whole app looks out of focus" report — and the file's own
+       the "the whole app looks out of focus" report - and the file's own
        comment justified it with "the tint never drops below ~76%", which was
        untrue for the three dark themes, where it dropped to 25%.
    (b) A dozen-plus simultaneous blur+saturate layers per page, each one a
@@ -3051,7 +3051,7 @@ h3{font-size:var(--fs-h3);line-height:1.25;letter-spacing:-.01em;text-wrap:balan
    `.modal-box`, `.cmdk`, `.toast`, `.ai-panel`, `.tracker-bar`,
    `.mobile-header`, `.sidebar`. In-flow cards are now opaque.
 
-   Depth is kept, not flattened away — the sub-pixel INSET hairlines (bright
+   Depth is kept, not flattened away - the sub-pixel INSET hairlines (bright
    top edge, dim bottom edge) and the layered soft shadow stay exactly as
    they were, so a card still reads as a raised surface. Only the
    translucency and the refraction are gone. `--glass-blur` survives as the
@@ -3060,8 +3060,8 @@ h3{font-size:var(--fs-h3);line-height:1.25;letter-spacing:-.01em;text-wrap:balan
 :root{
   /* The ONE frost knob, and it is consumed only by surfaces that float over
      scrolling content (.cmdk, .modal-box, .toast, .ai-panel, .tracker-bar).
-     Every one of those used to hardcode its own radius — 38px, 24px, 22px,
-     20px, 14px — so the phone cost-control override below changed nothing. */
+     Every one of those used to hardcode its own radius - 38px, 24px, 22px,
+     20px, 14px - so the phone cost-control override below changed nothing. */
   --glass-blur:blur(26px) saturate(180%);
   /* Solid by construction: the card paint IS the surface, so nothing behind
      a card can bleed through under its text. */
@@ -3178,7 +3178,7 @@ body.theme-dark .pulse-dot.live,body.theme-obsidian .pulse-dot.live,body.theme-n
    4 · APP-LIKE MOBILE DOCK
    The sidebar becomes a floating capsule pinned above the gesture bar.
    It respects every safe-area edge, sits inside the natural thumb arc,
-   and the workspace reserves exactly its height — never more, never less.
+   and the workspace reserves exactly its height - never more, never less.
 ────────────────────────────────────────────────────────────────────── */
 @media(max-width:860px){
   .sidebar{
@@ -3228,7 +3228,7 @@ body.theme-dark .pulse-dot.live,body.theme-obsidian .pulse-dot.live,body.theme-n
     padding-top:calc(var(--header-h) + 6px);
   }
   /* Single source of truth for the mobile gutter. Longhands, not a `padding:`
-     shorthand — the shorthand silently discards the safe-area longhands set
+     shorthand - the shorthand silently discards the safe-area longhands set
      earlier, which is what let content sit under a notch on every phone
      outside the old 360–412px band. */
   .app-wrapper{
@@ -3245,7 +3245,7 @@ body.theme-dark .pulse-dot.live,body.theme-obsidian .pulse-dot.live,body.theme-n
 @media(max-width:640px){.tracker-bar{top:calc(var(--header-h) + 2px)}}
 
 /* ──────────────────────────────────────────────────────────────────────
-   5 · TOUCH TARGETS — 44×44 FLOOR
+   5 · TOUCH TARGETS - 44×44 FLOOR
    Two mechanisms, chosen deliberately:
      (a) REAL height, for anything that is a primary control. Visual size
          and hit area are the same thing.
@@ -3255,7 +3255,7 @@ body.theme-dark .pulse-dot.live,body.theme-obsidian .pulse-dot.live,body.theme-n
          Only valid on elements that do not clip their own overflow.
 
    Status chips are <span> labels in this app, not controls, so they are
-   exempt — a 44px floor on a non-interactive label would add 22px of dead
+   exempt - a 44px floor on a non-interactive label would add 22px of dead
    space to every task row. Any chip that IS made interactive inherits
    the full target automatically via the rule at the end of this block.
 ────────────────────────────────────────────────────────────────────── */
@@ -3289,7 +3289,7 @@ body.theme-dark .pulse-dot.live,body.theme-obsidian .pulse-dot.live,body.theme-n
   }
   .tracker-actions .btn-xs:last-child{width:var(--tap);flex-basis:var(--tap);aspect-ratio:1/1}
 
-  /* (b) hit-area expansion — no overflow:hidden on any of these */
+  /* (b) hit-area expansion - no overflow:hidden on any of these */
   .toast-close,.ai-copy,.voice-replay,.more-options-toggle,.ob-cancel-link{position:relative}
   .toast-close::after,.ai-copy::after,.voice-replay::after,
   .more-options-toggle::after,.ob-cancel-link::after{
@@ -3309,7 +3309,7 @@ body.theme-dark .pulse-dot.live,body.theme-obsidian .pulse-dot.live,body.theme-n
 
 /* ──────────────────────────────────────────────────────────────────────
    6 · POINTER vs TOUCH
-   A tapped :hover sticks on touch devices — the element stays lit after
+   A tapped :hover sticks on touch devices - the element stays lit after
    the finger lifts, which is the classic "clunky website" tell. Every
    unguarded hover rule above is returned to rest here, and the :active
    states from §0 become the only feedback a finger ever sees.
@@ -3391,9 +3391,9 @@ body.theme-dark .pulse-dot.live,body.theme-obsidian .pulse-dot.live,body.theme-n
 /* ──────────────────────────────────────────────────────────────────────
    7 · DEVICE CALIBRATION
    Real hardware, not abstract breakpoints:
-     · Galaxy S24 — 360×780 CSS px @3x, punch-hole, gesture bar
-     · Lenovo V15 — 15.6" 1366×768 / 1920×1080, mouse, short viewport
-     · High-DPI desktop — 2dppx+, hairlines must stay hairlines
+     · Galaxy S24 - 360×780 CSS px @3x, punch-hole, gesture bar
+     · Lenovo V15 - 15.6" 1366×768 / 1920×1080, mouse, short viewport
+     · High-DPI desktop - 2dppx+, hairlines must stay hairlines
 ────────────────────────────────────────────────────────────────────── */
 
 /* ── Galaxy S24 class (360–412px, the tightest mainstream band) ── */
@@ -3412,7 +3412,7 @@ body.theme-dark .pulse-dot.live,body.theme-obsidian .pulse-dot.live,body.theme-n
   .kpi-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
   .main-workspace{padding-bottom:56px}
 }
-/* 1366×768 specifically — the tightest common laptop canvas there is */
+/* 1366×768 specifically - the tightest common laptop canvas there is */
 @media(min-width:1200px) and (max-width:1400px) and (max-height:800px){
   .kpi-card{min-height:104px;padding:16px}
   .tracker-bar{padding:10px 18px;margin-bottom:16px}
@@ -3424,7 +3424,7 @@ body.theme-dark .pulse-dot.live,body.theme-obsidian .pulse-dot.live,body.theme-n
   .glass-panel:not(.ai-panel),.task-row,.btn-secondary,.input-field,.cmdk,.sidebar{
     border-width:.5px;
   }
-  /* Hairline edges only — the side hairlines are sub-pixel noise at 2dppx */
+  /* Hairline edges only - the side hairlines are sub-pixel noise at 2dppx */
   .glass-panel:not(.ai-panel){
     box-shadow:var(--glass-edge-top),var(--glass-edge-bot),var(--glass-depth);
   }
@@ -3466,18 +3466,18 @@ body.theme-dark .pulse-dot.live,body.theme-obsidian .pulse-dot.live,body.theme-n
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   v12 — AMBIENT CANVAS + CINEMATIC MOTION + CLICK MICRO-FX
+   v12 - AMBIENT CANVAS + CINEMATIC MOTION + CLICK MICRO-FX
    Appended last, so it wins the cascade over every section above.
    Nothing above is deleted; this layer only re-materials and re-times.
 
-     A · Ambient canvas — fine grid mesh + dual accent glow (reference
+     A · Ambient canvas - fine grid mesh + dual accent glow (reference
          screenshot), themed end-to-end: loader → onboarding → app →
          settings all share one canvas.
      B · Silver Lavender finally gets its own token set (the theme id
          existed in the picker but had zero CSS before this layer).
-     C · Slower, weightier motion — re-times entrances, hovers, presses,
+     C · Slower, weightier motion - re-times entrances, hovers, presses,
          sheets, toasts and the theme cross-fade.
-     D · Click micro-interactions — every small click pulses, CTAs grow
+     D · Click micro-interactions - every small click pulses, CTAs grow
          a ripple (ripple look lives here; the trigger is a tiny
          delegated effect in page.tsx using the Web Animations API).
 ═══════════════════════════════════════════════════════════════════ */
@@ -3502,7 +3502,7 @@ body[class*="theme-"]{
     radial-gradient(1500px 820px at 50% 122%,color-mix(in srgb,var(--accent) 6%,transparent),transparent 76%);
 }
 /* Hairline strength per family: whisper-faint on light canvases,
-   clearly legible on OLED — exactly like the reference shot. */
+   clearly legible on OLED - exactly like the reference shot. */
 body.theme-default,body.theme-silver-lavender,body.theme-mint,body.theme-sunset{
   --grid-line:color-mix(in srgb,var(--accent) 8%,transparent);
 }
@@ -3512,7 +3512,7 @@ body.theme-dark,body.theme-obsidian,body.theme-nebula{
 
 /* The mesh itself: a fixed layer painted above the body wash and
    below all content, fading out toward the fold like the reference.
-   Lives on ::after — ::before already carries the slow aurora drift. */
+   Lives on ::after - ::before already carries the slow aurora drift. */
 body::after{
   content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:1;animation:none;
   background:
@@ -3523,7 +3523,7 @@ body::after{
 }
 
 /* Onboarding + loader share the app canvas instead of repainting a
-   flat one on top of it — one continuous surface, end to end. */
+   flat one on top of it - one continuous surface, end to end. */
 .ob-overlay,.loader-screen{background:transparent}
 
 /* ── B · SILVER LAVENDER TOKEN SET ───────────────────────────────── */
@@ -3628,7 +3628,7 @@ body.theme-switching{animation:themeBlink .7s ease}
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   v13 — DELUXE POLISH
+   v13 - DELUXE POLISH
      1 · Cursor spotlight on tilt-cards (::before; ::after keeps sheen)
      2 · AI FAB breathing glow (drop-shadow survives overflow:hidden)
      3 · Shimmer sweep on display headings
@@ -3636,7 +3636,7 @@ body.theme-switching{animation:themeBlink .7s ease}
      5 · Confetti particles (styled here; page.tsx spawns them)
 ═══════════════════════════════════════════════════════════════════ */
 
-/* 1 · Spotlight — a soft accent pool that follows the cursor */
+/* 1 · Spotlight - a soft accent pool that follows the cursor */
 @media(hover:hover) and (pointer:fine){
   .tilt-card::before{
     content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:0;
@@ -3656,7 +3656,7 @@ body.theme-switching{animation:themeBlink .7s ease}
   50%{filter:drop-shadow(0 10px 30px rgba(var(--ai-rgb),.58))}
 }
 
-/* 3 · Heading shimmer — a slow light sweep across display type */
+/* 3 · Heading shimmer - a slow light sweep across display type */
 .page-title,.ob-card h1,.loader-title{
   background:linear-gradient(100deg,var(--text-main) 42%,
     color-mix(in srgb,var(--accent) 65%,var(--text-main)) 50%,var(--text-main) 58%);
@@ -3669,7 +3669,7 @@ body.theme-switching{animation:themeBlink .7s ease}
 /* 4 · Theme flip becomes a real cross-fade where the browser supports it.
      The cross-fade must be the ONLY animation: while it runs, page.tsx puts
      `.theme-switching` on <html> to freeze every per-element colour
-     transition — otherwise the .4–.5s colour fades keep playing inside the
+     transition - otherwise the .4–.5s colour fades keep playing inside the
      incoming snapshot and stack with the cross-fade (a blurry double-morph). */
 ::view-transition-old(root),::view-transition-new(root){
   animation-duration:.35s;animation-timing-function:cubic-bezier(.4,0,.2,1);
@@ -3691,38 +3691,38 @@ body.theme-switching{animation:themeBlink .7s ease}
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
-   v14 — LIQUID GLASS DELUXE
+   v14 - LIQUID GLASS DELUXE
    Appended last, so it wins the cascade over every layer above; nothing
    above is edited or deleted. Design document:
    docs/design/v14-liquid-glass-deluxe.md
 
-     A · Material tiers — a four-step ladder (canvas / card / floating /
+     A · Material tiers - a four-step ladder (canvas / card / floating /
          overlay) with translucent gradient tints and a top gloss light
-     B · Refractive rim — the actual liquid-glass cue: the edge of a
+     B · Refractive rim - the actual liquid-glass cue: the edge of a
          floating layer samples and bends what passes behind it
-     C · Pointer light — a specular pool that tracks the cursor across
+     C · Pointer light - a specular pool that tracks the cursor across
          every card, plus a gradient that slides with the pointer on CTAs
-     D · Liquid nav indicator — one pill that morphs between destinations
+     D · Liquid nav indicator - one pill that morphs between destinations
          in the rail AND the phone dock, instead of per-item repaints
-     E · Scroll-aware chrome — sticky frost, header hairline, card reveals
+     E · Scroll-aware chrome - sticky frost, header hairline, card reveals
          and canvas parallax, all on real scroll timelines (no JS)
-     F · Translucent gradients — gradient hairlines, gradient accent edges,
+     F · Translucent gradients - gradient hairlines, gradient accent edges,
          a conic rim-beam on whatever owns the live session, gradient bars
-     G · Alignment + padding — one card language, one section-head language,
+     G · Alignment + padding - one card language, one section-head language,
          one accent-edge language (retires 40+ inline style declarations)
-     H · Motion — @starting-style entries, interpolated auto-height,
+     H · Motion - @starting-style entries, interpolated auto-height,
          directional page enters
-     I · Intrinsic layout — auto-fit grids + safe container queries, so
+     I · Intrinsic layout - auto-fit grids + safe container queries, so
          collapsing the sidebar reflows the dashboard
-     J · Device matrix — safe areas on every edge, short landscape,
+     J · Device matrix - safe areas on every edge, short landscape,
          standalone/PWA, 4K, high-DPI hairlines
-     K · Guards — reduced motion, reduced transparency, forced colors,
+     K · Guards - reduced motion, reduced transparency, forced colors,
          high contrast, print, touch
 ═══════════════════════════════════════════════════════════════════════ */
 
 /* Registered so the pointer pool, the frost and the rim beam INTERPOLATE
    instead of snapping. Where @property is unsupported the declarations are
-   ignored and the effect simply applies instantly — never broken. */
+   ignored and the effect simply applies instantly - never broken. */
 @property --spec-x{syntax:"<length-percentage>";inherits:false;initial-value:50%}
 @property --spec-y{syntax:"<length-percentage>";inherits:false;initial-value:0%}
 @property --spec-o{syntax:"<number>";inherits:false;initial-value:0}
@@ -3733,19 +3733,19 @@ body.theme-switching{animation:themeBlink .7s ease}
    A · MATERIAL TIERS
 ──────────────────────────────────────────────────────────────────────── */
 :root{
-  /* Tier 1 — card body: OPAQUE.
+  /* Tier 1 - card body: OPAQUE.
 
      This is the layer that actually paints a card (it runs after the
      material block above and sets `background-color:transparent`, so the
      whole fill comes from these layers). It used to be a translucent ladder
-     — 90%→84% here, 88%→80% on the dark themes — which meant every card in
+     - 90%→84% here, 88%→80% on the dark themes - which meant every card in
      the product let the page's background gradient show through at 10–20%.
      Stacked over the frosted backdrop-filter that has now been removed, that
      was the "everything looks slightly soft" report: not one blurry rule but
      two half-transparent ones compounding.
 
-     The direction of light is not lost — `--gloss` above still lays a
-     top-lit white fade across the card — it is simply painted on a surface
+     The direction of light is not lost - `--gloss` above still lays a
+     top-lit white fade across the card - it is simply painted on a surface
      that is actually there. */
   --panel-tint-a:var(--surface-solid);
   --panel-tint-b:var(--surface-solid);
@@ -3757,7 +3757,7 @@ body.theme-switching{animation:themeBlink .7s ease}
   --hair-grad:linear-gradient(90deg,transparent,
      color-mix(in srgb,var(--accent) 40%,transparent) 26%,
      color-mix(in srgb,var(--color-ai) 30%,transparent) 62%,transparent);
-  /* Tier 2 — floating: refractive rim strength + frost budget */
+  /* Tier 2 - floating: refractive rim strength + frost budget */
   --lg-refract:blur(16px) saturate(190%) brightness(1.04);
   --rim-w:10px;
   --panel-edge:none;
@@ -3806,7 +3806,7 @@ body.theme-mint,body.theme-sunset,body.theme-silver-lavender,body.theme-default{
   .kpi-card:hover,.dash-card:hover,.section-card:hover,.day-block:hover{transform:translateY(-1px)}
 }
 
-/* Tier 2 — floating layers earn their blur. Translucent gradient body plus
+/* Tier 2 - floating layers earn their blur. Translucent gradient body plus
    real frost, with an alpha floor high enough that nothing bleeds through
    into the labels (the v11 legibility rule, kept). */
 .toast{
@@ -3841,7 +3841,7 @@ body.theme-mint,body.theme-sunset,body.theme-silver-lavender,body.theme-default{
   :root{--rim-w:7px;--lg-refract:blur(11px) saturate(175%) brightness(1.12)}
 }
 
-/* Tier 3 — overlays: dimmer, frosted, vignetted, so a sheet always reads as
+/* Tier 3 - overlays: dimmer, frosted, vignetted, so a sheet always reads as
    ABOVE the app rather than painted onto it. */
 .modal-overlay,.cmdk-overlay{
   background-image:radial-gradient(120% 90% at 50% 0%,rgba(18,16,38,.26),rgba(6,6,14,.6) 80%);
@@ -3851,7 +3851,7 @@ body.theme-mint,body.theme-sunset,body.theme-silver-lavender,body.theme-default{
   .modal-overlay,.cmdk-overlay{backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px)}
 }
 /* Removed: `.zen{background-image:radial-gradient(...rgba(60,52,140,.22)...)}`
-   — a hardcoded violet wash on the Zen room. ui-system.css already repaints
+   - a hardcoded violet wash on the Zen room. ui-system.css already repaints
    `.zen` from `--zen-*` tokens with the final word, so this rule was dead,
    but it was the one place left that could put purple back into a Sunset or
    Mint room if that layer ever moved. The theme owns the room. */
@@ -3878,7 +3878,7 @@ body.theme-mint,body.theme-sunset,body.theme-silver-lavender,body.theme-default{
     .cmdk::before{padding:14px;opacity:.9}
     .cmdk{position:relative}
     /* A modal scrolls inside its own box, so a masked pseudo-ring would slide
-       with the content — its rim is an inset shadow instead, which is painted
+       with the content - its rim is an inset shadow instead, which is painted
        on the border box and stays put. */
     .modal-box{
       box-shadow:inset 0 1px 0 var(--lg-rim),inset 0 0 0 1px color-mix(in srgb,var(--glass-border) 60%,transparent),
@@ -3935,14 +3935,14 @@ body.theme-mint,body.theme-sunset,body.theme-silver-lavender,body.theme-default{
 }
 /* (v25) retired: this pass used to switch `-webkit-backdrop-filter` off on
    coarse pointers. Chips, badges and buttons are not frosted at any size any
-   more — see the blur policy in `ui-system.css` §25 — so there is nothing
+   more - see the blur policy in `ui-system.css` §25 - so there is nothing
    left to switch off. */
 
 /* ──────────────────────────────────────────────────────────────────────
    D · LIQUID NAV INDICATOR
    One pill in the nav list that travels and resizes between destinations
    instead of five backgrounds blinking. An item only surrenders its own
-   fill once .lg-nav-ready proves the measurement ran — no JS, no change.
+   fill once .lg-nav-ready proves the measurement ran - no JS, no change.
 ──────────────────────────────────────────────────────────────────────── */
 .nav-list{position:relative;isolation:isolate}
 .nav-list::before,.nav-list::after{
@@ -3999,7 +3999,7 @@ body.theme-mint,body.theme-sunset,body.theme-silver-lavender,body.theme-default{
 @supports (animation-timeline:scroll()){
   @media (prefers-reduced-motion: no-preference){
     /* Sticky chrome is fully opaque while it owns the top edge and turns to
-       frost as content slides beneath it — the iOS nav-bar behaviour. */
+       frost as content slides beneath it - the iOS nav-bar behaviour. */
     .tracker-bar,.mobile-header{
       animation:lgFrost auto linear both;animation-timeline:scroll(root block);animation-range:0 76px;
     }
@@ -4037,7 +4037,7 @@ body.theme-mint,body.theme-sunset,body.theme-silver-lavender,body.theme-default{
                    0 -2px 12px rgba(10,12,26,calc(.06 + var(--frost) * .05)),
                    0 20px 44px -20px rgba(10,12,26,calc(.34 + var(--frost) * .12));}
     }
-    /* Canvas parallax: the mesh lags one cell behind the scroll — depth,
+    /* Canvas parallax: the mesh lags one cell behind the scroll - depth,
        not motion. Skipped while focus-live owns body::after. */
     body:not(.focus-live)::after{animation:lgMesh auto linear both;animation-timeline:scroll(root block)}
   }
@@ -4068,7 +4068,7 @@ body.theme-mint,body.theme-sunset,body.theme-silver-lavender,body.theme-default{
 .day-block:hover .day-head::after,.section-card:hover .section-head::after{opacity:.7}
 
 @keyframes lgBeam{to{--lg-angle:360deg}}
-/* The card that OWNS the running session gets the rim beam — pure CSS via
+/* The card that OWNS the running session gets the rim beam - pure CSS via
    :has(), so no state has to be threaded through the component tree. */
 .glass-panel:not(.ai-panel).up-next.live::after,
 .glass-panel:not(.ai-panel).day-block:has(.task-row.active-clock)::after{
@@ -4098,7 +4098,7 @@ body.theme-mint,body.theme-sunset,body.theme-silver-lavender,body.theme-default{
     color-mix(in srgb,var(--accent) 70%,transparent) 100deg,transparent 210deg);
   animation:lgBeam 3.2s linear infinite;filter:blur(7px);opacity:.85;
 }
-/* Gradient hairline under section titles — draws in once. */
+/* Gradient hairline under section titles - draws in once. */
 .section-title{position:relative}
 .section-title::after{
   content:"";position:absolute;left:0;bottom:-6px;width:34px;height:2px;border-radius:99px;
@@ -4133,12 +4133,12 @@ body.theme-mint,body.theme-sunset,body.theme-silver-lavender,body.theme-default{
 }
 
 /* ──────────────────────────────────────────────────────────────────────
-   G · ALIGNMENT + PADDING — one language for every card
+   G · ALIGNMENT + PADDING - one language for every card
 ──────────────────────────────────────────────────────────────────────── */
 :root{--daybar-w:clamp(84px,10vw,132px);--heat-cell:13px;--heat-gap:3px}
 .section-card{padding:var(--pad-card);margin-bottom:0}
 .section-title{line-height:1.25;margin:0 0 var(--sp-2);text-wrap:balance}
-/* Only panel headings get the size bump — headings that sit inside a
+/* Only panel headings get the size bump - headings that sit inside a
    `.day-head` or a `.section-head` row keep their own, smaller voice. */
 .section-card > .section-title,.dash-card > .section-title{font-size:var(--fs-h3);font-weight:780;letter-spacing:-.014em}
 .section-card > .section-title,.dash-card > .section-title:not(.section-title--row){margin-bottom:var(--sp-3)}
@@ -4220,7 +4220,7 @@ body.theme-mint,body.theme-sunset,body.theme-silver-lavender,body.theme-default{
 .modal-actions-wrap{flex-wrap:wrap}
 
 /* ──────────────────────────────────────────────────────────────────────
-   H · MOTION — entries that transition instead of keyframe-popping
+   H · MOTION - entries that transition instead of keyframe-popping
 ──────────────────────────────────────────────────────────────────────── */
 @media (prefers-reduced-motion: no-preference){
   .up-next,.day-complete,.intel-details,.planner-lesson-brief,.ob-note-panel{
@@ -4271,7 +4271,7 @@ body.theme-mint,body.theme-sunset,body.theme-silver-lavender,body.theme-default{
 .sb-toggle:hover{background:color-mix(in srgb,var(--accent) 9%,var(--row-hover))}
 
 /* ──────────────────────────────────────────────────────────────────────
-   I · INTRINSIC LAYOUT — respond to the COLUMN, not the viewport
+   I · INTRINSIC LAYOUT - respond to the COLUMN, not the viewport
    `container-type` is deliberately NOT put on .main-workspace: containment
    would make it the containing block for the fixed modal overlays rendered
    inside the views. Column-awareness comes from auto-fit grids instead
@@ -4363,7 +4363,7 @@ body.theme-mint,body.theme-sunset,body.theme-silver-lavender,body.theme-default{
     .ai-fab{bottom:calc(var(--dock-h) + 20px + env(safe-area-inset-bottom))}
   }
 }
-/* Coarse pointers: no hover ink and no pool — but the press still dims the
+/* Coarse pointers: no hover ink and no pool - but the press still dims the
    glass, so a tap is never silent. */
 @media (hover:none){
   .glass-panel:not(.ai-panel),.ai-panel{--spec-o:0}
@@ -4386,7 +4386,7 @@ body.mode-focused .btn-primary{background-position:50% 0}
   body.mode-focused .kpi-card:hover,body.mode-focused .section-card:hover,
   body.mode-focused .day-block:hover,body.mode-focused .dash-card:hover{transform:none}
 }
-/* mode-young: bigger, rounder, slower — the gloss keeps up with it. */
+/* mode-young: bigger, rounder, slower - the gloss keeps up with it. */
 body.mode-young .nav-list::before,body.mode-young .nav-list::after{border-radius:20px}
 body.mode-young .section-card{padding:var(--sp-5) var(--sp-4)}
 body.mode-young .up-next.live::after,
@@ -4485,7 +4485,7 @@ body.mode-young .section-title::after{width:46px;height:3px;bottom:-8px}
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   STUDY CLOCK — MOBILE UI ALIGNMENT & RESPONSIVENESS FIX
+   STUDY CLOCK - MOBILE UI ALIGNMENT & RESPONSIVENESS FIX
    Appended last to win cascade. Implements:
    - Header: flex-row space-between center, inner flex-col
    - Remove stray blue underline (section-title::after)
@@ -4532,7 +4532,7 @@ body.mode-young .section-title::after{width:46px;height:3px;bottom:-8px}
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
-   FOCUS STUDIO — calm workspace refinement
+   FOCUS STUDIO - calm workspace refinement
    The focus view uses its own small layout system so the clock, timer and
    supporting cards share one optical edge, one spacing rhythm and one type
    hierarchy at every width.
@@ -4594,13 +4594,13 @@ body.mode-young .section-title::after{width:46px;height:3px;bottom:-8px}
 }
 
 /* ════════════════════════════════════════════════════════════════
-   v15 — ALIGNMENT & LEGIBILITY + LIQUID-OS DEEPENING
+   v15 - ALIGNMENT & LEGIBILITY + LIQUID-OS DEEPENING
    Design document: docs/design/v15-ui-ux-alignment-and-legibility.md
    Appended last, so it wins equal-specificity conflicts over every
    layer above (v12/v13/v14 convention). Two jobs:
-     · Legibility — the tracker bar and task lists stop reading as
+     · Legibility - the tracker bar and task lists stop reading as
        mashed-together fragments and read as normal sentences.
-     · Liquid OS — the tracker body becomes real translucent glass,
+     · Liquid OS - the tracker body becomes real translucent glass,
        the live session earns a rotating rim-light, task rows get a
        glass gloss, and the focus ring gains a slow conic halo.
    No feature/data/copy changes. The only edits above this block are
@@ -4623,7 +4623,7 @@ body.mode-young .section-title::after{width:46px;height:3px;bottom:-8px}
    sheet already drops it to 14px on coarse pointers. */
 
 /* ── Tracker bar · identity + time cluster left, actions flush
-      right — no more space-between dead gutter ──────────────────── */
+      right - no more space-between dead gutter ──────────────────── */
 @media(min-width:641px){
   .tracker-bar{justify-content:flex-start;flex-wrap:nowrap;border-radius:var(--radius-xl)}
   .tracker-labels{flex:0 1 auto;flex-direction:row;align-items:baseline;gap:7px}
@@ -4694,7 +4694,7 @@ body.mode-young .section-title::after{width:46px;height:3px;bottom:-8px}
 }
 
 /* ════════════════════════════════════════════════════════════════
-   v16 — TRUE LIST VIEWS + POLISHED ROW CONTROLS + CALENDAR COLOR
+   v16 - TRUE LIST VIEWS + POLISHED ROW CONTROLS + CALENDAR COLOR
    (appended last so it wins the cascade over earlier sections)
 ════════════════════════════════════════════════════════════════ */
 
@@ -4727,7 +4727,7 @@ body.mode-young .section-title::after{width:46px;height:3px;bottom:-8px}
   .task-row.clean-list .task-row-actions{width:100%}
 }
 
-/* 5) Calendar: colour and topics at a glance — on phones the pills were
+/* 5) Calendar: colour and topics at a glance - on phones the pills were
       hidden entirely, leaving a plain number grid. Now every day with
       tasks shows a soft tint of its first subject plus tiny coloured
       topic pills, and the "+n more" hint stays readable. */
@@ -4738,22 +4738,22 @@ body.mode-young .section-title::after{width:46px;height:3px;bottom:-8px}
 }
 
 /* Zen linked-mode hint under the action buttons */
-/* Removed: `.zen-hint{color:rgba(255,255,255,.62)}` — hardcoded white. It was
+/* Removed: `.zen-hint{color:rgba(255,255,255,.62)}` - hardcoded white. It was
    already overridden by ui-system.css (`.zen-hint{color:var(--zen-muted)}`),
    but on the four light themes the Zen room is light paper with dark ink, so
-   white-on-light measured 1.44:1 — if that later layer ever stopped restating
+   white-on-light measured 1.44:1 - if that later layer ever stopped restating
    the colour the hint would have gone invisible. Theme owns it. */
 
 
 /* ════════════════════════════════════════════════════════════════
-   v17 — TRUE ONE-PER-ROW PLANNER LIST · SMOOTH SIDEBAR RAIL ·
+   v17 - TRUE ONE-PER-ROW PLANNER LIST · SMOOTH SIDEBAR RAIL ·
          REBUILT MOBILE TOP BAR AND PHONE CHROME
    Appended last so it wins the cascade over every earlier layer.
    Design notes: docs/design/v17-list-rail-mobile.md
 ════════════════════════════════════════════════════════════════ */
 
 /* ─────────────────────────────────────────────────────────────
-   1 · PLANNER LIST VIEW IS A LIST — ONE DAY PER ROW
+   1 · PLANNER LIST VIEW IS A LIST - ONE DAY PER ROW
    v11 turned `.planner-days` into a 2-up (and 3-up ≥1600px) grid, so
    "List" rendered as side-by-side columns of days. A list reads top to
    bottom: one day block per row, full width, at every viewport.
@@ -4772,13 +4772,13 @@ body.mode-young .section-title::after{width:46px;height:3px;bottom:-8px}
 }
 
 /* ─────────────────────────────────────────────────────────────
-   2 · SIDEBAR COLLAPSE / EXPAND — ONE CHOREOGRAPHED MOTION
+   2 · SIDEBAR COLLAPSE / EXPAND - ONE CHOREOGRAPHED MOTION
    Before: labels, brand text and the footer card were switched with
    `display:none`, so they popped out one frame before the width even
    started moving, and the toggle teleported from the corner to the
    centre. Now every part of the rail travels on the same easing:
    the text clips + fades, the icons re-centre, the footer folds, and
-   the toggle glides. Desktop only — on phones the sidebar is the dock.
+   the toggle glides. Desktop only - on phones the sidebar is the dock.
 ───────────────────────────────────────────────────────────── */
 @media(min-width:861px){
   :root{--rail-dur:.4s;--rail-ease:cubic-bezier(.32,.72,0,1)}
@@ -4875,8 +4875,8 @@ body.mode-young .section-title::after{width:46px;height:3px;bottom:-8px}
 }
 
 /* ─────────────────────────────────────────────────────────────
-   3 · MOBILE TOP BAR — REBUILT & COMPACT
-   Clean, proportional app bar — 26px icon tile, current section in
+   3 · MOBILE TOP BAR - REBUILT & COMPACT
+   Clean, proportional app bar - 26px icon tile, current section in
    tight display type with quiet eyebrow above, and right-aligned
    status chip on a frosted surface. Sized comfortably without
    consuming excessive vertical viewport space.
@@ -4884,7 +4884,7 @@ body.mode-young .section-title::after{width:46px;height:3px;bottom:-8px}
 .tracker-exam-chip .exam-chip-short{display:none}
 @media(max-width:860px){
   .mobile-header{
-    /* NB: no `display` here — landscape phones hide the bar entirely and
+    /* NB: no `display` here - landscape phones hide the bar entirely and
        this layer must not resurrect it. */
     background:color-mix(in srgb,var(--surface-elevated) 90%,transparent);
     -webkit-backdrop-filter:var(--glass-blur);
@@ -4915,7 +4915,7 @@ body.mode-young .section-title::after{width:46px;height:3px;bottom:-8px}
 }
 
 /* ─────────────────────────────────────────────────────────────
-   4 · PHONE CHROME — STATUS BAR, PAGE HEADER, CONTROLS
+   4 · PHONE CHROME - STATUS BAR, PAGE HEADER, CONTROLS
 ───────────────────────────────────────────────────────────── */
 @media(max-width:640px){
   /* Study-clock strip: compact, sleek two-row card */
@@ -4989,7 +4989,7 @@ body.mode-young .section-title::after{width:46px;height:3px;bottom:-8px}
 }
 
 /* ════════════════════════════════════════════════════════════════════
-   v19 — COLLAPSED RAIL: ONE HIGHLIGHT · SIDEBAR-SIZED ⌘K HINT ·
+   v19 - COLLAPSED RAIL: ONE HIGHLIGHT · SIDEBAR-SIZED ⌘K HINT ·
          MOBILE APP BAR FLEX CONTRACT
    Appended last so it wins the cascade over every earlier layer.
    Design notes: docs/design/v19-rail-hint-appbar.md
@@ -5001,8 +5001,8 @@ body.mode-young .section-title::after{width:46px;height:3px;bottom:-8px}
    pill on the active route (`.nav-list::before`). The brand tile used
    to be painted with the very same `--accent-gradient` fill (plus a
    spinning conic halo), so collapsed it read as a second selected tab
-   stacked above the real one. In the rail the mark goes quiet — neutral
-   surface, muted glyph, hairline rim, no glow, no halo — and it rides
+   stacked above the real one. In the rail the mark goes quiet - neutral
+   surface, muted glyph, hairline rim, no glow, no halo - and it rides
    the same --rail-dur/--rail-ease curve as the labels so the swap is
    part of the collapse, not a pop.
    The expanded sidebar keeps the gradient tile: there the wordmark sits
@@ -5028,13 +5028,13 @@ body.mode-young .section-title::after{width:46px;height:3px;bottom:-8px}
 }
 
 /* ──────────────────────────────────────────────────────────────
-   3 · MOBILE APP BAR — AN EXPLICIT FLEX CONTRACT
+   3 · MOBILE APP BAR - AN EXPLICIT FLEX CONTRACT
    The bar used to inherit its layout from whichever of four older
    `@media(max-width:860px)` blocks happened to win, which is how it ended
    up crowding the logo into the title, letting the streak chip push the
    page name off, and sitting flush against curved screen edges. It now
    states its own contract so nothing else has to be relied on:
-     · the container is a flex row — `space-between`, `align-items:center`
+     · the container is a flex row - `space-between`, `align-items:center`
      · logo + page title are ONE group (`.mh-brand`) on a 12px gap
      · the logo tile and the streak chip are hard-bounded: `flex:0 0 …`
        plus max-width/max-height, so they never stretch, swell or squash
@@ -5079,7 +5079,7 @@ body.mode-young .section-title::after{width:46px;height:3px;bottom:-8px}
 }
 
 /* ──────────────────────────────────────────────────────────────
-   4 · GUARDS — mirror the v15/v17 accessibility contracts for the
+   4 · GUARDS - mirror the v15/v17 accessibility contracts for the
        elements this layer touches
 ────────────────────────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce){
@@ -5095,7 +5095,7 @@ body.mode-young .section-title::after{width:46px;height:3px;bottom:-8px}
 }
 
 /* ════════════════════════════════════════════════════════════════════
-   v20 — COMPACT COLLAPSED RAIL + REDUCED TRACKER BAR ON SMALL SCREENS
+   v20 - COMPACT COLLAPSED RAIL + REDUCED TRACKER BAR ON SMALL SCREENS
    Appended last so it wins the cascade over every earlier layer.
    Two fixes:
      1 · Collapsed rail (desktop): the toggle, brand mark and first nav
@@ -5108,7 +5108,7 @@ body.mode-young .section-title::after{width:46px;height:3px;bottom:-8px}
          action buttons auto-sized.
 ════════════════════════════════════════════════════════════════════ */
 
-/* ── 1 · COLLAPSED RAIL — one compact, optically aligned stack ─── */
+/* ── 1 · COLLAPSED RAIL - one compact, optically aligned stack ─── */
 @media(min-width:861px){
   /* Match the rail's top inset to its side inset. The previous 20px sidebar
      padding + 10px toggle margin left 30px of dead space above the stack. */
@@ -5141,7 +5141,7 @@ body.mode-young .section-title::after{width:46px;height:3px;bottom:-8px}
   /* Toggle, brand, and route glyphs use the same optical size and x-axis. */
 }
 
-/* ── 2 · TRACKER BAR — compact pill on phones ──────────────────── */
+/* ── 2 · TRACKER BAR - compact pill on phones ──────────────────── */
 @media(max-width:640px){
   .tracker-bar{
     display:flex;flex-wrap:wrap;
@@ -5183,7 +5183,7 @@ body.mode-young .section-title::after{width:46px;height:3px;bottom:-8px}
   body.focus-live .tracker-bar .tracker-labels{display:none}
 }
 
-/* ── 3 · TRACKER BAR — tighter on small tablets ────────────────── */
+/* ── 3 · TRACKER BAR - tighter on small tablets ────────────────── */
 @media(min-width:641px) and (max-width:860px){
   .tracker-bar{padding:8px 14px;gap:8px}
   .tracker-bar .tracker-actions{gap:5px}
@@ -5192,7 +5192,7 @@ body.mode-young .section-title::after{width:46px;height:3px;bottom:-8px}
 }
 
 /* ════════════════════════════════════════════════════════════════════
-   v21 — MOBILE TRACKER ALIGNMENT + SOLID SHIGUN CONVERSATION
+   v21 - MOBILE TRACKER ALIGNMENT + SOLID SHIGUN CONVERSATION
    The phone tracker uses a deliberate two-row grid instead of wrapping by
    accident. Shigun is a solid app surface, not a glass card inside the app.
 ════════════════════════════════════════════════════════════════════ */
@@ -5329,7 +5329,7 @@ body.mode-young .section-title::after{width:46px;height:3px;bottom:-8px}
 }
 
 /* ════════════════════════════════════════════════════════════════════
-   v22 — ICON GEOMETRY: ICONS ARE GLYPHS, NOT IMAGES
+   v22 - ICON GEOMETRY: ICONS ARE GLYPHS, NOT IMAGES
    The overflow-guard `svg{max-width:100%;height:auto}` treated every
    icon like a photo. Without an intrinsic CSS box, SVGs collapsed to a
    hairline or stretched to the row width. Icons now keep the square
@@ -5365,7 +5365,7 @@ svg{overflow:visible;flex-shrink:0;max-width:none}
 }
 
 /* ════════════════════════════════════════════════════════════════════
-   v23 — SHIGUN IS A CONVERSATION, NOT A CARD
+   v23 - SHIGUN IS A CONVERSATION, NOT A CARD
    The panel looked boxy because every surface was a rectangle with a
    hairline: 22px shell, bordered bot bubbles with a left spine, a
    square send tile, a square avatar, and (on phones) a 0-radius wall.
@@ -5498,7 +5498,7 @@ svg{overflow:visible;flex-shrink:0;max-width:none}
   transform: translateY(0);
 }
 /* The word separator. `pre-wrap` preserves it (a plain trailing space at the
-   end of an inline-block is thrown away — that is what made every animated
+   end of an inline-block is thrown away - that is what made every animated
    heading read "Acalmerwaytostudy") while still offering a soft wrap point,
    so long titles break instead of overflowing. */
 .mw-gap{
@@ -5569,7 +5569,7 @@ body.theme-nebula .spot::before {
 }
 
 /* ══════════════════════════════════════════════════════════════════════
-   (v26) SUBJECT CARD + MOBILE TASK ROW — one hierarchy, tokenised
+   (v26) SUBJECT CARD + MOBILE TASK ROW - one hierarchy, tokenised
    ──────────────────────────────────────────────────────────────────────
    Two of the reported defects were the same defect: a component choosing its
    own font size instead of a role from the ramp.
@@ -5593,7 +5593,7 @@ body.theme-nebula .spot::before {
 }
 .subject-card-meta{line-height:var(--lh-meta);overflow-wrap:anywhere}
 
-/* Mobile list row. Only the *scale* changes here — nothing is removed, and
+/* Mobile list row. Only the *scale* changes here - nothing is removed, and
    the desktop rules are untouched. */
 @media(max-width:860px){
   .task-card-title{font-size:var(--fs-md);line-height:var(--lh-heading)}
@@ -5607,7 +5607,7 @@ body.theme-nebula .spot::before {
 }
 
 /* ══════════════════════════════════════════════════════════════════════
-   (v26) AI COACH — it may float, but it may not hide the page
+   (v26) AI COACH - it may float, but it may not hide the page
    ──────────────────────────────────────────────────────────────────────
    The coach is a fixed card at the right edge, which meant it sat directly on
    top of the Planner's header actions and the top of the list. `body.ai-open`

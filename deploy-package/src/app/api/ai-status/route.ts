@@ -9,10 +9,10 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
 /**
- * GET  — cheap, cache-free snapshot: which providers the deployment's
+ * GET  - cheap, cache-free snapshot: which providers the deployment's
  *        environment configured and what the last real tutor request did.
  *        Never returns keys.
- * POST — live connectivity probe (operator tool): one tiny real request to
+ * POST - live connectivity probe (operator tool): one tiny real request to
  *        EVERY configured provider, with per-provider status, latency and a
  *        sanitised reason. Distinguishes a rejected key, a retired model, a
  *        rate limit, a timeout and a network block from each other.
@@ -21,7 +21,7 @@ export async function GET(req: Request) {
   const runtimeKeys = parseRuntimeKeys(req.headers.get("x-ai-keys"));
   const providers = configuredProviders(runtimeKeys);
   /* Env-only view: exactly what the DEPLOYMENT configured, which is what
-     every learner on it shares. Ids, not labels — the client matches on ids. */
+     every learner on it shares. Ids, not labels - the client matches on ids. */
   const serverIds = envConfiguredProviderIds();
   return NextResponse.json({
     mode: providers.length ? "cloud-with-local-fallback" : "local-only",

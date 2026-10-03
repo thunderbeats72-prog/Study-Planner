@@ -7,7 +7,7 @@ import { guardResponse, unauthorizedResponse } from "@/lib/routeGuard";
 export const dynamic = "force-dynamic";
 
 /**
- * POST /api/auth/password — change the password of the signed-in account.
+ * POST /api/auth/password - change the password of the signed-in account.
  *
  * Succeeding here signs out every OTHER device: changing a password is how
  * a learner takes access back, so the old password must stop working

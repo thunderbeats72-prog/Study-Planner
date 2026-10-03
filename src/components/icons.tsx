@@ -299,11 +299,11 @@ export const IconFilter = ({ size = 16, className, style }: P) => (
     <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
   </svg>
 );
-/* v25 additions — same 24×24 stroke grid, same `base()`, so the set stays a
+/* v25 additions - same 24×24 stroke grid, same `base()`, so the set stays a
    single family. `IconUndo` labels the reversible Done action, `IconStopwatch`
    is the session verb every Clock-in / Clock-out control shares. */
 /* Redrawn at button size (13–16px): the old undo was a near-full circle that
-   read as "refresh". This is the open-arrow hook — one corner + one arc —
+   read as "refresh". This is the open-arrow hook - one corner + one arc -
    which stays legible when the stroke is a fifth of the glyph. */
 export const IconUndo = ({ size = 16, className, style }: P) => (
   <svg {...base(size)} className={className} style={style}>
@@ -329,7 +329,7 @@ export const IconSwap = ({ size = 16, className, style }: P) => (
 );
 /* Redrawn: the old stopwatch carried a base line and a stem that crossed the
    dial, and at 13px it collapsed into a circle-with-a-dot. Now it is exactly
-   three parts — crown, dial, hand — with nothing touching the rim. */
+   three parts - crown, dial, hand - with nothing touching the rim. */
 export const IconStopwatch = ({ size = 16, className, style }: P) => (
   <svg {...base(size)} className={className} style={style}>
     <circle cx="12" cy="13" r="8" />
@@ -338,9 +338,9 @@ export const IconStopwatch = ({ size = 16, className, style }: P) => (
     <path d="m17 5 2-2" />
   </svg>
 );
-/* v32 — two quiet glyphs the reference uses sparingly: a clipboard for the
+/* v32 - two quiet glyphs the reference uses sparingly: a clipboard for the
    lesson brief's \"takeaway\" and a shield for protected/checkpoint states.
-   Same 24×24 stroke grid, same base — the set stays one family. */
+   Same 24×24 stroke grid, same base - the set stays one family. */
 export const IconClipboard = ({ size = 16, className, style }: P) => (
   <svg {...base(size)} className={className} style={style}>
     <rect x="9" y="4" width="6" height="4" rx="1" />

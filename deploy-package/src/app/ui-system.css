@@ -1,5 +1,5 @@
 /* ════════════════════════════════════════════════════════════════════════
-   ui-system.css — THE single refinement layer for Study Planner Pro.
+   ui-system.css - THE single refinement layer for Study Planner Pro.
    ──────────────────────────────────────────────────────────────────────
    Ten historical patch sheets (study-planner-refresh, pastel-ui-system,
    study-planner-redesign, practical-enhancements, ui-polish,
@@ -8,7 +8,7 @@
    next, so every visual question was answered by "whoever wrote the last
    file" rather than by one system. They are merged here into ONE layer,
    concatenated in their original import order, so the cascade result is
-   bit-for-bit the same as before — there is simply one file to read, and
+   bit-for-bit the same as before - there is simply one file to read, and
    one place the final word lives.
 
    Contract, top to bottom:
@@ -19,10 +19,10 @@
    ════════════════════════════════════════════════════════════════════════ */
 
 /* ══════════════════════════════════════════════════════════════════════
-   LAYER · study-planner-refresh.css   (merged verbatim, source order preserved — see header below)
+   LAYER · study-planner-refresh.css   (merged verbatim, source order preserved - see header below)
    ══════════════════════════════════════════════════════════════════════ */
 
-/* Study Planner Pro — reference-driven UI refresh.
+/* Study Planner Pro - reference-driven UI refresh.
    Loaded after globals.css so it can refine the existing product without
    changing business logic or the timer/planner data model. */
 
@@ -39,8 +39,8 @@
   /* (v25) ONE illustration palette instead of three.
      `--ill-*` is the source of truth: every theme block in the token bridge
      restates it, and nothing here carries a raw hex. `--illustration-*` is the
-     public, readable name of the same values, and `--scene-*` — the names the
-     SVG scenes already use — aliases it, so a header scene, a card flourish
+     public, readable name of the same values, and `--scene-*` - the names the
+     SVG scenes already use - aliases it, so a header scene, a card flourish
      and the Zen desk can never disagree about what "paper", "plant" or "brass"
      looks like in the current theme. */
   --illustration-desk:var(--ill-desk);
@@ -103,7 +103,7 @@ body.theme-dark,body.theme-obsidian,body.theme-nebula{
 .sidebar-foot>.glass-panel{border-radius:20px;padding:18px 14px}
 .foot-title{font-size:.95rem}
 
-/* (v25) The top session bar is defined once — see §12 at the foot of this
+/* (v25) The top session bar is defined once - see §12 at the foot of this
    file. Ten generations of `.tracker-*` patches used to stack here, which is
    how the bar ended up with a grid layout fighting a flex layout. */
 
@@ -159,7 +159,7 @@ body.theme-dark,body.theme-obsidian,body.theme-nebula{
    (v25) Retired: the mint / sunset / silver / dark `--scene-*` patches each
    hand-picked four colours that the theme's own `--ill-*` set already
    expresses, so the same book spines were tuned twice and drifted apart.
-   The aliases above read `--ill-*` directly — one place to change per theme. */
+   The aliases above read `--ill-*` directly - one place to change per theme. */
 
 /* ---------------- Phone: reference-quality mobile app ---------------- */
 @media(max-width:860px){
@@ -201,7 +201,7 @@ body.theme-dark,body.theme-obsidian,body.theme-nebula{
   .sidebar,.tracker-bar{background:var(--surface-elevated)}
 }
 
-/* Real component illustration — if/when mounted, it gets the same tokens. */
+/* Real component illustration - if/when mounted, it gets the same tokens. */
 .study-scene{height:auto;pointer-events:none;opacity:.98}
 .study-scene svg{overflow:visible}
 .study-scene__lamp{transform-origin:220px 50px;animation:sceneLamp 7s ease-in-out infinite alternate}
@@ -213,10 +213,10 @@ body.theme-dark,body.theme-obsidian,body.theme-nebula{
 @media(prefers-reduced-motion:reduce){.study-scene__lamp,.study-scene__plant{animation:none}}
 
 /* ══════════════════════════════════════════════════════════════════════
-   LAYER · pastel-ui-system.css   (merged verbatim, source order preserved — see header below)
+   LAYER · pastel-ui-system.css   (merged verbatim, source order preserved - see header below)
    ══════════════════════════════════════════════════════════════════════ */
 
-/* Calm study workspace system — shared visual layer for every stateful view. */
+/* Calm study workspace system - shared visual layer for every stateful view. */
 :root {
   --pastel-ivory:#fbfaf6;
   --pastel-paper:#fffefd;
@@ -265,8 +265,8 @@ body { background-attachment:fixed; color:var(--text-main); }
 .input-field:focus { box-shadow:0 0 0 4px var(--accent-glow); }
 .chip { border-radius:999px; }
 
-/* (v26) This rule used to reserve `padding-right:min(29vw,310px)` — and then
-   315px, 245px and 220px in three later breakpoints — so the illustration
+/* (v26) This rule used to reserve `padding-right:min(29vw,310px)` - and then
+   315px, 245px and 220px in three later breakpoints - so the illustration
    could be absolutely positioned over the right-hand side. That is what made
    the heading read as squeezed and the copy column start 4px off the grid:
    the reserved padding was a guess that only matched one illustration size at
@@ -355,7 +355,7 @@ body { background-attachment:fixed; color:var(--text-main); }
 
 @media (max-width:860px) {
   :root { --dock-h:72px; --header-h:58px; }
-  /* `overflow-x` is owned once, in globals.css — see the guard note there. */
+  /* `overflow-x` is owned once, in globals.css - see the guard note there. */
   html,body { min-width:0; }
   .app-wrapper {
     display:block !important;
@@ -366,7 +366,7 @@ body { background-attachment:fixed; color:var(--text-main); }
     width:100%; min-width:0; padding:calc(58px + env(safe-area-inset-top)) 0 20px !important;
   }
 
-  /* A compact, readable mobile masthead — it never competes with the timer. */
+  /* A compact, readable mobile masthead - it never competes with the timer. */
   .mobile-header {
     display:flex !important; position:fixed !important; inset:0 0 auto !important;
     height:58px !important; min-height:58px; padding:0 14px !important;
@@ -441,7 +441,7 @@ body { background-attachment:fixed; color:var(--text-main); }
   .sidebar { inset-inline:7px !important; }
 }
 
-/* Narrow phone cleanup — content remains readable before decoration. */
+/* Narrow phone cleanup - content remains readable before decoration. */
 @media (max-width:480px) {
   .page-header { margin-bottom:var(--sp-2); }
   /* Header buttons are touch targets, not slabs: full width comes from the
@@ -471,7 +471,7 @@ body { background-attachment:fixed; color:var(--text-main); }
   }
 }
 
-/* Collapsed desktop rail alignment — an intentional icon stack, not a shrunken sidebar. */
+/* Collapsed desktop rail alignment - an intentional icon stack, not a shrunken sidebar. */
 @media (min-width:861px) {
   .app-wrapper.sb-collapsed { --sidebar-w:78px !important; gap:18px !important; }
   .app-wrapper.sb-collapsed .sidebar {
@@ -506,11 +506,11 @@ body { background-attachment:fixed; color:var(--text-main); }
 }
 
 /* ══════════════════════════════════════════════════════════════════════
-   LAYER · study-planner-redesign.css   (merged verbatim, source order preserved — see header below)
+   LAYER · study-planner-redesign.css   (merged verbatim, source order preserved - see header below)
    ══════════════════════════════════════════════════════════════════════ */
 
 /* ============================================================================
-   STUDY PLANNER PRO — v24 REDESIGN
+   STUDY PLANNER PRO - v24 REDESIGN
    Warm-white canvas · lavender accents · ink-navy text · soft cards.
    Loaded last; every rule here either restates the design system cleanly or
    restyles specific regions (dash hero, KPI icons, mini calendar, quote,
@@ -594,7 +594,7 @@ body {
 }
 /* (v25) the -.035em tracking that used to sit here is exactly the blanket squeeze
    this pass removes; size, leading and tracking now come from the ramp above. */
-/* Remove the shimmering gradient text pass on page titles — clean ink. */
+/* Remove the shimmering gradient text pass on page titles - clean ink. */
 .page-title, .shimmer-text {
   background-image: none !important;
   -webkit-background-clip: initial;
@@ -807,7 +807,7 @@ body {
 /* Below the desktop breakpoint the header is a single column and the scene is
    `aria-hidden` decoration, so it leaves the flow entirely: three later patch
    sheets each said `display:none !important` while this one said "centred
-   block underneath", and the `!important` ones won — the centring code was
+   block underneath", and the `!important` ones won - the centring code was
    dead. One decision, stated once. */
 @media (max-width: 860px) {
   .page-header {
@@ -915,7 +915,7 @@ body {
 .quote-mark {
   /* The last second typeface in the product. A decorative glyph is still a
      glyph: Georgia is not loaded, so this was silently falling back to the
-     platform serif — a different voice in the one card the user reads every
+     platform serif - a different voice in the one card the user reads every
      day. It inherits Inter like everything else now. */
   font-family: inherit;
   color: var(--accent); opacity: .5;
@@ -1049,7 +1049,7 @@ body {
   }
   .drawer-tool:hover { color: var(--accent); border-color: var(--nav-active-border); background: var(--rd-lavender-soft); }
   .drawer-tool:disabled { opacity: .55; cursor: wait; }
-  /* The mobile drawer carries navigation only — no theme swatches
+  /* The mobile drawer carries navigation only - no theme swatches
      (themes live in Settings). */
   .drawer-nav { display: flex; flex-direction: column; gap: 4px; }
   .mobile-drawer .sb-toggle { display: none !important; }
@@ -1122,25 +1122,25 @@ body {
    ZEN FOCUS MODE
    A full-screen, immersive dark room: atmospheric desk · lamp · books ·
    plant at the bottom, one large centred timer with an elegant progress
-   ring, and a quiet guidance panel underneath. Calm and premium — the
+   ring, and a quiet guidance panel underneath. Calm and premium - the
    only colour in the room is the ring and the lamp.
 
-   Layout contract — ONE flex column in normal flow, nothing overlaps:
-     1. top bar  — Focus Mode ←→ Full Screen / Exit Zen
-     2. stage    — focus emblem · DEEP FOCUS SESSION · timer ring ·
+   Layout contract - ONE flex column in normal flow, nothing overlaps:
+     1. top bar  - Focus Mode ←→ Full Screen / Exit Zen
+     2. stage    - focus emblem · DEEP FOCUS SESSION · timer ring ·
                    actions · hint, vertically centred as a group
-     3. guidance — 3-part focus bar, the last row of the flow
+     3. guidance - 3-part focus bar, the last row of the flow
    The room sizes off 100dvh (with a 100vh fallback), so phones with
    dynamic toolbars keep the composition in one viewport. Nothing uses
    fixed heights: if a very small screen genuinely cannot fit the
-   composition, the room itself scrolls — content is never clipped, and
+   composition, the room itself scrolls - content is never clipped, and
    the page behind it never grows a scrollbar.
 ══════════════════════════════════════════════════════════════════════ */
 .zen {
   position: fixed; inset: 0; z-index: 999999;
   min-height: 100dvh;   /* dynamic viewport: wins where supported */
   /* (v25) theme-driven: every theme restates --zen-bg / --zen-bg-2 /
-     --zen-accent, so Sunset's room is warm amber and Mint's is cool green —
+     --zen-accent, so Sunset's room is warm amber and Mint's is cool green -
      the room is the theme, not a fixed violet overlay sitting on top of it. */
   background:
     radial-gradient(900px 460px at 50% -12%, color-mix(in srgb, var(--zen-accent) 15%, transparent), transparent 62%),
@@ -1191,7 +1191,7 @@ body {
   width: 100%; pointer-events: none; opacity: .78;
 }
 /* Kept deliberately lower than the old 34vh: the desk scene is atmosphere,
-   not content — it must stay clear of the action buttons and guidance bar. */
+   not content - it must stay clear of the action buttons and guidance bar. */
 .zen-environment svg { display: block; width: 100%; height: auto; max-height: min(240px, 26vh); }
 
 /* ── Ambient movement inside the scene: barely there, never distracting ── */
@@ -1219,7 +1219,7 @@ body {
   50% { opacity: .6; transform: translateY(-7px); }
 }
 
-/* ── Top bar: Focus Mode ←→ Full Screen / Exit Zen — one quiet row ────── */
+/* ── Top bar: Focus Mode ←→ Full Screen / Exit Zen - one quiet row ────── */
 .zen-topbar {
   position: relative; z-index: 4;
   flex: 0 0 auto;
@@ -1289,7 +1289,7 @@ body {
   font-size: .72rem; font-weight: 800; letter-spacing: .3em; text-indent: .3em;
   text-transform: uppercase;
   /* Accent-tinted, but pulled halfway to the room's ink. Raw `--zen-accent`
-     only reaches 2.40:1 on Mint and Sunset — under the 4.5:1 this 11px/800
+     only reaches 2.40:1 on Mint and Sunset - under the 4.5:1 this 11px/800
      label needs. 50% keeps the accent hue and clears AA in all 7 themes
      (worst case 5.20:1). */
   color: color-mix(in srgb, var(--zen-accent) 50%, var(--zen-ink));
@@ -1366,7 +1366,7 @@ body {
 
 .zen-actions { flex-wrap: wrap; width: 100%; max-width: 420px; margin-inline: auto;
 }
-/* Primary verb only — 40px tall, not a 48px block, and tinted from the
+/* Primary verb only - 40px tall, not a 48px block, and tinted from the
    active accent instead of a hardcoded violet ramp. */
 .zen-primary {
   min-height: 40px; padding: 0 22px;
@@ -1430,7 +1430,7 @@ body {
 .zen-minimal .zen-kicker { display: none; }
 
 /* ── Zen responsive behaviour ───────────────────────────────────────────
-   Phones & tablets: the timer stays the visual priority — everything
+   Phones & tablets: the timer stays the visual priority - everything
    else shrinks first. Buttons stack, the scene gets quieter, and the
    guidance bar keeps its place below the controls. */
 @media (max-width: 640px) {
@@ -1447,7 +1447,7 @@ body {
 /* Narrow phones: the action buttons become one stacked, full-width column
    so they can never collide with each other or with the scene. */
 @media (max-width: 460px) {
-  /* stacked, but capped — a control the width of the phone reads as a slab,
+  /* stacked, but capped - a control the width of the phone reads as a slab,
      not as a button */
   .zen-actions {
     flex-direction: column; align-items: stretch;
@@ -1523,7 +1523,7 @@ body {
 }
 /* ── Mobile / touch chrome ───────────────────────────────────────────────
    Below 860px primary navigation moves to the fixed bottom bar; the
-   drawer keeps secondary controls. No theme swatches anywhere here —
+   drawer keeps secondary controls. No theme swatches anywhere here -
    theme switching stays in Settings, where it belongs. */
 @media (max-width: 860px) {
   .sidebar {
@@ -1547,7 +1547,7 @@ body {
 }
 
 /* Touch devices (phones and tablets at any width) never show the rail
-   collapse arrow — the desktop rail is not in use there. */
+   collapse arrow - the desktop rail is not in use there. */
 @media (pointer: coarse) {
   .sb-toggle { display: none !important; }
 }
@@ -1949,7 +1949,7 @@ body::after { content: none !important; display: none !important; }
 .ai-fab:hover { box-shadow: 0 10px 28px -10px var(--accent-glow) !important; }
 
 /* ══════════════════════════════════════════════════════════════════════
-   MOTION — refined, purposeful, quiet
+   MOTION - refined, purposeful, quiet
    This layer has the final word on animation. Decorative loops stay off;
    what survives is feedback that means something: a view arriving, a
    press landing, a lesson completed, a value growing, a panel opening.
@@ -1990,7 +1990,7 @@ body::after { content: none !important; display: none !important; }
   animation: pageInBack .34s cubic-bezier(.22, 1, .36, 1) both !important;
 }
 /* The dense "focused" presentation mode stays completely still. */
-/* Density, not a motion preference — entrance choreography stays on for
+/* Density, not a motion preference - entrance choreography stays on for
    PG / professional learners. `prefers-reduced-motion` owns motion opt-out. */
 
 /* ── Buttons: lift on hover, settle on press ──────────────────────────── */
@@ -2089,14 +2089,14 @@ body::after { content: none !important; display: none !important; }
 }
 
 /* ══════════════════════════════════════════════════════════════════════
-   LAYER · practical-enhancements.css   (merged verbatim, source order preserved — see header below)
+   LAYER · practical-enhancements.css   (merged verbatim, source order preserved - see header below)
    ══════════════════════════════════════════════════════════════════════ */
 
 /* ════════════════════════════════════════════════════════════════════
-   STUDY PLANNER PRO — practical-enhancements.css (v20)
+   STUDY PLANNER PRO - practical-enhancements.css (v20)
    Additive styles for the real-world enhancement pass. Everything here
    builds ON the existing visual language (glass panels, theme tokens,
-   pastel surfaces) — no redesign, no new identity.
+   pastel surfaces) - no redesign, no new identity.
 
    Surfaces styled here:
    1. Dashboard "What now?" hero        (NOW / NEXT / TODAY / RECOVERY)
@@ -2118,7 +2118,7 @@ body::after { content: none !important; display: none !important; }
   .now-actions .btn{flex:1 1 auto}
 }
 
-/* ── 2. BACKLOG RECOVERY — unfinished work is a decision, not a failure */
+/* ── 2. BACKLOG RECOVERY - unfinished work is a decision, not a failure */
 .recovery-panel{
   display:flex;flex-wrap:wrap;align-items:center;gap:12px 18px;
   padding:16px 18px;
@@ -2126,7 +2126,7 @@ body::after { content: none !important; display: none !important; }
 .recovery-copy .panel-lead{margin:0}
 .recovery-actions{flex-wrap:wrap}
 
-/* ── 3. QUICK ADD — capture a task in one breath ───────────────────── */
+/* ── 3. QUICK ADD - capture a task in one breath ───────────────────── */
 .quick-add{position:relative}
 .quick-add-panel{margin-top:10px;padding:clamp(10px,1.6vw,14px);display:flex;flex-direction:column;gap:12px}
 .quick-add-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
@@ -2196,17 +2196,17 @@ body::after { content: none !important; display: none !important; }
 }
 
 /* ══════════════════════════════════════════════════════════════════════
-   LAYER · ui-polish.css   (merged verbatim, source order preserved — see header below)
+   LAYER · ui-polish.css   (merged verbatim, source order preserved - see header below)
    ══════════════════════════════════════════════════════════════════════ */
 
 /*
-  Study Planner Pro — targeted UI/UX polish pass
+  Study Planner Pro - targeted UI/UX polish pass
   Preserves the existing lavender/pastel system and only tightens hierarchy,
   alignment, mobile task actions, onboarding density, and motion.
 
   This file is imported LAST (see src/app/layout.tsx), so it is the layer
   that resolves the cascade for the things it touches. Rules here should
-  stay small, specific and commented — anything structural belongs in
+  stay small, specific and commented - anything structural belongs in
   globals.css.
 */
 
@@ -2405,7 +2405,7 @@ body::after { content: none !important; display: none !important; }
 .task-live-time { font-size: .64rem; font-variant-numeric: tabular-nums; opacity: .92; }
 
 /* =========================
-   TRACKER BAR — stable geometry
+   TRACKER BAR - stable geometry
    =========================
    Clocked in → Paused → Clocked out must not shuffle the row. The primary
    verb keeps one fixed-width slot, so only its label changes. */
@@ -2424,7 +2424,7 @@ body.focus-live .tracker-bar::after { animation: none; }
 /* =========================
    PROGRAM / COURSE TEXT
    =========================
-   Long values such as "NMIMS CDOE MBA — Semester 1 (Marketing) — NMIMS"
+   Long values such as "NMIMS CDOE MBA - Semester 1 (Marketing) - NMIMS"
    appear in the sidebar, the drawer, the tracker and the review step. They
    must wrap inside their own column, never squeeze a neighbour and never
    force a one-word-per-line strip. */
@@ -2501,7 +2501,7 @@ body.focus-live .tracker-bar::after { animation: none; }
 /* Labels sit on a shared baseline above every field: a label that wraps to
    two lines no longer pushes its own input below the one beside it, so
    Institution and Specialisation line up exactly. Scoped to real form
-   fields — the slider and choice cards set their own label rhythm. */
+   fields - the slider and choice cards set their own label rhythm. */
 .ob-schedule-grid > .ob-field > label {
   display: block;
   min-height: 2.4em;
@@ -2791,7 +2791,7 @@ body.theme-nebula .ob-range-value {
 }
 
 /* =========================
-   ZEN — hierarchy refinements
+   ZEN - hierarchy refinements
    =========================
    The composition stays. The timer is the hero, the secondary controls
    step back, and the glow is a constant rather than a pulse. */
@@ -2812,7 +2812,7 @@ body.theme-nebula .ob-range-value {
   height: 6px;
   border-radius: 50%;
   flex-shrink: 0;
-  /* was rgba(255,255,255,.38) — invisible on the light-theme rooms. */
+  /* was rgba(255,255,255,.38) - invisible on the light-theme rooms. */
   background: var(--zen-muted);
 }
 
@@ -2919,7 +2919,7 @@ body.theme-nebula .ob-range-value {
 }
 
 /* ══════════════════════════════════════════════════════════════════════
-   LAYER · ui-polish-pass.css   (merged verbatim, source order preserved — see header below)
+   LAYER · ui-polish-pass.css   (merged verbatim, source order preserved - see header below)
    ══════════════════════════════════════════════════════════════════════ */
 
 /* Final targeted polish for onboarding + planner + session controls. */
@@ -3111,7 +3111,7 @@ body.theme-nebula .ob-range-value {
 }
 
 /* ══════════════════════════════════════════════════════════════════════
-   LAYER · ui-polish-landing.css   (merged verbatim, source order preserved — see header below)
+   LAYER · ui-polish-landing.css   (merged verbatim, source order preserved - see header below)
    ══════════════════════════════════════════════════════════════════════ */
 
 /* Final visual cleanup: loaded last so the requested screenshot fixes win the cascade. */
@@ -3160,10 +3160,10 @@ body.theme-nebula .ob-range-value {
 @media(max-width:520px){ .zen-actions{gap:7px;} .zen-actions .btn{min-height:38px;} }
 
 /* ══════════════════════════════════════════════════════════════════════
-   LAYER · final-ui-fixes.css   (merged verbatim, source order preserved — see header below)
+   LAYER · final-ui-fixes.css   (merged verbatim, source order preserved - see header below)
    ══════════════════════════════════════════════════════════════════════ */
 
-/* Final targeted QA pass — keep the existing Study Planner Pro identity. */
+/* Final targeted QA pass - keep the existing Study Planner Pro identity. */
 
 /* --------------------------------------------------------------------------
    Planner task geometry
@@ -3238,7 +3238,7 @@ body.theme-nebula .ob-range-value {
 }
 
 /* --------------------------------------------------------------------------
-   Mobile rows — title/information first, controls in one aligned footer.
+   Mobile rows - title/information first, controls in one aligned footer.
    -------------------------------------------------------------------------- */
 @media (max-width:640px) {
   .planner-days .task-row,
@@ -3381,7 +3381,7 @@ body.theme-nebula .ob-range-value {
 }
 
 /* --------------------------------------------------------------------------
-   Onboarding sliders — quieter, tactile controls that blend with the card.
+   Onboarding sliders - quieter, tactile controls that blend with the card.
    -------------------------------------------------------------------------- */
 .ob-range-card {
   border-color:var(--glass-border) !important;
@@ -3480,7 +3480,7 @@ body.theme-nebula .ob-range-value {
 }
 
 /* ══════════════════════════════════════════════════════════════════════
-   LAYER · task-actions-final.css   (merged verbatim, source order preserved — see header below)
+   LAYER · task-actions-final.css   (merged verbatim, source order preserved - see header below)
    ══════════════════════════════════════════════════════════════════════ */
 
 /* Task actions: final geometry fix. The ⋮ menu is a row-level control,
@@ -3531,11 +3531,11 @@ body.theme-nebula .ob-range-value {
 }
 
 /* ══════════════════════════════════════════════════════════════════════
-   LAYER · v24-theme-alignment.css   (merged verbatim, source order preserved — see header below)
+   LAYER · v24-theme-alignment.css   (merged verbatim, source order preserved - see header below)
    ══════════════════════════════════════════════════════════════════════ */
 
 /* ══════════════════════════════════════════════════════════════════════
-   v24 — THEME ADAPTIVITY BRIDGE + REFERENCE UI ALIGNMENT
+   v24 - THEME ADAPTIVITY BRIDGE + REFERENCE UI ALIGNMENT
    ─────────────────────────────────────────────────────────────────────
    Problem this layer fixes: the newer view components (Planner, Analytics,
    Dashboard, Focus, Subjects, bits, Illustrations) paint through a set of
@@ -3544,14 +3544,14 @@ body.theme-nebula .ob-range-value {
    whole `--ill-*` illustration palette) that were never declared on the
    theme classes. Every usage carried a LIGHT-theme hex fallback, so on
    dark, obsidian and nebula the inset chips, progress tracks, badges and
-   the desk illustrations stayed light-theme coloured — visibly unadapted.
+   the desk illustrations stayed light-theme coloured - visibly unadapted.
 
    This layer is imported LAST, so it also owns the final word on the
    onboarding centring, the mobile dock polish and the analytics ticker
    pill strip. Token blocks are per-theme and explicit: no fallbacks.
    ══════════════════════════════════════════════════════════════════════ */
 
-/* ── 1 · TOKEN BRIDGE — light themes ───────────────────────────────── */
+/* ── 1 · TOKEN BRIDGE - light themes ───────────────────────────────── */
 body.theme-default,
 body.theme-silver-lavender,
 body.theme-mint,
@@ -3595,7 +3595,7 @@ body.theme-sunset {
   --ill-glow: #ffb84d; --ill-halo: rgba(225, 98, 15, .12); --ill-ink: #77604f;
 }
 
-/* ── 2 · TOKEN BRIDGE — dark themes (insets step LIGHTER, ink on accent
+/* ── 2 · TOKEN BRIDGE - dark themes (insets step LIGHTER, ink on accent
         goes dark so accent-filled chips stay legible) ────────────────── */
 body.theme-dark,
 body.theme-obsidian,
@@ -3642,14 +3642,14 @@ body.theme-nebula {
   color: var(--nav-active-text);
 }
 
-/* ── 3 · HEADING TYPOGRAPHY — clean, modern, never italic ─────────────
+/* ── 3 · HEADING TYPOGRAPHY - clean, modern, never italic ─────────────
    MaskWords wraps each word in <i>; the base sheet resets it, but the
    guard is restated here with the final word so no later layer, font
    fallback or browser default can ever italicise a display heading. */
 h1, h2, h3, .page-title, .mw i { font-style: normal; }
 .mw i { letter-spacing: inherit; }
 
-/* ── 4 · ONBOARDING — centred shell on wide screens (max-w ~4xl) ────── */
+/* ── 4 · ONBOARDING - centred shell on wide screens (max-w ~4xl) ────── */
 .ob-shell {
   width: min(100%, 896px);          /* 4xl-class container */
   margin-inline: auto;              /* mx-auto */
@@ -3672,13 +3672,13 @@ h1, h2, h3, .page-title, .mw i { font-style: normal; }
   .ob-card { padding: 22px 18px; }
 }
 
-/* ── 5 · MOBILE DOCK — six items, reference pill behind the icon ───── */
+/* ── 5 · MOBILE DOCK - six items, reference pill behind the icon ───── */
 @media (max-width: 860px) {
   .mbn-item {
     border-radius: 14px;
   }
   /* Reference language: the icon travels inside a soft pill, the label
-     stays plain — the whole cell no longer fills with colour. */
+     stays plain - the whole cell no longer fills with colour. */
   .mbn-item.active { background: transparent; }
   .mbn-icon {
     display: grid;
@@ -3701,7 +3701,7 @@ h1, h2, h3, .page-title, .mw i { font-style: normal; }
    and every drawer tool has a home elsewhere, so the hamburger was just a
    second, vaguer door. The app bar now carries brand + streak only. */
 
-/* Bell + theme in the app bar — only on phones, where the tracker bar
+/* Bell + theme in the app bar - only on phones, where the tracker bar
    hides its own quick trio below 640px. Between 640 and 860px the
    tracker's controls are visible, so the header pair stays hidden to
    avoid two live popovers bound to the same state. */
@@ -3710,7 +3710,7 @@ h1, h2, h3, .page-title, .mw i { font-style: normal; }
 @media (max-width: 640px) {
   .mh-quick { display: inline-flex; align-items: center; gap: 6px; }
   /* Header popovers drop as a near-full-width sheet pinned under the
-     app bar — never clipped by the button's position near the edge. */
+     app bar - never clipped by the button's position near the edge. */
   .mobile-header .quick-popover {
     position: fixed;
     top: calc(58px + env(safe-area-inset-top));
@@ -3722,12 +3722,12 @@ h1, h2, h3, .page-title, .mw i { font-style: normal; }
   }
 }
 @media (max-width: 360px) {
-  /* Breathing room on very narrow phones — the streak also lives in the
+  /* Breathing room on very narrow phones - the streak also lives in the
      drawer footer and on the dashboard. */
   .mh-streak { display: none; }
 }
 
-/* ── 7 · ANALYTICS TICKER — single-row pill badge strip ─────────────── */
+/* ── 7 · ANALYTICS TICKER - single-row pill badge strip ─────────────── */
 .tick-pill {
   display: inline-flex;
   align-items: center;
@@ -3770,7 +3770,7 @@ h1, h2, h3, .page-title, .mw i { font-style: normal; }
 .marquee-track { align-items: center; }
 .marquee .tick-pill { margin: 0 6px; }
 
-/* ── 8 · PLANNER LIST — kind icon + day flags ───────────────────────── */
+/* ── 8 · PLANNER LIST - kind icon + day flags ───────────────────────── */
 .kind-ic {
   display: inline-flex;
   align-items: center;
@@ -3829,7 +3829,7 @@ h1, h2, h3, .page-title, .mw i { font-style: normal; }
   50%      { transform: translateY(-5px); }
 }
 @keyframes spinCW { to { transform: rotate(1turn); } }
-/* Wall-clock hands (ClockScene): one full turn per period — the 60s second
+/* Wall-clock hands (ClockScene): one full turn per period - the 60s second
    hand, 3600s minute hand, 43200s hour hand. The component pins the REAL
    time two ways: an inline rotate() (the static fallback when animations
    are off or reduced motion is requested) and a negative animation-delay of
@@ -3848,7 +3848,7 @@ h1, h2, h3, .page-title, .mw i { font-style: normal; }
 .anim-spin    { animation: spinCW .9s linear infinite; }
 
 /* ── 11 · REDUCED MOTION GUARDS for everything this layer adds ────────
-   Decorative loops switch off; the wall clock freezes too — its hands
+   Decorative loops switch off; the wall clock freezes too - its hands
    carry an inline rotate() of the real current time, so the scene stays
    truthful without movement. */
 @media (prefers-reduced-motion: reduce) {
@@ -3870,15 +3870,15 @@ h1, h2, h3, .page-title, .mw i { font-style: normal; }
 }
 
 /* ══════════════════════════════════════════════════════════════════════
-   §25 · THE v25 CONTRACT — the single owner of the surfaces that had
+   §25 · THE v25 CONTRACT - the single owner of the surfaces that had
    several redesigns stacked on them.
 
    Why this section exists: `globals.css` owns tokens, base type and the
    theme sets, and everything above this line is the merged history of ten
    stylesheets that each re-tuned the same widgets (six generations of
    `.task-more-wrap`, four of `.tracker-bar`, three of `.page-header`). The
-   components now render *semantic* classes — `.task-card`, `.planner-cal`,
-   `.page-stack`, `.card-head` — and this is the one place that defines them.
+   components now render *semantic* classes - `.task-card`, `.planner-cal`,
+   `.page-stack`, `.card-head` - and this is the one place that defines them.
    Rules here are !important-free and win on source order, so a later fix is
    an edit, not a fourth competing layer.
    ══════════════════════════════════════════════════════════════════════ */
@@ -3927,7 +3927,7 @@ body.theme-sunset {
   --zen-line: color-mix(in srgb, var(--text-main) 12%, transparent);
   --zen-ring-track: color-mix(in srgb, var(--text-main) 10%, transparent);
 }
-/* Dark themes: furniture is light on dark, as before — but tinted by accent. */
+/* Dark themes: furniture is light on dark, as before - but tinted by accent. */
 body.theme-dark,
 body.theme-obsidian,
 body.theme-nebula {
@@ -3960,7 +3960,7 @@ body.theme-sunset {
   --task-test: #d84a3c;
 }
 
-/* ── 25.2 · PAGE RHYTHM — one gap for every view ────────────────────── */
+/* ── 25.2 · PAGE RHYTHM - one gap for every view ────────────────────── */
 .page-stack {
   display: flex; flex-direction: column;
   gap: var(--gap-page);
@@ -3993,7 +3993,7 @@ body.theme-sunset {
   /* One deliberate step below the subtitle, and the same step everywhere. */
 }
 /* Two header buttons side by side must be the same height even when one
-   label wraps — the row is centre-aligned and the buttons share `--btn-h`. */
+   label wraps - the row is centre-aligned and the buttons share `--btn-h`. */
 /* The old rule stretched every button in the header to full width on a phone;
    that is what made Focus/Zen look like slabs. Controls keep their own width
    and wrap instead. */
@@ -4005,7 +4005,7 @@ body.theme-sunset {
   .page-header .page-head-actions .btn { flex: 1 1 auto; }
 }
 
-/* Shared card head — one pattern for the title block of every card. */
+/* Shared card head - one pattern for the title block of every card. */
 .card-head {
   display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between;
   gap: 10px var(--gap-cluster); margin-bottom: var(--pad-tight);
@@ -4178,7 +4178,7 @@ body.theme-sunset {
   font-size: .7rem; font-weight: 700; color: var(--text-muted);
 }
 .task-card-subject > svg { flex: 0 0 auto; opacity: .8 }
-/* Subject colour at a glance — the calendar paints the same token on its
+/* Subject colour at a glance - the calendar paints the same token on its
    day chips, so a task and its cell can never disagree. */
 .task-subject-dot {
   flex: 0 0 auto;
@@ -4191,7 +4191,7 @@ body.theme-sunset {
 .task-card-title {
   margin: 0; font-weight: 750;
   color: var(--text-main);
-  /* wrapping, on words — the opposite of the old `truncate` */
+  /* wrapping, on words - the opposite of the old `truncate` */
   white-space: normal; overflow-wrap: anywhere; hyphens: auto; text-wrap: balance;
 }
 .task-card-brief {
@@ -4243,7 +4243,7 @@ body.theme-sunset {
 /* (v25) the list rhythm was written three times here; 25.12 owns it now. */
 .task-card.in-sheet { padding-inline: 0; }
 
-/* The overflow menu lives IN the action row now — the old absolute
+/* The overflow menu lives IN the action row now - the old absolute
    top-right anchor is what made the ⋮ float over the title. */
 .task-btns { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
 .task-card .task-more {
@@ -4456,7 +4456,7 @@ body.theme-sunset {
 .quote-verb { display: inline-flex; align-items: center; gap: 6px; font-size: .72rem; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--accent); }
 .quote-who { font-size: .74rem; font-weight: 650; color: var(--text-dim); }
 
-/* WeekBars (Overview + Analytics) — tokens, no hex fallbacks. */
+/* WeekBars (Overview + Analytics) - tokens, no hex fallbacks. */
 .weekbars { width: 100%; min-width: 0; }
 .weekbars-track { position: relative; display: flex; align-items: flex-end; gap: 8px; min-width: 0; }
 .weekbars-goal-line {
@@ -4523,7 +4523,7 @@ body.theme-sunset {
 .focus-clock-read-label { font-size: .62rem; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; color: var(--text-dim); }
 .focus-clock-digits {
   margin: 2px 0 0; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; color: var(--accent);
-  /* no text-shadow here either — a blurred halo around a running clock reads
+  /* no text-shadow here either - a blurred halo around a running clock reads
      as a rendering fault, and the digits are the only thing on this card */
   text-shadow: none;
 }
@@ -4617,8 +4617,8 @@ body.theme-sunset {
 .inset-note { margin: 0; font-size: .72rem; font-weight: 600; line-height: 1.5; color: var(--text-muted); text-wrap: pretty; }
 .ring-figure { place-items: center; }
 
-/* ── 25.10 · ONBOARDING BUTTON ROW — never squeezed, always centred ───
-   Inside the footer strip this row must NOT claim width:100% — doing so
+/* ── 25.10 · ONBOARDING BUTTON ROW - never squeezed, always centred ───
+   Inside the footer strip this row must NOT claim width:100% - doing so
    starved the privacy note beside it down to one word per line. It sizes
    to its buttons; the strip and the privacy note share the rest. On phones
    the strip stacks, and only there the row goes full-width. */
@@ -4689,7 +4689,7 @@ body.theme-sunset {
    with its own padding. The container query is the only one that reads the
    card's real width, so it owns the compact state and these rules own the
    rest. Every token here is one the repo already defines (`--surface`,
-   `--gap-cluster`, `--pad-card`, `--dur-normal`, `--success-accent`) — a
+   `--gap-cluster`, `--pad-card`, `--dur-normal`, `--success-accent`) - a
    generic design-system name that never existed here would silently make the
    declaration invalid, which is why the audit at the end of this pass looked
    for exactly that. Nothing here needs `!important`.
@@ -4760,10 +4760,10 @@ body.theme-sunset {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   SELECT — one styled listbox everywhere.
+   SELECT - one styled listbox everywhere.
    Native <select> popups are the OS's, not ours: the blue-row Android
-   spinner fought every theme. This is a real listbox — button trigger,
-   popover list, full keyboard support — painted from the same semantic
+   spinner fought every theme. This is a real listbox - button trigger,
+   popover list, full keyboard support - painted from the same semantic
    tokens as the rest of the chrome, so it follows all seven themes.
    ═══════════════════════════════════════════════════════════════════ */
 .sp-select { position: relative; min-width: 0; }
@@ -4824,7 +4824,7 @@ body.theme-sunset {
 }
 
 /* ══════════════════════════════════════════════════════════════════════
-   v26 · ANDROID POLISH — calm app chrome, clear clock actions, and a
+   v26 · ANDROID POLISH - calm app chrome, clear clock actions, and a
    lesson brief that reads like a useful study card rather than an opened
    text dump. This is intentionally the final layer: one place for the
    phone fixes requested after the v25 responsive pass.
@@ -4910,7 +4910,7 @@ select:not([multiple]) option {
 
 /* Calendar: the month stacks as one vertical column of week rows. (v25
    removed the legacy base layer's seven columns on `.cal-grid`, so the
-   parent no longer needs a column reset — `.cal-row` owns the seven-column
+   parent no longer needs a column reset - `.cal-row` owns the seven-column
    template and the grid's implicit single column stacks the rows.) */
 .cal-grid > .cal-row {
   grid-column: 1;
@@ -5149,7 +5149,7 @@ span.cal-cell.is-empty:hover {
 
 
 /* ══════════════════════════════════════════════════════════════════════
-   v27 · TOP BAR PASS — one live clock cluster, calm action rhythm, and a
+   v27 · TOP BAR PASS - one live clock cluster, calm action rhythm, and a
    tracker that degrades in deliberate steps (pill → compact card → phone
    card) instead of wrapping by accident. Appended last on purpose: this is
    the final word on `.tracker-bar` and `.mobile-header`.
@@ -5189,7 +5189,7 @@ span.cal-cell.is-empty:hover {
 }
 
 /* ── Compact band (small laptops / large tablets): the stadium pill becomes
-      a deliberate two-row card — status · clock on top, actions below —
+      a deliberate two-row card - status · clock on top, actions below -
       the proven ≤860px layout, moved up before the pill can wrap mid-glyph
       at awkward widths. */
 @media (max-width: 1180px) {
@@ -5239,7 +5239,7 @@ span.cal-cell.is-empty:hover {
 
 /* ── Subjects: ONE quiet row per topic ───────────────────────────────────
    The old row front-loaded unit, minutes, difficulty AND mastery next to two
-   buttons per lesson — a 30-lesson subject became a wall of labels. Now the
+   buttons per lesson - a 30-lesson subject became a wall of labels. Now the
    row is number · title · minutes · state, and everything else (unit,
    difficulty, mastery, concepts, practice, the tutor) lives inside the
    one-tap brief. */
@@ -5404,7 +5404,7 @@ body > .task-menu {
   word-break: break-word;
 }
 
-/* Legacy task-row absolute override cleanup — task-row still exists in
+/* Legacy task-row absolute override cleanup - task-row still exists in
    some views (dashboard today), but its more-wrap must not float over title
    on narrow screens. Keep it absolute only on ≥641px where there is room. */
 @media (max-width: 640px) {
@@ -5575,7 +5575,7 @@ body > .task-menu {
   }
 }
 
-/* ── Narrow breakpoints: 320/360/375/390/414/430 — no h-scroll/clip ─── */
+/* ── Narrow breakpoints: 320/360/375/390/414/430 - no h-scroll/clip ─── */
 @media (max-width: 430px) {
   .app-wrapper { padding-left: 10px; padding-right: 10px; }
   .planner-day { padding: 10px; }
@@ -5765,7 +5765,7 @@ body > .task-menu {
 
 
 /* ══════════════════════════════════════════════════════════════════════
-   v29 · RESPONSIVE POLISH — final batch of UI fixes
+   v29 · RESPONSIVE POLISH - final batch of UI fixes
    • Planner list alignment + gentler density
    • Idle tracker bar: no ticking clock, clean layout, big Clock-in CTA
    • Mobile clock-in bar: properly positioned single compact pill
@@ -6007,7 +6007,7 @@ body.focus-live .tracker-bar {
   border-radius: 11px;
 }
 
-/* Focus clock card — make the running clock pop. */
+/* Focus clock card - make the running clock pop. */
 .focus-clock-read {
   padding: 22px 20px 26px;
   border-radius: 20px;
@@ -6104,7 +6104,7 @@ body.focus-live .tracker-bar {
   .mbn-label { font-size: .58rem; }
 }
 
-/* ── 7. MOBILE RESPONSIVENESS — guard rails everywhere ────────────── */
+/* ── 7. MOBILE RESPONSIVENESS - guard rails everywhere ────────────── */
 @media (max-width: 860px) {
   html, body {
     min-width: 0;
@@ -6215,7 +6215,7 @@ body.focus-live .tracker-bar {
 /* ══════════════════════════════════════════════════════════════════════
    v30 · MOBILE PLANNER + SESSION BAR POLISH
    ──────────────────────────────────────────────────────────────────────
-   Appended last on purpose — this is the final word on the phone/tablet
+   Appended last on purpose - this is the final word on the phone/tablet
    Planner. Everything here is geometry and presentation: no view, route,
    state or behaviour is added or removed.
 
@@ -6223,7 +6223,7 @@ body.focus-live .tracker-bar {
      session bar and the content padding can no longer disagree (the old
      `padding-top: header + 64px` left a dead band under the header and let
      the session bar float over the Planner heading).
-   • The bottom dock is four destinations — Settings moved to the app bar.
+   • The bottom dock is four destinations - Settings moved to the app bar.
    • The subject filter is one compact row that takes only the height it
      needs, and its listbox opens inside the viewport, above the dock and
      the chat button.
@@ -6231,7 +6231,7 @@ body.focus-live .tracker-bar {
      row and an action row that can never overlap the copy.
    ══════════════════════════════════════════════════════════════════════ */
 
-/* ── 1 · TOP BAR GEOMETRY — one variable, no dead band ───────────────── */
+/* ── 1 · TOP BAR GEOMETRY - one variable, no dead band ───────────────── */
 @media (max-width: 860px) {
   :root {
     --header-h: 56px;
@@ -6245,7 +6245,7 @@ body.focus-live .tracker-bar {
     /* Safe area lives INSIDE the bar, not as extra padding below it. */
   }
 
-  /* Content starts 10px under the app bar — nothing else. */
+  /* Content starts 10px under the app bar - nothing else. */
   .main-workspace {
     /* Dock (≈68px) + breathing room, so the last task card and its actions
        are always reachable above the navigation. */
@@ -6271,7 +6271,7 @@ body.focus-live .tracker-bar {
   }
 
   /* The app bar is the only home for notifications/theme on phones and
-     tablets, so its trio is always shown — the tracker bar keeps its
+     tablets, so its trio is always shown - the tracker bar keeps its
      Re-plan spark and drops the duplicated bell/palette instead. */
   .mh-quick { display: inline-flex; align-items: center; gap: 6px; }
   .tracker-quick-controls .icon-quick-btn[aria-label^="Notifications"],
@@ -6306,7 +6306,7 @@ body.focus-live .tracker-bar {
   }
 }
 
-/* ── 2 · SESSION BAR — clock · state · elapsed · verbs ───────────────── */
+/* ── 2 · SESSION BAR - clock · state · elapsed · verbs ───────────────── */
 .tracker-bar.session-bar {
   /* One row on desktop: state · clock · verbs, gap-tolerant. */
   align-items: center;
@@ -6340,7 +6340,7 @@ body.focus-live .tracker-bar {
 @media (max-width: 380px) {
   /* Ultra-narrow used to drop the session context entirely
      (`.tracker-task { display: none }`). The bar's whole job is "what am I
-     on, and for how long" — keep it, one clamped line. */
+     on, and for how long" - keep it, one clamped line. */
   .tracker-bar.session-bar .tracker-task {
     display: block !important;
     font-size: .68rem !important;
@@ -6353,7 +6353,7 @@ body.focus-live .tracker-bar {
 }
 
 /* While the clock runs, `body.focus-live .tracker-labels` used to be hidden
-   on phones — a recording session showed a bare timer with no idea WHAT was
+   on phones - a recording session showed a bare timer with no idea WHAT was
    being recorded. The session bar keeps its state line and its subject/task
    name; there is room for them because the verbs already own their own row. */
 @media (max-width: 860px) {
@@ -6368,7 +6368,7 @@ body.focus-live .tracker-bar {
   body.focus-live .tracker-actions { gap: 6px; }
   /* State ABOVE the subject in every session state. On one line the pair
      ("NOT CLOCKED IN · Free session") needs ~160px, which the verbs leave
-     behind on a 320px screen — the state was being clipped to "NOT CLOCKED".
+     behind on a 320px screen - the state was being clipped to "NOT CLOCKED".
      Two short lines never clip and read better. */
   .tracker-bar.session-bar .tracker-labels {
     flex-direction: column;
@@ -6399,7 +6399,7 @@ body.focus-live .tracker-bar {
   }
 }
 
-/* ── 3 · BOTTOM DOCK — four destinations, safe-area aware ────────────── */
+/* ── 3 · BOTTOM DOCK - four destinations, safe-area aware ────────────── */
 @media (max-width: 860px) {
   .mobile-bottom-nav {
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -6425,14 +6425,14 @@ body.focus-live .tracker-bar {
   .ai-fab { right: 10px; width: 48px; height: 48px; }
 }
 
-/* ── 4 · PLANNER TOOLBAR + SUBJECT FILTER — compact, one row ─────────── */
+/* ── 4 · PLANNER TOOLBAR + SUBJECT FILTER - compact, one row ─────────── */
 @media (max-width: 860px) {
   .planner-toolbar {
     display: flex;
     flex-direction: column;
     align-items: stretch;
     width: 100%;
-    /* The toolbar is as tall as its two rows — no stretch, no min-height,
+    /* The toolbar is as tall as its two rows - no stretch, no min-height,
        no phantom space above the date section. */
     min-height: 0;
   }
@@ -6472,7 +6472,7 @@ body.focus-live .tracker-bar {
 }
 
 /* A revealed block keeps `transform: translateY(0)`, and a transformed
-   ancestor is a stacking context — which trapped the subject listbox below
+   ancestor is a stacking context - which trapped the subject listbox below
    the fixed dock however high its own z-index. `none` is visually identical
    (identity matrix) and restores normal painting order. */
 .reveal.in { transform: none; }
@@ -6519,7 +6519,7 @@ body.focus-live .tracker-bar {
   .day-id .day-meta { font-size: .7rem; }
 }
 
-/* ── 6 · TASK CARD — rail · body, wrapping meta, own action row ───────── */
+/* ── 6 · TASK CARD - rail · body, wrapping meta, own action row ───────── */
 .task-card {
   /* Two columns: the colour rail and the copy. The old three-column
      template reserved an empty `auto` track that did nothing but add a
@@ -6570,7 +6570,7 @@ body.focus-live .tracker-bar {
     flex: 1 1 100%;
     justify-content: center;
   }
-  /* The live pair keeps its own floors — "Pause" and "Clock out" are the two
+  /* The live pair keeps its own floors - "Pause" and "Clock out" are the two
      labels that must never wrap or clip mid-session. */
   .task-clock-group .task-clock-toggle { min-width: 76px; }
   .task-clock-group .task-clock-out { min-width: 82px; }
@@ -6623,19 +6623,19 @@ body > .task-menu button { min-height: 40px; }
   /* The header scene becomes a 130px-tall static block under the hero copy
      on phones (it is absolutely positioned beside the title on desktop).
      Between the hero and the List/Calendar toolbar that read as a wall of
-     empty space above the subject filter — exactly the room the heading,
+     empty space above the subject filter - exactly the room the heading,
      Add Task and Rebalance need. It is pure decoration (aria-hidden), so it
      returns as soon as the viewport has space for it. */
   .page-head-actions { gap: 8px; margin-top: var(--sp-2); }
   /* Add Task and Rebalance share the row when there is room and stack
-     when the phone is narrow — both stay full-width touch targets. */
-  /* An open Quick Add tray takes the whole row — the form needs the width,
+     when the phone is narrow - both stay full-width touch targets. */
+  /* An open Quick Add tray takes the whole row - the form needs the width,
      and the Rebalance button drops below it instead of squeezing it. */
   .page-head-actions > *:has(.quick-add-panel) { flex: 1 1 100%; }
   .page-subtitle { overflow-wrap: anywhere; text-wrap: pretty; line-height: 1.5; }
 }
 
-/* ── 8 · CALENDAR — responsive, never overflowing ────────────────────── */
+/* ── 8 · CALENDAR - responsive, never overflowing ────────────────────── */
 .planner-cal,
 .cal-grid,
 .cal-row,
@@ -6651,7 +6651,7 @@ body > .task-menu button { min-height: 40px; }
   .cal-cell { padding: 5px; }
 }
 
-/* ── 9 · LAST RESORT GUARDS — no h-scroll, nothing clipped ───────────── */
+/* ── 9 · LAST RESORT GUARDS - no h-scroll, nothing clipped ───────────── */
 @media (max-width: 860px) {
   .planner-view,
   .planner-list,
@@ -6671,7 +6671,7 @@ body > .task-menu button { min-height: 40px; }
    v31 · THREE ALIGNMENT / SIZING DEFECTS
    ──────────────────────────────────────────────────────────────────────
    1. The Analytics consistency ring's readout (86% / ACTIVE) was built from
-      two Tailwind utilities — `absolute text-center` — with no positioned
+      two Tailwind utilities - `absolute text-center` - with no positioned
       ancestor anywhere in the card, so the percentage never sat inside the
       ring: it kept its static position, i.e. UNDER the ring, next to the
       footnote. The component now uses `.ring-center`, the design system's
@@ -6679,16 +6679,16 @@ body > .task-menu button { min-height: 40px; }
       is the positioned box it needs.
    2. Desktop navigation rows had no icon sizing at all above 860px, so every
       destination rendered its icon at the component default in a differently
-      filled 24-box — the Settings gear (the densest glyph in the set) read
+      filled 24-box - the Settings gear (the densest glyph in the set) read
       as oversized and off the row's optical line.
    3. The task-card subject carried body-scale weight next to quieter
       metadata, so it dominated the row on phones.
    ══════════════════════════════════════════════════════════════════════ */
 
-/* ── 1 · CONSISTENCY RING — readout centred in the ring ──────────────── */
+/* ── 1 · CONSISTENCY RING - readout centred in the ring ──────────────── */
 /* `.ring-center` is `position: absolute; inset: 0`, so the figure has to be
    the containing block. Without this the readout is positioned against the
-   nearest positioned ancestor (the card, or the page) — the bug. */
+   nearest positioned ancestor (the card, or the page) - the bug. */
 /* (v26) Centred by construction, not by offset.
 
    The readout is centred by placing the *content box* in the middle of the
@@ -6714,7 +6714,7 @@ body > .task-menu button { min-height: 40px; }
 }
 /* Tracked uppercase carries a trailing space AFTER the last glyph, so a
    centred label always looks pushed half a step left. The correction is
-   derived from the same tracking token the label uses — they cannot drift
+   derived from the same tracking token the label uses - they cannot drift
    apart, and it is not a number that only works for one percentage. */
 .ring-state {
   margin-inline-end: var(--tracking-fix-eyebrow);
@@ -6728,7 +6728,7 @@ body > .task-menu button { min-height: 40px; }
   .ring-svg circle { transition: none !important; }
 }
 
-/* ── 2 · DESKTOP NAV + STREAK — one optical line ─────────────────────── */
+/* ── 2 · DESKTOP NAV + STREAK - one optical line ─────────────────────── */
 @media (min-width: 861px) {
   .nav-item {
     /* One row geometry for every destination, Settings included: the height
@@ -6762,23 +6762,23 @@ body > .task-menu button { min-height: 40px; }
   transform: translateY(-.04em);
 }
 
-/* ── 3 · MOBILE TASK CARD — subject is metadata, not a heading ──────────
+/* ── 3 · MOBILE TASK CARD - subject is metadata, not a heading ──────────
    (v26) Moved to globals.css, where the component owns it, and expressed on
    the `--fs-*` ramp so the row's ladder (title → subject → metadata) cannot
    drift from the rest of the product. Kept here as a pointer, not a rule. */
 
 /* ══════════════════════════════════════════════════════════════════════
-   v32 · FINAL POLISH — clipboard/shield icons, subject-filter compact,
+   v32 · FINAL POLISH - clipboard/shield icons, subject-filter compact,
    planner empty-space + z-index, 320-414 steady, prompt task cards
    Appended last on purpose: final word before release.
    ══════════════════════════════════════════════════════════════════════ */
 
-/* ── 1 · SUBJECT FILTER — one compact row, no phantom height ───────── */
+/* ── 1 · SUBJECT FILTER - one compact row, no phantom height ───────── */
 @media (max-width: 860px) {
   .planner-toolbar { gap: 8px; }
   .planner-filter {
     /* Tighter than v30's 6px 8px + 1px border: the filter is a tool,
-       not a card — it should sit like a single form row. */
+       not a card - it should sit like a single form row. */
     gap: 7px;
     padding: 5px 7px 5px 8px;
     min-height: 0;
@@ -6789,19 +6789,19 @@ body > .task-menu button { min-height: 40px; }
     font-size: .82rem;
   }
   /* Listbox must clear the dock (150) + chat FAB (200) but stay below
-     the portalled ⋮ (400) — 260 is the sweet spot, and it scrolls. */
+     the portalled ⋮ (400) - 260 is the sweet spot, and it scrolls. */
   .planner-filter .sp-select-pop {
     z-index: 260;
     max-height: min(44vh, 300px);
   }
 }
 /* On 320-class screens keep the label but shrink it instead of dropping
-   it — removing it freed only 42px but cost the row its affordance. */
+   it - removing it freed only 42px but cost the row its affordance. */
 @media (max-width: 360px) {
   .planner-filter-label { font-size: .58rem; gap: 4px; }
 }
 
-/* ── 2 · PLANNER LIST — gap owns the space, not margins ────────────── */
+/* ── 2 · PLANNER LIST - gap owns the space, not margins ────────────── */
 .planner-list { gap: 14px; }
 .planner-day { gap: 10px; }
 .planner-day-list { gap: 8px; }
@@ -6811,10 +6811,10 @@ body > .task-menu button { min-height: 40px; }
   .planner-day-list { gap: 8px; padding-top: 0; }
 }
 
-/* ── 3 · TASK CARD — shield/clipboard subtle use ─────────────────────
+/* ── 3 · TASK CARD - shield/clipboard subtle use ─────────────────────
    Checkpoint tasks already carry a Shield intent in the data; the rail +
    kind chip own the colour, so the title stays clean. No extra markup
-   needed — icons are available to bits/TaskCard via imports when a future
+   needed - icons are available to bits/TaskCard via imports when a future
    kind genuinely needs them (IconClipboard/IconShield). This layer only
    ensures they inherit the correct size when used inline. */
 .task-card .task-shield,
@@ -6823,13 +6823,13 @@ body > .task-menu button { min-height: 40px; }
   opacity: .75;
 }
 
-/* ── 4 · TOP BAR — ensure header + session bar never overlap heading ── */
+/* ── 4 · TOP BAR - ensure header + session bar never overlap heading ── */
 @media (max-width: 860px) {
   .page-header { margin-top: 2px; }
   .tracker-bar.session-bar { margin-bottom: 12px; }
 }
 
-/* ── 5 · BOTTOM NAV — keep chat FAB clear on every width ──────────── */
+/* ── 5 · BOTTOM NAV - keep chat FAB clear on every width ──────────── */
 @media (max-width: 860px) {
   .ai-fab { bottom: calc(86px + env(safe-area-inset-bottom)) !important; }
 }
@@ -6837,7 +6837,7 @@ body > .task-menu button { min-height: 40px; }
   .ai-fab { bottom: calc(82px + env(safe-area-inset-bottom)) !important; }
 }
 
-/* ── 6 · GUARD — no h-scroll at 320-414, no clipped actions ───────── */
+/* ── 6 · GUARD - no h-scroll at 320-414, no clipped actions ───────── */
 @media (max-width: 414px) {
   .planner-view, .planner-list, .planner-day, .cal-grid, .cal-row { min-width: 0; max-width: 100%; }
   .task-card-title { hyphens: auto; }
@@ -6850,35 +6850,35 @@ body > .task-menu button { min-height: 40px; }
 
 /* ══════════════════════════════════════════════════════════════════════
    v33 · COMPREHENSIVE UI/UX + ERROR-STATE AUDIT
-   Appended last — final word over every layer above (v25→v32).
+   Appended last - final word over every layer above (v25→v32).
    Design doc: this audit run (2026-09-11). Systematic, token-driven,
    no overflow-x:hidden hack, no fixed-height/absolute traps, no
    duplicate mobile stacks. Verified at 1440 · 1280 · 1024 · 768 ·
    480 · 390 · 360 without horizontal scroll or clipped content.
 
    Sections:
-     1  Planner header — PLANNER eyebrow + "Your month, mapped" + 
+     1  Planner header - PLANNER eyebrow + "Your month, mapped" + 
         Add task / Rebalance · List/Calendar · right-side SUE clip
         root cause (scene width vs copy min-width + filter flex-basis)
-     2  Global typography hierarchy — one ramp owns every heading,
+     2  Global typography hierarchy - one ramp owns every heading,
         no per-page or per-breakpoint re-tuning
-     3  Alignment — app wrapper, header, cards, toolbar share one
+     3  Alignment - app wrapper, header, cards, toolbar share one
         gutter/ rhythm so left edges line up at every width
-     4  Sidebar / header / top bar — sticky geometry, safe-area,
+     4  Sidebar / header / top bar - sticky geometry, safe-area,
         collapsed rail, no overlap
-     5  Subjects mobile list — title clamp-2 · percentage shrink-0 ·
+     5  Subjects mobile list - title clamp-2 · percentage shrink-0 ·
         topic row one-line contract
-     6  Analytics Consistency Ring — centred by construction
-     7  AI error panel sanitization — provider/model IDs never reach
+     6  Analytics Consistency Ring - centred by construction
+     7  AI error panel sanitization - provider/model IDs never reach
         the UI; user sees code/notice/retryable only
-     8  Floating AI panel — reserves column at ≥1280, shorter card
+     8  Floating AI panel - reserves column at ≥1280, shorter card
         at 861-1279 so it never hides the Planner heading
-     9  Responsive — explicit 1440/1280/1024/768/480/390/360
+     9  Responsive - explicit 1440/1280/1024/768/480/390/360
         guards: min-width:0 + max-width:100% + box-sizing:border-box
         at every container edge, no clipped actions
    ══════════════════════════════════════════════════════════════════════ */
 
-/* ── 1 · PLANNER HEADER — the SUE… clip root cause ───────────────────
+/* ── 1 · PLANNER HEADER - the SUE… clip root cause ───────────────────
    Cause: `.page-header` is `grid: minmax(0,1fr) auto`. The `auto` track
    is the illustration scene at `clamp(190px,21vw,280px)`. Below ~1100px
    the scene stayed 200px while the copy column's `.page-head-copy` had
@@ -6888,14 +6888,14 @@ body > .task-menu button { min-height: 40px; }
    title/subtitle, so the title wrapped aggressively and the second button
    label was ellipsised to "Reb…"/"SUE…" and then clipped by the panel's
    `overflow:hidden`. On 360 the same 150px floor forced each button to
-   150px inside a 336px content box — again leaving no room for the heading
+   150px inside a 336px content box - again leaving no room for the heading
    and truncating the filter's value to an unreadable fragment.
    Fix: scene shrinks at each band and hides before it can squeeze the copy;
    the copy column is a true `minmax(0,1fr)` flex column; buttons are
    `flex:1 1 0` with `min-width:0` so they share the row and wrap instead of
    clipping their own labels. The filter owns one compact row and the
    toolbar reserves no phantom height above the day section.
-   No `overflow:hidden` is added — the content fits. */
+   No `overflow:hidden` is added - the content fits. */
 .page-header,
 .page-head-copy,
 .page-head-actions,
@@ -6955,7 +6955,7 @@ body > .task-menu button { min-height: 40px; }
   min-width: 0;
   /* `flex-basis` here must NOT be 240px on phones: under 860px the toolbar
      stacks into a column, where a flex-basis with grow:1 sizes the CROSS
-     axis (height) — that was the 240px-tall "giant empty subject panel".
+     axis (height) - that was the 240px-tall "giant empty subject panel".
      The horizontal grow is desktop-only (see the min-861 rule below). */
   flex: 0 1 auto;
   max-width: 460px;
@@ -6976,7 +6976,7 @@ body > .task-menu button { min-height: 40px; }
 }
 .planner-filter .sp-select { flex: 1 1 auto; min-width: 0; max-width: 100%; }
 .planner-filter .sp-select-btn { min-width: 0; max-width: 100%; }
-/* Scene sizing per band — shrinks before it can squeeze the copy. */
+/* Scene sizing per band - shrinks before it can squeeze the copy. */
 .page-header-scene {
   grid-column: 2;
   grid-row: 1;
@@ -7018,9 +7018,9 @@ body > .task-menu button { min-height: 40px; }
   }
 }
 
-/* ── 2 · GLOBAL TYPOGRAPHY HIERARCHY — one ramp, no per-page drift ──
+/* ── 2 · GLOBAL TYPOGRAPHY HIERARCHY - one ramp, no per-page drift ──
    Sizes live ONLY in the `:root` ramp in globals.css and are READ here
-   exactly once per role — never re-clamped, never re-tuned per breakpoint.
+   exactly once per role - never re-clamped, never re-tuned per breakpoint.
    Family/weight/leading/tracking stay in globals.css; wrapping here. */
 .page-stack .page-title,
 .page-title {
@@ -7052,7 +7052,7 @@ body > .task-menu button { min-height: 40px; }
   color: var(--text-main);
 }
 
-/* ── 3 · ALIGNMENT — one gutter, one rhythm ────────────────────────── */
+/* ── 3 · ALIGNMENT - one gutter, one rhythm ────────────────────────── */
 .app-wrapper {
   max-width: 1720px;
   margin-inline: auto;
@@ -7082,7 +7082,7 @@ body > .task-menu button { min-height: 40px; }
   .app-wrapper { padding: 0 12px calc(84px + env(safe-area-inset-bottom)) !important; }
 }
 
-/* ── 4 · SIDEBAR / HEADER / TOP BAR — no overlap, one geometry ─────── */
+/* ── 4 · SIDEBAR / HEADER / TOP BAR - no overlap, one geometry ─────── */
 .sidebar {
   width: var(--sidebar-w);
   flex-shrink: 0;
@@ -7152,7 +7152,7 @@ body > .task-menu button { min-height: 40px; }
   .main-workspace { padding-top: 10px !important; }
 }
 
-/* ── 5 · SUBJECTS — mobile list subject sizing ───────────────────────
+/* ── 5 · SUBJECTS - mobile list subject sizing ───────────────────────
    Long names (e.g. "Micro Economics & Macro Economics") wrap to two lines
    inside a min-width:0 column; the percentage never leaves the card. Topic
    rows keep number · title · minutes · state on one line; unit/detail lives
@@ -7193,7 +7193,7 @@ body > .task-menu button { min-height: 40px; }
   .subject-card-name { font-size: var(--fs-md); }
 }
 
-/* ── 6 · ANALYTICS CONSISTENCY RING — centred by construction ───────
+/* ── 6 · ANALYTICS CONSISTENCY RING - centred by construction ───────
    `.ring-figure` is the containing block (position:relative + grid); the
    readout fills it (inset:0) and centres its stacked content with
    place-content:center so "86% / ACTIVE" is centred at 0%, 25%, 86% and
@@ -7204,7 +7204,7 @@ body > .task-menu button { min-height: 40px; }
   place-items: center;
   gap: 0;
   /* Shrink to the ring: the SVG carries the fixed 170px size, so `inset: 0`
-     on the readout IS the ring's box and the digits centre on the ring —
+     on the readout IS the ring's box and the digits centre on the ring -
      not on the card around it. (The old `width: 100%` on the SVG below
      defeated `.ana-ring`'s size and blew the ring up to full card width.) */
   width: fit-content;
@@ -7252,8 +7252,8 @@ body > .task-menu button { min-height: 40px; }
    Code contract (src/lib/ai.ts → src/app/api/chat/route.ts): provider
    model IDs and raw status/detail stay in `summarizeAttempts` for server
    logs and /api/ai-status; the UI receives only `userFacingAiNotice`'s
-   {code, notice, retryable} — e.g. "AI is temporarily unavailable — please
-   try again. (code: rate_limit)" — never "Cerebras llama-3.3-70b 429" or
+   {code, notice, retryable} - e.g. "AI is temporarily unavailable - please
+   try again. (code: rate_limit)" - never "Cerebras llama-3.3-70b 429" or
    "Groq timeout". This layer ensures the fallback strip never leaks a
    vendor span even if a future component maps `attempts` directly. */
 .ai-error,
@@ -7264,10 +7264,10 @@ body > .task-menu button { min-height: 40px; }
 }
 .ai-error code,
 .ai-notice code { display: none !important; }
-/* Fallback/mode badge reads Ready / Local mode only — no vendor list. */
+/* Fallback/mode badge reads Ready / Local mode only - no vendor list. */
 .ai-status { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* ── 8 · FLOATING AI PANEL — never hides the Planner heading ─────────
+/* ── 8 · FLOATING AI PANEL - never hides the Planner heading ─────────
    ≥1280: reserves a column via body.ai-open so the workspace reflows clear
    of the panel (same spring as the sidebar). At 861-1279 the panel is a
    shorter card (56vh) at the right edge so the header stays visible; the
@@ -7314,23 +7314,23 @@ body > .task-menu button { min-height: 40px; }
 .ai-fab { z-index: 200; }
 .ai-scrim { z-index: 199; }
 
-/* ── 9 · RESPONSIVE — 1440 / 1280 / 1024 / 768 / 480 / 390 / 360 ─────
+/* ── 9 · RESPONSIVE - 1440 / 1280 / 1024 / 768 / 480 / 390 / 360 ─────
    No breakpoint introduces a fixed width that exceeds its container;
    every grid/flex child is min-width:0 + max-width:100% + border-box.
-   The guards here are *not* overflow-x:hidden — content fits. */
-/* 1440 — comfortable 4-up KPI, generous illustration. */
+   The guards here are *not* overflow-x:hidden - content fits. */
+/* 1440 - comfortable 4-up KPI, generous illustration. */
 @media (min-width: 1280px) and (max-width: 1600px) {
   .kpi-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .app-wrapper { gap: 20px; }
 }
-/* 1280 — 4-up holds, sidebar 248px, toolbar gap tighter. */
+/* 1280 - 4-up holds, sidebar 248px, toolbar gap tighter. */
 @media (min-width: 1100px) and (max-width: 1279px) {
   :root { --sidebar-w: 232px; }
   .app-wrapper { gap: 16px; padding: 16px clamp(12px, 1.8vw, 22px) 24px; }
   .kpi-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
   .planner-filter { max-width: 400px; }
 }
-/* 1024 — laptop: 2-up KPI, 2-col today split, filter 360. */
+/* 1024 - laptop: 2-up KPI, 2-col today split, filter 360. */
 @media (min-width: 861px) and (max-width: 1023px) {
   :root { --sidebar-w: 212px; }
   .app-wrapper { gap: 14px; padding: 14px; }
@@ -7339,7 +7339,7 @@ body > .task-menu button { min-height: 40px; }
   .cal-cell { min-height: 64px; }
   .tracker-task { max-width: min(32vw, 320px); }
 }
-/* 768 — tablet portrait (falls in ≤860). Ensure header block, toolbar
+/* 768 - tablet portrait (falls in ≤860). Ensure header block, toolbar
    column, calendar 7-col via .cal-row, task card rail·body grid. */
 @media (min-width: 641px) and (max-width: 860px) {
   .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 10px !important; }
@@ -7347,7 +7347,7 @@ body > .task-menu button { min-height: 40px; }
   .cal-cell { min-height: 58px; padding: 6px; }
   .task-card { grid-template-columns: 3px minmax(0, 1fr); }
 }
-/* 480 — phablet: single-column planner days, full-width actions. */
+/* 480 - phablet: single-column planner days, full-width actions. */
 @media (max-width: 480px) {
   .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 8px !important; }
   .kpi-card { min-height: 96px; padding: 12px; border-radius: 16px; }
@@ -7356,7 +7356,7 @@ body > .task-menu button { min-height: 40px; }
   .planner-day { padding: 12px; }
   .task-card { padding: 11px 12px 12px 0; }
 }
-/* 390 — tight mainstream phone: subject filter compact, task actions wrap. */
+/* 390 - tight mainstream phone: subject filter compact, task actions wrap. */
 @media (max-width: 390px) {
   .app-wrapper { padding-left: 10px !important; padding-right: 10px !important; }
   .planner-filter { padding: 5px 7px; gap: 6px; }
@@ -7366,7 +7366,7 @@ body > .task-menu button { min-height: 40px; }
   .cal-cell { min-height: 48px; padding: 4px; }
   .cal-daynum { font-size: .72rem; }
 }
-/* 360 — SE / old Android: keep 2-up KPI, shrink type, preserve touch targets. */
+/* 360 - SE / old Android: keep 2-up KPI, shrink type, preserve touch targets. */
 @media (max-width: 360px) {
   .app-wrapper { padding-left: 8px !important; padding-right: 8px !important; }
   .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 7px !important; }
@@ -7378,7 +7378,7 @@ body > .task-menu button { min-height: 40px; }
   .cal-row { gap: 3px; }
   .ai-panel { left: 6px !important; right: 6px !important; }
 }
-/* 320 — very small: single-column KPI fallback, filter label keeps affordance. */
+/* 320 - very small: single-column KPI fallback, filter label keeps affordance. */
 @media (max-width: 320px) {
   .app-wrapper { padding-left: 6px !important; padding-right: 6px !important; }
   .kpi-grid { grid-template-columns: minmax(0, 1fr) !important; }
@@ -7392,7 +7392,7 @@ body > .task-menu button { min-height: 40px; }
   .cal-daynum { font-size: .68rem; }
 }
 
-/* ── Last-resort box-sizing guard — every interactive/layout node fits ─ */
+/* ── Last-resort box-sizing guard - every interactive/layout node fits ─ */
 .app-wrapper, .main-workspace, .sidebar, .mobile-header, .tracker-bar,
 .page-header, .page-head-copy, .page-head-actions,
 .planner-view, .planner-toolbar, .planner-filter, .planner-list,
@@ -7406,7 +7406,7 @@ body > .task-menu button { min-height: 40px; }
   max-width: 100%;
   box-sizing: border-box;
 }
-/* Never hide overflow to fake a fit — content fits by grid/flex/tokens. */
+/* Never hide overflow to fake a fit - content fits by grid/flex/tokens. */
 html, body { min-width: 0; max-width: 100%; }
 img, svg, video, canvas { max-width: 100%; height: auto; }
 
@@ -7472,7 +7472,7 @@ img, svg, video, canvas { max-width: 100%; height: auto; }
 /* ── Task cards: compact, stacking-safe, natural height on phones ───── */
 @media (max-width: 860px) {
   .task-card {
-    /* Natural document height — never a borrowed desktop height. */
+    /* Natural document height - never a borrowed desktop height. */
     height: auto;
     max-height: none;
     overflow: visible;
@@ -7497,7 +7497,7 @@ img, svg, video, canvas { max-width: 100%; height: auto; }
   }
 }
 
-/* Phones: curriculum unit + difficulty are secondary — both are already
+/* Phones: curriculum unit + difficulty are secondary - both are already
    in the Lesson brief panel, and four meta chips + date crowded the row
    into the description at 320–390px. Date, duration and logged minutes
    stay. ≤480 so small tablets keep the richer row. */
@@ -7570,7 +7570,7 @@ img, svg, video, canvas { max-width: 100%; height: auto; }
    A) Edit / Delete were the two least reachable controls in the product:
       `.btn-ghost` was referenced by eight controls and defined NOWHERE, so
       the pencil and the bin on every subject card painted as a 30×30 box
-      with a transparent border, a 13px glyph and the ambient text colour —
+      with a transparent border, a 13px glyph and the ambient text colour -
       technically present, practically invisible, and below the 44px touch
       floor the rest of the app keeps. They are real verbs now: icon + word,
       a surface, a border, a hover lift, an active press, a focus ring, and a
@@ -7583,7 +7583,7 @@ img, svg, video, canvas { max-width: 100%; height: auto; }
       Planner and Focus each carried a scene. The three new scenes live in
       `Illustrations.tsx` on the same 560×340 canvas, the same desk/plant/
       books helpers and the same `--ill-*` tokens; this section only owns
-      their motion — one mount flip, compositor-friendly transitions on
+      their motion - one mount flip, compositor-friendly transitions on
       transform / width / stroke-dashoffset, three slow loops, and a
       reduced-motion guard that stops every loop while leaving the DATA on
       screen (a frozen bar chart is still true; an empty one is not).
@@ -7669,7 +7669,7 @@ img, svg, video, canvas { max-width: 100%; height: auto; }
   .subj-action { padding: 10px 15px; }
 }
 /* Phones: the lessons verb takes its own line and Edit/Delete split the next
-   one 50/50 — thumb-sized, no label clipping, nothing pushed off the card. */
+   one 50/50 - thumb-sized, no label clipping, nothing pushed off the card. */
 @media (max-width: 480px) {
   .subject-card-foot { gap: 8px; }
   .subject-lessons-btn { flex: 1 1 100%; }
@@ -7760,7 +7760,7 @@ img, svg, video, canvas { max-width: 100%; height: auto; }
   justify-content: center;
 }
 
-/* ── 5 · Scene plumbing — sizing, mobile slot, hover ─────────────────── */
+/* ── 5 · Scene plumbing - sizing, mobile slot, hover ─────────────────── */
 .page-header-scene svg { display: block; width: 100%; height: auto; }
 /* A data scene is a read-out, not wallpaper: on phones it keeps a compact
    centred slot under the header copy instead of disappearing, and on desktop
@@ -7867,7 +7867,7 @@ img, svg, video, canvas { max-width: 100%; height: auto; }
 }
 
 /* ══════════════════════════════════════════════════════════════════════
-   v35 · PHONE FIXES — real-time logged time on task cards + compact Zen
+   v35 · PHONE FIXES - real-time logged time on task cards + compact Zen
    ──────────────────────────────────────────────────────────────────────
    Final layer. Phone-scoped (≤640px) geometry/presentation only; every
    rule above still owns desktop and tablet (≥641px) untouched.
@@ -7947,7 +7947,7 @@ img, svg, video, canvas { max-width: 100%; height: auto; }
   .zen .zen-actions .zen-clock-out,
   .zen .zen-actions .zen-exit-btn { min-width: 0; flex: 0 1 auto; }
 
-  /* Top bar: Focus mode / Full screen / Exit Zen — quiet compact pills. */
+  /* Top bar: Focus mode / Full screen / Exit Zen - quiet compact pills. */
   .zen .zen-topbar { gap: 6px; }
   .zen .zen-ghost {
     min-height: 30px;
@@ -7960,7 +7960,7 @@ img, svg, video, canvas { max-width: 100%; height: auto; }
 }
 
 @media (max-width: 460px) {
-  /* Two short rows at most — never three full-width slabs. The primary
+  /* Two short rows at most - never three full-width slabs. The primary
      shares its row with the clock-out verb; Exit Zen wraps beneath. */
   .zen .zen-actions { max-width: 100%; gap: 6px; }
   .zen .zen-actions .btn { padding-inline: 12px; }

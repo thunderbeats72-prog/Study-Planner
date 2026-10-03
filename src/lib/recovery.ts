@@ -1,15 +1,15 @@
 // ============================================================
-//  STUDY PLANNER PRO — src/lib/recovery.ts
+//  STUDY PLANNER PRO - src/lib/recovery.ts
 //  Backlog maths: how much is unfinished, whether it fits today,
 //  and how to redistribute it across coming days WITHOUT cramming
 //  an unrealistic amount into one day.
 //
-//  Pure functions only — testable with plain task rows, reusable
+//  Pure functions only - testable with plain task rows, reusable
 //  by the Dashboard recovery panel and the AI tutor.
 // ============================================================
 
 import type { SettingsRow, TaskRow } from "./client";
-// Pure planner helpers — this module runs server-side too (bulk moves),
+// Pure planner helpers - this module runs server-side too (bulk moves),
 // where the "use client" exports of client.ts cannot be called.
 import { addDays, diffDays } from "./planner";
 

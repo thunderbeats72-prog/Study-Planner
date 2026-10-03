@@ -7,7 +7,7 @@ import { guardResponse } from "@/lib/routeGuard";
 export const dynamic = "force-dynamic";
 
 /**
- * GET /api/state — everything the app paints, for the SIGNED-IN account.
+ * GET /api/state - everything the app paints, for the SIGNED-IN account.
  *
  * This is the boot call, so it is also where a session quietly renews: an
  * account used every day keeps sliding its expiry forward and never meets a

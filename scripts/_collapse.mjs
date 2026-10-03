@@ -1,5 +1,5 @@
 /**
- * _collapse.mjs — mechanical same-scope dead-declaration removal.
+ * _collapse.mjs - mechanical same-scope dead-declaration removal.
  *
  * For every conflict group the audit counts (same file + same @media scope +
  * same selector + same box prop, 2+ values), all declarations except the

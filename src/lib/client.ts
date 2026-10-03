@@ -122,7 +122,7 @@ export type Ctx = {
   today: { title: string; kind: string; minutes: number; status: string }[];
 };
 /** The signed-in account, as the client is allowed to see it. Never carries
- *  the password hash or the session token — only what the UI greets the
+ *  the password hash or the session token - only what the UI greets the
  *  learner with and shows in Settings → Account. */
 export type AccountInfo = {
   username: string;
@@ -249,7 +249,7 @@ export class ApiError extends Error {
   }
 }
 
-/** True when the server said "sign in first" — the app answers this by
+/** True when the server said "sign in first" - the app answers this by
  *  showing the sign-in screen, never a red error toast. */
 export function isAuthError(error: unknown): boolean {
   return error instanceof ApiError && (error.status === 401 || error.code === "AUTH_REQUIRED");
@@ -259,7 +259,7 @@ type UnauthorizedHandler = () => void;
 let unauthorizedHandler: UnauthorizedHandler | null = null;
 
 /**
- * Register what should happen when ANY request comes back unauthenticated —
+ * Register what should happen when ANY request comes back unauthenticated -
  * an expired session, or this device being signed out from another one. The
  * app registers a handler that returns it to the sign-in screen with the
  * work-in-progress intact, so a learner never keeps tapping into a void.
@@ -520,8 +520,8 @@ export const KIND_META: Record<string, { label: string; color: string }> = {
  * Older scheduler builds wrote `Weekly Checkpoint Test #0` (zero-based,
  * no middle dot) and a few intermediate variants exist in real databases
  * (e.g. `Weekly Checkpoint · Test #0`). Any of those should render as
- * `Weekly Checkpoint · Test #1` — the same 1-based, dotted form the
- * current scheduler emits — so no user ever sees a "Test #0" again.
+ * `Weekly Checkpoint · Test #1` - the same 1-based, dotted form the
+ * current scheduler emits - so no user ever sees a "Test #0" again.
  * Anything that is not a checkpoint title is returned untouched.
  */
 export function normalizeCheckpointTitle(title: string): string {

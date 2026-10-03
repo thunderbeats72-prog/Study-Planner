@@ -163,7 +163,7 @@ function cookieSameSite(): "Lax" | "None" | "Strict" {
 
 /**
  * The Set-Cookie value for a signed-in browser.
- * HttpOnly (JavaScript — including anything injected into the page — cannot
+ * HttpOnly (JavaScript - including anything injected into the page - cannot
  * read it), SameSite (see above), Path=/ and a long Max-Age so a phone stays
  * signed in for months rather than days.
  */
@@ -206,7 +206,7 @@ const schemaGlobal = globalThis as SchemaGlobal;
 
 /**
  * Accounts added columns to `users` and a whole new `auth_sessions` table.
- * `npm run db:push` applies them — but a deployment whose build command is
+ * `npm run db:push` applies them - but a deployment whose build command is
  * plain `next build` would otherwise boot against the old shape and fail
  * every sign-in with a raw SQL error.
  *
@@ -378,7 +378,7 @@ export async function authenticate(req: Request): Promise<AuthContext | null> {
 }
 
 /**
- * The learner this request belongs to — or a 401. Every data route starts
+ * The learner this request belongs to - or a 401. Every data route starts
  * here, which is what makes a plan private to its account.
  *
  * The one exception is the database-less preview (see `demoGate`): with no
@@ -407,20 +407,20 @@ async function previewUser(req: Request): Promise<User> {
 /* ── Accounts ───────────────────────────────────────────────────────── */
 
 export type AccountResult = { user: User; token: string; claimedExistingPlan: boolean };
-/** Sign-up deliberately stops short of a session — see createAccount. */
+/** Sign-up deliberately stops short of a session - see createAccount. */
 export type NewAccountResult = { user: User; claimedExistingPlan: boolean };
 
 /**
- * Create an account — and nothing more.
+ * Create an account - and nothing more.
  *
  * Creating credentials does NOT sign anybody in. The learner types the
  * username and password they just chose into the sign-in form, which both
  * proves the credentials work (a typo in a password manager is caught here,
- * not a week later on their phone) and makes the two acts — "I have an
- * account" and "I am signed in on this device" — visibly separate.
+ * not a week later on their phone) and makes the two acts - "I have an
+ * account" and "I am signed in on this device" - visibly separate.
  *
  * If this browser already built a plan anonymously, the new account ADOPTS
- * that row instead of starting empty — months of lessons, logs and streak
+ * that row instead of starting empty - months of lessons, logs and streak
  * survive the upgrade, and from that moment the same data is one sign-in
  * away on every other device.
  */
@@ -474,7 +474,7 @@ export async function createAccount(
       .limit(1);
     const candidate = existing[0];
     // Only an un-credentialed row can be claimed, and only by the device
-    // that holds its key — an account is never silently taken over.
+    // that holds its key - an account is never silently taken over.
     if (candidate && !candidate.passwordHash) {
       const updated = await db
         .update(users)
@@ -573,7 +573,7 @@ export async function signIn(
 
 /**
  * Change the password of a signed-in account. Every other device is signed
- * out — the whole point of changing a password is that whoever had the old
+ * out - the whole point of changing a password is that whoever had the old
  * one loses access.
  */
 export async function changePassword(

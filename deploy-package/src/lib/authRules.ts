@@ -1,11 +1,11 @@
 /**
- * ACCOUNT RULES — the single source of truth for what a valid username and
+ * ACCOUNT RULES - the single source of truth for what a valid username and
  * a valid password are.
  * ─────────────────────────────────────────────────────────────────────────
  * This module is deliberately PURE: no `node:crypto`, no database, no React.
  * The sign-in screen imports it to validate while the learner types, and the
  * API routes import the SAME functions to validate what finally arrives. A
- * rule can therefore never drift between the two sides — the browser never
+ * rule can therefore never drift between the two sides - the browser never
  * promises something the server then rejects, and nothing that the browser
  * rejected can be smuggled past it with a direct POST.
  */
@@ -35,7 +35,7 @@ const RESERVED_USERNAMES = new Set([
 /**
  * The handful of passwords that show up in every credential-stuffing list.
  * This is NOT a security control on its own (the real protections are the
- * scrypt hash, the rate limiter and the per-account lockout) — it just keeps
+ * scrypt hash, the rate limiter and the per-account lockout) - it just keeps
  * a learner from choosing a password that is guessed on the first attempt.
  */
 const COMMON_PASSWORDS = new Set([
@@ -49,7 +49,7 @@ const COMMON_PASSWORDS = new Set([
 /**
  * The canonical, comparable form of a username: trimmed and lower-cased.
  * Accounts are stored and looked up by this value, so `Sanjay`, `sanjay`
- * and ` SANJAY ` are the SAME account — a learner who types their name with
+ * and ` SANJAY ` are the SAME account - a learner who types their name with
  * a capital on their phone still lands in the plan they built on the laptop.
  */
 export function normalizeUsername(raw: unknown): string {
@@ -107,18 +107,18 @@ export function passwordProblem(password: unknown, username?: string): RuleProbl
   if (password !== password.trim())
     return "Remove the space at the start or end of the password.";
   if (COMMON_PASSWORDS.has(password.toLowerCase()))
-    return "That password is too common — pick something less guessable.";
+    return "That password is too common - pick something less guessable.";
   const user = normalizeUsername(username || "");
   if (user && password.toLowerCase().includes(user))
     return "The password cannot contain your username.";
   if (characterClasses(password) < 2 && password.length < 12)
-    return "Mix in a number or a capital — or use 12+ characters.";
+    return "Mix in a number or a capital - or use 12+ characters.";
   if (/^(.)\1+$/.test(password)) return "That password is a single repeated character.";
   return null;
 }
 
 export type PasswordStrength = {
-  /** 0 (unusable) … 4 (excellent) — drives the meter on the sign-up form. */
+  /** 0 (unusable) … 4 (excellent) - drives the meter on the sign-up form. */
   score: number;
   label: string;
   /** The single most useful next improvement, or null when it is strong. */
@@ -126,7 +126,7 @@ export type PasswordStrength = {
 };
 
 /**
- * A calm, honest strength read for the sign-up meter. It never blocks —
+ * A calm, honest strength read for the sign-up meter. It never blocks -
  * `passwordProblem` is the gate; this is the encouragement next to it.
  */
 export function passwordStrength(password: string, username?: string): PasswordStrength {
@@ -150,10 +150,10 @@ export function passwordStrength(password: string, username?: string): PasswordS
     score >= 4
       ? null
       : password.length < 12
-        ? "Longer is stronger — aim for 12+ characters."
+        ? "Longer is stronger - aim for 12+ characters."
         : classes < 3
           ? "Add a capital, a number, or a symbol."
-          : "Nearly there — a few more characters makes it excellent.";
+          : "Nearly there - a few more characters makes it excellent.";
   return { score, label: labels[score], hint };
 }
 

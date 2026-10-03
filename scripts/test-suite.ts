@@ -232,7 +232,7 @@ async function runTests() {
   const userOnly = appendChatTurn(
     [{ id: 9, userId: 1, role: "user", content: "hello", createdAt: "2026-08-22T00:00:00.000Z" }],
     "hello",
-    "Hi — I am Shigun.",
+    "Hi - I am Shigun.",
   );
   check(userOnly.length === 2 && userOnly[1].content.includes("Shigun"),
     "Assistant reply is attached when only the user line was saved");
@@ -417,7 +417,7 @@ async function runTests() {
   console.log("\n--- 4c. v10 AI stack: error classes, failure memory, hedging, self-status ---");
   {
     // Error classification: the Cerebras retired-model wording says "does not
-    // exist or your API key does not have access" — that is a MODEL error,
+    // exist or your API key does not have access" - that is a MODEL error,
     // not an auth error (misreading it once benched the whole provider).
     check(classifyProviderError(404, "Model llama3.1-70b does not exist or your API key does not have access to it") === "model",
       "Cerebras retired-model 404 is classified as a model error, not auth");
@@ -468,9 +468,9 @@ async function runTests() {
     const elapsed = Date.now() - started;
     check(hedged.text === "Hedged answer" && hedged.provider === "cerebras",
       "A stalled first provider is hedged: the second provider answers in the same request");
-    check(elapsed < 6_000, `Hedged answer arrived in ${elapsed} ms — well under the per-attempt timeout`);
+    check(elapsed < 6_000, `Hedged answer arrived in ${elapsed} ms - well under the per-attempt timeout`);
     check(hits[0] === "gemini" && hits.includes("cerebras"),
-      "Priority order is kept — the hedge starts only after the leader goes silent");
+      "Priority order is kept - the hedge starts only after the leader goes silent");
 
     // Give the abandoned Gemini leg time to hit its own timeout so the
     // failure memory records it, then check the next call skips it.
@@ -587,9 +587,9 @@ async function runTests() {
   console.log("\n--- 4d. Deployment-keys-only tutoring contract ---");
   {
     check(!existsSync(join(process.cwd(), "src/lib/byok.ts")),
-      "Browser key storage (byok.ts) is removed — the app never stores a learner-pasted key");
+      "Browser key storage (byok.ts) is removed - the app never stores a learner-pasted key");
     check(!existsSync(join(process.cwd(), "src/lib/aiBridge.ts")),
-      "The browser-direct bridge (aiBridge.ts) is removed — model calls happen only on the server");
+      "The browser-direct bridge (aiBridge.ts) is removed - model calls happen only on the server");
     check(!existsSync(join(process.cwd(), "src/components/AiKeyCard.tsx")),
       "The Settings key-paste card is removed");
 
@@ -599,19 +599,19 @@ async function runTests() {
 
     const chatRouteSrc = readFileSync(join(process.cwd(), "src/app/api/chat/route.ts"), "utf8");
     check(chatRouteSrc.includes("callLLMDetailed") && !/directReply|prepare === true|ChatMode/.test(chatRouteSrc),
-      "The chat route walks the deployment's own provider chain — no prepare/finalise modes");
+      "The chat route walks the deployment's own provider chain - no prepare/finalise modes");
     check(!/creditExhausted|CREDIT_EXHAUSTED/.test(chatRouteSrc),
-      "Shigun credit is informational only — it can never block a cloud answer");
+      "Shigun credit is informational only - it can never block a cloud answer");
     check(chatRouteSrc.includes("localTutor") && chatRouteSrc.includes("localCurriculumReply"),
       "When every cloud leg fails the on-device engine and the syllabus still answer");
 
     const clientSrc = readFileSync(join(process.cwd(), "src/lib/client.ts"), "utf8");
     check(!/x-ai-keys|byok/i.test(clientSrc),
-      "The API client never sends an x-ai-keys header — deployment env keys are the only keys");
+      "The API client never sends an x-ai-keys header - deployment env keys are the only keys");
 
     const chatPanelSrc = readFileSync(join(process.cwd(), "src/components/ChatPanel.tsx"), "utf8");
     check(!/byok|aiBridge|free community|free endpoint/i.test(chatPanelSrc),
-      "The chat panel has no BYOK or free-relay state — its status reflects the deployment chain");
+      "The chat panel has no BYOK or free-relay state - its status reflects the deployment chain");
 
     const coachCardSrc = readFileSync(join(process.cwd(), "src/components/AiCoachCard.tsx"), "utf8");
     check(coachCardSrc.includes("/api/ai-status") && !/type="password"|setByokKey|<input| Seg</i.test(coachCardSrc),
@@ -623,16 +623,16 @@ async function runTests() {
   /* ── 4e · A 200 body is not proof of an answer ────────────────────────────
      The failure this pins: free relays (Pollinations in particular) answer
      HTTP 200 with a well-formed OpenAI body whose `content` is their OWN
-     error notice — "The API key used for this request has reached its
+     error notice - "The API key used for this request has reached its
      budget… 🌸 Ad 🌸 Powered by Pollinations.AI". Status 200 + non-empty
      content used to mean SUCCESS, so the notice was shown to the learner as
      if SHIGUN had written it, the broken leg became STICKY and was paid first
      on every later message, and the on-device ML engine never ran because a
      "cloud answer" existed. `lib/aiAnswer.ts` is now the single judge, used
      by the server chain, the browser bridge and the chat route's finalise
-     path. False positives are the real danger — this is a planner used by
+     path. False positives are the real danger - this is a planner used by
      accounting students, and "the department has reached its budget ceiling"
-     is a good sentence about cost accounting — so the lesson cases below are
+     is a good sentence about cost accounting - so the lesson cases below are
      as load-bearing as the relay cases. */
   console.log("\n--- 4e. Answer sanity gate: relay notices must never reach a learner ---");
   {
@@ -654,7 +654,7 @@ Powered by [Pollinations.AI](http://Pollinations.ai) free text APIs. ++[Support 
       JSON.stringify(polluted));
     check(sanitizeModelAnswer(WALL) === null,
       "sanitizeModelAnswer refuses it, which is what makes the chain keep walking");
-    check(classifyModelAnswer('{"note":"You exceeded your current quota"} — error code: 429 - insufficient_quota').noise,
+    check(classifyModelAnswer('{"note":"You exceeded your current quota"} - error code: 429 - insufficient_quota').noise,
       "A quota/billing notice delivered as content is refused");
     check(classifyModelAnswer("<!doctype html><html><head><title>502 Bad Gateway</title></head></html>").noise,
       "An HTML error page delivered as content is refused");
@@ -676,9 +676,9 @@ A **budget** is a quantitative plan for a future period. When a department has r
       "A cost-accounting lesson about reaching a budget ceiling is NOT mistaken for a relay notice");
     check(classifyModelAnswer("The department reached its budget ceiling in Q3, so the variance report shows an adverse ₹2,400.").noise === false,
       "Nor is a one-line answer about a budget ceiling");
-    check(classifyModelAnswer("Import quota exhausted — the firm must now source domestically, which raises the landed cost per unit.").noise === false,
+    check(classifyModelAnswer("Import quota exhausted - the firm must now source domestically, which raises the landed cost per unit.").noise === false,
       "Nor is a one-line answer about an import quota");
-    check(classifyModelAnswer("Yes — start with the ledger.").noise === false,
+    check(classifyModelAnswer("Yes - start with the ledger.").noise === false,
       "A short real answer is not rejected for being short");
     check(sanitizeModelAnswer(LESSON) === LESSON.trim(), "A clean lesson is returned byte-for-byte");
 
@@ -724,7 +724,7 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
     check(fellThrough.provider === "cerebras" && !/budget|wallet|pollinations/i.test(fellThrough.text ?? ""),
       "Gemini answering 200 with a budget notice falls through to Cerebras in the SAME request",
       `${fellThrough.provider}: ${JSON.stringify((fellThrough.text ?? "").slice(0, 50))}`);
-    check(hits.some((url) => url.includes("generativelanguage")), "Gemini is tried first — the priority order is unchanged");
+    check(hits.some((url) => url.includes("generativelanguage")), "Gemini is tried first - the priority order is unchanged");
     check(fellThrough.attempts.some((attempt) => attempt.provider === "gemini" && attempt.status === 200 && attempt.error === "auth"),
       "The polluted attempt is recorded as a FAILURE, so /api/ai-status and the sticky slot tell the truth");
     /* Read the slot back off globalThis: after a `delete` TypeScript narrows
@@ -741,7 +741,7 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
       (String(input).includes("generativelanguage") ? geminiBody(WALL) : openAiBody(WALL))) as unknown as typeof fetch;
     const exhausted = await callLLMDetailed("You are SHIGUN.", [{ role: "user", content: "why do black holes exist" }], 300);
     check(exhausted.text === null && exhausted.provider === null,
-      "When no leg can produce a real answer the chain returns null — the cue for the on-device ML engine");
+      "When no leg can produce a real answer the chain returns null - the cue for the on-device ML engine");
     check(exhausted.attempts.length >= 2 && exhausted.attempts.every((attempt) => attempt.error),
       "Every leg is reported as failed rather than one being reported as the winner");
 
@@ -777,7 +777,7 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
      recovery wait (AI_RECOVERY_MS, always inside the shared deadline), so a
      throttled free-tier window that reopens seconds later still produces a
      cloud answer. Deterministic benches (rejected keys) are skipped for the
-     whole request — retrying them seconds later fails identically — which
+     whole request - retrying them seconds later fails identically - which
      hands the question to the local ML engine fast instead of burning the
      budget on a dead key. */
   console.log("\n--- 4f. Chain persistence: benched legs get a bounded second chance ---");
@@ -823,7 +823,7 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
       `${second.provider} after ${elapsed} ms`);
     check(elapsed < 5_000, `The recovery wait stayed inside the AI_RECOVERY_MS cap (${elapsed} ms)`);
 
-    // Pass 2b: an UNSET AI_RECOVERY_MS must fall back to its 12 s default —
+    // Pass 2b: an UNSET AI_RECOVERY_MS must fall back to its 12 s default -
     // Number(null) is 0, not NaN, and a silent zero once collapsed the whole
     // second chance, so every benched request retried instantly and the
     // chain "kept disconnecting" in production even though the tests (which
@@ -842,7 +842,7 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
       "An unset AI_RECOVERY_MS still grants the bounded second chance",
       `after ${defaultElapsed} ms`);
     check(defaultElapsed >= 2_000,
-      `The default recovery wait is actually applied when the knob is unset (${defaultElapsed} ms — instant would mean the default collapsed to 0)`);
+      `The default recovery wait is actually applied when the knob is unset (${defaultElapsed} ms - instant would mean the default collapsed to 0)`);
     process.env.AI_RECOVERY_MS = "600"; // restore for the remaining phases
 
     // Deterministic benches are never re-paid: two rejected keys produce ZERO
@@ -863,7 +863,7 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
     const fastStart = Date.now();
     const third = await callLLMDetailed("Tutor", [{ role: "user", content: "q2" }], 100);
     check(third.text === null && hits.length === authCalls && Date.now() - fastStart < 1_500,
-      "Rejected keys are skipped entirely on the next request — zero wasted calls, instant local handoff");
+      "Rejected keys are skipped entirely on the next request - zero wasted calls, instant local handoff");
 
     globalThis.fetch = originalFetch;
     resetAiCooldowns();
@@ -906,7 +906,7 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
       : url.includes("sambanova") ? "sambanova"
       : url.includes("cohere") ? "cohere"
       : "other";
-    // Each provider gets its OWN native wire format — exactly like the real
+    // Each provider gets its OWN native wire format - exactly like the real
     // hosts (Gemini answers with candidates/parts, the rest with choices).
     const ok = (host: string, content: string) => new Response(
       host === "gemini"
@@ -924,7 +924,7 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
     check(JSON.stringify(envConfiguredProviderIds()) === JSON.stringify(["gemini", "cerebras", "mistral", "sambanova", "cohere"]),
       "The five configured keys walk in the exact requested priority; keyless providers are skipped");
 
-    // Scenario 1: a healthy Gemini answers alone — nothing else is touched.
+    // Scenario 1: a healthy Gemini answers alone - nothing else is touched.
     let hits: string[] = [];
     globalThis.fetch = (async (input: string | URL | Request) => {
       const host = hostOf(String(input));
@@ -935,7 +935,7 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
     check(healthy.text === "Gemini answer" && healthy.provider === "gemini",
       "Gemini healthy → the answer comes from Gemini");
     check(hits.length === 1 && hits[0] === "gemini",
-      "A healthy primary costs exactly one call — no speculative fan-out");
+      "A healthy primary costs exactly one call - no speculative fan-out");
 
     // Scenario 5: Gemini throttled (429) → Cerebras answers the SAME request.
     resetAiCooldowns();
@@ -952,7 +952,7 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
     check(!hits.includes("mistral") && !hits.includes("sambanova") && !hits.includes("cohere"),
       "The chain stops at the first provider that answers");
 
-    // Scenario 3: two failures in a row keep walking — Gemini 503, Cerebras
+    // Scenario 3: two failures in a row keep walking - Gemini 503, Cerebras
     // 429 → Mistral answers; the legs behind the winner are never spent.
     resetAiCooldowns();
     delete stickyGlobal.__studyPlannerPreferred;
@@ -973,7 +973,7 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
     check(!hits.includes("sambanova") && !hits.includes("cohere"),
       "Once Mistral answers, the remaining legs are not spent");
 
-    // Scenario 4: missing keys are skipped — with only Mistral + Cohere
+    // Scenario 4: missing keys are skipped - with only Mistral + Cohere
     // configured, no request is ever sent to the other three hosts.
     resetAiCooldowns();
     delete stickyGlobal.__studyPlannerPreferred;
@@ -992,7 +992,7 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
     check(skipped.text === "Keyless-chain answer" && skipped.provider === "mistral",
       "A smaller key set still answers from its first configured leg");
     check(hits.every((host) => host === "mistral" || host === "cohere"),
-      "Missing keys are skipped — no call reaches an unconfigured host");
+      "Missing keys are skipped - no call reaches an unconfigured host");
     process.env.GEMINI_API_KEY = "prod-gemini-key";
     process.env.CEREBRAS_API_KEY = "prod-cerebras-key";
     process.env.SAMBANOVA_API_KEY = "prod-sambanova-key";
@@ -1099,7 +1099,7 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
   check(loggedMinutes.reduce((sum, minutes) => sum + minutes, 0) === beforeBreakClockOut, "Clocking out on break does not log break time");
 
   // Switching lessons mid-session banks the ACTIVE minutes of the previous
-  // lesson — the running session's partial time is never silently eaten.
+  // lesson - the running session's partial time is never silently eaten.
   await act(async () => {
     renderer = TestRenderer.create(React.createElement(Probe));
   });
@@ -1267,7 +1267,7 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
          GET  /api/analytics  503   ← analytics had nothing to show
 
        Because reads and writes disagreed, nothing the visitor did had any
-       effect — which reads as "the clock is missing" and "there are no
+       effect - which reads as "the clock is missing" and "there are no
        animations", since every animation worth seeing is triggered by a
        successful interaction. Reads and writes must consult ONE predicate. */
     /* Next.js types `NODE_ENV` read-only, so drive the gate through a
@@ -1364,7 +1364,7 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
 
   console.log("\n--- 9. Unconfigured-Database Guard ---");
   // Without DATABASE_URL the db handle must reject full drizzle-style chains
-  // with one clear sentinel error — never a confusing TypeError, and never an
+  // with one clear sentinel error - never a confusing TypeError, and never an
   // orphaned rejected promise (regression: `db.select(...).from is not a function`).
   const { unavailableDb, DatabaseUnavailableError } = await import("../src/db");
   const { users } = await import("../src/db/schema");
@@ -1460,7 +1460,7 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
     "weakestSubjectIds finds the lowest-completion subject");
 
   console.log("\n--- 11. Quick Add Validation ---");
-  const good = validateQuickAdd({ title: "Physics — Current Electricity", minutes: 30, date: T, subjectId: 2, kind: "practice" });
+  const good = validateQuickAdd({ title: "Physics - Current Electricity", minutes: 30, date: T, subjectId: 2, kind: "practice" });
   check(good.valid, "Valid quick-add input passes");
   const noTitle = validateQuickAdd({ title: "   ", minutes: 30, date: T, subjectId: null, kind: "practice" });
   check(!noTitle.valid && !!noTitle.errors.title, "Missing title is rejected");
@@ -1516,7 +1516,7 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
 
   console.log("\n--- 13. Responsive & Accessibility Static Checks ---");
   /* (v25) The ten standalone stylesheets were consolidated into the two the
-     app actually imports — `globals.css` (tokens, base, themes) and
+     app actually imports - `globals.css` (tokens, base, themes) and
      `ui-system.css` (component contracts, final word). These guards therefore
      read the *imported* pair, which is the only honest source of truth; the
      assertions themselves are unchanged. */
@@ -1530,7 +1530,7 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
   check(enhancementCss.includes("prefers-contrast"), "High contrast is respected");
   check(enhancementCss.includes("--tap"), "Touch targets use the shared tap token");
   check(globalsCss.includes("--tap:44px"), "The shared touch floor is 44px");
-  /* v25 architecture guards — these are what stop the old drift creeping back. */
+  /* v25 architecture guards - these are what stop the old drift creeping back. */
   check(!/JetBrains/i.test(`${globalsCss}\n${uiSystemCss}`) || /font-jetbrains/.test(globalsCss) === false,
     "No second typeface is referenced by the sheets");
   check(uiSystemCss.includes("@import") === false && globalsCss.includes("@import ui-") === false,
@@ -1599,7 +1599,7 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
 
   /* A clock the learner started by hand (Planner "Clock in", a task row) is a
      first-class session too: Pause must stop it, Resume must restart it and
-     Break must take it off the bill — none of which may spin up the focus
+     Break must take it off the bill - none of which may spin up the focus
      countdown or grab ownership. This used to be the missing half: manual
      sessions ignored Pause and Break entirely. */
   const manual = snap({ clockSessionActive: true, clockRunning: true });
@@ -1865,7 +1865,7 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
     "The onboarding name input is gone, not merely hidden");
   check(/const name = initialName\.trim\(\)/.test(onboardingSource)
     && /name,/.test(onboardingSource.slice(onboardingSource.indexOf("const payload"))),
-    "The plan is still posted with the learner's name — taken from the account");
+    "The plan is still posted with the learner's name - taken from the account");
   check(!/e\.g\./.test(onboardingSource),
     "No 'e.g. …' example text is left anywhere in the wizard");
   check(!/e\.g\./.test(readFileSync(join(process.cwd(), "src/components/AuthGate.tsx"), "utf8")),
@@ -1892,9 +1892,9 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
   /* ── The syllabus step: what the learner picked is what the learner edits ──
      Two separate breakages made "click to edit the subject" look dead:
        1. `/api/course-suggest` validated `body.courseName` while the wizard
-          posted `query`, so EVERY assessment — the button on the course step,
+          posted `query`, so EVERY assessment - the button on the course step,
           the automatic one on the details step, and "Re-assess" on the
-          syllabus step — failed with 400 "Course name is required." The list
+          syllabus step - failed with 400 "Course name is required." The list
           on screen never changed and an error banner was the only feedback.
        2. The details step re-ran the assessment whenever any detail changed,
           silently replacing the syllabus of the course the learner had just
@@ -1907,7 +1907,7 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
   check(/courseName: query/.test(onboardingSource),
     "The wizard sends the course title under the name the endpoint documents");
   check(/if \(targetQuery && !subs\.length\)/.test(onboardingSource),
-    "The details step only builds a syllabus when there is nothing to lose — a picked course is never overwritten");
+    "The details step only builds a syllabus when there is nothing to lose - a picked course is never overwritten");
   check(onboardingSource.includes("subsEdited") && onboardingSource.includes("confirmReassess"),
     "A re-assessment asks before replacing subjects the learner edited by hand");
   check(/key=\{s\.uid\}/.test(onboardingSource) && !/className="ob-sub-row" key=\{i\}/.test(onboardingSource),
@@ -1915,7 +1915,7 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
   check(onboardingSource.includes("ob-sub-name") && onboardingSource.includes("ob-sub-units"),
     "The subject fields carry their own classes so they can look like inputs");
   check(globalsCss.includes(".ob-sub-name:focus") && globalsCss.includes(":focus-within"),
-    "Clicking a subject field gives visible feedback — a focus ring on the field and on its row");
+    "Clicking a subject field gives visible feedback - a focus ring on the field and on its row");
   check(!/\.ob-sub-row input\[type=text\]\{flex:1;background:transparent;border:none;outline:none/.test(globalsCss),
     "The invisible borderless subject input is gone");
   check(/weakSubject: \(\(\) =>/.test(onboardingSource) && /String\(s\.uid\) === weak/.test(onboardingSource),
@@ -2012,7 +2012,7 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
       await act(async () => { await new Promise((resolve) => setTimeout(resolve, 30)); });
     };
 
-    // The wizard opens on Level now — no name step to walk past.
+    // The wizard opens on Level now - no name step to walk past.
     check(wizard.root.findAll((node) => node.type === "h1").some((node) => (node.children || []).join("").includes("Choose your study level")),
       "The wizard opens on the first real question, not on a name field");
     check(!wizard.root.findAll((node) => node.type === "input" && node.props.className === "ob-name-input").length,
@@ -2032,7 +2032,7 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
     check(!posted.some((call) => call.url.includes("course-suggest")),
       "Moving to the syllabus step does not silently re-assess over a picked course");
 
-    // Edit a name — the interaction that was reported as dead.
+    // Edit a name - the interaction that was reported as dead.
     const target = rows().find((row) => nameField(row).props.value === "Corporate Accounting")!;
     check(nameField(target).props.className === "ob-sub-name" && !nameField(target).props.readOnly && !nameField(target).props.disabled,
       "The subject name is a real, enabled input with its own class (so it can look like one)");
@@ -2112,7 +2112,7 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
     const sheets = strip(enhancementCss);
 
     check(!/\.page-title\s*\{[^}]*font-size/.test(strip(polishCss)),
-      "ui-system.css does not re-tune the H1 size — one owner (the --fs-h1 ramp)");
+      "ui-system.css does not re-tune the H1 size - one owner (the --fs-h1 ramp)");
     check(/\.page-title\s*\{[^}]*font-size:var\(--fs-h1\)/.test(sheets) &&
           /\.card-title[^}]*font-size:\s*var\(--fs-h3\)/.test(strip(polishCss)),
       "Page and card titles read from the shared fluid type ramp");
@@ -2123,7 +2123,7 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
 
     /* The month is rows of seven cells; the grid only stacks the rows. A
        seven-column template on `.cal-grid` would lay the header + week rows
-       side by side as seven crushed strips — exactly the broken month that
+       side by side as seven crushed strips - exactly the broken month that
        shipped on phones. */
     const calGridCols = [...sheets.matchAll(/\.cal-grid\s*\{([^}]*)\}/g)]
       .some(([, body]) => /grid-template-columns\s*:/.test(body));
@@ -2132,7 +2132,7 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
     check(!/var\(--[a-z0-9-]+,\s*#/.test(componentFiles),
       "No hardcoded hex fallbacks are left inside var() in the components");
 
-    /* Native <select> hands the open popup to the OS — the blue-row Android
+    /* Native <select> hands the open popup to the OS - the blue-row Android
        spinner that fought every theme. Every dropdown is now the shared
        themed listbox from bits.tsx. */
     const allComponents = componentFiles +
@@ -2141,9 +2141,9 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
         .map(strip)
         .join("\n");
     check(!/<select/.test(allComponents),
-      "No native <select> remains in the views — dropdowns use the themed listbox");
+      "No native <select> remains in the views - dropdowns use the themed listbox");
     check(!/JetBrains\s*Mono/.test(sheets),
-      "No second font-family name for the numerals — --font-num is the alias");
+      "No second font-family name for the numerals - --font-num is the alias");
     check(/--font-num:/.test(sheets), "--font-num (tabular numerals) is defined once");
 
     check(/\.zen\{[^}]*background:var\(--zen-bg\)/.test(sheets) && /--zen-bg:/.test(sheets),
@@ -2175,8 +2175,8 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
           /\.mobile-bottom-nav\s*\{\s*display: *grid/.test(sheets) && /\.mbn-item/.test(sheets),
       "Bottom nav is off by default and a multi-slot grid on phones");
 
-    /* (v30) Mobile chrome. The dock is four destinations — Overview · Planner
-       · Focus · Subjects — and Settings moved up into the app bar as a gear,
+    /* (v30) Mobile chrome. The dock is four destinations - Overview · Planner
+       · Focus · Subjects - and Settings moved up into the app bar as a gear,
        so the remaining cells get real width and no route becomes unreachable.
        The top-bar footprint is owned by ONE variable, because the old
        `header + 64px` content padding left a dead band under the app bar and
@@ -2185,7 +2185,7 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
     check((pageSource.match(/dock: *true/g) ?? []).length === 4,
       "The mobile dock carries exactly four destinations");
     check(/id: *"settings"[^}]*dock: *false/.test(pageSource),
-      "Settings is not docked — it lives in the top app bar");
+      "Settings is not docked - it lives in the top app bar");
     check(/aria-label="Settings"/.test(pageSource) && /mh-settings/.test(pageSource),
       "A labelled Settings gear sits in the mobile app bar");
     check(/repeat\(4, *minmax\(0, *1fr\)\)/.test(sheets),
@@ -2195,7 +2195,7 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
       "One variable owns the top-bar footprint (header + safe area)");
 
     /* (v31) The consistency ring. Its readout used to be two Tailwind
-       utilities — `absolute text-center` — and `.ring-figure` was never a
+       utilities - `absolute text-center` - and `.ring-figure` was never a
        containing block, so the percentage and the ACTIVE label kept their
        static position (under the ring) instead of centring inside it. The
        Focus timer's ring never had the bug: its `.ring-wrap` is
@@ -2214,8 +2214,8 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
        because a blurred card under 12px body copy is what read as "the whole
        app is out of focus".
 
-       This guard used to pass while `.glass-panel` — ≈39 usages, i.e. every
-       card in the product — sat frosted at blur(26px)+saturate(180%). Two
+       This guard used to pass while `.glass-panel` - ≈39 usages, i.e. every
+       card in the product - sat frosted at blur(26px)+saturate(180%). Two
        holes let it through, and both are closed here:
          · it matched only a literal `backdrop-filter: blur(`, so routing the
            radius through a token (`backdrop-filter:var(--glass-blur)`) hid it;
@@ -2244,16 +2244,16 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
       .filter((m) => /transparent/.test(m[1]))
       .map((m) => m[0].trim().slice(0, 60));
     check(translucentCardTokens.length === 0,
-      `Card paint is opaque, not a translucent ladder${translucentCardTokens.length ? ` (${translucentCardTokens.join("; ")})` : " — the surface under text is solid"}`);
+      `Card paint is opaque, not a translucent ladder${translucentCardTokens.length ? ` (${translucentCardTokens.join("; ")})` : " - the surface under text is solid"}`);
 
     /* ONE typeface. Every `font-family` must resolve to the Inter aliases (or
        the usual system fallbacks). A decorative glyph still counts: Georgia
        on the quote mark was the last second voice in the product, and it was
-       not even loaded — it fell back to the platform serif. */
+       not even loaded - it fell back to the platform serif. */
     /* The aliases, or the usual system fallback stack. A `var()` may carry a
-       fallback (`var(--font-display, inherit)`) — that is still the alias. */
+       fallback (`var(--font-display, inherit)`) - that is still the alias. */
     const ALLOWED_FONT = /^(inherit|var\(--font-(ui|num|display|inter)(,\s*[^)]+)?\)|-apple-system|BlinkMacSystemFont|Segoe UI|system-ui|ui-sans-serif|sans-serif)$/;
-    /* Split the stack on commas that are NOT inside parens — a naive split
+    /* Split the stack on commas that are NOT inside parens - a naive split
        tears `var(--font-display, inherit)` in half and reports both pieces. */
     const splitStack = (v: string) => {
       const out: string[] = [];
@@ -2271,7 +2271,7 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
       .map((f) => f.trim().replace(/^["']|["']$/g, ""))
       .filter((f) => f.length > 0 && !ALLOWED_FONT.test(f));
     check([...new Set(foreignFonts)].length === 0,
-      `One typeface everywhere${foreignFonts.length ? ` — foreign: ${[...new Set(foreignFonts)].join(", ")}` : " (no second family in either sheet)"}`);
+      `One typeface everywhere${foreignFonts.length ? ` - foreign: ${[...new Set(foreignFonts)].join(", ")}` : " (no second family in either sheet)"}`);
 
     /* The Zen room is the theme. A `.zen*` rule may still use a neutral
        black/white for a shadow or vignette, but it may not paint a
@@ -2301,13 +2301,13 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
       if (paints.length) zenHardcoded.push(`${sel.trim().slice(0, 30)} → ${paints[0]}`);
     }
     check(zenHardcoded.length === 0,
-      `Zen paints no hardcoded chromatic colour${zenHardcoded.length ? ` (${zenHardcoded.join("; ")})` : " — the room follows the theme"}`);
+      `Zen paints no hardcoded chromatic colour${zenHardcoded.length ? ` (${zenHardcoded.join("; ")})` : " - the room follows the theme"}`);
 
     /* ── The mobile gutter must be monotonic ──────────────────────────────
        Five different rules used to set `.app-wrapper`'s horizontal padding.
        Three of them were dead, and the one that actually won on phones was a
-       `padding:` shorthand carrying `--pad-shell` — a clamp whose floor is
-       16px — while a narrower 360–412px band overrode it with 12px. Net
+       `padding:` shorthand carrying `--pad-shell` - a clamp whose floor is
+       16px - while a narrower 360–412px band overrode it with 12px. Net
        effect on real hardware:
 
          320px phone → 16px gutters   (288px of content)
@@ -2381,7 +2381,7 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
       }
     }
     check(shrink.length === 0,
-      `The page gutter is monotonic — content never shrinks as the phone gets wider${shrink.length ? ` (${shrink.join("; ")})` : ""}`);
+      `The page gutter is monotonic - content never shrinks as the phone gets wider${shrink.length ? ` (${shrink.join("; ")})` : ""}`);
 
     /* The winning mobile rule has to keep the safe-area term. Written as a
        `padding:` shorthand it cannot: the shorthand resets all four
@@ -2398,7 +2398,7 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
        PG / PhD / professional (page.tsx). Eleven separate rules used to hang
        `animation:none` off it, which switched off the entrance choreography
        for panels, task rows, KPI counters, day blocks, heatmap cells, kanban
-       columns and the weekly bars — for those learners the app simply had no
+       columns and the weekly bars - for those learners the app simply had no
        animations, and nothing in Settings could put them back.
 
        Motion opt-out is `prefers-reduced-motion`'s job: it is user-controlled
@@ -2413,7 +2413,7 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
       }
     }
     check(motionKilledByDensity.length === 0,
-      `Density mode leaves the animations on${motionKilledByDensity.length ? ` (${motionKilledByDensity.join("; ")})` : " — reduced-motion remains the only motion opt-out"}`);
+      `Density mode leaves the animations on${motionKilledByDensity.length ? ` (${motionKilledByDensity.join("; ")})` : " - reduced-motion remains the only motion opt-out"}`);
     check(/prefers-reduced-motion/.test(sheets),
       "prefers-reduced-motion still opts out of motion for those who ask");
     check(/body\.mode-focused \.task-row\{padding/.test(globalsCss),
@@ -2487,7 +2487,7 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
     check(userFacingAiNotice(attemptSets[3].attempts).retryable === true &&
           userFacingAiNotice(attemptSets[0].attempts).retryable === false,
       "A transient failure offers Retry; local-only mode does not offer a pointless one");
-    /* The operator string must still be diagnostic — the fix is about routing,
+    /* The operator string must still be diagnostic - the fix is about routing,
        not about hiding the truth from whoever can act on it. */
     check(/CEREBRAS_API_KEY/.test(summarizeAttempts(attemptSets[1].attempts)),
       "The operator-facing diagnosis still names the keys an operator can fix");
@@ -2567,17 +2567,17 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
     check(/resetAiCooldowns/.test(routeSrc) && /clearRateLimit\(req, "chat"\)/.test(routeSrc),
       "The credit reset refills the counter, forgets provider failures and clears the rate limiter");
     check(/recordShigunUse/.test(chatSrc) && !/creditExhausted|CREDIT_EXHAUSTED/.test(chatSrc),
-      "The chat route records one credit per cloud answer — and credit can NEVER gate the cloud call");
+      "The chat route records one credit per cloud answer - and credit can NEVER gate the cloud call");
     check(/never throws/i.test(usageLibSrc) && /ensureShigunTable/.test(usageLibSrc),
-      "The meter self-heals a missing table and degrades to memory — it can never take the tutor down");
+      "The meter self-heals a missing table and degrades to memory - it can never take the tutor down");
     check(/ShigunCreditCard/.test(settingsSrc) && /AiCoachCard/.test(settingsSrc),
-      "Settings surfaces the deployment AI status and the usage meter — and nothing asks for a key");
+      "Settings surfaces the deployment AI status and the usage meter - and nothing asks for a key");
   }
 
   /* ── 16c · When every cloud leg is down, the on-device ML engine takes
      over and is the responsible adult ──────────────────────────────────────
      The learner complaint this pins: "it keeps falling back to the local
-     engine" — but the old local engine then answered a strategy question
+     engine" - but the old local engine then answered a strategy question
      with "couldn't find that in your plan". Now the deterministic study
      strategist answers the whole strategy family (readiness, revision,
      workload, focus, how-to-study) from the learner's OWN logged signals,
@@ -2624,13 +2624,13 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
     check(!!bareReady && /don't have enough logged history/i.test(bareReady.text),
       "Without history the strategist says so rather than fabricating a projection");
 
-    // Concept questions must NOT be swallowed by the strategist — they still
+    // Concept questions must NOT be swallowed by the strategist - they still
     // belong to the encyclopedia / syllabus path.
     check(instantTutorReply("explain the accounting equation", strategistCtx) === null,
       "A concept question is not hijacked by the strategist");
 
     // The syllabus card teaches a lesson the plan contains, even without a
-    // teach verb — this is the on-device answer when the cloud is silent.
+    // teach verb - this is the on-device answer when the cloud is silent.
     const syllabusState = {
       tasks: [],
       subjects: [{ id: 1, name: "Financial Accounting" }],
@@ -2660,7 +2660,7 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
      Each of those is pinned below. */
   console.log("\n--- 18. Accounts: credentials, hashing, sessions ---\n");
   {
-    // Usernames — comparable in lower case, so the phone and the laptop
+    // Usernames - comparable in lower case, so the phone and the laptop
     // agree about who "Arjun.R" is.
     check(normalizeUsername("  Arjun.R  ") === "arjun.r", "Username normalises to a single comparable form");
     check(usernameProblem("arjun.r") === null, "A sensible username is accepted");
@@ -2674,7 +2674,7 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
     check(usernameProblem("ADMIN") !== null, "Reserved names are caught after normalisation");
     check(displayUsername("Arjun.R") === "Arjun.R", "The casing the learner typed is kept for display");
 
-    // Passwords — strong but humane: a passphrase is as welcome as a
+    // Passwords - strong but humane: a passphrase is as welcome as a
     // symbol soup, and nothing that would lock a learner out silently.
     check(passwordProblem("StudyHard2026", "arjun.r") === null, "A strong password is accepted");
     check(passwordProblem("the quiet morning library", "arjun.r") === null, "A long passphrase is accepted");
@@ -2688,7 +2688,7 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
     check(passwordStrength("abc", "arjun.r").score <= 1, "A weak password scores at most 1");
     check(passwordStrength("", "arjun.r").hint !== null, "An empty password still explains what to do");
 
-    // Hashing — the stored value must be useless to whoever reads the
+    // Hashing - the stored value must be useless to whoever reads the
     // database, and must still recognise the real password.
     const hash = await hashPassword("StudyHard2026");
     check(hash.startsWith("scrypt$"), "Passwords are stored as self-describing scrypt hashes");
@@ -2701,7 +2701,7 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
     check(!(await verifyPassword("StudyHard2026", "garbage")), "A corrupted hash never verifies (and never throws)");
     check(!(await verifyPassword("x", "scrypt$99999999$8$1$YWJj$YWJj")), "Absurd scrypt parameters are refused, not allocated");
 
-    // Session cookies — HttpOnly, SameSite, and Secure only where Secure works.
+    // Session cookies - HttpOnly, SameSite, and Secure only where Secure works.
     const httpsReq = new Request("https://plan.example/api/state", {
       headers: { "x-forwarded-proto": "https" },
     });
@@ -2818,7 +2818,7 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
   console.log("\n--- 18d. Signing up hands over to signing in ---\n");
   {
     /* Creating credentials and USING them are two different acts. The
-       sign-up call stops at "account created" — no session, no cookie — and
+       sign-up call stops at "account created" - no session, no cookie - and
        the form flips to Sign in with the username already filled in. A
        password typo is therefore caught while the learner still remembers
        typing it, instead of locking them out of their own phone later. */
@@ -2937,6 +2937,35 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
     else Object.assign(globalThis, { localStorage: savedLocal });
   }
 
+  console.log("\n--- 18e. Plain words: no em dashes, no slogans ---\n");
+  {
+    /* An em dash in every other sentence is the single clearest tell of
+       machine-written copy, and a tagline under the logo is the second.
+       Both are banned from the app, the docs and the tutor's own replies. */
+    const dashed: string[] = [];
+    const walk = (dir: string) => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const full = join(dir, entry.name);
+        if (entry.isDirectory()) { walk(full); continue; }
+        if (!/\.(ts|tsx|css)$/.test(entry.name)) continue;
+        if (readFileSync(full, "utf8").includes("\u2014")) dashed.push(full);
+      }
+    };
+    walk(join(process.cwd(), "src"));
+    check(dashed.length === 0, "No em dash is left anywhere in src/", dashed.slice(0, 4).join(", "));
+    check(!readFileSync(join(process.cwd(), "README.txt"), "utf8").includes("\u2014"),
+      "…nor in the README that ships with it");
+    const gate = readFileSync(join(process.cwd(), "src/components/AuthGate.tsx"), "utf8");
+    check(!gate.includes("auth-brand-tag") && !/>One account/.test(gate),
+      "The sign-in screen states its name, not a slogan");
+    check(!readFileSync(join(process.cwd(), "src/components/Onboarding.tsx"), "utf8").includes("ob-brand-tag"),
+      "…and neither does the setup wizard");
+    const { plainDashes } = await import("../src/lib/ai");
+    check(plainDashes("Revise vectors - then rest \u2014 you earned it") === "Revise vectors - then rest - you earned it",
+      "The tutor's own answers are de-dashed before they reach the chat");
+    check(plainDashes("no dashes here") === "no dashes here", "Text without dashes is passed through untouched");
+  }
+
   console.log("\n--- 18b. Every data route is behind the account ---\n");
   {
     /* The regression this prevents: ONE route left reading identity from the
@@ -2987,7 +3016,7 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
     /* `src/` is the only tree the app runs (README.txt). Two separate breakages
        have shipped through the mirrors, so both are locked here:
 
-       1. `deploy-package/src` — the drag-and-drop mirror — drifted 10 files
+       1. `deploy-package/src` - the drag-and-drop mirror - drifted 10 files
           behind `src/`, so a drag-and-drop deploy silently shipped stale
           behaviour.
 

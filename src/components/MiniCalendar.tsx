@@ -4,7 +4,7 @@ import React, { useMemo, useState } from "react";
 import { fmtDate, parseDate, today, type AppState } from "@/lib/client";
 import { IconChevron } from "./icons";
 
-/** Compact monthly calendar for the Dashboard — dates with planned tasks
+/** Compact monthly calendar for the Dashboard - dates with planned tasks
  *  carry a soft dot; today gets the accent ring. Read-only at a glance. */
 export default function MiniCalendar({ state }: { state: AppState }) {
   const now = new Date();

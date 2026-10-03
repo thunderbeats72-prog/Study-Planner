@@ -10,7 +10,7 @@
  * The module also keeps a small IN-MEMORY mutation layer (task overrides,
  * extra tasks, session logs, settings overrides) so that in demo mode the
  * interactive API routes (clock in/out, Done/Skip/Edit, settings) return
- * healthy responses instead of 5xx — a preview visitor should be able to
+ * healthy responses instead of 5xx - a preview visitor should be able to
  * exercise the exact flows a real learner uses, without any database.
  */
 
@@ -56,7 +56,7 @@ const TOPIC_TITLES: Record<string, string[]> = {
     "Essentials of a valid contract",
     "Offer, acceptance and consideration",
     "Discharge and breach of contract",
-    "Sale of Goods Act — conditions & warranties",
+    "Sale of Goods Act - conditions & warranties",
   ],
 };
 
@@ -155,10 +155,10 @@ export function demoAddSubject(input: { name: string; color: string; difficulty:
     extraTopics.push({
       id: nextExtraTopicId++, userId: 0, subjectId: row.id,
       unit: `Unit ${i + 1}`,
-      title: `${input.name} — Module ${i + 1}: core concepts`,
+      title: `${input.name} - Module ${i + 1}: core concepts`,
       summary: `Core ideas, worked examples and the exam-style questions for module ${i + 1} of ${input.name}.`,
       objectives: [`Explain the key ideas of module ${i + 1}`, "Solve two exam-level questions unaided"],
-      prerequisites: i ? [`${input.name} — Module ${i}: core concepts`] : [],
+      prerequisites: i ? [`${input.name} - Module ${i}: core concepts`] : [],
       keyConcepts: ["Definition", "Worked example", "Common mistake"],
       practice: "5 practice questions with answers",
       depth: "standard",
@@ -245,7 +245,7 @@ export function demoFallbackState(userKey: string): DemoState {
       subjectId: subject.id,
       unit: `Unit ${index + 1}`,
       title,
-      summary: `${title} — core ideas, worked examples and the exam-style questions that come from this section.`,
+      summary: `${title} - core ideas, worked examples and the exam-style questions that come from this section.`,
       objectives: [`Explain ${title.toLowerCase()}`, "Solve two exam-level questions unaided"],
       prerequisites: index ? [(TOPIC_TITLES[subject.name] || [])[index - 1]] : [],
       keyConcepts: ["Definition", "Worked example", "Common mistake"],

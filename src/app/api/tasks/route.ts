@@ -37,7 +37,7 @@ async function patchTasks(req: Request) {
   const user = await requireUser(req);
   const key = user.userKey;
 
-  // Shared demo response builder — the in-memory preview round-trips the
+  // Shared demo response builder - the in-memory preview round-trips the
   // same { ...state, context } shape every mutation path returns.
   const demoResponse = async () => {
     const fresh = await fullState(key);

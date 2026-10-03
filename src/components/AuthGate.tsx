@@ -15,7 +15,7 @@ import {
 import { cn } from "@/lib/cn";
 
 type Mode = "signin" | "signup";
-/** Remembers that THIS browser has signed in before — nothing identifying,
+/** Remembers that THIS browser has signed in before - nothing identifying,
  *  just which tab to open on. A returning learner should not have to walk
  *  past "Create account" every time they sign out. */
 const RETURNING_KEY = "spp_has_account";
@@ -37,13 +37,13 @@ type MeResponse = {
  * One account, every device. This screen is the only thing standing between
  * a visitor and somebody's study plan, so it does four jobs carefully:
  *
- *   1. It explains, in one line, WHY an account exists — "your plan follows
- *      you to your phone" — because that is the whole feature.
+ *   1. It explains, in one line, WHY an account exists - "your plan follows
+ *      you to your phone" - because that is the whole feature.
  *   2. It validates with the EXACT rules the server uses (src/lib/authRules
  *      is shared), so the form never promises something the API rejects.
  *   3. Creating an account does not barge into the app. It hands over to the
  *      sign-in form with the username already filled in, so the learner uses
- *      the credentials once while they still remember typing them — a
+ *      the credentials once while they still remember typing them - a
  *      mistyped password is caught here, not next week on their phone.
  *   4. It fails kindly: wrong password, taken username, database asleep and
  *      Caps Lock all read as plain sentences, next to the field at fault.
@@ -128,7 +128,7 @@ export default function AuthGate({
     setError(null);
     setTouched(false);
     setConfirm("");
-    // Keep whatever they typed — switching tabs should never retype a name.
+    // Keep whatever they typed - switching tabs should never retype a name.
   }, []);
 
   const submit = async (event: React.FormEvent) => {
@@ -190,7 +190,7 @@ export default function AuthGate({
       try {
         window.localStorage?.setItem(RETURNING_KEY, "1");
       } catch {
-        /* private mode — the tab default is not worth an error */
+        /* private mode - the tab default is not worth an error */
       }
       // A sign-in that follows a sign-up IS the sign-up, as far as the
       // welcome message is concerned. Compare canonical usernames: the
@@ -224,7 +224,6 @@ export default function AuthGate({
           </div>
           <div>
             <div className="auth-brand-name">Study Planner Pro</div>
-            <div className="auth-brand-tag">One account · every device</div>
           </div>
         </header>
 
@@ -255,7 +254,7 @@ export default function AuthGate({
           </h1>
           <p className="auth-lead">
             {isSignup
-              ? "Pick a username and password, then sign in with them. Your plan, hours, streak and tutor history live with the account — on every device."
+              ? "Pick a username and password, then sign in with them. Your plan, hours, streak and tutor history live with the account - on every device."
               : "Sign in and your plan appears exactly as you left it, on any device."}
           </p>
 
@@ -317,7 +316,7 @@ export default function AuthGate({
               {isSignup && (
                 <p className={cn("auth-hint", usernameIssue && "auth-hint-bad")}>
                   {usernameIssue ||
-                    "3–24 characters: letters, numbers, and . _ - — capitals don't matter when signing in."}
+                    "3–24 characters: letters, numbers, and . _ - - capitals don't matter when signing in."}
                 </p>
               )}
             </div>
@@ -388,7 +387,7 @@ export default function AuthGate({
               )}
               {isSignup && (
                 <p className={cn("auth-hint", passwordIssue && touched && "auth-hint-bad")}>
-                  {passwordIssue || strength.hint || "Strong password — good to go."}
+                  {passwordIssue || strength.hint || "Strong password - good to go."}
                 </p>
               )}
             </div>
@@ -469,7 +468,7 @@ export default function AuthGate({
             <span className="auth-point-icon">
               <IconCheck size={13} />
             </span>
-            Same plan on laptop and phone — tasks, logged hours, streak and chat.
+            Same plan on laptop and phone - tasks, logged hours, streak and chat.
           </li>
           <li>
             <span className="auth-point-icon">
@@ -481,7 +480,7 @@ export default function AuthGate({
             <span className="auth-point-icon">
               <IconLock size={13} />
             </span>
-            Passwords are stored as salted scrypt hashes — never in plain text.
+            Passwords are stored as salted scrypt hashes - never in plain text.
           </li>
         </ul>
       </div>

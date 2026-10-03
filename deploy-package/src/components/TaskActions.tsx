@@ -37,7 +37,7 @@ function releaseMenu(id: string) {
 /* ══════════════════════════════════════════════════════════════════════
    The ⋯ menu renders in a PORTAL pinned with position:fixed.
 
-   Why: the old in-flow absolute dropdown was silently clipped to nothing —
+   Why: the old in-flow absolute dropdown was silently clipped to nothing -
    `.day-block` carries `overflow: hidden` (for its rounded corners) and the
    day sheet's list is a scroll container, so opening the menu on the last
    task of a day painted it outside the visible box. A portal anchored to
@@ -130,7 +130,7 @@ export default function TaskActions({
     placeMenu();
     /* One more pass on the next frame: the first measurement can happen
        before the portal's entry animation and fonts have settled, which
-       used to leave the menu anchored a few pixels off — or, on a cold
+       used to leave the menu anchored a few pixels off - or, on a cold
        open, still parked off-screen. */
     /* Guarded: react-test-renderer (the suite) has no rAF on `window`. */
     const raf =
@@ -159,7 +159,7 @@ export default function TaskActions({
     const onClick = (event: MouseEvent) => {
       const target = event.target as Node | null;
       if (wrapRef.current?.contains(target)) return;
-      // Clicks inside the portalled menu are "inside" too — their own
+      // Clicks inside the portalled menu are "inside" too - their own
       // handlers decide whether the menu closes.
       if (menuRef.current?.contains(target)) return;
       closeMenu();
@@ -186,7 +186,7 @@ export default function TaskActions({
   /* `stopPropagation` matters: the window click listener that closes the menu
      is registered on the very same click in some browsers, and without it the
      open tap could be read as an outside tap and close the menu again in the
-     same tick — the "⋮ does nothing" symptom. */
+     same tick - the "⋮ does nothing" symptom. */
   const toggleMenu = (event?: React.MouseEvent<HTMLButtonElement>) => {
     event?.preventDefault();
     event?.stopPropagation();
@@ -375,7 +375,7 @@ export default function TaskActions({
           aria-label={
             done ? "Mark this task as not done" : "Mark this task as done"
           }
-          title={done ? "Undo — put it back on tomorrow's plan" : "Mark done"}
+          title={done ? "Undo - put it back on tomorrow's plan" : "Mark done"}
           onClick={handleDone}
         >
           {done ? <IconUndo size={13} /> : <IconCheck size={13} />}
@@ -412,7 +412,7 @@ export default function TaskActions({
               {task.date} along with the minutes planned for it.
             </>
           }
-          detail="Your curriculum lesson stays in the syllabus — use Re-plan to reschedule it, or Skip if you only want it off today."
+          detail="Your curriculum lesson stays in the syllabus - use Re-plan to reschedule it, or Skip if you only want it off today."
           confirmLabel="Delete task"
           cancelLabel="Keep it"
           onCancel={() => setConfirmDelete(false)}

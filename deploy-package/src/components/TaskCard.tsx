@@ -28,7 +28,7 @@ import TaskActions from "./TaskActions";
 import { TaskLiveBadge } from "./TaskClockButton";
 
 /* ══════════════════════════════════════════════════════════════════════
-   TaskCard — the single task-row component (v25).
+   TaskCard - the single task-row component (v25).
 
    Before this, the Overview and the Planner each hand-rolled their own row
    out of Tailwind utilities, so the two "same" lists drifted (one truncated
@@ -37,11 +37,11 @@ import { TaskLiveBadge } from "./TaskClockButton";
    component is that shared owner:
 
      • grid-based card: rail · body · actions, so controls can never overlap
-       the copy — on phones the action row drops below the body and the card
+       the copy - on phones the action row drops below the body and the card
        grows to fit its content instead of clipping it;
      • title wraps on words (no `truncate`), the lesson brief is always
        visible (2 lines, then "more"), meta is a wrapping chip row;
-     • colour comes from ONE semantic source — the task-kind token — used by
+     • colour comes from ONE semantic source - the task-kind token - used by
        the rail, the chip and the calendar dot, so they can't disagree.
    ══════════════════════════════════════════════════════════════════════ */
 
@@ -87,7 +87,7 @@ const isCheckpoint = (task: TaskRow) =>
   task.kind === "checkpoint" ||
   (!!task.title && task.title.toLowerCase().startsWith("checkpoint:"));
 
-/** "Today" / "Tomorrow" / "Yesterday" / "in 3 days" — short, so the chip
+/** "Today" / "Tomorrow" / "Yesterday" / "in 3 days" - short, so the chip
  *  fits on a 320px screen without wrapping the whole meta row. */
 function dueLabel(date: string) {
   const diff = dayDiff(today(), date);
@@ -252,7 +252,7 @@ export default function TaskCard({
               )}
               title={
                 live
-                  ? `Actual study time logged on this task — recording now (${mmss(totalLoggedSeconds)})`
+                  ? `Actual study time logged on this task - recording now (${mmss(totalLoggedSeconds)})`
                   : "Actual minutes studied and logged on this task"
               }
             >

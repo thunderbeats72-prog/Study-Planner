@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 
 /**
  * Makes the hardware/browser Back button close an overlay (modal, sheet,
- * zen mode, chat panel) instead of leaving the page — the behaviour every
+ * zen mode, chat panel) instead of leaving the page - the behaviour every
  * native app has and users instinctively expect on Android.
  *
  * While `open` is true, one history entry is pushed; pressing Back pops it
@@ -23,7 +23,7 @@ export function useBackClose(open: boolean, onClose: () => void) {
     if (typeof window === "undefined") return;
 
     /* `history` is missing outside a browser (the react-test-renderer suite
-       mounts overlays in Node), and an overlay must still open there — the
+       mounts overlays in Node), and an overlay must still open there - the
        Back shortcut is a nicety, never a precondition. */
     if (open && !armedRef.current && typeof window.history?.pushState === "function") {
       armedRef.current = true;

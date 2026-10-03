@@ -7,7 +7,7 @@ import { IconCheck, IconLock, IconRefresh, IconShield, IconUser, IconWarn } from
 import { Reveal, Spot } from "@/lib/fx";
 import { cn } from "@/lib/cn";
 
-/** "2 minutes ago" / "yesterday" — enough for a device list, no library. */
+/** "2 minutes ago" / "yesterday" - enough for a device list, no library. */
 function sinceLabel(iso: string): string {
   const then = Date.parse(iso);
   if (!Number.isFinite(then)) return "";
@@ -28,7 +28,7 @@ function sinceLabel(iso: string): string {
  * The management side of the credentials created at the front door: who is
  * signed in, which devices are currently open on this plan, how to change
  * the password, and how to leave. Everything here is about the ONE promise
- * accounts make — the same plan, wherever you sign in.
+ * accounts make - the same plan, wherever you sign in.
  */
 export default function AccountCard({
   account,
@@ -188,7 +188,7 @@ export default function AccountCard({
               style={{ color: "var(--text-dim)" }}
             >
               Sign in with these credentials on a phone, tablet or another laptop and you will see
-              exactly this plan — every change lands on all of them.
+              exactly this plan - every change lands on all of them.
             </p>
 
             {/* ── Signed-in devices ── */}
@@ -366,7 +366,7 @@ export default function AccountCard({
               className="text-[length:var(--fs-meta)] font-semibold leading-relaxed"
               style={{ color: "var(--text-dim)" }}
             >
-              Signing out never deletes anything — your plan waits for the next sign-in.
+              Signing out never deletes anything - your plan waits for the next sign-in.
             </p>
           </>
         )}

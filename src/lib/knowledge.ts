@@ -2,7 +2,7 @@
    Runs server-side only.
    Multilingual: a question written in an Indic/Arabic/East-Asian script is
    looked up on that language's Wikipedia, and the lesson is structured with
-   headers in that language — so the voice tutor's local fallback is actually
+   headers in that language - so the voice tutor's local fallback is actually
    useful to Hindi/Bengali/Tamil/... learners, not just English speakers. */
 
 import { detectLanguage, LANGS } from "./language";
@@ -33,7 +33,7 @@ const STOP = new Set([
   // solve", "what is the possible solution …") without carrying topic meaning
   "possible", "possibly", "solve", "solving", "solved", "going", "gonna", "want", "wants",
   "know", "knew", "think", "thinking", "really", "actually", "just", "like", "some", "any",
-  // talk ABOUT the assistant / the session — never a topic ("why did it
+  // talk ABOUT the assistant / the session - never a topic ("why did it
   // take time to connect" once produced a lesson on the quiz show
   // "Only Connect"; "why are you not responsive" hit a random article)
   "take", "took", "taking", "time", "connect", "connected", "connecting", "connection",
@@ -235,8 +235,8 @@ export function isRelevantKnowledge(k: Knowledge, question: string): boolean {
  *  and return a rich extract for the best matching article.
  *  MULTI-PROBE: a spoken question ("please define the ukraine and russia
  *  conflict how it is going to solve") produces a long keyword soup that
- *  often has zero direct search hits. Progressive shorter probes — the full
- *  term, then its leading keywords — find the real article instead of
+ *  often has zero direct search hits. Progressive shorter probes - the full
+ *  term, then its leading keywords - find the real article instead of
  *  returning nothing. */
 export async function lookupKnowledge(question: string): Promise<Knowledge | null> {
   const term = searchTerms(question);
@@ -257,7 +257,7 @@ export async function lookupKnowledge(question: string): Promise<Knowledge | nul
   }
 
   // Some technical topics only exist (or are far richer) on the English wiki.
-  // A non-English learner still gets a useful, correctly structured lesson —
+  // A non-English learner still gets a useful, correctly structured lesson -
   // the bilingual lesson headers below stay in their language.
   if (lang === "en") return null;
   for (const probe of probes) {
@@ -418,10 +418,10 @@ function lessonHeaders(lang: string) {
 }
 
 /**
- * Turn a raw encyclopedia extract into a genuine tutor-style lesson — not a
+ * Turn a raw encyclopedia extract into a genuine tutor-style lesson - not a
  * copy-paste. It restructures the material into: one-line definition, why it
  * matters, a mechanism/components breakdown, a worked/exam angle, common
- * mistakes, and a self-test — all adapted to the learner's level. When the
+ * mistakes, and a self-test - all adapted to the learner's level. When the
  * extract came from a non-English Wikipedia, the structure headers switch to
  * the learner's language so the whole answer reads (and speaks) coherently.
  */
@@ -453,32 +453,32 @@ export function teachFromKnowledge(
   out.push("");
   out.push(`${h.whyMatters} ${whyItMatters(k.title, subjectHint, question, k.lang)}`);
 
-  // 3. The mechanism / components — restructured, not dumped
+  // 3. The mechanism / components - restructured, not dumped
   if (supporting.length) {
     out.push("");
     out.push(deep ? h.keyMechanisms : h.howWorks);
     supporting.forEach((d, i) => out.push(`${i + 1}. ${d}`));
   }
 
-  // 4. Exam / application angle — this is the part that isn't "wikipedia"
+  // 4. Exam / application angle - this is the part that isn't "wikipedia"
   out.push("");
   out.push(h.examAngle);
   const devanagari = k.lang === "hi" || k.lang === "mr" || k.lang === "ne";
   if (young) {
     out.push(`- ${devanagari ? `यदि प्रश्न *${k.title}* के बारे में हो, तो पहले बताएँ कि यह क्या है, फिर एक रोज़मर्रा का उदाहरण दें।` : `If a question asks about *${k.title}*, first say what it is, then give one everyday example.`}`);
-    out.push(`- ${devanagari ? "हो सके तो चित्र बनाएँ — लेबल वाला चित्र आसान अंक दिलाता है।" : "Draw it if you can — a labelled picture earns easy marks."}`);
+    out.push(`- ${devanagari ? "हो सके तो चित्र बनाएँ - लेबल वाला चित्र आसान अंक दिलाता है।" : "Draw it if you can - a labelled picture earns easy marks."}`);
   } else if (deep) {
     out.push(`- ${devanagari ? "मान्यताएँ, किनारे के मामले और मानक दृष्टिकोण की एक आलोचना बताने के लिए तैयार रहें।" : `Be ready to state assumptions, edge cases, and one criticism of the standard view.`}`);
     out.push(`- ${devanagari ? `*${k.title}* को पास के ढाँचे से जोड़ें और बताएँ कि वे कहाँ अलग होते हैं।` : `Link *${k.title}* to an adjacent framework and explain where they diverge.`}`);
   } else {
     out.push(`- ${devanagari ? "उत्तर की शुरुआत एक स्पष्ट एक-पंक्ति परिभाषा से करें, फिर ऊपर के बिंदुओं के आसपास शरीर बनाएँ।" : "Lead your answer with a crisp 1-line definition, then structure the body around the points above."}`);
-    out.push(`- ${devanagari ? "एक ठोस उदाहरण या हल किया गया संख्यात्मक जोड़ें — परीक्षक रटने की नहीं, प्रयोग की सराहना करते हैं।" : "Add one concrete example or a worked numerical — examiners reward application, not recall."}`);
+    out.push(`- ${devanagari ? "एक ठोस उदाहरण या हल किया गया संख्यात्मक जोड़ें - परीक्षक रटने की नहीं, प्रयोग की सराहना करते हैं।" : "Add one concrete example or a worked numerical - examiners reward application, not recall."}`);
   }
 
   // 5. Common mistakes + self test
   out.push("");
   out.push(h.watchOut);
-  out.push(`- ${devanagari ? "परिभाषा को उसके *उदाहरण* से न मिलाएँ — दोनों को अलग-अलग बताएँ।" : "Don't confuse the *definition* with an *example* of it — state both separately."}`);
+  out.push(`- ${devanagari ? "परिभाषा को उसके *उदाहरण* से न मिलाएँ - दोनों को अलग-अलग बताएँ।" : "Don't confuse the *definition* with an *example* of it - state both separately."}`);
   out.push(`- ${devanagari ? "सीमा की शर्तें सीखें: यह **कब** लागू नहीं होता?" : "Learn the boundary conditions: when does this **not** apply?"}`);
   out.push("");
   out.push(h.testNow);
@@ -492,7 +492,7 @@ export function teachFromKnowledge(
   }
   if (k.related.length) {
     out.push("");
-    out.push(`${h.studyNext} ${k.related.join(" · ")} — ${h.askMe} *"${k.related[0]}"*`);
+    out.push(`${h.studyNext} ${k.related.join(" · ")} - ${h.askMe} *"${k.related[0]}"*`);
   }
   out.push("");
   out.push(`_${h.reference} [${k.title}](${k.url})_`);
@@ -512,14 +512,14 @@ function whyItMatters(title: string, subject: string | undefined, question: stri
   const devanagari = lang === "hi" || lang === "mr" || lang === "ne";
   if (devanagari) {
     if (/exam|marks|score/i.test(question)) {
-      return `यह बार-बार आने वाला परीक्षा विषय है — इसे अच्छी तरह समझना आसान अंक सुरक्षित करता है।`;
+      return `यह बार-बार आने वाला परीक्षा विषय है - इसे अच्छी तरह समझना आसान अंक सुरक्षित करता है।`;
     }
     if (subject) {
-      return `यह **${subject}** की आधारशिला है — आगे के विषय मानते हैं कि आप ${title} पहले ही समझ चुके हैं।`;
+      return `यह **${subject}** की आधारशिला है - आगे के विषय मानते हैं कि आप ${title} पहले ही समझ चुके हैं।`;
     }
     return `${title} को समझना उस पर बने विषयों को बहुत आसान बना देता है, इसलिए इसे अभी अच्छी तरह सीखें।`;
   }
-  if (/exam|marks|score/i.test(question)) return `It's a recurring exam topic — understanding it well protects easy marks.`;
-  if (subject) return `It's a building block in **${subject}** — later topics assume you already understand ${title}.`;
+  if (/exam|marks|score/i.test(question)) return `It's a recurring exam topic - understanding it well protects easy marks.`;
+  if (subject) return `It's a building block in **${subject}** - later topics assume you already understand ${title}.`;
   return `Grasping ${title} makes the topics built on top of it far easier, so it's worth over-learning now.`;
 }

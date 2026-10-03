@@ -4,7 +4,7 @@ import { AuthError, AuthRequiredError } from "./auth";
 
 /**
  * True when a request failed specifically because DATABASE_URL is not
- * configured — as opposed to a transient database outage or a genuine bug.
+ * configured - as opposed to a transient database outage or a genuine bug.
  */
 export function isDatabaseConfigError(error: unknown): boolean {
   return error instanceof DatabaseUnavailableError;

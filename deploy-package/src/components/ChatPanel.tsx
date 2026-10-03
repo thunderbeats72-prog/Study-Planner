@@ -6,7 +6,7 @@ import { IconChat, IconCheck, IconClose, IconCopy, IconSend, IconSpark } from ".
 
 const QUICKS = [
   "What should I study today?",
-  "I'm behind — replan",
+  "I'm behind - replan",
   "Explain my weakest topic in detail",
 ];
 
@@ -14,7 +14,7 @@ type HealthSnapshot = {
   ai?: { mode?: string; configuredProviders?: string[] };
 };
 
-/** What the last tutor reply actually came from — set by the page after
+/** What the last tutor reply actually came from - set by the page after
  *  each /api/chat round-trip. "cloud" = a provider answered; "local" =
  *  cloud was configured but the on-device engine answered instead;
  *  "instant" = a deterministic reply (commands, greetings, plan queries)
@@ -40,7 +40,7 @@ export default function ChatPanel({
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   /* A send lock prevents double-submits on mobile. It MUST clear whenever a
-     send was not actually started — `onSend` can bail out (empty text, a
+     send was not actually started - `onSend` can bail out (empty text, a
      request already in flight) before `thinking` ever flips, and before this
      guard the lock then stayed set forever: the button went dead and no
      further message could be sent until a reload. Releasing on a short timer
@@ -55,7 +55,7 @@ export default function ChatPanel({
   }, [thinking, messages.length, releaseLock]);
 
   /* Tell the document the coach is open. On desktop the panel is a floating
-     card, and a floating card over a working page hides whatever is under it —
+     card, and a floating card over a working page hides whatever is under it -
      the Planner's Add Task / Rebalance row especially. `body.ai-open` lets the
      workspace pull its content clear of the panel instead of letting the panel
      sit on top of the controls. On phones the panel is a bottom sheet with a
@@ -65,7 +65,7 @@ export default function ChatPanel({
     return () => document.body.classList.remove("ai-open");
   }, [open]);
 
-  // Fetch health on every open — cheap, no-store, and we use raw fetch so
+  // Fetch health on every open - cheap, no-store, and we use raw fetch so
   // a 503 (db down) still preserves ai.configuredProviders from the body.
   // Also probe /api/ai-status GET for the shared llm snapshot.
   useEffect(() => {
@@ -143,10 +143,10 @@ export default function ChatPanel({
 
   /* Cloud is active when the deployment configured at least one provider key
      in its environment, or when the page just saw a model answer. Which
-     provider it is stays private — clean UI, no vendor lock-in feel. */
+     provider it is stays private - clean UI, no vendor lock-in feel. */
   const isCloudActive = !!(health?.ai?.configuredProviders?.length || provider);
 
-  /* The header used to say "Ready" whenever a key existed — even while every
+  /* The header used to say "Ready" whenever a key existed - even while every
      cloud call was failing and the learner was getting fallback text. The
      label now follows the LAST REAL REPLY: a cloud answer shows "Cloud AI",
      a fallback shows "Local engine" so the state on screen matches what the
@@ -162,9 +162,9 @@ export default function ChatPanel({
           ? "Cloud busy · local engine answered"
           : "Ready";
   const statusTitle = !isCloudActive
-    ? "This deployment has no AI provider keys configured, so Shigun answers from the on-device study engine — plan-aware, but less conversational. Keys are added once in the deployment's server environment and then work for every learner."
+    ? "This deployment has no AI provider keys configured, so Shigun answers from the on-device study engine - plan-aware, but less conversational. Keys are added once in the deployment's server environment and then work for every learner."
     : degraded
-      ? "The cloud providers didn't answer the last message in time, so the on-device engine replied. Send it again — the next provider in the chain picks it up."
+      ? "The cloud providers didn't answer the last message in time, so the on-device engine replied. Send it again - the next provider in the chain picks it up."
       : "Shigun is connected to its cloud AI layer through this deployment's own keys, grounded by the on-device ML engine.";
 
   return (
@@ -214,7 +214,7 @@ export default function ChatPanel({
                 </h4>
                 <p className="companion-sub">
                   {learner.todayTotal > 0 && learner.todayDone >= learner.todayTotal
-                    ? "All sessions done for today — great work."
+                    ? "All sessions done for today - great work."
                     : learner.todayTotal > 0
                       ? `${learner.todayTotal - learner.todayDone} of ${learner.todayTotal} sessions left · ${learner.daysLeft}d to exam`
                       : `${learner.daysLeft} days to exam · ${learner.progressPct}% complete`}
@@ -264,7 +264,7 @@ export default function ChatPanel({
 
           {/* ── No cloud keys configured ──
               Keys live in the deployment environment, never in the app, so
-              the only honest note is a calm one-liner — no setup wizard. */}
+              the only honest note is a calm one-liner - no setup wizard. */}
           {!isCloudActive && (
             <div className="ai-connect">
               <div className="ai-connect-text">

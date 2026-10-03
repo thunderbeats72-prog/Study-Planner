@@ -15,7 +15,7 @@ import { cn } from "@/lib/cn";
 type Level = { id: string; label: string; sub: string };
 type SeedSubject = { name: string; units: number; difficulty: string; color: string };
 /** A syllabus row while the wizard owns it. `uid` is a stable React key and
- *  the identity the "weakest subject" choice is stored against — it is
+ *  the identity the "weakest subject" choice is stored against - it is
  *  stripped before the payload is posted, so `/api/onboard` sees exactly the
  *  `{name, units, difficulty, color}` shape it validates. */
 type EditableSubject = SeedSubject & { uid: number };
@@ -76,8 +76,8 @@ function formatHours(value: number) { const whole = Math.floor(value); const min
 function formatHoursCompact(value: number) { return `${compactNumber(value)}h`; }
 function studyDaysPerWeek(mode: string) { if (mode === "weekdays") return 5; if (mode === "6days") return 6; return 7; }
 function studyHourHint(hours: number, studyDaysMode: string) { const weeklyHours = Math.round(hours * studyDaysPerWeek(studyDaysMode) * 10) / 10; const rhythm = hours <= 1.5 ? "Gentle pace" : hours <= 3.5 ? "Sustainable pace" : hours <= 6.5 ? "Strong daily rhythm" : "Intensive push"; return `${rhythm} · about ${compactNumber(weeklyHours)}h/week`; }
-function subjectsPerDayHint(count: number) { if (count <= 1) return "Deep focus on one subject each day."; if (count === 2) return "Balanced variety without too much switching."; if (count <= 4) return "Good for mixed revision and syllabus coverage."; return "Fast rotation — useful close to exams."; }
-function bufferDaysHint(days: number) { if (days <= 0) return "No spare recovery days — every study day counts."; if (days <= 3) return "Lean buffer for small delays and busy days."; if (days <= 7) return "Healthy safety net for revision and catch-up."; return "Plenty of recovery room before the deadline."; }
+function subjectsPerDayHint(count: number) { if (count <= 1) return "Deep focus on one subject each day."; if (count === 2) return "Balanced variety without too much switching."; if (count <= 4) return "Good for mixed revision and syllabus coverage."; return "Fast rotation - useful close to exams."; }
+function bufferDaysHint(days: number) { if (days <= 0) return "No spare recovery days - every study day counts."; if (days <= 3) return "Lean buffer for small delays and busy days."; if (days <= 7) return "Healthy safety net for revision and catch-up."; return "Plenty of recovery room before the deadline."; }
 
 function OnboardingSlider({ label, value, valueLabel, hint, min, max, step, minLabel, maxLabel, onChange, presets = [], fullWidth = false }: OnboardingSliderProps) {
   const inputId = useId();
@@ -175,7 +175,7 @@ export default function Onboarding({
   const [search, setSearch] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
-  /* The account already carries the learner's name — the wizard reads it,
+  /* The account already carries the learner's name - the wizard reads it,
      never asks for it again, and posts it straight back with the plan. */
   const name = initialName.trim();
   const firstName = name.split(/\s+/)[0] || "";
@@ -262,9 +262,9 @@ export default function Onboarding({
   const addSubject = () => {
     const name = newSub.trim();
     if (!name) return;
-    if (subs.length >= 12) { setErr("That is the maximum — 12 subjects. Remove one first."); return; }
+    if (subs.length >= 12) { setErr("That is the maximum - 12 subjects. Remove one first."); return; }
     if (subs.some((s) => s.name.trim().toLocaleLowerCase() === name.toLocaleLowerCase())) {
-      setErr(`"${name}" is already in the list — edit that row instead of adding a duplicate.`);
+      setErr(`"${name}" is already in the list - edit that row instead of adding a duplicate.`);
       return;
     }
     setErr("");
@@ -300,7 +300,7 @@ export default function Onboarding({
         body: JSON.stringify({
           // `/api/course-suggest` reads the title from `courseName`. It was
           // only ever sent as `query`, so every assessment came back 400
-          // "Course name is required." — both are sent while the server
+          // "Course name is required." - both are sent while the server
           // accepts either, so an older cached bundle still works.
           courseName: query,
           query,
@@ -321,7 +321,7 @@ export default function Onboarding({
         setSuggestSource(d.source || "AI assessment");
         setSuggestSources(d.sources || []);
       } else {
-        setErr("The assessment came back empty — add your subjects below, or press Continue to keep the ones you have.");
+        setErr("The assessment came back empty - add your subjects below, or press Continue to keep the ones you have.");
       }
     } catch (e: unknown) {
       setErr(e instanceof Error ? e.message : "Failed to suggest subjects");
@@ -348,7 +348,7 @@ export default function Onboarding({
       /* Only assess when there is NOTHING to lose. This used to re-run on
          every details change, which silently replaced the syllabus the
          learner had just picked from the catalogue (or hand-edited) with a
-         fresh AI guess — the subjects on screen were not the ones they
+         fresh AI guess - the subjects on screen were not the ones they
          chose, and any edit looked like it had been ignored. The explicit
          "Re-assess subjects with AI" button on the next step is the only way
          to rebuild a list that already exists. */
@@ -362,9 +362,9 @@ export default function Onboarding({
     if (step === 4 && !subs.length) { setErr("Add at least one subject to continue"); return; }
     if (step === 4) {
       const blanks = subs.filter((s) => !s.name.trim()).length;
-      if (blanks) { setErr(`${blanks} subject${blanks === 1 ? "" : "s"} still need${blanks === 1 ? "s" : ""} a name — fill it in or remove the row.`); return; }
+      if (blanks) { setErr(`${blanks} subject${blanks === 1 ? "" : "s"} still need${blanks === 1 ? "s" : ""} a name - fill it in or remove the row.`); return; }
       const names = subs.map((s) => s.name.trim().toLocaleLowerCase());
-      if (new Set(names).size !== names.length) { setErr("Two subjects share the same name — rename one so the planner can tell them apart."); return; }
+      if (new Set(names).size !== names.length) { setErr("Two subjects share the same name - rename one so the planner can tell them apart."); return; }
     }
     setStep((s) => Math.min(total, s + 1));
   };
@@ -415,7 +415,7 @@ export default function Onboarding({
          maxDuration=120 and generates every subject's curriculum with the AI
          pipeline (5 subjects × LLM call, 3 in parallel), which routinely takes
          30–100 s. api()'s default 30 s client timeout used to abort the
-         in-flight build with "The request took too long." — wait out the
+         in-flight build with "The request took too long." - wait out the
          server's full budget (plus margin) instead. */
       const res = await api<AppState>("/api/onboard", {
         method: "POST",
@@ -435,7 +435,6 @@ export default function Onboarding({
         <div className="ob-brand-mark"><IconLogo size={20} /></div>
         <div className="ob-brand-copy">
           <div className="ob-brand-name">Study Planner Pro</div>
-          <div className="ob-brand-tag">Plan · focus · finish</div>
         </div>
       </div>
 
@@ -472,7 +471,7 @@ export default function Onboarding({
           <>
             <h1>Choose your study level</h1>
             <p className="ob-lead">
-              {firstName ? `Hi ${firstName} — this ` : "This "}sets how deep the syllabus goes, from school to doctoral research.
+              {firstName ? `Hi ${firstName} - this ` : "This "}sets how deep the syllabus goes, from school to doctoral research.
             </p>
             <div className="ob-level-grid">
               {levels.map((l) => (
@@ -525,7 +524,7 @@ export default function Onboarding({
                 >
                   <div className="ob-course-check" />
                   <span>
-                    {suggesting ? "Building your syllabus…" : <>Use <strong>&ldquo;{search.trim()}&rdquo;</strong> — AI will build the subject list</>}
+                    {suggesting ? "Building your syllabus…" : <>Use <strong>&ldquo;{search.trim()}&rdquo;</strong> - AI will build the subject list</>}
                   </span>
                 </button>
               )}
@@ -589,11 +588,11 @@ export default function Onboarding({
               <div className="ob-program-meta">
                 <div className="ob-program-item">
                   <span className="ob-field-label">{isSchool ? "Board" : "Specialisation"}</span>
-                  <strong>{(isSchool ? board : specialisation.trim()) || "—"}</strong>
+                  <strong>{(isSchool ? board : specialisation.trim()) || "-"}</strong>
                 </div>
                 <div className="ob-program-item">
                   <span className="ob-field-label">{isDegree ? "Institution" : isCompetitive ? "Exam body" : "Level"}</span>
-                  <strong>{institution.trim() || (isDegree || isCompetitive ? "—" : levels.find((l) => l.id === level)?.label || "School")}</strong>
+                  <strong>{institution.trim() || (isDegree || isCompetitive ? "-" : levels.find((l) => l.id === level)?.label || "School")}</strong>
                 </div>
                 {isDegree && (
                   <div className="ob-program-item">
@@ -784,7 +783,7 @@ export default function Onboarding({
               ))}
               {!subs.length && (
                 <div className="ob-subs-empty">
-                  No subjects yet — add one below, or press “Re-assess” to let the AI build the list.
+                  No subjects yet - add one below, or press “Re-assess” to let the AI build the list.
                 </div>
               )}
             </div>
@@ -857,7 +856,7 @@ export default function Onboarding({
         {step === 5 && (
           <>
             <h1>Tell me how you want to learn</h1>
-            <p>Pacing and emphasis only — all of it can be changed later.</p>
+            <p>Pacing and emphasis only - all of it can be changed later.</p>
             <div className="ob-schedule-grid">
               <div className="ob-field ob-field-span-full">
                 <div className="ob-choice-card">
@@ -908,8 +907,8 @@ export default function Onboarding({
               <div className="ob-projection-date">{prettyLong(projected)}</div>
               <div className={`ob-projection-note ${feasible ? "ok" : "warn"}`}>
                 {feasible
-                  ? `Comfortable — ${availDays} days available, ${Math.round(estMinutes / 60)}h of content.`
-                  : `Tight — needs ~${Math.round(estMinutes / 60)}h but you only have ~${Math.round(capacity / 60)}h. I'll compress lessons.`}
+                  ? `Comfortable - ${availDays} days available, ${Math.round(estMinutes / 60)}h of content.`
+                  : `Tight - needs ~${Math.round(estMinutes / 60)}h but you only have ~${Math.round(capacity / 60)}h. I'll compress lessons.`}
               </div>
             </div>
           </>
@@ -919,7 +918,7 @@ export default function Onboarding({
         {step === 7 && (
           <>
             <h1>Review your setup</h1>
-            <p>Everything here is still editable — step back any time.</p>
+            <p>Everything here is still editable - step back any time.</p>
             <div className="ob-review-grid">
               <div className="ob-review-card">
                 <div className="ob-review-title">Plan snapshot</div>
@@ -976,7 +975,7 @@ export default function Onboarding({
         <div className="ob-footer-strip mt-md">
           <div className="ob-privacy">
             <IconLock size={13} />
-            <span>Your workspace stays private — study data never leaves your account.</span>
+            <span>Your workspace stays private - study data never leaves your account.</span>
           </div>
           <div className="ob-btn-row">
             {step > 1 && (
@@ -985,7 +984,7 @@ export default function Onboarding({
                 type="button"
                 onClick={back}
                 disabled={busy || suggesting}
-                title="One step back — nothing you typed is lost"
+                title="One step back - nothing you typed is lost"
               >
                 <IconArrowLeft size={14} /> <span>Back</span>
               </button>
@@ -1020,7 +1019,7 @@ export default function Onboarding({
             onClick={onCancel}
             disabled={busy}
           >
-            Cancel — keep my current plan
+            Cancel - keep my current plan
           </button>
         )}
       </div>

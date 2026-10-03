@@ -1,9 +1,9 @@
 # NEXT SESSION MASTER PROMPT
-## Study Planner Pro — Copy-paste this entire block into the new Arena session
+## Study Planner Pro - Copy-paste this entire block into the new Arena session
 
 ---
 
-## v37 — PRODUCTION FIVE-KEY CHAIN + HARDENED FAILSAFE (this session)
+## v37 - PRODUCTION FIVE-KEY CHAIN + HARDENED FAILSAFE (this session)
 
 **The request.** Implement a production-ready automatic fallback in the exact
 priority `Gemini → Cerebras → Mistral → SambaNova → Cohere → local ML`, using the
@@ -23,11 +23,11 @@ pass tightened the contract rather than rewriting it.
 - **Priority order** is now exactly the requested production chain:
   `DEFAULT_PROVIDER_ORDER = gemini, cerebras, mistral, sambanova, cohere, groq,
   openrouter`. Groq and OpenRouter moved BEHIND the five configured providers as
-  optional extra legs — a deployment without those keys skips them, so the five
+  optional extra legs - a deployment without those keys skips them, so the five
   real keys always walk first. `.env.example` and `README.txt` updated to match.
 - **402 → rate_limit.** `classifyProviderError` now treats HTTP 402 (exhausted
   quota / "Payment Required") like a throttle: fall through to the next provider
-  immediately, give the leg the short transient bench + bounded second chance —
+  immediately, give the leg the short transient bench + bounded second chance -
   same as 429.
 - **New test §4g** pins the whole contract with the FIVE production keys and each
   provider's NATIVE wire format (Gemini `candidates/parts`, the rest
@@ -39,11 +39,11 @@ pass tightened the contract rather than rewriting it.
 
 ### Hard constraints carried forward (do not break)
 - Suite 4e static regex requires `DEFAULT_PROVIDER_ORDER` to START with
-  `"gemini", "cerebras",` — the reorder keeps that prefix.
+  `"gemini", "cerebras",` - the reorder keeps that prefix.
 - No streaming today: transport is one bounded POST /api/chat (client 60 s,
   server deadline 30 s, per-attempt 9 s, hedge after 2.5 s). A provider that
   hangs is hedged/aborted, and `askTutor` in `page.tsx` has a `finally` that
-  clears the spinner plus a catch that answers locally — the UI cannot get stuck.
+  clears the spinner plus a catch that answers locally - the UI cannot get stuck.
 - Never echo keys: `keyFingerprint` is a djb2 hash; logs/attempts/ai-status carry
   provider+model+error only. `summarizeAttempts` is server-log-only, never sent to
   the browser; the learner sees `userFacingAiNotice` wording.
@@ -51,23 +51,23 @@ pass tightened the contract rather than rewriting it.
   `rm -rf deploy-package/src && cp -r src deploy-package/src` and copy README.txt
   (suite §17 enforces parity).
 
-Quality gate: `npm run check` all green — 460 tests / 0 failed, zero lint
+Quality gate: `npm run check` all green - 460 tests / 0 failed, zero lint
 warnings, ui-audit within budget.
 
 ---
 
-## v36 — THE CHAIN MUST NOT COLLAPSE TO ONE LEG, + THE ML ENGINE TAKES OVER
+## v36 - THE CHAIN MUST NOT COLLAPSE TO ONE LEG, + THE ML ENGINE TAKES OVER
 
 **The complaint.** "The cloud engine keeps disconnecting… majority of the time it
 falls back to the local engine. If Gemini is not working it should fall to another
-AI. The fallback mechanism needs to be strong — and the ML should take over and be
+AI. The fallback mechanism needs to be strong - and the ML should take over and be
 responsible when AI is not there."
 
 ### 1. Chain persistence: benched legs get a bounded second chance (`src/lib/ai.ts`)
 
 **The diagnosis.** `callLLMDetailed` built its provider queue with `skipCooled`:
 when EVERY configured leg sat on a cooldown (a bad minute of free-tier 429s does
-exactly this), the request was handed **one** leg — the soonest to expire — and
+exactly this), the request was handed **one** leg - the soonest to expire - and
 when that leg was still throttled the whole request collapsed to the local engine.
 One 429-storm and every message afterwards read "Cloud busy · local engine
 answered", even with seven keys configured.
@@ -77,14 +77,14 @@ answered", even with seven keys configured.
   (priority order, unchanged), then **every** transiently-benched leg
   (rate_limit / timeout / network / provider) in soonest-expiry order. Legs
   benched for a DETERMINISTIC reason (auth, relay-notice "empty") are skipped for
-  the whole request — retrying a rejected key seconds later fails identically, so
+  the whole request - retrying a rejected key seconds later fails identically, so
   the request returns fast and the ML engine answers instead of burning the budget.
 - Each benched leg gets `recoveryWait()` before its retry: it sleeps until the
   bench expires, capped by `AI_RECOVERY_MS` (default 12 s, override in env, 0
   disables) and always by the shared deadline minus 1.2 s for the attempt itself.
   Free-tier windows roll over per minute, so a few seconds of patience routinely
   converts "local fallback" back into a cloud answer. Healthy legs never wait.
-  GOTCHA pinned by §4f pass 2b: `Number(envValue(...))` is 0 — not NaN — when the
+  GOTCHA pinned by §4f pass 2b: `Number(envValue(...))` is 0 - not NaN - when the
   knob is unset, so the default branch must test the raw string for null FIRST.
   A silent zero collapses the whole second chance (every benched request retries
   instantly and the chain "keeps disconnecting"). Never write
@@ -92,7 +92,7 @@ answered", even with seven keys configured.
 - Default `AI_TIMEOUT_MS` raised 24 s → 30 s so one full walk plus one bounded
   recovery fits inside the budget (client still waits 60 s).
 - `assistantStatusReply()` slow-branch copy updated to describe the second chance
-  (vendor-neutral — the "never name a vendor" check still passes).
+  (vendor-neutral - the "never name a vendor" check still passes).
 
 **Pinned by** `scripts/test-suite.ts` §4f: a rate-limited lone leg still ends
 request 1 locally, then request 2 waits inside the `AI_RECOVERY_MS` cap and gets
@@ -100,19 +100,19 @@ the cloud answer; two rejected keys produce zero wasted follow-up calls and an
 instant local handoff. The §4/4b/4c/4e contracts (Gemini-first, sticky success,
 hedging, 200-gate) all still pass unchanged.
 
-### 2. The ML engine takes over — a deterministic study strategist (`src/lib/ai.ts`)
+### 2. The ML engine takes over - a deterministic study strategist (`src/lib/ai.ts`)
 
 The local fallback used to be: greeting/instant/percent replies, the encyclopedia,
 and otherwise "couldn't find that". Strategy questions ("am I ready for the exam?",
 "what should I revise?", "I can't focus", "how many hours should I study?") fell
-through to a generic apology whenever the cloud was down — exactly when the coach
+through to a generic apology whenever the cloud was down - exactly when the coach
 matters most.
 
-**The fix.** `mlStrategistReply()` — a deterministic strategist answering the whole
+**The fix.** `mlStrategistReply()` - a deterministic strategist answering the whole
 strategy family from the learner's OWN logged signals (readiness projection, FSRS
 due reviews, pace EWMA, skip-risk, focus-hour profile, weekday rates, observed
 minutes). It is wired into the tail of `instantTutorReply()`, so it answers both
-when the cloud is healthy (these are live-data questions — instant beats a model
+when the cloud is healthy (these are live-data questions - instant beats a model
 round-trip) and, fully responsible, when every cloud leg is down. Every number
 quoted is real; with no history yet it says so instead of inventing. Concept
 questions ("explain photosynthesis") never match its patterns.
@@ -121,7 +121,7 @@ questions ("explain photosynthesis") never match its patterns.
 
 `localCurriculumReply` now teaches when the question NAMES a lesson strongly
 (full title +20, ≥4 shared significant tokens, or the subject itself +4) even
-without "explain/teach" — "dual aspect concept" no longer needs the magic word
+without "explain/teach" - "dual aspect concept" no longer needs the magic word
 when the learner's own plan has that lesson. The weak fallback pick (score 2)
 still requires an explicit verb, so "capital of France" can never be answered
 with a random plan card. Pinned in §16c.
@@ -130,14 +130,14 @@ with a random plan card. Pinned in §16c.
 deadline default, status copy), `src/app/api/chat/route.ts` (curriculum gate),
 `src/app/page.tsx` (timeout comment), `scripts/test-suite.ts` (+15 checks: §4f,
 §16c), `.env.example` (AI_RECOVERY_MS + new defaults), `deploy-package/src/**`
-(byte-exact re-sync — rule unchanged).
+(byte-exact re-sync - rule unchanged).
 
-**Gate:** `npm run check` — typecheck, zero-warning lint, 439 tests, ui-audit
+**Gate:** `npm run check` - typecheck, zero-warning lint, 439 tests, ui-audit
 budget: ALL GREEN.
 
 ---
 
-## v35 — A 200 STATUS IS NOT AN ANSWER, + THE SYLLABUS STEP WAS NEVER WIRED UP
+## v35 - A 200 STATUS IS NOT AN ANSWER, + THE SYLLABUS STEP WAS NEVER WIRED UP
 
 Two unrelated bugs produced one complaint each. Both are now pinned by tests.
 
@@ -145,7 +145,7 @@ Two unrelated bugs produced one complaint each. Both are now pinned by tests.
 
 **The symptom.** Every answer came back as *"The API key used for this request
 has reached its budget. Please ++[raise the key budget](…)++, then try again…
-🌸 **Ad** 🌸 Powered by Pollinations.AI free text APIs."* — under the header
+🌸 **Ad** 🌸 Powered by Pollinations.AI free text APIs."* - under the header
 `Shigun · Cloud AI · free endpoint`. The learner could not hold a conversation.
 
 **The diagnosis.** Every leg of every chain was judged by its HTTP status. Free
@@ -158,9 +158,9 @@ content and reported SUCCESS, so:
    leg that "worked" and **promoted it to first place**, so every later message
    paid it again before the healthy legs behind it;
 3. because a "cloud answer" existed, `degraded` stayed `false` and the on-device
-   ML engine — the one thing that always works — **never ran**.
+   ML engine - the one thing that always works - **never ran**.
 
-**The fix.** `src/lib/aiAnswer.ts` — one shared judge of a 200 body, imported by
+**The fix.** `src/lib/aiAnswer.ts` - one shared judge of a 200 body, imported by
 the server chain (`ai.ts`), the browser bridge (`aiBridge.ts`) and `/api/chat`'s
 `finalise` path (the last gate, for a browser still running a cached bundle).
 A provider notice is treated as a FAILURE: the leg/model is benched with the
@@ -173,10 +173,10 @@ planner is used by accounting students, and "the department **has reached its
 budget** ceiling" / "import **quota exhausted**" / "the **credit** balance
 **exceeded** the limit" are *teaching*. `HARD_NOISE` holds relay-specific strings
 no lesson contains; `CONTEXT_NOISE` is only believed when the answer ALSO names
-AI plumbing (`AI_PLUMBING` — deliberately excludes budget/quota/credit/balance)
+AI plumbing (`AI_PLUMBING` - deliberately excludes budget/quota/credit/balance)
 or addresses the app's user (`ADDRESSES_USER`), and never inside something
 `looksLikeLesson()` (a heading, a 3+ item list, 4+ sentences or 900+ chars).
-Section 4e of `scripts/test-suite.ts` pins both halves — the lesson cases are as
+Section 4e of `scripts/test-suite.ts` pins both halves - the lesson cases are as
 load-bearing as the relay cases.
 
 **Also changed:** `DEFAULT_PROVIDER_ORDER` is now
@@ -192,22 +192,22 @@ longer promotes a sticky leg that is currently benched.
 So the "AI: Assess & Build Subjects" button, the automatic assessment on the
 details step and "↻ Re-assess subjects with AI" **all** failed with
 `400 "Course name is required."` The subject list never changed and an error
-banner was the only feedback — which reads exactly as "clicking does nothing".
+banner was the only feedback - which reads exactly as "clicking does nothing".
 The endpoint now accepts `courseName ?? query ?? course ?? name`, and the wizard
 sends both spellings.
 
 **The details step re-assessed on every change**, silently replacing the syllabus
 of the course the learner had just picked (or hand-edited) with a fresh AI guess.
-It now only assesses when `!subs.length` — when there is nothing to lose. The
+It now only assesses when `!subs.length` - when there is nothing to lose. The
 explicit button is the only way to rebuild a list that exists, and it asks once
 (`confirmReassess`) when `subsEdited` is true.
 
 **The rows themselves were unreadable as inputs:** `.ob-sub-row input[type=text]`
 was `background:transparent; border:none; outline:none` with no padding and no
-`:focus` rule anywhere — visually identical to a static label. Now
+`:focus` rule anywhere - visually identical to a static label. Now
 `.ob-sub-name` / `.ob-sub-units` are real fields with hover + focus rings and a
 `:focus-within` highlight on the row, plus a caption row that says
-*"Subject — click any field to edit"*.
+*"Subject - click any field to edit"*.
 
 **Also fixed while in there:** rows were `key={i}`, so deleting a row made React
 hand row N+1's DOM node to row N's data and the field being typed in jumped
@@ -222,7 +222,7 @@ instead of failing the whole plan at the last step.
 `scripts/test-suite.ts` §16b renders the real wizard, walks it 1→5 and drives
 every one of these interactions.
 
-## v34 — BROWSER-DIRECT AI BRIDGE: "AI IS NOT CONNECTED" FIXED AT THE ROOT (this session)
+## v34 - BROWSER-DIRECT AI BRIDGE: "AI IS NOT CONNECTED" FIXED AT THE ROOT (this session)
 
 Read this before touching anything AI-shaped: it explains why two server-side
 rewrites did not fix the complaint, and where the model call lives now.
@@ -232,10 +232,10 @@ Cohere → Gemini → OpenRouter **from the server**, with v10's failure memory,
 hedging and sticky success. That is all still true and still first in line. But
 "AI is not connected" has two causes no server-side code can fix:
 
-1. **The deployment has no key** — a fresh Vercel deploy, a fork, a preview.
+1. **The deployment has no key** - a fresh Vercel deploy, a fork, a preview.
    Nothing can be invented server-side, so every open-ended question fell to the
    on-device engine and the chat strip said "Full AI chat isn't connected yet".
-2. **The host has no outbound network** — Arena/e2b sandboxes and CI allowlist
+2. **The host has no outbound network** - Arena/e2b sandboxes and CI allowlist
    egress. Verified in this sandbox: `registry.npmjs.org` and `api.github.com`
    answer, while `api.groq.com`, `generativelanguage.googleapis.com`,
    `text.pollinations.ai` and even `www.google.com` fail at TLS
@@ -257,7 +257,7 @@ stayed on the server.
 
 **Files changed:**
 ```
-src/lib/aiBridge.ts        NEW — browser-side chain: 7 own-key legs (same hosts
+src/lib/aiBridge.ts        NEW - browser-side chain: 7 own-key legs (same hosts
                            + current model ids as ai.ts) then 3 anonymous free
                            relays (OVHcloud AI Endpoints → Kilo Gateway →
                            Pollinations). Per-tab failure memory (CORS/offline
@@ -266,8 +266,8 @@ src/lib/aiBridge.ts        NEW — browser-side chain: 7 own-key legs (same host
                            the honest browser-side connectivity test,
                            `setFreeBridgeAllowedByOperator()` for the
                            AI_FREE_BRIDGE=off kill-switch. A free leg is never
-                           given a key — enforced by a test.
-src/lib/chatClient.ts      NEW — `askTutorMessage()`: picks the route, runs
+                           given a key - enforced by a test.
+src/lib/chatClient.ts      NEW - `askTutorMessage()`: picks the route, runs
                            prepare → bridge → finalise, and upgrades a degraded
                            server answer from the browser. `serverAiStatus()`
                            caches /api/ai-status for 45 s.
@@ -280,7 +280,7 @@ src/app/api/chat/route.ts  ONE route, THREE modes: `full` (unchanged), `prepare`
                            fallback answer so one question never shows two.
                            Rate limit 18 → 36/min (one question = two calls).
                            `buildTutorPrompt()` is now the ONE prompt builder.
-src/lib/ai.ts              `envConfiguredProviderIds()` (ids, not labels —
+src/lib/ai.ts              `envConfiguredProviderIds()` (ids, not labels -
                            "Gemini" ≠ "Google Gemini" made a configured
                            deployment read as unconfigured),
                            `freeBridgeAllowed()`, `assistantStatusReply()` and
@@ -294,14 +294,14 @@ src/app/page.tsx           `askTutorMessage()` replaces the raw /api/chat call;
 src/components/ChatPanel.tsx  "Cloud AI · free endpoint" / "Free AI endpoint ·
                            ready" statuses, and the strip is either the old
                            "Connect AI" warning or a plain "a free community
-                           endpoint is answering — add my key" note.
+                           endpoint is answering - add my key" note.
 src/components/AiKeyCard.tsx  "Test from this browser" + per-leg results with
                            latency and reason, the free-relay Seg switch with
                            the privacy trade-off beside it, stuck-off state
                            when the operator banned relays, server providers
                            matched by ID.
 src/app/globals.css        `.ai-connect-free` (accent edge + dimmer copy) next
-                           to the `.ai-connect` rules it variants — no new
+                           to the `.ai-connect` rules it variants - no new
                            owner, no restated component.
 scripts/test-suite.ts      +27 checks (section 4d), 365 total.
 .env.example               three routes explained, AI_FREE_BRIDGE documented.
@@ -311,7 +311,7 @@ docs/design/v34-browser-ai-bridge.md   NEW design note.
 deploy-package/**          byte-exact re-sync from src/ (rule below).
 ```
 
-**Verification tricks that work here — keep using them:**
+**Verification tricks that work here - keep using them:**
 1. The sandbox has no AI egress, so test the bridge the way the suite does:
    stub `globalThis.window` (localStorage/sessionStorage/setTimeout/
    dispatchEvent) and `globalThis.fetch`, then assert WHICH url was fetched and
@@ -338,16 +338,16 @@ the `4d` checks that assert the default.
 
 ---
 
-## v25 — CSS CONSOLIDATION · ONE TYPE SCALE · RESPONSIVE CALENDAR · DE-BLUR (this session)
+## v25 - CSS CONSOLIDATION · ONE TYPE SCALE · RESPONSIVE CALENDAR · DE-BLUR (this session)
 
 Read this block first: it changes the rules for every later UI pass.
 
 **Twelve sheets became two.** `src/app/globals.css` (tokens, base type, themes,
-shell) and `src/app/ui-system.css` — the ten patch sheets concatenated in their
+shell) and `src/app/ui-system.css` - the ten patch sheets concatenated in their
 original import order, then re-authored into numbered sections; `§25.x` is this
 pass. `layout.tsx` imports exactly those two, and `§25` is the last word in the
 last file. **Never add another stylesheet, and never restate a component in
-`globals.css`** — extend the owning `§25` section instead, and delete the copy
+`globals.css`** - extend the owning `§25` section instead, and delete the copy
 you are replacing.
 
 **One fluid ramp owns type.** `--fs-micro/xs/sm/md/lg/h1/h2/h3/kpi/timer` are
@@ -356,13 +356,13 @@ you are replacing.
 font-size declarations (4 `!important`) and 6 for `.section-title`, so:
 no `font-size` on a heading inside any `@media`, no second clamp, no blanket
 negative tracking (H1 is `-.022em` + `word-spacing:.012em` + `text-wrap:balance`),
-and one numeral family (`--font-num`, tabular) — `JetBrains Mono` and the
+and one numeral family (`--font-num`, tabular) - `JetBrains Mono` and the
 `--font-ibm-plex-mono` alias are gone.
 
 **Four tokens own space.** `--gap-page` (page stacks) · `--pad-card` (cards) ·
 `--pad-tight` (inside heads) · `--gap-cluster` (control groups). Sibling
 margins between cards were deleted; a container gap is one owner, an `* + *`
-margin is N. `.section-card` carries `container: card / inline-size` — that is
+margin is N. `.section-card` carries `container: card / inline-size` - that is
 what makes the calendar and card heads responsive *to the card*.
 
 **Colour comes from tokens, never from a fallback.** `var(--x, #hex)` is banned:
@@ -370,13 +370,13 @@ what makes the calendar and card heads responsive *to the card*.
 (rail, chip and dot all read `KIND_META`); Zen and the illustrations read
 `--zen-*`, which derives from each theme's `--ill-*` bridge (`--illustration-*`
 is the alias layer). A light-theme hex fallback inside `var()` *is* a dark-theme
-bug — the theme owns the token.
+bug - the theme owns the token.
 
 **Blur is a material for floating layers only**: `.mobile-bottom-nav`,
 `.mobile-header`, `.tracker-bar`, `.sidebar`, `.modal-*`, `.cmdk`, `.toast`,
 `.ai-panel`, scrims, `.day-sheet`. No in-flow text surface is frosted; hover
 lifts use `translate3d(0, var(--reveal-y), 0)` with whole-pixel values (a
-`.5px` translate under a blur is what made type look smeared — do not fix
+`.5px` translate under a blur is what made type look smeared - do not fix
 legibility by raising contrast).
 
 **Files changed:**
@@ -404,20 +404,20 @@ README.txt               ← “v25 CSS + RESPONSIVE UI SYSTEM (this build)”
 deploy-package/**        ← byte-exact re-sync from src/ (rule below)
 ```
 
-**Verification tricks that replaced a browser here — keep using them:**
+**Verification tricks that replaced a browser here - keep using them:**
 1. Winner of the cascade: `grep -o '\.page-title{[^}]*}' .next/static/chunks/*.css`
-   after `npm run build:app` — the last line wins, and after v25 there is exactly
+   after `npm run build:app` - the last line wins, and after v25 there is exactly
    one with a `font-size` (plus the two `body.mode-*` variants).
-2. Undefined tokens (the silent kind — `var()` falls back to inherit): diff every
+2. Undefined tokens (the silent kind - `var()` falls back to inherit): diff every
    `var(--x` used in `src/**` against every `--x:` defined in the two sheets. This
    caught `--surface-1`, `--success`, `--gap-row`, `--dur-2` invented by a design
    system that was never this repo's.
 3. Dead-rule audit: for each top-level rule, if *every* class in its selectors is
-   absent from **comment-stripped** `src/**`, delete it — and re-run the audit
+   absent from **comment-stripped** `src/**`, delete it - and re-run the audit
    after deleting, since ghosts reference other ghosts. Strip `/* */` first or a
    prose mention of `.task-row` will keep 125 dead rules alive.
 4. Render smoke without a browser: a temp `scripts/_smoke.tsx` + `react-test-renderer`
-   (it must live in the repo to get `node_modules` and the `@/*` paths) — render each
+   (it must live in the repo to get `node_modules` and the `@/*` paths) - render each
    view, `act()` a tab click, then count nodes by `className.startsWith('cal-grid')`
    etc. Delete the script afterwards.
 5. Batch regex edits on JSX must be followed immediately by `npx tsc --noEmit`
@@ -430,7 +430,7 @@ All checks green at hand-off: `npm run typecheck`, `npm run lint` (0 warnings),
 
 ---
 
-## v19 — COLLAPSED RAIL: ONE HIGHLIGHT · SIDEBAR-SIZED ⌘K HINT · MOBILE APP BAR CONTRACT (this session)
+## v19 - COLLAPSED RAIL: ONE HIGHLIGHT · SIDEBAR-SIZED ⌘K HINT · MOBILE APP BAR CONTRACT (this session)
 
 Three visual bugs, all styling/structure (no behaviour, data or routing changes):
 
@@ -444,7 +444,7 @@ Three visual bugs, all styling/structure (no behaviour, data or routing changes)
    the labels. A reserved `border:1px solid transparent` on the base rule means
    the rim never nudges the glyph. Expanded view keeps the gradient tile
    (branding, next to the wordmark). Both brand marks are now
-   `aria-hidden="true"` — they are presentational; the clipped `.brand-text`
+   `aria-hidden="true"` - they are presentational; the clipped `.brand-text`
    carries the accessible name.
 2. **The ⌘K hint cropped and overflowed the rail.** It was
    `position:fixed;bottom:14px;left:14px` *outside* `.app-wrapper`, sized by its
@@ -455,7 +455,7 @@ Three visual bugs, all styling/structure (no behaviour, data or routing changes)
    guarantees containment. The sentence wraps (`white-space:normal;
    overflow-wrap:anywhere`) instead of chopping in narrow sidebars; in the rail
    it clips away (`max-width:190px→0`, fade, `translateX`) and the compact key
-   chip centres. The chip shows the real modifier for the platform —
+   chip centres. The chip shows the real modifier for the platform -
    `useAppleKeyboard()` via `useSyncExternalStore` (⌘ on the server snapshot,
    ⌃ on non-Apple clients) because `react-hooks/set-state-in-effect` forbids
    `setState` in an effect and a lazy `useState` would mismatch hydration. The
@@ -502,30 +502,30 @@ All checks green: `npm run typecheck`, `npm run lint` (0 warnings), `npm test`
 
 ---
 
-## v18 — DEPLOY BUNDLE RESYNC + CHECKPOINT NORMALIZATION + README TRUTH
+## v18 - DEPLOY BUNDLE RESYNC + CHECKPOINT NORMALIZATION + README TRUTH
 
 Root cause found for "I mentioned this before and it's still not resolved":
 the drag-and-drop deploy bundle had drifted far behind `src/`.
 
-1. **`deploy-package/` resynced** — it was pre-v15 (missing `completion.ts`,
+1. **`deploy-package/` resynced** - it was pre-v15 (missing `completion.ts`,
    `routeGuard.ts`, `demoState.ts`, `icon.svg`, all v15–v18 UI/API fixes).
    Deploying it shipped stale behaviour. It is now a byte-exact mirror of
    `src/` (`diff -rq src deploy-package/src` is empty), and
    `deploy-package/README.txt` is a copy of the root README. After every
    future session that touches `src/`, re-sync the bundle.
-2. **Checkpoint titles never show "#0"** — new shared helper
+2. **Checkpoint titles never show "#0"** - new shared helper
    `normalizeCheckpointTitle()` in `src/lib/client.ts` (handles
    `Weekly Checkpoint Test #0`, `Weekly Checkpoint · Test #0`, unspaced
    later numbers → canonical `Weekly Checkpoint · Test #N`, 1-based).
    Dashboard.tsx and PlannerView.tsx both use it (duplicated regexes
    removed). Tests: test-suite section "5c. Weekly Checkpoint Title
    Normalization" (124/124 pass).
-3. **README AI docs now match the app** — root README.txt no longer tells
+3. **README AI docs now match the app** - root README.txt no longer tells
    users to set GROQ/XAI/OpenRouter keys or use the removed Settings →
    AI Connectivity panel; it documents the real 5-provider chain
    (Cerebras → Mistral → SambaNova → Cohere → Gemini), local ML engine,
    and the live health endpoints. Added a "v18 FIXES" section.
-4. **Latent bug fixed** — `applyCompletionMastery` in `src/lib/state.ts`
+4. **Latent bug fixed** - `applyCompletionMastery` in `src/lib/state.ts`
    updated topics with `eq(topics.userId, topic.userId)` (column compared
    to itself) instead of the task's userId.
 5. **`.env.example`** now documents the preview-only `SPP_DEMO_DATA=1` flag.
@@ -540,73 +540,73 @@ the drag-and-drop deploy bundle had drifted far behind `src/`.
    with `completedTask` in the response), PATCH/POST/DELETE /api/tasks,
    PATCH /api/settings, subjects POST/PATCH/DELETE, replan and onboard all
    round-trip through the demo state. GET /api/analytics computes the real
-   ML intel from demo rows. Never import demoState into production paths —
+   ML intel from demo rows. Never import demoState into production paths -
    every branch is gated by `demoDataEnabled()`.
 
 Note: no PostgreSQL is available in the sandbox; the app was exercised in
 `SPP_DEMO_DATA=1` demo mode (dev server, port 3000). All checks green:
 typecheck, lint (0 warnings), 131/131 tests, `npm run build:app`.
 Caveat: `.env.local` must NOT contain the placeholder DATABASE_URL from
-`.env.example` — with it set, the app attempts real pg connections and the
+`.env.example` - with it set, the app attempts real pg connections and the
 preview 500s (the bug found in the server logs).
 
 ---
 
 ## CONTEXT (what was already done in the merged session)
 
-The following changes were made and merged. Do NOT redo them — just verify they are present:
+The following changes were made and merged. Do NOT redo them - just verify they are present:
 
-### 1. `src/lib/ai.ts` — Provider Architecture v9
+### 1. `src/lib/ai.ts` - Provider Architecture v9
 - **ProviderId** is now: `"cerebras" | "mistral" | "sambanova" | "cohere" | "gemini"`
-- **Removed**: `groq`, `grok`, `openrouter` — completely gone from the type, PROVIDERS map, and DEFAULT_PROVIDER_ORDER
+- **Removed**: `groq`, `grok`, `openrouter` - completely gone from the type, PROVIDERS map, and DEFAULT_PROVIDER_ORDER
 - **Added**: Full provider specs for Cerebras, Mistral, SambaNova, Cohere (all OpenAI-compatible endpoints)
 - **DEFAULT_PROVIDER_ORDER**: `["cerebras", "mistral", "sambanova", "cohere", "gemini"]`
 - **SHIGUN system prompt**: Upgraded with AI+ML hybrid identity block (Cerebras WSE-3, Mistral, SambaNova, Cohere, Gemini as safety net + local ML engine described)
 - **Fallback message**: No longer references "Settings → AI Connectivity"
 
-### 2. `src/components/SettingsView.tsx` — AI Connectivity section removed
+### 2. `src/components/SettingsView.tsx` - AI Connectivity section removed
 - Entire "AI Connectivity" glass panel (probe UI, connectivity test button, provider status rows) is GONE
 - Removed unused imports: `api`, `ApiError`, `IconSignal`
 - Removed unused state: `probing`, `probes`, `probeNote`, `runProbe`, `allProbes`, `PROVIDER_ENV`, `FRIENDLY_ERROR`, `Probe` type
 
-### 3. `src/components/ChatPanel.tsx` — Cleaner SHIGUN interface
+### 3. `src/components/ChatPanel.tsx` - Cleaner SHIGUN interface
 - Title changed from "Shigun AI Tutor" → "Shigun AI Study Coach"
 - Status line: "AI + ML engine active" (when cloud configured) / "ML engine active · add an AI key to unlock cloud tutoring"
 - Removed noisy provider list from status chip (no more "Gemini + Groq + Grok live" clutter)
 - Default welcome message updated
 
-### 4. `.env.example` — Updated with new provider keys, old providers removed
+### 4. `.env.example` - Updated with new provider keys, old providers removed
 
-### 5. `scripts/test-suite.ts` — Test references updated from groq → cerebras
+### 5. `scripts/test-suite.ts` - Test references updated from groq → cerebras
 
 ---
 
-## v16 — UI POLISH: TRUE LISTS, ALIGNED BUTTONS, CALENDAR COLOUR, FOCUS+CLOCK LINK (this session)
+## v16 - UI POLISH: TRUE LISTS, ALIGNED BUTTONS, CALENDAR COLOUR, FOCUS+CLOCK LINK (this session)
 
 Four UX gaps were fixed together:
 
-1. **List view is a list again** — `src/app/globals.css` (appended "v16" section):
+1. **List view is a list again** - `src/app/globals.css` (appended "v16" section):
    - Planner day blocks: `.planner-days .day-block` padding moved to the day
      head; `.planner-days .task-row` rows are edge-to-edge with hairline
-     separators (`last-row` class removes the final divider — set from
+     separators (`last-row` class removes the final divider - set from
      `PlannerView.tsx` via `renderTask(task, { lastRow })`).
    - Dashboard "Today's Study Load": `.task-row.clean-list` is horizontal
      again (was a stack of bordered cards with a dashed divider).
-2. **Aligned row controls** — `.task-row-actions` uniform 30px buttons, fixed
+2. **Aligned row controls** - `.task-row-actions` uniform 30px buttons, fixed
    clock-button width (`min-width:88px`), Done pinned right; on ≤640px the
    action bar is a 3-column grid (Done · Clock · ⋯) with `order:-2/-1` and
    expanded actions wrapping below.
-3. **Calendar colour** — `PlannerView.tsx` sets `--cell-tint` per cell from
+3. **Calendar colour** - `PlannerView.tsx` sets `--cell-tint` per cell from
    the first task's subject colour; CSS tints `.cal-cell.has-tasks`; the
    ≤640px rule that hid `.cal-pill` is overridden so phones show coloured
    topic pills too.
-4. **Focus ↔ clock link** — `FocusView.tsx` `toggleTimerLinked()`: starting a
+4. **Focus ↔ clock link** - `FocusView.tsx` `toggleTimerLinked()`: starting a
    focus block also starts the study clock (attaches the first pending task
    of the day), breaks never touch the clock, new `onClockLink` prop surfaces
    a toast. `page.tsx` Zen mode: primary button is now "Start Focus + Clock"
    (`startFocusWithClock`), with the redundant standalone Clock In removed
    and a `.zen-hint` explaining the combined action.
-5. **Branded favicon** — new `src/app/icon.svg` (gradient tile + layered
+5. **Branded favicon** - new `src/app/icon.svg` (gradient tile + layered
    chevrons matching `IconLogo`); Next.js serves it as the tab icon.
 
 Files changed:
@@ -622,29 +622,29 @@ README.txt                     ← v16 section
 
 ---
 
-## v15 — STUDY CLOCK AUTO-COMPLETE (merged in this session)
+## v15 - STUDY CLOCK AUTO-COMPLETE (merged in this session)
 
 Tasks are now marked **done automatically** the moment the minutes logged for
-them reach the planned time — no manual "Done" tap required (e.g. a 15-min
+them reach the planned time - no manual "Done" tap required (e.g. a 15-min
 recall studied for 28 min completes at the 15-min mark). This was the fix for:
 "the recall planned time was given 15min but I logged in for 28mins … if I have
 logged above 15 min it should be marked as complete and should notify me that
 this is done and after that it should come to next task."
 
 Where the logic lives:
-1. `src/lib/completion.ts` (NEW) — pure rule: `shouldAutoComplete(actual,
+1. `src/lib/completion.ts` (NEW) - pure rule: `shouldAutoComplete(actual,
    planned, status)` (pending + actual ≥ planned) and `nextPendingTask(tasks,
    date, excludeId)` (the task the clock rolls into after a completion).
-2. `src/lib/state.ts` — `applyCompletionMastery(tx, updated, today, rating?)`
+2. `src/lib/state.ts` - `applyCompletionMastery(tx, updated, today, rating?)`
    extracted from the tasks route (mastery gain + FSRS-lite update), now
    shared by the manual Done flow and the auto-complete flow so they cannot
    drift apart.
-3. `src/app/api/sessions/route.ts` — after summing session minutes and
+3. `src/app/api/sessions/route.ts` - after summing session minutes and
    updating `actualMinutes`, a pending task that has met its plan is flipped
    to `done` via a conditional update (`where status = 'pending'`), so a
    concurrent request can never double-apply mastery. The response includes
    `completedTask: { id, title, plannedMinutes, actualMinutes } | null`.
-4. `src/app/page.tsx` — `drainSessionQueue` reads `completedTask`, shows a
+4. `src/app/page.tsx` - `drainSessionQueue` reads `completedTask`, shows a
    success toast, and if the study clock is STILL running on that task calls
    `clock.clockIn({ taskId: next.id })` to roll forward to the next pending
    task so continued minutes are logged against the right lesson.
@@ -686,7 +686,7 @@ Every platform has a place called "Environment Variables" or "Secrets". That is 
 
 ---
 
-### Step 1 — Get your keys from each provider website
+### Step 1 - Get your keys from each provider website
 
 | Provider | Website | Where to find your key |
 |---|---|---|
@@ -696,12 +696,12 @@ Every platform has a place called "Environment Variables" or "Secrets". That is 
 | **Cohere** | https://dashboard.cohere.com | Left sidebar → "API Keys" → "New Trial Key" or "New Production Key" |
 | **Gemini** | https://aistudio.google.com | Click "Get API Key" → "Create API key" |
 
-Copy the key immediately after creating it — most providers only show it once.
+Copy the key immediately after creating it - most providers only show it once.
 It looks like a long random string, for example: `sk-abc123XYZ789...`
 
 ---
 
-### Step 2 — Open your hosting platform's environment variables
+### Step 2 - Open your hosting platform's environment variables
 
 **On Vercel:**
 1. Go to https://vercel.com → click your project
@@ -718,7 +718,7 @@ It looks like a long random string, for example: `sk-abc123XYZ789...`
 
 ---
 
-### Step 3 — Add each key one by one
+### Step 3 - Add each key one by one
 
 For each provider you have a key for, add a new environment variable:
 
@@ -735,19 +735,19 @@ Cerebras first → Mistral → SambaNova → Cohere → Gemini → local ML engi
 
 ---
 
-### Step 4 — What to do with your OLD keys
+### Step 4 - What to do with your OLD keys
 
 You may have old keys for Groq, Grok (XAI), or OpenRouter sitting in your environment variables.
 
 **Those providers have been removed from this app.** You have two choices:
-- **Leave them** — they will be silently ignored. No harm done.
-- **Delete them** — clean up your environment. Go to your hosting platform's environment variables, find `GROQ_API_KEY`, `XAI_API_KEY`, `OPENROUTER_API_KEY` and delete those rows.
+- **Leave them** - they will be silently ignored. No harm done.
+- **Delete them** - clean up your environment. Go to your hosting platform's environment variables, find `GROQ_API_KEY`, `XAI_API_KEY`, `OPENROUTER_API_KEY` and delete those rows.
 
 Your `GEMINI_API_KEY` if you already have one: **keep it**. Gemini is still in the app as the safety net.
 
 ---
 
-### Step 5 — Redeploy
+### Step 5 - Redeploy
 
 After adding or changing environment variables, you must redeploy for changes to take effect.
 
@@ -757,12 +757,12 @@ After adding or changing environment variables, you must redeploy for changes to
 
 ---
 
-### Step 6 — Verify it worked
+### Step 6 - Verify it worked
 
 Open your Study Planner app → click the Shigun chat button (bottom right).
 You should see: **"AI + ML engine active"** in the status line under "Shigun AI Study Coach".
 
-If you see "ML engine active · add an AI key to unlock cloud tutoring" — the key was not picked up. Check:
+If you see "ML engine active · add an AI key to unlock cloud tutoring" - the key was not picked up. Check:
 1. The key name is spelled exactly right (no spaces, correct case)
 2. You redeployed after adding the key
 3. The key value has no extra spaces or quotes around it
@@ -779,7 +779,7 @@ Even with zero API keys, SHIGUN answers intelligently using:
 - **Time-of-day focus**: tracks your best study hours
 - **Ebbinghaus decay**: estimates memory fade since last review
 
-These run 100% on the server from your own logged data. Adding an AI key makes Shigun smarter at open-ended tutoring and concept explanations — the ML engine handles schedule queries and progress reports either way.
+These run 100% on the server from your own logged data. Adding an AI key makes Shigun smarter at open-ended tutoring and concept explanations - the ML engine handles schedule queries and progress reports either way.
 
 ---
 

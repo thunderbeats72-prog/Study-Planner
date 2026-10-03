@@ -61,9 +61,9 @@ export async function regeneratePlan(userId: number, settingsRow: {
     opts.fromToday || diffDays(settingsRow.startDate, today) > 0 ? today : settingsRow.startDate;
 
   // ── ML: learn from this user's complete task history ────────
-  // 1. PACE — how long they ACTUALLY take vs planned, per subject.
-  // 2. WEEKDAYS — which days of the week they historically complete.
-  // 3. DECAY — mastery fades for topics untouched for a long time,
+  // 1. PACE - how long they ACTUALLY take vs planned, per subject.
+  // 2. WEEKDAYS - which days of the week they historically complete.
+  // 3. DECAY - mastery fades for topics untouched for a long time,
   //    so old "done" work resurfaces in revision with priority.
   const allHistory = await db.select().from(tasks).where(eq(tasks.userId, userId));
   const historyRows = allHistory.map((t) => ({

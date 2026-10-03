@@ -18,7 +18,7 @@ import {
  *
  * Both credential columns are NULLABLE on purpose: rows created before
  * accounts existed (one per browser) keep working untouched, and the first
- * time such a device signs up it ADOPTS its own row — the laptop's plan
+ * time such a device signs up it ADOPTS its own row - the laptop's plan
  * becomes the new account's plan instead of being orphaned.
  *
  * `username` always stores the lower-cased, comparable form (so `Sanjay`
@@ -55,7 +55,7 @@ export const users = pgTable(
  * (in an HttpOnly cookie it cannot read); the database stores its SHA-256,
  * so a leaked database dump cannot be replayed as a login.
  *
- * Because the row — not the browser — is the session, "sign out of all other
+ * Because the row - not the browser - is the session, "sign out of all other
  * devices" is a single DELETE, and a stolen phone can be cut off from the
  * laptop in two taps.
  */
@@ -151,7 +151,7 @@ export const topics = pgTable(
   (t) => [
     index("topics_user_id_idx").on(t.userId),
     index("topics_subject_id_idx").on(t.subjectId),
-    // State loader orders a subject's topics by position — this composite
+    // State loader orders a subject's topics by position - this composite
     // serves the filter AND the sort from one index.
     index("topics_subject_pos_idx").on(t.subjectId, t.position),
   ]
@@ -179,7 +179,7 @@ export const tasks = pgTable(
     index("tasks_subject_id_idx").on(t.subjectId),
     index("tasks_topic_id_idx").on(t.topicId),
     index("tasks_user_date_idx").on(t.userId, t.date),
-    // The planner's default listing is "my tasks by date then position" —
+    // The planner's default listing is "my tasks by date then position" -
     // one composite index covers it end to end.
     index("tasks_user_date_pos_idx").on(t.userId, t.date, t.position),
   ]
@@ -211,7 +211,7 @@ export const sessions = pgTable(
 /**
  * Coverage telemetry: every course-suggestion query is logged with the
  * resolution source, so we know exactly which courses users search for
- * that only get generic/LLM fallbacks — a ranked to-do list for adding
+ * that only get generic/LLM fallbacks - a ranked to-do list for adding
  * verified catalog entries where they matter most.
  */
 export const courseQueries = pgTable("course_queries", {
@@ -233,14 +233,14 @@ export const messages = pgTable(
   },
   (t) => [
     index("messages_user_id_idx").on(t.userId),
-    // Chat history is fetched ordered by id per user — composite keeps the
+    // Chat history is fetched ordered by id per user - composite keeps the
     // hot path index-only as histories grow.
     index("messages_user_id_id_idx").on(t.userId, t.id),
   ]
 );
 
 /**
- * SHIGUN credit meter — per learner, per day. One "credit" is one tutor
+ * SHIGUN credit meter - per learner, per day. One "credit" is one tutor
  * question answered (a `full` or `finalise` chat turn). The period rolls over
  * automatically each day; Settings shows the used/limit bar and offers a
  * manual reset that refills the counter and clears provider cooldowns, so a

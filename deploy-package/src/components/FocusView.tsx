@@ -48,7 +48,7 @@ const MODES: { id: TimerMode; label: string }[] = [
 ];
 
 /* ══════════════════════════════════════════════════════════════════════
-   Focus (v25) — same session logic, one visual contract.
+   Focus (v25) - same session logic, one visual contract.
 
    Every colour used to be `var(--token, #hex)`: on the five dark themes the
    fallback was invisible and on the light ones it fought the theme, which is
@@ -94,7 +94,7 @@ export default function FocusView({
       if (document.fullscreenElement) void document.exitFullscreen();
       else void el.requestFullscreen?.();
     } catch {
-      /* blocked — the focus page works without it */
+      /* blocked - the focus page works without it */
     }
   }, []);
 
@@ -196,7 +196,7 @@ export default function FocusView({
         }
       />
 
-      {/* ── 1 · STUDY CLOCK — the functional heart of the page ───────── */}
+      {/* ── 1 · STUDY CLOCK - the functional heart of the page ───────── */}
       <Reveal>
         <Spot className="glass-panel tilt-card section-card focus-clock-card accent-edge accent-edge--success">
           <div className="focus-clock-top">
@@ -268,7 +268,7 @@ export default function FocusView({
                   value={clock.subjectId ? String(clock.subjectId) : ""}
                   onChange={(v) => clock.setSubjectId(v ? Number(v) : null)}
                   options={[
-                    { value: "", label: "— none —" },
+                    { value: "", label: "- none -" },
                     ...state.subjects.map((x) => ({
                       value: String(x.id),
                       label: x.name,
@@ -295,7 +295,7 @@ export default function FocusView({
                     if (task?.subjectId) clock.setSubjectId(task.subjectId);
                   }}
                   options={[
-                    { value: "", label: "— free session —" },
+                    { value: "", label: "- free session -" },
                     ...todayTasks.map((x) => ({
                       value: String(x.id),
                       label: x.title,
@@ -539,7 +539,7 @@ export default function FocusView({
                 <div className="card-head-copy">
                   <h3 className="card-title section-title">Ambient sounds</h3>
                   <p className="card-sub">
-                    Calm background layer — never a playlist
+                    Calm background layer - never a playlist
                   </p>
                 </div>
               </div>
@@ -609,7 +609,7 @@ export default function FocusView({
                 </li>
                 <li>
                   <IconCheck size={14} />
-                  <span>One lesson per block — close unrelated tabs.</span>
+                  <span>One lesson per block - close unrelated tabs.</span>
                 </li>
                 <li>
                   <IconCheck size={14} />
@@ -627,7 +627,7 @@ export default function FocusView({
               </ul>
               <p className="principle-note">
                 <IconSpark size={13} /> Ask the tutor for a worked example any
-                time — the clock keeps running.
+                time - the clock keeps running.
               </p>
             </Spot>
           </Reveal>

@@ -42,7 +42,7 @@ export default function SubjectsView({
   const [editing, setEditing] = useState<SubjectRow | null>(null);
   const [openTopics, setOpenTopics] = useState<number | null>(null);
   const [openLesson, setOpenLesson] = useState<number | null>(null);
-  /* Subject queued for removal — the delete verb opens the in-app confirm
+  /* Subject queued for removal - the delete verb opens the in-app confirm
      instead of a bare `window.confirm()`, so the copy can say exactly what
      goes with it (lessons, scheduled tasks, logged history). */
   const [confirmDelete, setConfirmDelete] = useState<SubjectRow | null>(null);
@@ -211,7 +211,7 @@ export default function SubjectsView({
                 {/* ── EXPANDABLE LESSONS LIST ──
                     One quiet row per topic: number · title · minutes · state.
                     Everything else (unit, difficulty, mastery, concepts,
-                    practice, the tutor) lives INSIDE the brief, one tap away —
+                    practice, the tutor) lives INSIDE the brief, one tap away -
                     the row itself stays scannable when a subject has 30
                     lessons. */}
                 {open && (

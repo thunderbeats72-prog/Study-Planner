@@ -21,13 +21,13 @@ const inter = localFont({
  * redesigns stacked on top of each other, the mono file cost an extra 100 kB
  * download, and mono metrics made the numeric columns sit on a different
  * baseline from the labels above them. The `.mono` utility now means "tabular
- * figures, slightly open tracking" — the same Inter, so numerals still align in
+ * figures, slightly open tracking" - the same Inter, so numerals still align in
  * columns but everything shares one voice. The font file is no longer loaded.
  */
 export const metadata: Metadata = {
-  title: "Study Planner Pro — AI Study Engine",
+  title: "Study Planner Pro - AI Study Engine",
   description:
-    "An AI study architect that turns any syllabus — school to PhD and competitive exams — into a lesson-by-lesson daily plan, with focus timer, spaced recall and a built-in tutor.",
+    "An AI study architect that turns any syllabus - school to PhD and competitive exams - into a lesson-by-lesson daily plan, with focus timer, spaced recall and a built-in tutor.",
 };
 
 export const viewport: Viewport = {

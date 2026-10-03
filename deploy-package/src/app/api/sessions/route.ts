@@ -144,7 +144,7 @@ async function postSessions(req: Request) {
           .where(and(eq(tasks.id, taskId), eq(tasks.userId, user.id)));
 
         // Auto-complete: once the logged minutes reach the planned time, the
-        // task is done — no manual "Done" tap needed (a 15-min recall studied
+        // task is done - no manual "Done" tap needed (a 15-min recall studied
         // for 28 min is complete at the 15-min mark). Only a pending task
         // flips; done/skipped are never re-marked, and if a concurrent
         // request completes it first, the conditional status update below

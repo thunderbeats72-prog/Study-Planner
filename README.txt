@@ -1,4 +1,4 @@
-STUDY PLANNER PRO — Repository Guide
+STUDY PLANNER PRO - Repository Guide
 ====================================
 
 THE SOURCE OF TRUTH IS THE `src/` FOLDER
@@ -26,7 +26,7 @@ Root-level config files (package.json, tsconfig.json, next.config.ts,
 postcss.config.mjs, eslint.config.mjs, drizzle.config.ts) are real and
 used by the build.
 
-ACCOUNTS — ONE SIGN-IN, EVERY DEVICE
+ACCOUNTS - ONE SIGN-IN, EVERY DEVICE
 ------------------------------------
 A learner creates a username and password, SIGNS IN with them, and that
 account OWNS the plan. Sign in on a phone, a tablet or another laptop and the
@@ -56,7 +56,7 @@ How identity works now:
     browser cannot read it, and the database stores only its SHA-256, so a
     database dump cannot be replayed as a login.
   * EVERY data route resolves the learner with `requireUser(req)`. The old
-    `x-user-key` header is no longer an identity — it survives only for
+    `x-user-key` header is no longer an identity - it survives only for
     rate-limit fingerprinting and for the sign-up claim below. A test in
     `npm test` fails if any data route ever reads identity from it again.
   * Passwords are salted scrypt (16 MB cost), never recoverable. Eight
@@ -75,13 +75,13 @@ Upgrading an existing deployment:
   * The new columns and the `auth_sessions` table are applied by
     `npm run db:push` (or `npm run build`, which pushes then builds). If a
     deployment builds with plain `next build`, the first auth request also
-    applies them itself — `ensureAuthSchema()` in src/lib/auth.ts runs
+    applies them itself - `ensureAuthSchema()` in src/lib/auth.ts runs
     idempotent `ADD COLUMN IF NOT EXISTS` / `CREATE TABLE IF NOT EXISTS`
     statements once per server process, so "deploy and sign up" works
     without a manual migration step.
   * Plans built BEFORE accounts existed are not lost. They were keyed to a
     browser; when that same browser creates the first account, the sign-up
-    CLAIMS that row — the new credentials are attached to the existing plan
+    CLAIMS that row - the new credentials are attached to the existing plan
     instead of starting an empty one, and the response says
     `claimedExistingPlan: true` so the UI can say so.
 
@@ -130,9 +130,9 @@ AI CONFIGURATION & DIAGNOSTICS
 ------------------------------
 KEYS LIVE ONLY IN THE DEPLOYMENT ENVIRONMENT. Use any of GEMINI_API_KEY
 (alias GOOGLE_API_KEY), CEREBRAS_API_KEY, GROQ_API_KEY, MISTRAL_API_KEY,
-SAMBANOVA_API_KEY, COHERE_API_KEY and/or OPENROUTER_API_KEY — e.g. in Vercel
+SAMBANOVA_API_KEY, COHERE_API_KEY and/or OPENROUTER_API_KEY - e.g. in Vercel
 under Project → Settings → Environment Variables. Never put a secret in a
-NEXT_PUBLIC_* variable. You do NOT need all seven — one key works, and every
+NEXT_PUBLIC_* variable. You do NOT need all seven - one key works, and every
 learner on the deployment shares it automatically. Learners are never asked
 for a key anywhere in the app; there is no key field, no paste box, no
 browser-stored key and no public relay.
@@ -140,13 +140,13 @@ Providers fail over inside one bounded request in priority order Gemini →
 Cerebras → Mistral → SambaNova → Cohere (with Groq and OpenRouter as
 optional extra legs when those keys exist), each with its own MODEL
 FALLBACK CHAIN because model IDs retire. So when one provider hits
-its daily limit or goes down, the next one answers in the SAME request — a
+its daily limit or goes down, the next one answers in the SAME request - a
 question is never left waiting. The last provider/model that answered is
 remembered and tried first, and failures are benched (rejected key 10 min,
 retired model 30 min, rate limit ~45 s, stall ~60 s) so the next message
 skips the broken leg. A bench is a shortcut, never a lock-out: once every
 healthy leg has been tried, the chain gives each throttled leg one bounded
-second chance (AI_RECOVERY_MS) once its window reopens — free tiers
+second chance (AI_RECOVERY_MS) once its window reopens - free tiers
 throttle per minute, so a few seconds of patience routinely buys a real
 cloud answer instead of a local fallback. Only rejected keys are skipped
 for the whole request, because retrying them seconds later fails
@@ -157,14 +157,14 @@ this request has reached its budget …"). src/lib/aiAnswer.ts is the single
 judge of a 200 body: a provider notice counts as a FAILURE, the leg is
 benched, its sticky slot is dropped, and the chain keeps walking until
 something real answers or the local ML engine takes over. It is deliberately
-conservative — a cost-accounting lesson about a department that "has reached
+conservative - a cost-accounting lesson about a department that "has reached
 its budget ceiling" is teaching, not a billing error, and is always delivered
 untouched. Advertising stapled under a good answer is trimmed instead of
 being treated as a failure.
 The local ML engine (FSRS-lite, pace models, skip-risk, weekday propensity,
 focus hours, Ebbinghaus decay, readiness projection) answers plan/progress
 questions even with zero keys and zero network, and it is the last-resort
-answerer when every cloud leg fails. It does not just feed the cloud layer —
+answerer when every cloud leg fails. It does not just feed the cloud layer -
 when the cloud is down it TAKES OVER: a deterministic study strategist
 answers the whole strategy family (am I ready for the exam, what should I
 revise, how many hours should I study, I can't focus, how should I study)
@@ -172,13 +172,13 @@ from the learner's own logged signals, instantly and unrate-limitable. When
 a signal has no history yet it says so instead of inventing a number.
 SHIGUN CREDIT (Settings → AI coach) is a visibility meter only: one credit
 per cloud-answered question, rolling over daily. It never blocks, throttles
-or degrades tutoring — and a meter problem can never take the tutor down
+or degrades tutoring - and a meter problem can never take the tutor down
 (the usage table self-heals, and the meter falls back to memory).
-GET  /api/health    — database status + provider names + `serverProviderIds`
+GET  /api/health    - database status + provider names + `serverProviderIds`
                       + last result.
-GET  /api/ai-status — same snapshot, cache-free: what the deployment has
+GET  /api/ai-status - same snapshot, cache-free: what the deployment has
                       configured and which legs are briefly benched.
-POST /api/ai-status — LIVE SERVER-SIDE probe (operator tool): one tiny real
+POST /api/ai-status - LIVE SERVER-SIDE probe (operator tool): one tiny real
                       request to every configured provider, reporting ok /
                       latency / HTTP status / reason (rejected key, retired
                       model, rate limit, timeout, network block).
@@ -188,7 +188,7 @@ deployment configured no keys. If every cloud leg fails, the local
 Wikipedia-backed tutor answers instead of an apology, and the notice explains
 what happened in one calm sentence.
 Optional tuning: AI_TIMEOUT_MS (default 30000), AI_RECOVERY_MS (default
-12000; the cap on waiting for a throttled leg's window to reopen — set 0 to
+12000; the cap on waiting for a throttled leg's window to reopen - set 0 to
 disable the second chance), AI_PROVIDER_ORDER (a comma-separated subset or
 reorder of the seven providers). Per-provider model
 pins: GEMINI_MODEL, CEREBRAS_MODEL, GROQ_MODEL, MISTRAL_MODEL,
@@ -208,7 +208,7 @@ automatically on deploy. Existing plans are enriched non-destructively
 when state is loaded; rebuilding is not required.
 
 Re-running the Setup Wizard performs a HARD RESET of course data
-(subjects, lessons, schedule, sessions, chat) — always behind a
+(subjects, lessons, schedule, sessions, chat) - always behind a
 confirmation dialog in the UI.
 
 CONSISTENT SHIGUN VOICE
@@ -233,36 +233,36 @@ The browser-side key paste (BYOK), the browser-direct bridge and the free
 community relays were REMOVED. SHIGUN is now configured exclusively by the
 deployment environment, which is what a production deployment wants:
 
-  - one place for keys — the server environment (e.g. Vercel);
+  - one place for keys - the server environment (e.g. Vercel);
   - every learner gets the same cloud tutoring automatically;
   - nothing to toggle, paste or switch off inside the app;
   - no question ever leaves for an anonymous public relay.
 
 Removed: src/lib/byok.ts, src/lib/aiBridge.ts, src/components/AiKeyCard.tsx,
 the prepare/finalise modes of /api/chat, and the x-ai-keys header.
-Added: src/components/AiCoachCard.tsx — a read-only Settings card showing the
+Added: src/components/AiCoachCard.tsx - a read-only Settings card showing the
 deployment's live connection state (configured providers, last answer,
 briefly benched legs) and the automatic-failover contract.
 Fixed: the Shigun credit meter can no longer take the tutor offline. A
 missing/stale shigun_usage table used to throw on every /api/chat request,
 which skipped the cloud chain entirely and looked exactly like "the AI
 stopped working"; the meter now self-heals the table once and degrades to
-memory, and credit is informational — it never gates a cloud answer.
+memory, and credit is informational - it never gates a cloud answer.
 Priority order is now Gemini-first (Gemini → Cerebras → Groq → Mistral →
 SambaNova → Cohere → OpenRouter), matching the key most deployments
 configure; sticky success still promotes whichever leg actually answers.
 
-v35 ACCOUNTS — ONE SIGN-IN, EVERY DEVICE (this build)
+v35 ACCOUNTS - ONE SIGN-IN, EVERY DEVICE (this build)
 ------------------------------------------------------
  - THE PLAN BELONGS TO A PERSON, NOT A BROWSER. Study Planner Pro now opens
    on a front door (src/components/AuthGate.tsx): create a username and
-   password, or sign in. Everything behind it — subjects, lessons, schedule,
-   logged minutes, streak, settings and tutor history — hangs off that
+   password, or sign in. Everything behind it - subjects, lessons, schedule,
+   logged minutes, streak, settings and tutor history - hangs off that
    account, so signing in on a phone shows exactly what the laptop shows,
    and a change on either is what the other loads next.
  - IDENTITY MOVED FROM A HEADER TO A SESSION. Every data route resolves the
    learner with `requireUser(req)` (src/lib/auth.ts) against an HttpOnly,
-   SameSite=Lax, Secure cookie whose SHA-256 — never the token — is stored
+   SameSite=Lax, Secure cookie whose SHA-256 - never the token - is stored
    in the new `auth_sessions` table. The old `x-user-key` device header can
    no longer fetch anybody's data; it survives only for rate-limit
    fingerprinting and for the sign-up claim below. `npm test` fails if a
@@ -280,8 +280,8 @@ v35 ACCOUNTS — ONE SIGN-IN, EVERY DEVICE (this build)
  - SETTINGS → ACCOUNT & SYNC. See which devices are signed in and when each
    was last active, sign the others out, change the password (which signs
    every other device out), or sign out here. Signing out deletes nothing.
- - CREATE, THEN SIGN IN. Sign-up stops at "account created" — no session, no
-   cookie — and hands over to the sign-in form with the username pre-filled,
+ - CREATE, THEN SIGN IN. Sign-up stops at "account created" - no session, no
+   cookie - and hands over to the sign-in form with the username pre-filled,
    so the password is used once before anything depends on it.
  - THE WIZARD LOST A STEP AND ITS CLUTTER. Setup is 7 steps, not 8: the
    "What should we call you?" screen is gone because the account already
@@ -304,9 +304,9 @@ v25 CSS + RESPONSIVE UI SYSTEM (this build)
    question now has one documented owner instead of "whoever wrote the last
    file", and the cascade result is preserved.
  - DEAD CSS GONE: 738 rules (441 fewer rules, ~82 KB) whose classes no
-   longer existed in any component — old `.task-row` lists, `.planner-days`,
+   longer existed in any component - old `.task-row` lists, `.planner-days`,
    kanban, voice panels, mini-timer stages and five superseded generations of
-   the ⋮ popover — plus the empty `@media` shells they left behind.
+   the ⋮ popover - plus the empty `@media` shells they left behind.
  - ONE TYPE SCALE, NO OVERRIDE WAR: `.page-title` carried 13 font-size
    declarations and `.section-title` 6 across the sheets, four of them
    `!important`. Headings now read from the fluid `--fs-*` ramp
@@ -330,14 +330,14 @@ v25 CSS + RESPONSIVE UI SYSTEM (this build)
    so a card cannot disagree with itself.
  - ONE ICON SET, ONE ACTION ROW: icon buttons carry `aria-label` + `title`;
    `[Clock in] [Done]` live in one labelled group outside the ⋮ popover, which
-   keeps only Edit / Skip / restore — the primary verbs are no longer buried.
+   keeps only Edit / Skip / restore - the primary verbs are no longer buried.
  - ZEN FOLLOWS THE THEME: the room, desk, lamp and ring are painted from
    `--zen-*` tokens derived from each theme's `--illustration-*` bridge, so
    light themes get a lit-paper room and dark themes a night one; the controls
    shrank to medium and use the same tokens. The daily quote rotates by date
    and is attributed.
  - DE-BLUR, PROPERLY: blur is now a material for FLOATING layers only (dock,
-   top bar, modals, ⌘K, day sheet) — no in-flow surface that carries body
+   top bar, modals, ⌘K, day sheet) - no in-flow surface that carries body
    text is frosted, half-pixel hover transforms were snapped to whole pixels,
    and stacked opacity layers were removed. That, not a contrast bump, is
    what cleared the smeared type.
@@ -353,27 +353,27 @@ v25 CSS + RESPONSIVE UI SYSTEM (this build)
 v20 PRACTICAL REAL-WORLD ENHANCEMENT (this build)
 --------------------------------------------------
  - "WHAT SHOULD I DO NOW?" IS THE HERO: the Overview opens with one clear
-   answer — the single best next task (overdue → revision → today → weak
+   answer - the single best next task (overdue → revision → today → weak
    subject → soon), its reason, a Start button, the NEXT task behind it,
    and how much of today remains. Live session controls (pause / clock out)
    sit on that same card while it records. Statistics (KPIs, charts, heatmap,
    coaching, intelligence) moved BELOW the plan so they support instead of
    dominate. One deterministic priority order (src/lib/prioritization.ts) is
-   shared by the hero, the AI tutor's live context, and the command palette —
+   shared by the hero, the AI tutor's live context, and the command palette -
    the AI now recommends exactly what the hero shows.
  - BACKLOG RECOVERY, NOT GUILT: overdue work is framed as "N unfinished
-   tasks — let's recover them". Four options: Do today (disabled when it
+   tasks - let's recover them". Four options: Do today (disabled when it
    would exceed daily capacity), Move to tomorrow, Spread across the week
    (per-day capacity-aware, oldest first, never crammed), or Let AI re-plan.
    A gentle pace suggestion (+30 min/day for N days) comes from
    src/lib/recovery.ts. Bulk re-dating happens in ONE API call
-   (PATCH /api/tasks `moves`) — valid in demo and real DB modes.
- - QUICK ADD: capture a task in one breath — title, duration chips, optional
-   subject, Today/Tomorrow, type — from the Overview's Today card or the
+   (PATCH /api/tasks `moves`) - valid in demo and real DB modes.
+ - QUICK ADD: capture a task in one breath - title, duration chips, optional
+   subject, Today/Tomorrow, type - from the Overview's Today card or the
    Planner. Shared client-side validation (src/lib/quickAdd.ts) mirrors the
    server limits; the task lands in the plan immediately.
  - CLEANER TASK ROWS: every row is now [Done] / [Start] with everything else
-   (Edit, Skip, Skip subject, Reopen) inside a real "⋯" menu — the old
+   (Edit, Skip, Skip subject, Reopen) inside a real "⋯" menu - the old
    dead toggle on desktop is gone. Revision rating works identically on the
    Overview and Planner (one shared TaskActions component). Planner's kanban
    view was removed (duplicated the list's statuses; added visual noise).
@@ -396,14 +396,14 @@ v19 COLLAPSED-RAIL + MOBILE BAR FIXES (this build)
  - ONE HIGHLIGHT IN THE COLLAPSED SIDEBAR: the brand tile used to be painted
    with the very same --accent-gradient the active nav pill uses (plus a
    spinning conic halo), so in the 78px icon rail it read as a second selected
-   tab stacked above the real one. Collapsed, the mark is now quiet — neutral
-   surface, muted glyph, hairline rim, no glow, halo off — riding the same
+   tab stacked above the real one. Collapsed, the mark is now quiet - neutral
+   surface, muted glyph, hairline rim, no glow, halo off - riding the same
    --rail-dur curve as the labels. Expanded, it keeps the gradient tile,
    because there the wordmark sits beside it and it reads as branding. Only
    the active route is highlighted now.
  - ⌘K HINT NO LONGER CROPS OR OVERFLOWS: "Press ⌘K / Ctrl-K for commands"
    was a position:fixed strip pinned to the viewport corner, as wide as its
-   text — the rail shrank to 78px and the hint did not, so it hung out over
+   text - the rail shrank to 78px and the hint did not, so it hung out over
    the workspace with words cut in half. It is now an ordinary row at the foot
    of the sidebar (width:100%, min-width:0, overflow:hidden), so the rail's
    own width IS the hint's width. Narrow sidebar → the sentence wraps onto a
@@ -434,14 +434,14 @@ v18 FIXES
    drifted far behind src/ (it predated the study-clock auto-completion,
    the one-per-row planner list, the sidebar rail, the rebuilt mobile
    top bar and the DB-less route guard). Deploying it shipped months of
-   stale behaviour — exactly the "I reported this and it's still not
+   stale behaviour - exactly the "I reported this and it's still not
    fixed" symptom. It is again a byte-exact mirror of src/, and the
    bundle README now matches the live app.
  - WEEKLY CHECKPOINT TITLES NEVER SHOW "#0": checkpoint-title
    normalisation is now one shared helper (src/lib/client.ts →
    normalizeCheckpointTitle) used by both the Overview and the Planner.
-   Every legacy form — "Weekly Checkpoint Test #0", "Weekly Checkpoint
-   · Test #0", unspaced later numbers — renders as the canonical
+   Every legacy form - "Weekly Checkpoint Test #0", "Weekly Checkpoint
+   · Test #0", unspaced later numbers - renders as the canonical
    "Weekly Checkpoint · Test #N" (1-based). Covered by test-suite
    section 5c.
  - README AI DOCS MATCH THE APP: the guide no longer sends you to set
@@ -453,14 +453,14 @@ v18 FIXES
    database, every API surface (study clock sessions with the same
    auto-completion rule, task Done/Skip/Edit/Add/Delete, settings,
    subjects, replan, setup wizard) now answers through an in-memory
-   demo layer instead of erroring — a preview visitor can exercise the
+   demo layer instead of erroring - a preview visitor can exercise the
    real flows end to end without PostgreSQL. Covered by test-suite
    section 5d.
 
 v16 UI POLISH (this build)
 --------------------------
  - TRUE LIST VIEWS: Planner day blocks and the Overview's "Today's Study
-   Load" are real lists again — rows span the panel edge to edge, divided
+   Load" are real lists again - rows span the panel edge to edge, divided
    by clean hairlines instead of each row wearing its own card border,
    shadow and rounded corners.
  - ALIGNED ROW CONTROLS: every task row's buttons share one height, the
@@ -471,25 +471,25 @@ v16 UI POLISH (this build)
  - CALENDAR COLOUR EVERYWHERE: each calendar day with tasks is softly
    tinted with its first subject's colour, and on phones the coloured
    topic pills are visible again (they used to be hidden entirely, which
-   left a plain number grid) — the month now reads at a glance on any
+   left a plain number grid) - the month now reads at a glance on any
    device, and tapping a day still opens the full task sheet.
  - FOCUS + CLOCK IN ONE TAP: "Start Focus" now also starts the study
    clock (attaching the first pending task of the day when possible), and
-   Zen mode's primary button is "Start Focus + Clock" — no more juggling
+   Zen mode's primary button is "Start Focus + Clock" - no more juggling
    two timers. Breaks (short/long) never touch the clock; Pause and
    Clock Out stay independent.
  - BRANDED FAVICON: the browser tab now shows the Study Planner Pro
    logo (the layered chevron mark on the gradient tile) instead of the
-   default globe — `src/app/icon.svg`, served automatically by Next.js.
+   default globe - `src/app/icon.svg`, served automatically by Next.js.
 
 v15 STUDY CLOCK AUTO-COMPLETE (this build)
 ------------------------------------------
  - DONE WITHOUT THE DONE BUTTON: the study clock watches every task's
-   planned minutes. The moment your logged time reaches the plan — a
-   15-minute recall after 15+ minutes, a 45-minute lesson after 45+ — the
+   planned minutes. The moment your logged time reaches the plan - a
+   15-minute recall after 15+ minutes, a 45-minute lesson after 45+ - the
    task is marked complete automatically. No more studying for 28 minutes
    on a 15-minute recall and still seeing it "pending".
- - NOTIFIED, THEN NEXT: completion fires a success toast ("…complete —
+ - NOTIFIED, THEN NEXT: completion fires a success toast ("…complete -
    28m logged ≥ 15m planned") and, while the clock is still running on
    that task, the clock rolls itself forward to the next pending task, so
    every minute you keep studying lands on the right lesson. If the task
@@ -503,8 +503,8 @@ v15 STUDY CLOCK AUTO-COMPLETE (this build)
 v14 LIQUID GLASS DELUXE (this build)
 ------------------------------------
  - MATERIAL TIERS, NOT BLUR EVERYWHERE: cards (tier 1) paint their glass as
-   background LAYERS — pointer specular → gloss → gradient accent edge →
-   corner wash → tint body — at a 90%/84% tint floor (88%/80% on dark
+   background LAYERS - pointer specular → gloss → gradient accent edge →
+   corner wash → tint body - at a 90%/84% tint floor (88%/80% on dark
    themes) so text never loses contrast. Only genuinely floating layers
    (tracker bar, command palette, toasts, chat sheet, sidebar dock) get the
    refractive rim: a masked, blurred ring inside the edge that bends the
@@ -521,7 +521,7 @@ v14 LIQUID GLASS DELUXE (this build)
    was measured, so if the effect never runs the previous look is untouched.
  - SCROLL-AWARE CHROME: the sticky bar is opaque at the top of the page and
    frosts to ~86% tint + 20px blur over the first 76px of scroll
-   (animation-timeline: scroll — zero JS, zero scroll listeners); below-fold
+   (animation-timeline: scroll - zero JS, zero scroll listeners); below-fold
    panels reveal themselves on their own view timeline; the canvas mesh
    parallaxes one cell behind the page.
  - GRADIENT LANGUAGE: the accent edge is now one class
@@ -532,8 +532,8 @@ v14 LIQUID GLASS DELUXE (this build)
  - ALIGNMENT + PADDING: one card rhythm everywhere via `.section-card`,
    `.section-head`, `.section-title`, `.panel-lead`, `.stat-big` and the
    `--sp-1..5` scale; ~60 inline style declarations across the six views
-   became semantic classes (only genuinely data-driven values — a colour, a
-   bar width, a chevron angle — are still inline).
+   became semantic classes (only genuinely data-driven values - a colour, a
+   bar width, a chevron angle - are still inline).
  - RESPONSIVE FOR ALL DEVICES: KPI/subject/kanban grids are intrinsically
    sized (`auto-fit` + `min(…, 100%)`), cards answer their OWN width through
    `container: card / inline-size` (2-up KPI and a wider progress bar inside
@@ -553,7 +553,7 @@ v14 LIQUID GLASS DELUXE (this build)
    `prefers-reduced-motion`, `prefers-reduced-transparency`,
    `prefers-contrast`, `forced-colors` and print all get explicit exits.
    All seven themes and both `mode-focused` / `mode-young` densities keep
-   working — the whole layer is appended CSS, no earlier rule was edited and
+   working - the whole layer is appended CSS, no earlier rule was edited and
    no data, scheduling or AI behaviour changed (101/101 logic tests pass).
 
 v10 FIXES (this build)
@@ -614,7 +614,7 @@ v8 FIXES (this build)
    russia conflict and how it will solve" now return a real structured lesson
    even with zero AI keys.
  - DEPLOY-PACKAGE RESYNCED: the drag-and-drop deploy folder had drifted from
-   src/ (missing voice pieces, older chat/health/AI files) — deploying it
+   src/ (missing voice pieces, older chat/health/AI files) - deploying it
    shipped stale behaviour. It is now a byte-exact mirror of src/.
  - UI/UX (all devices): roomier desktop chat panel (480px, near-full height),
    near-full-screen phone sheet with landscape mode, auto-growing composer
@@ -627,7 +627,7 @@ v7 FIXES (this build)
  - SHIGUN ALWAYS SHOWS A REPLY. The chat UI used to replace the conversation
    with whatever /api/chat returned in `state.messages`. If the database was
    down, unconfigured, or the second state reload fell back to an empty
-   guest account, the reply was generated but never painted — it looked like
+   guest account, the reply was generated but never painted - it looked like
    Shigun was ignoring you. The API now always attaches the user+assistant
    turn to the returned state, and the client treats `reply` as source of
    truth. A real onboarded plan is never overwritten by the empty fallback.
@@ -648,7 +648,7 @@ v6 FIXES (this build)
    replan, theme change, or timer stop) instead of answered. The command
    parser now recognises question phrasing in English and Indic scripts and
    only executes clear imperative commands ("start timer", "open planner").
-   "Can you open the planner?" still navigates — it is harmless and explicit.
+   "Can you open the planner?" still navigates - it is harmless and explicit.
  - OFF-TOPIC QUESTIONS NO LONGER GET RANDOM LESSONS. "what is the capital of
    France?" used to be answered with whatever lesson was next in the plan.
    The curriculum fallback now only answers when the question is genuinely
@@ -690,8 +690,8 @@ v5 FIXES (this build)
    button while that lesson is being timed. Every task row (Overview +
    Planner) does the same: "Clock in" becomes a pulsing red "Clock out"
    for the running lesson, and "Switch" for other lessons (banking the
-   open minutes first). Re-tapping Start can never silently restart — or
-   eat unlogged minutes of — a running session anymore.
+   open minutes first). Re-tapping Start can never silently restart - or
+   eat unlogged minutes of - a running session anymore.
  - Pause no longer resets the visible timer: the clock freezes, minutes
    are banked, and Resume continues the same visible session. The
    tracker bar gained a proper "Paused" state with Resume + Clock Out,
@@ -702,12 +702,12 @@ v5 FIXES (this build)
  - Multilingual voice: the mic understands start/stop/pause/resume/break/
    navigation commands in Hindi, Marathi, Hinglish, Bengali, Tamil, Telugu,
    Kannada, Malayalam, Gujarati, Punjabi, Odia, Urdu, Arabic, French and
-   Spanish — and CONFIRMS them in the same language, spoken aloud. There is
+   Spanish - and CONFIRMS them in the same language, spoken aloud. There is
    NO language picker: Shigun assesses the language from your speech itself
    and answers in that same language automatically.
  - Voice-aware grammar: replies follow the selected voice. Pick a female
    voice and Shigun uses feminine forms ("कर सकती हूँ"); pick the male
-   voice and it uses masculine forms ("कर सकता हूँ") — in Hindi, Urdu,
+   voice and it uses masculine forms ("कर सकता हूँ") - in Hindi, Urdu,
    Marathi, Punjabi and every language the tutor writes.
  - Long answers read in full and FLOW: replies are split only when they are
    genuinely too long for one TTS request (never after every "."), and the
@@ -765,7 +765,7 @@ v3 FIXES
  - Full course name + tracker task title never truncate
  - 40px sidebar collapse toggle with smooth icon-rail animation
  - Mic pre-warm + watchdog + confidence-scored transcripts (review
-   before send when unsure) — no more multi-tap retries
+   before send when unsure) - no more multi-tap retries
  - Full-screen mobile chat sheet; redesigned bottom-anchored toasts
  - Time tracking accurate to the minute with client-timezone dates
  - Re-run Setup wipes ALL previous data (zero carryover)

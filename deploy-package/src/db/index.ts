@@ -67,7 +67,7 @@ export class DatabaseUnavailableError extends Error {
  *  The handle mimics drizzle's promise-like query builders: every property
  *  access and every call returns another awaitable handle, so a full chain
  *  such as `db.select().from(users).where(...).limit(1)` only rejects once,
- *  at the terminal `await`, with a DatabaseUnavailableError — never with a
+ *  at the terminal `await`, with a DatabaseUnavailableError - never with a
  *  confusing `TypeError: … .from is not a function` and never leaving an
  *  orphaned rejected promise behind. */
 export function unavailableDb(): Db {

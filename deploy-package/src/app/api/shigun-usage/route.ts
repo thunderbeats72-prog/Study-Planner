@@ -14,14 +14,14 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
 /**
- * SHIGUN credit meter — one endpoint, two verbs.
+ * SHIGUN credit meter - one endpoint, two verbs.
  *
- * GET  — the learner's allowance for today (used/limit/remaining), plus the
+ * GET  - the learner's allowance for today (used/limit/remaining), plus the
  *        live provider/relay quota state the tutor is actually working with:
  *        which legs are on cooldown (rate-limited providers with seconds
  *        left), the last real request's health, and whether the free relay
  *        is allowed. No keys, no raw provider internals.
- * POST — `{ action: "reset" }` refills the allowance, forgets remembered
+ * POST - `{ action: "reset" }` refills the allowance, forgets remembered
  *        provider failures and clears the per-minute rate-limit bucket, so a
  *        learner whose credit is exhausted can resume tutoring immediately.
  */

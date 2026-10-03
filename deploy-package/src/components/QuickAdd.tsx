@@ -12,7 +12,7 @@ import { Select } from "./bits";
 const MINUTE_CHOICES = [15, 25, 30, 45, 60];
 
 /**
- * Quick Add — capture a task in one breath: title, duration, optional
+ * Quick Add - capture a task in one breath: title, duration, optional
  * subject, today/tomorrow, type. Deliberately NOT the full editor.
  * Submits through the parent's `onAdd` (which owns the API call), then
  * collapses itself again.
@@ -100,7 +100,7 @@ export default function QuickAdd({
                 className="input-field"
                 value={title}
                 maxLength={300}
-                placeholder="e.g. Physics — Current Electricity"
+                placeholder="e.g. Physics - Current Electricity"
                 onChange={(event) => setTitle(event.target.value)}
                 onKeyDown={(event) => { if (event.key === "Enter") submit(); }}
               />

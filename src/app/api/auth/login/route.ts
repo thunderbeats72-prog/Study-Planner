@@ -9,7 +9,7 @@ import { demoDataEnabled } from "@/lib/demoGate";
 export const dynamic = "force-dynamic";
 
 /**
- * POST /api/auth/login — sign in on this device.
+ * POST /api/auth/login - sign in on this device.
  *
  * On success the learner's whole plan comes back with the response: the
  * phone that just signed in paints the same dashboard the laptop shows,

@@ -46,20 +46,20 @@ export const EXTRA_COURSES: Course[] = [
     s("Social Science", 11, "Medium", O), s("English", 9, "Medium", P),
     s("Information Technology", 5, "Easy", C),
   ]),
-  c("class_11_pcm", "Class 11 — Science (PCM)", "school", [
+  c("class_11_pcm", "Class 11 - Science (PCM)", "school", [
     s("Physics", 13, "Hard", B), s("Chemistry", 13, "Hard", G),
     s("Mathematics", 13, "Hard", P), s("English Core", 8, "Easy", O),
   ]),
-  c("class_11_pcb", "Class 11 — Science (PCB)", "school", [
+  c("class_11_pcb", "Class 11 - Science (PCB)", "school", [
     s("Physics", 13, "Hard", B), s("Chemistry", 13, "Hard", G),
     s("Biology", 12, "Hard", L), s("English Core", 8, "Easy", O),
   ]),
-  c("class_11_commerce", "Class 11 — Commerce", "school", [
+  c("class_11_commerce", "Class 11 - Commerce", "school", [
     s("Accountancy", 11, "Hard", B), s("Business Studies", 10, "Medium", G),
     s("Economics", 10, "Medium", O), s("Mathematics", 11, "Hard", P),
     s("English Core", 8, "Easy", PK),
   ]),
-  c("class_12_arts", "Class 12 — Humanities / Arts", "school", [
+  c("class_12_arts", "Class 12 - Humanities / Arts", "school", [
     s("History", 10, "Medium", O), s("Political Science", 10, "Medium", B),
     s("Geography", 10, "Medium", G), s("Psychology", 9, "Medium", P),
     s("English Core", 8, "Easy", PK),
@@ -77,12 +77,12 @@ export const EXTRA_COURSES: Course[] = [
     s("Electrical Machines", 8, "Hard", O), s("Power Systems", 7, "Hard", R),
     s("Electrical Measurements", 6, "Medium", G), s("Control Systems", 6, "Hard", P),
   ]),
-  c("iti_electrician", "ITI — Electrician Trade", "diploma", [
+  c("iti_electrician", "ITI - Electrician Trade", "diploma", [
     s("Trade Theory", 8, "Medium", B), s("Wiring & Installation", 7, "Medium", O),
     s("Electrical Machines Practical", 6, "Medium", G), s("Workshop Calculation & Science", 6, "Medium", P),
     s("Engineering Drawing", 5, "Easy", C),
   ]),
-  c("polytechnic_it", "Polytechnic — Information Technology", "diploma", [
+  c("polytechnic_it", "Polytechnic - Information Technology", "diploma", [
     s("Programming Fundamentals", 8, "Medium", B), s("Data Structures", 7, "Hard", P),
     s("Database Management", 7, "Medium", G), s("Networking Essentials", 6, "Medium", C),
     s("Software Engineering", 6, "Medium", O),
@@ -135,22 +135,22 @@ export const EXTRA_COURSES: Course[] = [
     s("Nursing Foundations", 9, "Medium", P), s("Microbiology", 6, "Medium", C),
     s("Psychology", 6, "Easy", O),
   ]),
-  c("bpharm", "B.Pharm — Pharmacy", "ug", [
+  c("bpharm", "B.Pharm - Pharmacy", "ug", [
     s("Pharmaceutics", 9, "Hard", B), s("Pharmacology", 9, "Hard", O),
     s("Pharmaceutical Chemistry", 9, "Hard", G), s("Pharmacognosy", 7, "Medium", L),
     s("Pharmaceutical Analysis", 7, "Medium", C),
   ]),
-  c("bca", "BCA — Computer Applications", "ug", [
+  c("bca", "BCA - Computer Applications", "ug", [
     s("Programming Fundamentals", 8, "Medium", B), s("Data Structures", 8, "Hard", P),
     s("Database Management Systems", 8, "Medium", G), s("Web Development", 7, "Medium", O),
     s("Operating Systems", 7, "Hard", C), s("Software Engineering", 6, "Medium", L),
   ]),
-  c("llb", "LL.B — Bachelor of Laws", "ug", [
+  c("llb", "LL.B - Bachelor of Laws", "ug", [
     s("Constitutional Law", 10, "Hard", B), s("Law of Contract", 8, "Medium", G),
     s("Criminal Law (IPC)", 9, "Hard", R), s("Law of Torts", 7, "Medium", O),
     s("Family Law", 7, "Medium", P), s("Legal Method & Research", 6, "Medium", C),
   ]),
-  c("barch", "B.Arch — Architecture", "ug", [
+  c("barch", "B.Arch - Architecture", "ug", [
     s("Architectural Design", 10, "Hard", P), s("Building Construction", 8, "Medium", O),
     s("History of Architecture", 7, "Medium", G), s("Structural Systems", 8, "Hard", B),
     s("Building Services", 6, "Medium", C),
@@ -175,17 +175,17 @@ export const EXTRA_COURSES: Course[] = [
     s("Machine Learning", 10, "Hard", P), s("Data Visualisation", 6, "Easy", O),
     s("Database & SQL", 7, "Medium", G), s("Big Data Systems", 7, "Hard", R),
   ]),
-  c("bhm", "BHM — Hotel Management", "ug", [
+  c("bhm", "BHM - Hotel Management", "ug", [
     s("Food Production", 8, "Medium", O), s("Food & Beverage Service", 7, "Medium", G),
     s("Front Office Operations", 7, "Easy", B), s("Housekeeping Operations", 6, "Easy", P),
     s("Hospitality Accounting", 6, "Medium", C),
   ]),
-  c("bjmc", "BJMC — Journalism & Mass Comm", "ug", [
+  c("bjmc", "BJMC - Journalism & Mass Comm", "ug", [
     s("Introduction to Journalism", 7, "Easy", B), s("Reporting & Editing", 8, "Medium", O),
     s("Media Laws & Ethics", 7, "Medium", R), s("Radio & TV Production", 7, "Medium", P),
     s("Digital & Social Media", 6, "Easy", C),
   ]),
-  c("bed", "B.Ed — Bachelor of Education", "ug", [
+  c("bed", "B.Ed - Bachelor of Education", "ug", [
     s("Childhood & Growing Up", 7, "Medium", P), s("Learning & Teaching", 8, "Medium", B),
     s("Knowledge & Curriculum", 7, "Medium", G), s("Assessment for Learning", 7, "Medium", O),
     s("Inclusive Education", 6, "Easy", C),
@@ -207,7 +207,7 @@ export const EXTRA_COURSES: Course[] = [
     s("Topology", 8, "Hard", G), s("Functional Analysis", 8, "Hard", O),
     s("Numerical Analysis", 7, "Hard", C),
   ]),
-  c("mca", "MCA — Computer Applications", "pg", [
+  c("mca", "MCA - Computer Applications", "pg", [
     s("Advanced Data Structures", 9, "Hard", P), s("Operating Systems", 8, "Hard", B),
     s("Computer Networks", 8, "Medium", C), s("Software Engineering", 7, "Medium", G),
     s("Machine Learning", 8, "Hard", O),
@@ -217,7 +217,7 @@ export const EXTRA_COURSES: Course[] = [
     s("Literary Criticism & Theory", 9, "Hard", O), s("Indian English Literature", 8, "Medium", G),
     s("Linguistics", 7, "Hard", C),
   ]),
-  c("msw", "MSW — Master of Social Work", "pg", [
+  c("msw", "MSW - Master of Social Work", "pg", [
     s("Social Work Practice", 8, "Medium", B), s("Community Organisation", 7, "Medium", G),
     s("Social Policy & Legislation", 8, "Medium", O), s("Research Methods", 7, "Hard", P),
     s("Counselling Skills", 6, "Medium", C),
@@ -229,17 +229,17 @@ export const EXTRA_COURSES: Course[] = [
     s("Obstetrics & Gynaecology", 9, "Hard", PK), s("Pathology", 8, "Hard", P),
     s("Pharmacology", 8, "Hard", O), s("Preventive & Social Medicine", 8, "Medium", G),
   ]),
-  c("gate_mech", "GATE — Mechanical Engineering", "competitive", [
+  c("gate_mech", "GATE - Mechanical Engineering", "competitive", [
     s("Engineering Mathematics", 9, "Hard", R), s("Thermodynamics", 9, "Hard", O),
     s("Fluid Mechanics", 8, "Hard", C), s("Strength of Materials", 8, "Hard", B),
     s("Theory of Machines", 8, "Hard", P), s("Manufacturing", 8, "Medium", G),
   ]),
-  c("gate_ece", "GATE — Electronics & Communication", "competitive", [
+  c("gate_ece", "GATE - Electronics & Communication", "competitive", [
     s("Engineering Mathematics", 9, "Hard", R), s("Signals & Systems", 9, "Hard", B),
     s("Analog Electronics", 8, "Hard", O), s("Digital Circuits", 8, "Medium", G),
     s("Communication Systems", 9, "Hard", P), s("Electromagnetics", 7, "Hard", C),
   ]),
-  c("gate_civil", "GATE — Civil Engineering", "competitive", [
+  c("gate_civil", "GATE - Civil Engineering", "competitive", [
     s("Engineering Mathematics", 9, "Hard", R), s("Structural Analysis", 9, "Hard", B),
     s("Geotechnical Engineering", 8, "Hard", O), s("Fluid Mechanics", 8, "Hard", C),
     s("Transportation Engineering", 7, "Medium", G),
@@ -264,7 +264,7 @@ export const EXTRA_COURSES: Course[] = [
     s("English Language", 8, "Medium", O), s("General & Banking Awareness", 8, "Medium", G),
     s("Computer Awareness", 5, "Easy", C),
   ]),
-  c("nda", "NDA / CDS — Defence Entrance", "competitive", [
+  c("nda", "NDA / CDS - Defence Entrance", "competitive", [
     s("Mathematics", 12, "Hard", B), s("General Science", 8, "Medium", G),
     s("History & Freedom Movement", 7, "Medium", O), s("Geography", 7, "Medium", L),
     s("Current Events & English", 7, "Medium", P),
@@ -290,8 +290,8 @@ export const EXTRA_COURSES: Course[] = [
   ]),
   c("net_jrf", "UGC NET / JRF", "competitive", [
     s("Teaching & Research Aptitude", 9, "Medium", B),
-    s("Subject Paper — Core Theory", 12, "Hard", P),
-    s("Subject Paper — Applications", 10, "Hard", G),
+    s("Subject Paper - Core Theory", 12, "Hard", P),
+    s("Subject Paper - Applications", 10, "Hard", G),
     s("Previous Year Analysis", 6, "Medium", O),
   ]),
 
@@ -321,7 +321,7 @@ export const EXTRA_COURSES: Course[] = [
     s("Financial Statement Analysis", 9, "Hard", G), s("Equity Valuation", 9, "Hard", P),
     s("Fixed Income", 8, "Hard", C), s("Derivatives & Alternatives", 8, "Hard", O),
   ]),
-  c("frm", "FRM — Financial Risk Manager", "professional", [
+  c("frm", "FRM - Financial Risk Manager", "professional", [
     s("Foundations of Risk Management", 7, "Medium", B),
     s("Quantitative Analysis", 9, "Hard", P), s("Financial Markets & Products", 9, "Hard", G),
     s("Valuation & Risk Models", 9, "Hard", O),
@@ -338,13 +338,13 @@ export const EXTRA_COURSES: Course[] = [
   ]),
 
   /* ---------- PhD ---------- */
-  c("phd_sciences", "PhD — Sciences / Engineering", "phd", [
+  c("phd_sciences", "PhD - Sciences / Engineering", "phd", [
     s("Advanced Domain Theory", 10, "Hard", P), s("Experimental / Simulation Methods", 8, "Hard", B),
     s("Statistical Analysis of Results", 8, "Hard", G),
     s("Literature Review & Gap Analysis", 8, "Hard", O),
     s("Paper Writing & Conferences", 7, "Hard", C),
   ]),
-  c("phd_humanities", "PhD — Humanities / Social Sciences", "phd", [
+  c("phd_humanities", "PhD - Humanities / Social Sciences", "phd", [
     s("Theoretical Frameworks", 9, "Hard", P), s("Qualitative Methodology", 8, "Hard", B),
     s("Archival & Field Research", 8, "Hard", G),
     s("Critical Literature Review", 8, "Hard", O),
@@ -356,7 +356,7 @@ export const EXTRA_COURSES: Course[] = [
     s("Sounds & First Words", 4, "Easy", P), s("Counting Fun 1-5", 3, "Easy", B),
     s("Colours & Shapes Play", 3, "Easy", G), s("Rhymes & Movement", 3, "Easy", O),
   ]),
-  c("lkg", "LKG — Lower Kindergarten", "nursery", [
+  c("lkg", "LKG - Lower Kindergarten", "nursery", [
     s("Phonics & Letter Sounds", 5, "Easy", P), s("Numbers 1-20", 4, "Easy", B),
     s("Pattern & Shape Recognition", 4, "Easy", G), s("Picture Story & Speaking", 4, "Easy", O),
     s("Colouring & Fine Motor Skills", 3, "Easy", PK),

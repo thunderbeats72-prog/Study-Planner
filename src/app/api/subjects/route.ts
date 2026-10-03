@@ -22,8 +22,8 @@ const DIFFICULTIES = ["Easy", "Medium", "Hard"] as const;
 const COLOR_RE = /^#[0-9a-f]{6}$/i;
 
 /* Difficulty is stored capitalised ("Easy"), but rows seeded before the enum
-   was frozen — the preview curriculum, early databases, hand-written clients
-   — carry "easy". An Edit must never fail (or, worse, look like a curriculum
+   was frozen - the preview curriculum, early databases, hand-written clients
+   - carry "easy". An Edit must never fail (or, worse, look like a curriculum
    change and re-generate every lesson) because of casing alone, so the
    boundary titles the value before validating it. */
 const titledDifficulty = (value: unknown): unknown =>

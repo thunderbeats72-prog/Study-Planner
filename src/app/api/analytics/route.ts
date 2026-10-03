@@ -16,7 +16,7 @@ import { withDbGuard } from "@/lib/routeGuard";
 export const dynamic = "force-dynamic";
 
 /**
- * GET /api/analytics — the ML models' view of this learner, computed
+ * GET /api/analytics - the ML models' view of this learner, computed
  * fresh from their history. Powers the Intelligence card on the
  * dashboard. All deterministic TypeScript; no LLM involved.
  */
@@ -34,7 +34,7 @@ async function getAnalytics(req: Request) {
   const key = account.userKey;
   const today = dateFrom(req);
 
-  // Rows used by the ML models below — the fields both the database rows and
+  // Rows used by the ML models below - the fields both the database rows and
   // the preview demo rows share.
   type TaskLike = {
     id: number; subjectId: number | null; topicId: number | null; date: string; kind: string;
@@ -150,7 +150,7 @@ async function getAnalytics(req: Request) {
   }
 
   // ── Up Next prediction: the pending task the learner most likely
-  // needs now — today's plan order weighted by peak-hour proximity and
+  // needs now - today's plan order weighted by peak-hour proximity and
   // subject momentum (recently touched subjects rank higher).
   const nowH = new Date().getHours();
   const pendingToday = allTasks

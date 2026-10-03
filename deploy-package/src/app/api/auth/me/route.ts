@@ -5,7 +5,7 @@ import { demoDataEnabled } from "@/lib/demoGate";
 export const dynamic = "force-dynamic";
 
 /**
- * GET /api/auth/me — "who is signed in on this device?"
+ * GET /api/auth/me - "who is signed in on this device?"
  *
  * The sign-in screen asks this before it paints, so a returning phone goes
  * straight into the plan instead of flashing a login form. It never fails

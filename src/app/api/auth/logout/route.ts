@@ -4,7 +4,7 @@ import { authenticate, clearSessionCookie, destroyOtherSessions, destroySession,
 export const dynamic = "force-dynamic";
 
 /**
- * POST /api/auth/logout — sign out of this device.
+ * POST /api/auth/logout - sign out of this device.
  *
  * `{ "everywhere": true }` also ends every other signed-in device, which is
  * the thing to do from a replacement phone after losing the old one.
@@ -30,7 +30,7 @@ export async function POST(req: Request) {
       }
       await destroySession(token);
     } catch (error) {
-      // The cookie is cleared regardless — a learner pressing "Sign out"
+      // The cookie is cleared regardless - a learner pressing "Sign out"
       // must end up signed out of this browser even if the database blinks.
       console.error("Logout cleanup failed:", error instanceof Error ? error.message : error);
     }
