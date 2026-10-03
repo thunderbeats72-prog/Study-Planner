@@ -1,11 +1,9 @@
 /**
  * EMAIL THEME
- * ───────────
+ * ------------
  * Shared, inline-only building blocks for transactional email. The templates
- * deliberately avoid remote images: inboxes often block them, and a new Gmail
- * sender needs every deliverability advantage. The logo and illustrations are
- * made from tables, borders and text glyphs so they render immediately and
- * never behave like tracking pixels.
+ * use static, non-tracking PNG artwork from the app itself, with CSS-only
+ * fallbacks when a mail client blocks images.
  */
 
 export function emailEscape(value: string): string {
@@ -14,6 +12,45 @@ export function emailEscape(value: string): string {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+const ASSETS = {
+  logo: "/email/study-planner-logo.png",
+  verify: "/email/email-verify-hero.png",
+  digest: "/email/email-digest-hero.png",
+  weekly: "/email/email-weekly-hero.png",
+  overdue: "/email/email-overdue-card.png",
+} as const;
+
+export function emailAssetBaseFromUrl(url: string): string {
+  try {
+    return new URL(url).origin;
+  } catch {
+    return url.replace(/\/+$/, "") || ".";
+  }
+}
+
+function assetUrl(assetBase: string | undefined, path: string): string | null {
+  if (!assetBase) return null;
+  try {
+    return new URL(path, assetBase).href;
+  } catch {
+    const cleanBase = assetBase.replace(/\/+$/, "") || ".";
+    return `${cleanBase}${path}`;
+  }
+}
+
+function imgTag(
+  assetBase: string | undefined,
+  path: string,
+  alt: string,
+  width: number,
+  height: number,
+  style: string,
+): string | null {
+  const src = assetUrl(assetBase, path);
+  if (!src) return null;
+  return `<img src="${emailEscape(src)}" width="${width}" height="${height}" alt="${emailEscape(alt)}" style="${style}"/>`;
 }
 
 export const EMAIL = {
@@ -42,7 +79,16 @@ export function preheader(text: string): string {
   return `<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;line-height:1px;font-size:1px">${emailEscape(text)}</div>`;
 }
 
-export function logoMark(size = 54): string {
+export function logoMark(size = 54, assetBase?: string): string {
+  const image = imgTag(
+    assetBase,
+    ASSETS.logo,
+    "Study Planner Pro logo",
+    size,
+    size,
+    `display:block;width:${size}px;height:${size}px;border:0;border-radius:16px;outline:none;text-decoration:none`,
+  );
+  if (image) return image;
   const inner = Math.max(28, size - 16);
   return (
     `<div style="width:${size}px;height:${size}px;border-radius:16px;background:#eeeaff;box-shadow:inset 0 0 0 1px #ddd7ff;text-align:center;line-height:${size}px">` +
@@ -51,10 +97,10 @@ export function logoMark(size = 54): string {
   );
 }
 
-export function brandLockup(): string {
+export function brandLockup(assetBase?: string): string {
   return (
     `<table role="presentation" cellspacing="0" cellpadding="0" style="border-collapse:collapse"><tr>` +
-    `<td style="vertical-align:middle;padding-right:14px">${logoMark(54)}</td>` +
+    `<td style="vertical-align:middle;padding-right:14px">${logoMark(54, assetBase)}</td>` +
     `<td style="vertical-align:middle">` +
     `<div style="font-size:24px;line-height:1.1;font-weight:900;letter-spacing:-0.04em;color:#101334">Study Planner <span style="color:#6253eb">Pro</span></div>` +
     `<div style="padding-top:7px;font-size:11px;line-height:1.2;letter-spacing:0.34em;color:#9aa0bb;font-weight:800">PLAN • FOCUS • ACHIEVE</div>` +
@@ -62,11 +108,11 @@ export function brandLockup(): string {
   );
 }
 
-export function emailHeader(): string {
+export function emailHeader(assetBase?: string): string {
   return (
     `<div style="padding:28px 28px 12px">` +
     `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse"><tr>` +
-    `<td style="vertical-align:top">${brandLockup()}</td>` +
+    `<td style="vertical-align:top">${brandLockup(assetBase)}</td>` +
     `<td align="right" style="vertical-align:top;padding-left:18px">` +
     `<div style="font-size:14px;line-height:1.45;color:#646984;font-style:italic">A better you,<br/>one study session at a time.</div>` +
     `<div style="width:38px;border-top:3px solid #7263f3;margin-top:12px;margin-left:auto"></div>` +
@@ -75,11 +121,11 @@ export function emailHeader(): string {
   );
 }
 
-export function emailFooter(note: string, unsubscribeUrl?: string): string {
+export function emailFooter(note: string, unsubscribeUrl?: string, assetBase?: string): string {
   return (
     `<div style="padding:20px 28px 26px;background:#f7f5ff;border-top:1px solid #ebe8fb">` +
     `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse"><tr>` +
-    `<td style="vertical-align:middle;padding-right:14px;width:52px">${logoMark(46)}</td>` +
+    `<td style="vertical-align:middle;padding-right:14px;width:52px">${logoMark(46, assetBase)}</td>` +
     `<td style="vertical-align:middle">` +
     `<div style="font-size:15px;line-height:1.25;font-weight:900;color:#101334">Study Planner <span style="color:#6253eb">Pro</span></div>` +
     `<div style="font-size:12px;line-height:1.45;color:#777b9a">Your personal study companion</div>` +
@@ -112,7 +158,7 @@ export function primaryButton(href: string, label: string, icon = "↗"): string
   );
 }
 
-export function illustration(kind: "verify" | "digest" | "weekly" | "overdue"): string {
+function fallbackIllustration(kind: "verify" | "digest" | "weekly" | "overdue"): string {
   const glyph = kind === "verify" ? "✓" : kind === "digest" ? "▤" : kind === "weekly" ? "↗" : "!";
   const label = kind === "verify" ? "Email verified" : kind === "digest" ? "Today plan" : kind === "weekly" ? "Week review" : "Recovery";
   const color = kind === "overdue" ? "#ef476f" : "#6253eb";
@@ -126,6 +172,22 @@ export function illustration(kind: "verify" | "digest" | "weekly" | "overdue"): 
   );
 }
 
+export function illustration(kind: "verify" | "digest" | "weekly" | "overdue", assetBase?: string): string {
+  const path = ASSETS[kind];
+  const alt = kind === "verify" ? "Email verification illustration" : kind === "digest" ? "Daily study plan illustration" : kind === "weekly" ? "Weekly progress illustration" : "Recovery reminder illustration";
+  const width = kind === "overdue" ? 136 : 174;
+  const height = kind === "overdue" ? 98 : 106;
+  const image = imgTag(
+    assetBase,
+    path,
+    alt,
+    width,
+    height,
+    `display:block;width:${width}px;height:auto;max-width:100%;border:0;outline:none;text-decoration:none;border-radius:22px`,
+  );
+  return image || fallbackIllustration(kind);
+}
+
 export function heroCard(kicker: string, title: string, subtitle: string, art: string): string {
   return (
     `<div style="margin:12px 28px 18px;padding:22px;border-radius:24px;background:#f4f1ff;background-image:linear-gradient(135deg,#f8f6ff,#eeeaff);border:1px solid #e6e0ff">` +
@@ -135,7 +197,7 @@ export function heroCard(kicker: string, title: string, subtitle: string, art: s
     `<div style="font-size:25px;line-height:1.22;font-weight:900;letter-spacing:-0.03em;color:#101334">${title}</div>` +
     `<div style="font-size:14px;line-height:1.55;color:#686d89;margin-top:10px">${subtitle}</div>` +
     `</td>` +
-    `<td align="right" style="vertical-align:middle;width:170px">${art}</td>` +
+    `<td align="right" style="vertical-align:middle;width:180px">${art}</td>` +
     `</tr></table>` +
     `</div>`
   );

@@ -22,6 +22,7 @@ import { nextAction, reasonLabel } from "./prioritization";
 import { backlogFor, dailyCapacityMinutes, suggestedRecovery, todayOverload } from "./recovery";
 import {
   EMAIL,
+  emailAssetBaseFromUrl,
   emailEscape,
   emailFooter,
   emailHeader,
@@ -228,6 +229,7 @@ function taskListHtml(input: DigestInput): string {
 export function digestHtml(input: DigestInput): string {
   const f = digestFacts(input);
   const subject = digestSubject(input);
+  const assetBase = emailAssetBaseFromUrl(input.appUrl);
   const esc = emailEscape;
   const firstSubject = f.now ? subjectName(input, f.now.subjectId) : "";
   const todayCount = f.todays.length;
@@ -242,7 +244,7 @@ export function digestHtml(input: DigestInput): string {
     `For ${input.name} - ${input.today}`,
     esc(subject),
     "Your best next step, today's lessons and recovery status in one calm note.",
-    illustration("digest"),
+    illustration("digest", assetBase),
   );
 
   const startBlock = infoCard(
@@ -284,7 +286,7 @@ export function digestHtml(input: DigestInput): string {
                 : "They fit with today's plan - no extra pace needed."
             }</span></p>` +
             `</td>` +
-            `<td align="right" style="vertical-align:middle;width:142px">${illustration("overdue")}</td>` +
+            `<td align="right" style="vertical-align:middle;width:142px">${illustration("overdue", assetBase)}</td>` +
             `</tr></table>`,
           "danger",
         )
@@ -303,14 +305,14 @@ export function digestHtml(input: DigestInput): string {
   );
 
   const content =
-    emailHeader() +
+    emailHeader(assetBase) +
     hero +
     startBlock +
     todayBlock +
     backlogBlock +
     metricsBlock +
     `<div style="padding:4px 28px 24px">${primaryButton(input.appUrl, "Open the planner", "→")}</div>` +
-    emailFooter("You receive this once a day because the daily digest is on for your account.", input.unsubscribeUrl);
+    emailFooter("You receive this once a day because the daily digest is on for your account.", input.unsubscribeUrl, assetBase);
 
   return shell(subject, `For ${input.name}: ${statusParts.join(" · ")}`, content);
 }
@@ -364,6 +366,7 @@ export function weeklyHtml(input: WeeklyInput): string {
     .sort((a, b) => a.date.localeCompare(b.date) || a.position - b.position)
     .slice(0, 3);
   const f = digestFacts(input);
+  const assetBase = emailAssetBaseFromUrl(input.appUrl);
   const esc = emailEscape;
   const subject = weeklySubject(input);
 
@@ -408,7 +411,7 @@ export function weeklyHtml(input: WeeklyInput): string {
     `${input.weekStart} to ${input.weekEnd}`,
     esc(subject),
     "A clean recap of study time, finished tasks, backlog and what comes next.",
-    illustration("weekly"),
+    illustration("weekly", assetBase),
   );
 
   const metricsBlock = infoCard(
@@ -428,13 +431,13 @@ export function weeklyHtml(input: WeeklyInput): string {
   );
 
   const content =
-    emailHeader() +
+    emailHeader(assetBase) +
     hero +
     metricsBlock +
     backlog +
     upcoming +
     `<div style="padding:4px 28px 24px">${primaryButton(input.appUrl, "Open the planner", "→")}</div>` +
-    emailFooter("You receive this on Sunday evenings because the weekly summary is on for your account.", input.unsubscribeUrl);
+    emailFooter("You receive this on Sunday evenings because the weekly summary is on for your account.", input.unsubscribeUrl, assetBase);
 
   return shell(subject, `Logged ${minLabel(minutes)} across ${days} study day${days === 1 ? "" : "s"}.`, content);
 }

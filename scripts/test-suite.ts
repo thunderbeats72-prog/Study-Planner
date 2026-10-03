@@ -3074,9 +3074,11 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
     check(digestSubject(restInput).includes("rest day") && !/fail|shame/i.test(digestText(restInput)),
       "A rest day is named as one and says nothing shaming");
 
-    // The HTML is structured but quiet: one card, no images, no trackers.
+    // The HTML is structured, branded and still free of tracking pixels.
     check(html.includes("href=") && html.length > 200, "The HTML render is a real linked page");
-    check(!/<img|px\.gif|track|open\.php/i.test(html), "No image pixels or tracking URLs in the HTML");
+    check(/<img[^>]+\/email\/(study-planner-logo|email-digest-hero)\.png/i.test(html),
+      "The HTML uses static app-hosted artwork for the branded template");
+    check(!/px\.gif|track|open\.php|utm_/i.test(html), "No tracking pixels or tracking URLs in the HTML");
 
     // The MIME envelope carries the one-click-unsubscribe machine headers.
     const mime = buildMimeMessage({
