@@ -12,7 +12,8 @@
  *   • List-Unsubscribe (and RFC 8058 List-Unsubscribe-Post) on every
  *     message that carries an unsubscribe URL;
  *   • no tracking pixels, no remote images, no attachments;
- *   • CRLF line endings and 76-column base64, so any MTA can relay it.
+ *   • CRLF line endings and quoted-printable bodies, so the message remains
+ *     readable to filters while still carrying UTF-8 safely.
  */
 
 import { randomBytes } from "node:crypto";
@@ -57,12 +58,38 @@ function addressHeader(name: string, address: string): string {
   return `${encodeHeader(name)} <${address}>`;
 }
 
-/** Wrap base64 at the RFC-recommended 76 columns. */
-function wrapBase64(input: string): string {
-  const base64 = Buffer.from(input, "utf8").toString("base64");
-  const lines: string[] = [];
-  for (let i = 0; i < base64.length; i += 76) lines.push(base64.slice(i, i + 76));
-  return lines.join("\r\n");
+/**
+ * Quoted-printable keeps ordinary English readable in the delivered source
+ * (friendlier to spam filters than opaque base64) while still safely carrying
+ * UTF-8 names, long URLs and HTML. Lines are soft-wrapped before 76 chars per
+ * RFC 2045, preserving hard line breaks from the renderer.
+ */
+function quotedPrintable(input: string): string {
+  const hardLines = input.replace(/\r\n|\r|\n/g, "\n").split("\n");
+  const encoded: string[] = [];
+
+  for (const hardLine of hardLines) {
+    let line = "";
+    const bytes = Buffer.from(hardLine, "utf8");
+    for (let i = 0; i < bytes.length; i += 1) {
+      const byte = bytes[i];
+      const trailingWhitespace = (byte === 0x20 || byte === 0x09) && i === bytes.length - 1;
+      const printable =
+        !trailingWhitespace &&
+        ((byte >= 0x21 && byte <= 0x3c) || (byte >= 0x3e && byte <= 0x7e) || byte === 0x20 || byte === 0x09);
+      const token = printable ? String.fromCharCode(byte) : `=${byte.toString(16).toUpperCase().padStart(2, "0")}`;
+
+      // A soft break adds "=", so cap the content line at 75 characters.
+      if (line.length > 0 && line.length + token.length > 75) {
+        encoded.push(`${line}=`);
+        line = "";
+      }
+      line += token;
+    }
+    encoded.push(line);
+  }
+
+  return encoded.join("\r\n");
 }
 
 /** Escape ">"/angle brackets in URLs inside angle-bracket headers. */
@@ -81,11 +108,15 @@ export function buildMimeMessage(message: OutgoingMessage, sentAt = new Date()):
 
   const headers: string[] = [
     `From: ${addressHeader(MAIL_FROM_NAME, message.from)}`,
+    `Reply-To: ${addressHeader(MAIL_FROM_NAME, message.from)}`,
+    `Sender: <${message.from}>`,
     `To: <${message.to}>`,
     `Subject: ${encodeHeader(message.subject)}`,
     `Date: ${rfc2822Date(sentAt)}`,
     `Message-ID: ${messageId}`,
     "MIME-Version: 1.0",
+    "Auto-Submitted: auto-generated",
+    "X-Mailer: Study Planner Pro",
   ];
   if (message.unsubscribeUrl) {
     headers.push(`List-Unsubscribe: <${angleUrl(message.unsubscribeUrl)}>`);
@@ -103,14 +134,14 @@ export function buildMimeMessage(message: OutgoingMessage, sentAt = new Date()):
     "",
     `--${boundary}`,
     'Content-Type: text/plain; charset="utf-8"',
-    "Content-Transfer-Encoding: base64",
+    "Content-Transfer-Encoding: quoted-printable",
     "",
-    wrapBase64(message.text),
+    quotedPrintable(message.text),
     `--${boundary}`,
     'Content-Type: text/html; charset="utf-8"',
-    "Content-Transfer-Encoding: base64",
+    "Content-Transfer-Encoding: quoted-printable",
     "",
-    wrapBase64(message.html),
+    quotedPrintable(message.html),
     `--${boundary}--`,
     "",
   ];

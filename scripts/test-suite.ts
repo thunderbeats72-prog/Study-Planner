@@ -3093,6 +3093,10 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
       "RFC 8058 one-click POST ships too, so Gmail shows the button");
     check(/Content-Type: text\/plain/i.test(mime) && /Content-Type: text\/html/i.test(mime),
       "Every mail carries both the plain-text and the HTML alternative");
+    check(/Content-Transfer-Encoding: quoted-printable/i.test(mime) && !/Content-Transfer-Encoding: base64/i.test(mime),
+      "Bodies stay readable as quoted-printable instead of opaque base64");
+    check(/Reply-To: Study Planner Pro <digest@planner\.example\.com>/.test(mime) && /Auto-Submitted: auto-generated/.test(mime),
+      "Deliverability headers make the sender identity and automation clear");
 
     // The Sunday review totals the week honestly.
     const weeklyInput: WeeklyInput = {
