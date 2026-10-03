@@ -1399,9 +1399,9 @@ export default function Home() {
           goPage("dashboard");
           notify(
             info.claimedExistingPlan
-              ? "Account created — the plan already on this device came with you. Sign in anywhere to see it."
+              ? "Signed in — the plan already on this device came with you. It is on your other devices now too."
               : info.mode === "signup"
-                ? `Welcome, ${fresh.account?.username || fresh.user.name}! Your plan now follows you to every device.`
+                ? `Welcome, ${fresh.account?.name || fresh.account?.username || fresh.user.name}! Your plan now follows you to every device.`
                 : `Signed in as ${fresh.account?.username || fresh.user.name}.`,
             "success",
           );
@@ -1436,7 +1436,9 @@ export default function Home() {
           goPage("dashboard");
         }}
         isRerun={state.user.onboarded}
-        initialName={state.user.onboarded ? state.user.name : ""}
+        /* The account's own name — the wizard greets with it instead of
+           asking for a name the learner already gave at sign-up. */
+        initialName={state.user.name || account?.name || ""}
         onCancel={
           state.user.onboarded ? () => setForceWizard(false) : undefined
         }

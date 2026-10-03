@@ -4,7 +4,7 @@ import React, { useEffect, useId, useMemo, useRef, useState } from "react";
 import { api, addDays, today, dayDiff, prettyLong, type AppState } from "@/lib/client";
 import { countStudyDays, projectCompletionDate } from "@/lib/planner";
 import {
-  IconCalendar, IconCheck, IconLock, IconLogo, IconSpark, IconTarget,
+  IconCheck, IconLock, IconLogo, IconSpark,
   IconArrowRight, IconArrowLeft,
 } from "./icons";
 import { Select } from "./bits";
@@ -32,14 +32,15 @@ const HOURS_PRESETS: SliderPreset[] = [{ value: 1, label: "1h" }, { value: 2, la
 const SUBJECTS_PRESETS: SliderPreset[] = [{ value: 1, label: "1" }, { value: 2, label: "2" }, { value: 3, label: "3" }, { value: 4, label: "4" }];
 const BUFFER_PRESETS: SliderPreset[] = [{ value: 0, label: "0" }, { value: 3, label: "3" }, { value: 5, label: "5" }, { value: 7, label: "7" }, { value: 10, label: "10" }];
 const YEAR_LABELS: Record<string, string> = { "0": "Full course (all terms)", "1": "Year 1 / Semester 1-2", "2": "Year 2 / Semester 3-4", "3": "Year 3 / Semester 5-6", "4": "Year 4 / Semester 7-8" };
+/* The account already knows who the learner is, so the wizard opens on the
+   first REAL question instead of asking for a name a second time. */
 const STEP_META: StepMeta[] = [
-  { key: "you", label: "You" }, { key: "level", label: "Level" }, { key: "course", label: "Course" }, { key: "details", label: "Details" },
-  { key: "subjects", label: "Syllabus" }, { key: "style", label: "Style" }, { key: "schedule", label: "Rhythm" }, { key: "review", label: "Review" },
+  { key: "level", label: "Level" }, { key: "course", label: "Course" }, { key: "details", label: "Details" }, { key: "subjects", label: "Syllabus" },
+  { key: "style", label: "Style" }, { key: "schedule", label: "Rhythm" }, { key: "review", label: "Review" },
 ];
 /** A themed illustration per step, so the wizard reads as a short visual
  *  story instead of a wall of forms (the "dynamic images" in onboarding). */
 const STEP_ART: Record<string, OnboardingArtVariant> = {
-  you: "you",
   level: "level",
   course: "course",
   details: "details",
@@ -166,16 +167,18 @@ export default function Onboarding({
   onCancel?: () => void;
 }) {
   const [step, setStep] = useState(1);
-  const total = 8;
+  const total = 7;
   const [levels, setLevels] = useState<Level[]>([]);
   const [levelCourses, setLevelCourses] = useState<Record<string, string[]>>({});
   const [courses, setCourses] = useState<CourseMeta[]>([]);
-  const [provider, setProvider] = useState<string | null>(null);
   const lastAssessmentRef = useRef("");
   const [search, setSearch] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
-  const [name, setName] = useState(initialName);
+  /* The account already carries the learner's name — the wizard reads it,
+     never asks for it again, and posts it straight back with the plan. */
+  const name = initialName.trim();
+  const firstName = name.split(/\s+/)[0] || "";
   const [level, setLevel] = useState("");
   const [course, setCourse] = useState("");
   const [year, setYear] = useState("1");
@@ -210,11 +213,10 @@ export default function Onboarding({
   const stepMeta = STEP_META[step - 1] || STEP_META[0];
 
   useEffect(() => {
-    api<{ levels: Level[]; levelCourses: Record<string, string[]>; courses: CourseMeta[]; aiProvider: string | null }>("/api/courses").then((d) => {
+    api<{ levels: Level[]; levelCourses: Record<string, string[]>; courses: CourseMeta[] }>("/api/courses").then((d) => {
       setLevels(d.levels);
       setLevelCourses(d.levelCourses);
       setCourses(d.courses);
-      setProvider(d.aiProvider);
     }).catch(() => undefined);
   }, []);
 
@@ -338,10 +340,9 @@ export default function Onboarding({
 
   const next = async () => {
     setErr("");
-    if (step === 1 && !name.trim()) { setErr("Please enter your name"); return; }
-    if (step === 2 && !level) { setErr("Please pick your study level"); return; }
-    if (step === 3 && !course && !customName.trim() && !search.trim()) { setErr("Please pick or type a course"); return; }
-    if (step === 4) {
+    if (step === 1 && !level) { setErr("Please pick your study level"); return; }
+    if (step === 2 && !course && !customName.trim() && !search.trim()) { setErr("Please pick or type a course"); return; }
+    if (step === 3) {
       const targetQuery = resolvedCourseName;
       const signature = `${targetQuery}|${level}|${institution}|${specialisation}|${board}|${year}|${goalText}`;
       /* Only assess when there is NOTHING to lose. This used to re-run on
@@ -358,8 +359,8 @@ export default function Onboarding({
         lastAssessmentRef.current = signature;
       }
     }
-    if (step === 5 && !subs.length) { setErr("Add at least one subject to continue"); return; }
-    if (step === 5) {
+    if (step === 4 && !subs.length) { setErr("Add at least one subject to continue"); return; }
+    if (step === 4) {
       const blanks = subs.filter((s) => !s.name.trim()).length;
       if (blanks) { setErr(`${blanks} subject${blanks === 1 ? "" : "s"} still need${blanks === 1 ? "s" : ""} a name — fill it in or remove the row.`); return; }
       const names = subs.map((s) => s.name.trim().toLocaleLowerCase());
@@ -375,7 +376,7 @@ export default function Onboarding({
     setErr("");
     try {
       const payload = {
-        name: name.trim(),
+        name,
         level,
         course: course === "custom" ? "custom" : course,
         courseName: resolvedCourseName,
@@ -466,58 +467,12 @@ export default function Onboarding({
           </div>
         </div>
 
-        {/* STEP 1: YOU */}
+        {/* STEP 1: LEVEL */}
         {step === 1 && (
-          <>
-            <h1>Set up a study workspace that fits your day</h1>
-            <p>Your planner, daily schedule and Shigun&apos;s answers will use only your course, dates and study history.</p>
-            <div className="ob-feature-list" aria-label="Planner capabilities">
-              <div className="ob-feature">
-                <span className="ob-feature-icon"><IconTarget size={14} /></span>
-                <div>
-                  <strong>Clear priorities</strong>
-                  <span>Your hardest and most urgent topics rise to the top automatically.</span>
-                </div>
-              </div>
-              <div className="ob-feature">
-                <span className="ob-feature-icon"><IconCalendar size={14} /></span>
-                <div>
-                  <strong>A realistic week</strong>
-                  <span>A schedule built from your real hours and rhythm — not a generic template.</span>
-                </div>
-              </div>
-              <div className="ob-feature">
-                <span className="ob-feature-icon"><IconLock size={14} /></span>
-                <div>
-                  <strong>Private local data</strong>
-                  <span>Your plan, progress and history stay yours — never shared or sold.</span>
-                </div>
-              </div>
-            </div>
-
-            <label className="lbl">What should we call you?</label>
-            <input
-              className="ob-name-input"
-              autoFocus
-              value={name}
-              placeholder="e.g. Lakshit"
-              onChange={(e) => setName(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && next()}
-            />
-            <div className="ob-hint ob-note-panel">
-              {provider
-                ? `Cloud AI is ready via ${provider}. If it ever fails, the local planner and fallback tutoring still keep the workflow working.`
-                : "Local planner is ready. Add a server-side AI key later if you want cloud-generated syllabus support too."}
-            </div>
-          </>
-        )}
-
-        {/* STEP 2: LEVEL */}
-        {step === 2 && (
           <>
             <h1>Choose your study level</h1>
             <p className="ob-lead">
-              From school and higher education through doctoral research, this tells the planner how deep the syllabus should go and how the language should be tuned.
+              {firstName ? `Hi ${firstName} — this ` : "This "}sets how deep the syllabus goes, from school to doctoral research.
             </p>
             <div className="ob-level-grid">
               {levels.map((l) => (
@@ -535,11 +490,11 @@ export default function Onboarding({
           </>
         )}
 
-        {/* STEP 3: COURSE */}
-        {step === 3 && (
+        {/* STEP 2: COURSE */}
+        {step === 2 && (
           <>
             <h1>Find your course or exam</h1>
-            <p>Pick a known programme or type your own. The planner will use it to assemble the right subject structure before scheduling begins.</p>
+            <p>Pick one, or type your own and the AI will build the subject list.</p>
             <input
               className="ob-course-search"
               placeholder="Search any course or exam..."
@@ -591,7 +546,7 @@ export default function Onboarding({
                   <input
                     className="ob-add-sub-input"
                     autoFocus
-                    placeholder="e.g. MBA in Marketing from NMIMS CDOE"
+                    placeholder="Full course or exam name"
                     value={customName}
                     onChange={(e) => setCustomName(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && suggestFor(customName, goalText)}
@@ -605,29 +560,27 @@ export default function Onboarding({
                     {suggesting ? "Working…" : "AI: Assess & Build Subjects"}
                   </button>
                 </div>
-                <label className="lbl" style={{ marginTop: 12 }}>Describe your goal (optional)</label>
+                <label className="lbl" style={{ marginTop: 12 }}>Your goal (optional)</label>
                 <textarea
                   className="input-field"
-                  rows={3}
-                  placeholder="e.g. I want to complete the course, prepare for exams, and revise weak topics"
+                  rows={2}
+                  placeholder="What you want out of this plan"
                   value={goalText}
                   onChange={(e) => setGoalText(e.target.value)}
                 />
                 <div className="ob-hint" style={{ marginTop: 8, marginBottom: 0 }}>
-                  The engine uses the course title first, then the goal as extra context. You can edit every subject on the next screen.
+                  You can edit every subject on the next step.
                 </div>
               </div>
             )}
           </>
         )}
 
-        {/* STEP 4: DETAILS */}
-        {step === 4 && (
+        {/* STEP 3: DETAILS */}
+        {step === 3 && (
           <>
             <h1>Add the details that make it accurate</h1>
-            <p className="ob-lead">
-              These answers help the planner assess the <em>exact</em> syllabus — the right papers, board pattern, stream, and attempt context — instead of a generic version.
-            </p>
+            <p className="ob-lead">Only what changes the syllabus. Leave the rest empty.</p>
             <div className="ob-program-card">
               <div className="ob-program-main">
                 <span className="ob-field-label">Programme</span>
@@ -658,7 +611,6 @@ export default function Onboarding({
                     <label>Institution / University (optional)</label>
                     <input
                       className="input-field"
-                      placeholder="e.g. NMIMS CDOE, IGNOU, Delhi University"
                       value={institution}
                       onChange={(e) => setInstitution(e.target.value)}
                     />
@@ -667,13 +619,12 @@ export default function Onboarding({
                     <label>Specialisation / Stream</label>
                     <input
                       className="input-field"
-                      placeholder="e.g. Marketing, Finance, Computer Science"
                       value={specialisation}
                       onChange={(e) => setSpecialisation(e.target.value)}
                     />
                   </div>
                   <div className="ob-field">
-                    <label>Year / Semester (narrows to that term)</label>
+                    <label>Year / Semester</label>
                     <Select
                       ariaLabel="Year or semester"
                       value={year}
@@ -750,11 +701,11 @@ export default function Onboarding({
               )}
 
               <div className="ob-field ob-field-span-full">
-                <label>Your goal (optional — shapes the plan&apos;s emphasis)</label>
+                <label>Your goal (optional)</label>
                 <textarea
                   className="input-field"
                   rows={2}
-                  placeholder="e.g. Clear the exam in first attempt, focus on weak areas, finish syllabus then revise"
+                  placeholder="Anything the plan should emphasise"
                   value={goalText}
                   onChange={(e) => setGoalText(e.target.value)}
                 />
@@ -762,19 +713,17 @@ export default function Onboarding({
             </div>
 
             <div className="ob-hint ob-note-panel" style={{ marginTop: 4 }}>
-              {suggesting ? "Assessing your exact syllabus…" : "When you continue, I’ll use these details to build the precise subject list before scheduling starts."}
+              {suggesting ? "Assessing your syllabus…" : "Continue and I’ll build your subject list."}
             </div>
           </>
         )}
 
-        {/* STEP 5: SYLLABUS / SUBJECTS */}
-        {step === 5 && (
+        {/* STEP 4: SYLLABUS / SUBJECTS */}
+        {step === 4 && (
           <>
             <h1>Review the syllabus structure</h1>
             <p>
-              {course && course !== "custom"
-                ? "We loaded a suggested syllabus. Fine-tune the units here — each unit turns into a scheduled lesson in your plan."
-                : "Add the subjects you want included. Each unit becomes an individually scheduled lesson."}
+              Every unit becomes one scheduled lesson. Edit, add or remove anything.
             </p>
             <div className="ob-mini-stats" aria-label="Syllabus stats">
               <div className="ob-mini-stat"><strong>{subs.length}</strong><span>subjects</span></div>
@@ -784,7 +733,7 @@ export default function Onboarding({
 
             <div className="ob-subs-grid">
               <div className="ob-subs-head" aria-hidden="true">
-                <span>Subject — click any field to edit</span>
+                <span>Subject</span>
                 <span>Units</span>
                 <span>Difficulty</span>
                 <span />
@@ -899,21 +848,21 @@ export default function Onboarding({
             )}
 
             <div className="ob-hint" style={{ marginTop: 10 }}>
-              {subs.length} subjects · <strong>{totalUnits} advanced lessons</strong> will be generated with prerequisites, key concepts, applied practice, and source references.
+              {subs.length} subjects · <strong>{totalUnits} lessons</strong> will be generated.
             </div>
           </>
         )}
 
-        {/* STEP 6: STYLE */}
-        {step === 6 && (
+        {/* STEP 5: STYLE */}
+        {step === 5 && (
           <>
             <h1>Tell me how you want to learn</h1>
-            <p>These choices only tune pacing and emphasis. The AI lesson generation and scheduler logic stay the same underneath.</p>
+            <p>Pacing and emphasis only — all of it can be changed later.</p>
             <div className="ob-schedule-grid">
               <div className="ob-field ob-field-span-full">
                 <div className="ob-choice-card">
                   <label>Weakest Subject</label>
-                  <div className="ob-range-hint">If one subject needs extra reinforcement, the planner can give it more attention.</div>
+                  <div className="ob-range-hint">It gets extra time in the plan.</div>
                   <Select
                     ariaLabel="Weakest subject"
                     value={weak}
@@ -927,18 +876,18 @@ export default function Onboarding({
                   />
                 </div>
               </div>
-              <OnboardingChoiceGroup label="Study Style" hint="Choose the learning mix that feels most natural to you." value={style} options={STYLE_OPTIONS} onChange={setStyle} columns={3} fullWidth />
-              <OnboardingChoiceGroup label="Revision Block" hint="Reserve time near the end for a dedicated revision phase." value={revision} options={REVISION_OPTIONS} onChange={setRevision} columns={2} fullWidth />
-              <OnboardingChoiceGroup label="Plan Mode" hint="This changes how the schedule distributes time across lessons." value={planMode} options={PLAN_MODE_OPTIONS} onChange={setPlanMode} columns={3} fullWidth />
+              <OnboardingChoiceGroup label="Study Style" hint="The mix that suits you." value={style} options={STYLE_OPTIONS} onChange={setStyle} columns={3} fullWidth />
+              <OnboardingChoiceGroup label="Revision Block" hint="Time reserved before the exam." value={revision} options={REVISION_OPTIONS} onChange={setRevision} columns={2} fullWidth />
+              <OnboardingChoiceGroup label="Plan Mode" hint="How time is spread across lessons." value={planMode} options={PLAN_MODE_OPTIONS} onChange={setPlanMode} columns={3} fullWidth />
             </div>
           </>
         )}
 
-        {/* STEP 7: RHYTHM */}
-        {step === 7 && (
+        {/* STEP 6: RHYTHM */}
+        {step === 6 && (
           <>
             <h1>Set your study rhythm</h1>
-            <p>Use direct controls to shape a schedule that feels clean, realistic, and easy to follow day after day.</p>
+            <p>Shape a week you can actually keep.</p>
             <div className="ob-schedule-grid">
               <div className="ob-field">
                 <label>Start Date</label>
@@ -950,7 +899,7 @@ export default function Onboarding({
               </div>
               <OnboardingSlider label="Daily Study Hours" value={hrs} valueLabel={`${formatHoursCompact(hrs)}/day`} hint={studyHourHint(hrs, sdays)} min={0.5} max={14} step={0.5} minLabel="30 min" maxLabel="14h" presets={HOURS_PRESETS} onChange={setHrs} fullWidth />
               <OnboardingSlider label="Subjects per Day" value={spd} valueLabel={`${spd} subject${spd > 1 ? "s" : ""}`} hint={subjectsPerDayHint(spd)} min={1} max={6} step={1} minLabel="1 subject" maxLabel="6 subjects" presets={SUBJECTS_PRESETS} onChange={setSpd} fullWidth />
-              <OnboardingChoiceGroup label="Study Days" hint="Choose how many days per week you realistically want to study." value={sdays} options={STUDY_DAY_OPTIONS} onChange={setSdays} columns={3} fullWidth />
+              <OnboardingChoiceGroup label="Study Days" hint="Days per week you will realistically study." value={sdays} options={STUDY_DAY_OPTIONS} onChange={setSdays} columns={3} fullWidth />
               <OnboardingSlider label="Buffer Days" value={buffer} valueLabel={`${buffer} day${buffer === 1 ? "" : "s"}`} hint={bufferDaysHint(buffer)} min={0} max={30} step={1} minLabel="0 days" maxLabel="30 days" presets={BUFFER_PRESETS} onChange={setBuffer} fullWidth />
             </div>
 
@@ -966,15 +915,15 @@ export default function Onboarding({
           </>
         )}
 
-        {/* STEP 8: REVIEW */}
-        {step === 8 && (
+        {/* STEP 7: REVIEW */}
+        {step === 7 && (
           <>
             <h1>Review your setup</h1>
-            <p>Everything below is still editable. When you continue, the planner uses the same AI and ML pipeline as before — only the onboarding presentation has changed.</p>
+            <p>Everything here is still editable — step back any time.</p>
             <div className="ob-review-grid">
               <div className="ob-review-card">
                 <div className="ob-review-title">Plan snapshot</div>
-                <div className="ob-summary-row"><span>Learner</span><span>{name}</span></div>
+                {!!name && <div className="ob-summary-row"><span>Learner</span><span>{name}</span></div>}
                 <div className="ob-summary-row"><span>Programme</span><span className="ob-review-value">{resolvedCourseName}</span></div>
                 {specialisation.trim() && <div className="ob-summary-row"><span>Specialisation</span><span className="ob-review-value">{specialisation}</span></div>}
                 {institution.trim() && <div className="ob-summary-row"><span>Institution</span><span className="ob-review-value">{institution}</span></div>}
@@ -992,15 +941,15 @@ export default function Onboarding({
                 <div className="ob-review-title">What happens next</div>
                 <div className="ob-review-check">
                   <span className="ob-review-check-icon"><IconCheck size={12} /></span>
-                  <div>Break each subject into sequenced lessons with prerequisites and key concepts.</div>
+                  <div>Each subject becomes sequenced lessons with key concepts.</div>
                 </div>
                 <div className="ob-review-check">
                   <span className="ob-review-check-icon"><IconCheck size={12} /></span>
-                  <div>Balance the schedule using your hours, study days, weak subjects, and revision buffer.</div>
+                  <div>Your hours, study days and revision buffer shape the calendar.</div>
                 </div>
                 <div className="ob-review-check">
                   <span className="ob-review-check-icon"><IconCheck size={12} /></span>
-                  <div>Generate a calendar you can re-plan later without losing the underlying learning logic.</div>
+                  <div>You can re-plan later without losing progress.</div>
                 </div>
 
                 <div className="ob-review-pulse">
@@ -1014,7 +963,7 @@ export default function Onboarding({
 
                 {busy && (
                   <div className="ob-review-loading">
-                    SHIGUN is analysing your syllabus and sequencing {totalUnits} lessons… this can take up to a couple of minutes — please keep this tab open.
+                    Sequencing {totalUnits} lessons… this can take a couple of minutes. Keep this tab open.
                   </div>
                 )}
               </div>
@@ -1049,7 +998,7 @@ export default function Onboarding({
                 disabled={busy || suggesting}
                 aria-busy={suggesting || undefined}
               >
-                <span>{suggesting ? "Assessing…" : step === 4 ? "Assess & continue" : "Continue"}</span> <IconArrowRight size={14} />
+                <span>{suggesting ? "Assessing…" : step === 3 ? "Assess & continue" : "Continue"}</span> <IconArrowRight size={14} />
               </button>
             ) : (
               <button

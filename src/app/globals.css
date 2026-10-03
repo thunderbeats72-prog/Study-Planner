@@ -688,6 +688,8 @@ body.theme-dark .tracker-bar,body.theme-obsidian .tracker-bar,body.theme-nebula 
 .auth-banner svg{flex:0 0 auto;margin-top:1px;color:var(--accent)}
 .auth-banner-warn{background:var(--status-skipped-bg);border-color:transparent;color:var(--status-skipped-text)}
 .auth-banner-warn svg{color:inherit}
+.auth-banner-ok{background:var(--status-done-bg);border-color:transparent;color:var(--status-done-text)}
+.auth-banner-ok svg{color:inherit}
 .auth-error{display:flex;align-items:flex-start;gap:9px;padding:10px 12px;border-radius:13px;font-size:.78rem;font-weight:700;line-height:1.5;background:var(--status-skipped-bg);color:var(--status-skipped-text)}
 .auth-error svg{flex:0 0 auto;margin-top:1px}
 .auth-submit{width:100%;margin-top:2px}

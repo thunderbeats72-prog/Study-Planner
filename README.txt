@@ -28,10 +28,16 @@ used by the build.
 
 ACCOUNTS — ONE SIGN-IN, EVERY DEVICE
 ------------------------------------
-A learner creates a username and password, and that account OWNS the plan.
-Sign in on a phone, a tablet or another laptop and the same lessons, logged
-hours, streak, settings and tutor history are there; every change made on
-one device is what the next device loads.
+A learner creates a username and password, SIGNS IN with them, and that
+account OWNS the plan. Sign in on a phone, a tablet or another laptop and the
+same lessons, logged hours, streak, settings and tutor history are there;
+every change made on one device is what the next device loads.
+
+Sign-up and sign-in are two deliberate steps. `POST /api/auth/signup` creates
+the account and sets NO cookie; the form then flips to Sign in with the
+username already filled in. The credentials are therefore proven once while
+the learner still remembers typing them, instead of a password-manager typo
+surfacing a week later on their phone.
 
   Front door       src/components/AuthGate.tsx   (create account / sign in)
   Shared rules     src/lib/authRules.ts          (username + password rules;
@@ -60,6 +66,9 @@ How identity works now:
     Changing the password signs out every other device; Settings can do the
     same on demand.
   * Signing out deletes nothing: the plan waits with the account.
+  * The planner never asks for a name twice. The display name given at
+    sign-up (or the username itself) is what the setup wizard greets and
+    what it posts back with the plan.
 
 Upgrading an existing deployment:
 
@@ -271,6 +280,14 @@ v35 ACCOUNTS — ONE SIGN-IN, EVERY DEVICE (this build)
  - SETTINGS → ACCOUNT & SYNC. See which devices are signed in and when each
    was last active, sign the others out, change the password (which signs
    every other device out), or sign out here. Signing out deletes nothing.
+ - CREATE, THEN SIGN IN. Sign-up stops at "account created" — no session, no
+   cookie — and hands over to the sign-in form with the username pre-filled,
+   so the password is used once before anything depends on it.
+ - THE WIZARD LOST A STEP AND ITS CLUTTER. Setup is 7 steps, not 8: the
+   "What should we call you?" screen is gone because the account already
+   knows (step 1 now greets by name and asks for the study level instead).
+   Every "e.g. …" sample value and the long paragraphs explaining internals
+   were cut, leaving short labels and real questions.
  - DEPLOYS WITHOUT A MIGRATION STEP. `npm run db:push` applies the new
    columns and table; if a deployment builds with plain `next build`, the
    first auth request applies them itself via idempotent DDL

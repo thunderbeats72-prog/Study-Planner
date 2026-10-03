@@ -1850,8 +1850,35 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
   const onboardingSource = readFileSync(join(process.cwd(), "src/components/Onboarding.tsx"), "utf8");
   check(!/from nursery/i.test(onboardingSource),
     "The Level step copy no longer advertises nursery / pre-school");
-  check(onboardingSource.includes("From school and higher education through doctoral research"),
+  check(onboardingSource.includes("sets how deep the syllabus goes, from school to doctoral research"),
     "The Level step explains itself in real markup");
+
+  /* ── The wizard stopped asking for a name it already has ────────────────
+     The account carries the learner's name, so a second "What should we
+     call you?" on step 1 was both a redundant question and a whole step of
+     friction. Example placeholders ("e.g. Lakshit") went with it: a sample
+     name in every field reads as clutter, and in a name field it is
+     actively confusing. */
+  check(!/What should we call you/i.test(onboardingSource),
+    "The wizard never asks again for the name the account already holds");
+  check(!onboardingSource.includes("ob-name-input"),
+    "The onboarding name input is gone, not merely hidden");
+  check(/const name = initialName\.trim\(\)/.test(onboardingSource)
+    && /name,/.test(onboardingSource.slice(onboardingSource.indexOf("const payload"))),
+    "The plan is still posted with the learner's name — taken from the account");
+  check(!/e\.g\./.test(onboardingSource),
+    "No 'e.g. …' example text is left anywhere in the wizard");
+  check(!/e\.g\./.test(readFileSync(join(process.cwd(), "src/components/AuthGate.tsx"), "utf8")),
+    "…nor on the sign-in screen");
+  check(/const total = 7/.test(onboardingSource)
+    && (onboardingSource.match(/\{ key: "/g) || []).length === 7,
+    "The wizard is seven steps, and the rail agrees with the step count");
+  for (const [n, heading] of [[1, "Choose your study level"], [2, "Find your course or exam"],
+    [4, "Review the syllabus structure"], [7, "Review your setup"]] as [number, string][]) {
+    const at = onboardingSource.indexOf(`{step === ${n} && (`);
+    check(at > 0 && onboardingSource.slice(at, at + 400).includes(heading),
+      `Step ${n} of the renumbered wizard is "${heading}"`);
+  }
   check(onboardingSource.includes("OnboardingArt") && onboardingSource.includes("STEP_ART[stepMeta.key]"),
     "Each onboarding step renders its own themed illustration (the dynamic step art)");
   const polishCss = uiSystemCss;
@@ -1985,11 +2012,12 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
       await act(async () => { await new Promise((resolve) => setTimeout(resolve, 30)); });
     };
 
-    // 1 → 2 (name), 2 → 3 (level), 3 → 4 (course), 4 → 5 (details)
-    await act(async () => {
-      wizard.root.findAll((node) => node.props?.className === "ob-name-input")[0].props.onChange({ target: { value: "Lakshit" } });
-    });
-    await advance();
+    // The wizard opens on Level now — no name step to walk past.
+    check(wizard.root.findAll((node) => node.type === "h1").some((node) => (node.children || []).join("").includes("Choose your study level")),
+      "The wizard opens on the first real question, not on a name field");
+    check(!wizard.root.findAll((node) => node.type === "input" && node.props.className === "ob-name-input").length,
+      "There is no second name field to fill in");
+    // 1 → 2 (level), 2 → 3 (course), 3 → 4 (details)
     await act(async () => { wizard.root.findAll((node) => String(node.props.className || "").startsWith("ob-level-btn"))[0].props.onClick(); });
     await advance();
     await act(async () => { wizard.root.findAll((node) => String(node.props.className || "").startsWith("ob-course-item"))[0].props.onClick(); });
@@ -2785,6 +2813,128 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
     await act(async () => {
       renderer.unmount();
     });
+  }
+
+  console.log("\n--- 18d. Signing up hands over to signing in ---\n");
+  {
+    /* Creating credentials and USING them are two different acts. The
+       sign-up call stops at "account created" — no session, no cookie — and
+       the form flips to Sign in with the username already filled in. A
+       password typo is therefore caught while the learner still remembers
+       typing it, instead of locking them out of their own phone later. */
+    const signupRoute = readFileSync(join(process.cwd(), "src/app/api/auth/signup/route.ts"), "utf8");
+    check(!signupRoute.includes("set-cookie") && !signupRoute.includes("sessionCookie"),
+      "POST /api/auth/signup sets no session cookie");
+    check(/created: true/.test(signupRoute) && /next: "signin"/.test(signupRoute),
+      "…it answers with 'created' and says what comes next");
+    const authLib = readFileSync(join(process.cwd(), "src/lib/auth.ts"), "utf8");
+    const createAccountBody = authLib.slice(
+      authLib.indexOf("export async function createAccount"),
+      authLib.indexOf("export async function signIn"),
+    );
+    check(!createAccountBody.includes("createSession("),
+      "createAccount() opens no session, so sign-up can never leak a logged-in device");
+    check(/export async function signIn/.test(authLib) && authLib.includes("const token = await createSession"),
+      "Only signing in mints a session token");
+
+    // …and the screen really does the handover.
+    const savedWindow = (globalThis as { window?: unknown }).window;
+    const savedDocument = (globalThis as { document?: unknown }).document;
+    const savedFetch = globalThis.fetch;
+    const savedLocal = (globalThis as { localStorage?: unknown }).localStorage;
+    const store = new Map<string, string>();
+    Object.assign(globalThis, {
+      window: globalThis,
+      document: { activeElement: null, cookie: "" },
+      localStorage: {
+        getItem: (key: string) => (store.has(key) ? (store.get(key) as string) : null),
+        setItem: (key: string, value: string) => void store.set(key, String(value)),
+        removeItem: (key: string) => void store.delete(key),
+      },
+      IS_REACT_ACT_ENVIRONMENT: true,
+    });
+    const calls: { url: string; body: Record<string, unknown> }[] = [];
+    globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input);
+      let body: Record<string, unknown> = {};
+      try { body = JSON.parse(String(init?.body || "{}")) as Record<string, unknown>; } catch { /* no body */ }
+      calls.push({ url, body });
+      const json = (payload: unknown, status = 200) =>
+        new Response(JSON.stringify(payload), { status, headers: { "content-type": "application/json" } });
+      if (url.includes("/api/auth/me")) return json({ authenticated: false, accountsReady: true });
+      if (url.includes("/api/auth/signup")) return json({ created: true, account: { username: "Nila.K", name: "Nila" }, claimedExistingPlan: false, next: "signin" });
+      if (url.includes("/api/auth/login")) return json({ user: { name: "Nila" }, account: { username: "Nila.K", name: "Nila" }, tasks: [], subjects: [], topics: [], sessions: [], messages: [], settings: {} });
+      return json({});
+    }) as unknown as typeof fetch;
+
+    const originalConsoleError = console.error;
+    console.error = () => {};
+    let authed: { mode: string; claimedExistingPlan: boolean } | null = null;
+    let screen!: TestRenderer.ReactTestRenderer;
+    await act(async () => {
+      screen = TestRenderer.create(
+        React.createElement(AuthGate, {
+          onAuthenticated: (_state: unknown, info: { mode: string; claimedExistingPlan: boolean }) => { authed = info; },
+        }),
+      );
+    });
+    console.error = originalConsoleError;
+
+    const inputs = () => screen.root.findAll((node) => node.type === "input");
+    const byName = (name: string) => inputs().find((node) => node.props.name === name);
+    const form = () => screen.root.findAll((node) => node.type === "form")[0];
+    const screenText = () => JSON.stringify(screen.toJSON());
+    const fill = async (field: string, value: string) => {
+      await act(async () => { byName(field)?.props.onChange({ target: { value } }); });
+    };
+    const submitForm = async () => {
+      await act(async () => { await form().props.onSubmit({ preventDefault: () => {} }); });
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)); });
+    };
+
+    await fill("username", "Nila.K");
+    await fill("password", "SeptemberRain24");
+    await fill("confirm-password", "SeptemberRain24");
+    await submitForm();
+
+    check(calls.some((call) => call.url.includes("/api/auth/signup")), "Submitting the form creates the account");
+    check(authed === null, "Creating an account does NOT walk straight into the planner");
+    check(!byName("confirm-password") && byName("password")?.props.autoComplete === "current-password",
+      "The screen is now the sign-in form");
+    check(byName("username")?.props.value === "Nila.K", "The new username is already filled in");
+    check(byName("password")?.props.value === "", "…and the password box is empty, waiting to be proven");
+    check(/created/i.test(screenText()) && screenText().includes("Nila.K"),
+      "A banner confirms the account was created");
+
+    await fill("password", "SeptemberRain24");
+    await submitForm();
+    check(calls.some((call) => call.url.includes("/api/auth/login")), "Signing in with the new credentials works");
+    check(authed !== null && (authed as { mode: string }).mode === "signup",
+      "The first sign-in still gets the welcome of a brand-new account");
+
+    check(store.get("spp_has_account") === "1",
+      "This browser now remembers that it HAS an account");
+    await act(async () => { screen.unmount(); });
+
+    // …so the next visit opens on Sign in instead of Create account.
+    console.error = () => {};
+    let returning!: TestRenderer.ReactTestRenderer;
+    await act(async () => {
+      returning = TestRenderer.create(React.createElement(AuthGate, { onAuthenticated: () => {} }));
+    });
+    console.error = originalConsoleError;
+    const returningInputs = returning.root.findAll((node) => node.type === "input");
+    check(!returningInputs.some((node) => node.props.name === "confirm-password"),
+      "A returning learner lands on Sign in, not on Create account");
+    await act(async () => { returning.unmount(); });
+
+    globalThis.fetch = savedFetch;
+    if (savedWindow === undefined) delete (globalThis as { window?: unknown }).window;
+    else Object.assign(globalThis, { window: savedWindow });
+    if (savedDocument === undefined) delete (globalThis as { document?: unknown }).document;
+    else Object.assign(globalThis, { document: savedDocument });
+    if (savedLocal === undefined) delete (globalThis as { localStorage?: unknown }).localStorage;
+    else Object.assign(globalThis, { localStorage: savedLocal });
   }
 
   console.log("\n--- 18b. Every data route is behind the account ---\n");

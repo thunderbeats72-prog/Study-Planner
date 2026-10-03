@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { createAccount, publicAccount, sessionCookie } from "@/lib/auth";
-import { buildContext, dateFrom, fullState } from "@/lib/state";
+import { createAccount, publicAccount } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/rateLimit";
 import { readJsonObject, validationPayload } from "@/lib/validation";
 import { guardResponse } from "@/lib/routeGuard";
@@ -11,9 +10,10 @@ export const dynamic = "force-dynamic";
 /**
  * POST /api/auth/signup — create the account that owns a study plan.
  *
- * The response is the learner's full state, already signed in, so the app
- * can go straight from the sign-up form into the planner without a second
- * round trip. The session token leaves only in an HttpOnly cookie.
+ * It creates the account and stops: NO session cookie is set. The learner
+ * then signs in with the credentials they just chose, which proves they
+ * work before any study data depends on them. The answer carries only what
+ * the sign-in form needs to greet them and pre-fill the username.
  */
 export async function POST(req: Request) {
   const limit = checkRateLimit(req, "auth-signup", 6, 60 * 60_000);
@@ -44,20 +44,20 @@ export async function POST(req: Request) {
   }
 
   try {
-    const { user, token, claimedExistingPlan } = await createAccount(req, {
+    const { user, claimedExistingPlan } = await createAccount(req, {
       username: body.username,
       password: body.password,
       name: body.name,
     });
-    const state = await fullState(user.userKey);
     return NextResponse.json(
       {
-        ...state,
-        context: buildContext(state, dateFrom(req)),
+        created: true,
         account: publicAccount(user),
         claimedExistingPlan,
+        /* What the client should do next, said out loud. */
+        next: "signin",
       },
-      { headers: { "set-cookie": sessionCookie(req, token), "cache-control": "no-store" } },
+      { headers: { "cache-control": "no-store" } },
     );
   } catch (error) {
     const guarded = guardResponse(error);

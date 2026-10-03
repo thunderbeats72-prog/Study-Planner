@@ -15,6 +15,15 @@ import {
 import { cn } from "@/lib/cn";
 
 type Mode = "signin" | "signup";
+/** Remembers that THIS browser has signed in before — nothing identifying,
+ *  just which tab to open on. A returning learner should not have to walk
+ *  past "Create account" every time they sign out. */
+const RETURNING_KEY = "spp_has_account";
+type SignupResponse = {
+  created?: boolean;
+  account?: { username: string; name: string } | null;
+  claimedExistingPlan?: boolean;
+};
 type MeResponse = {
   authenticated: boolean;
   preview?: boolean;
@@ -26,13 +35,17 @@ type MeResponse = {
  * THE FRONT DOOR
  * ──────────────
  * One account, every device. This screen is the only thing standing between
- * a visitor and somebody's study plan, so it does three jobs carefully:
+ * a visitor and somebody's study plan, so it does four jobs carefully:
  *
  *   1. It explains, in one line, WHY an account exists — "your plan follows
  *      you to your phone" — because that is the whole feature.
  *   2. It validates with the EXACT rules the server uses (src/lib/authRules
  *      is shared), so the form never promises something the API rejects.
- *   3. It fails kindly: wrong password, taken username, database asleep and
+ *   3. Creating an account does not barge into the app. It hands over to the
+ *      sign-in form with the username already filled in, so the learner uses
+ *      the credentials once while they still remember typing them — a
+ *      mistyped password is caught here, not next week on their phone.
+ *   4. It fails kindly: wrong password, taken username, database asleep and
  *      Caps Lock all read as plain sentences, next to the field at fault.
  */
 export default function AuthGate({
@@ -42,7 +55,17 @@ export default function AuthGate({
   onAuthenticated: (state: AppState, info: { mode: Mode; claimedExistingPlan: boolean }) => void;
   initialMode?: Mode;
 }) {
-  const [mode, setMode] = useState<Mode>(initialMode);
+  const [mode, setMode] = useState<Mode>(() => {
+    if (initialMode !== "signup") return initialMode;
+    try {
+      return typeof window !== "undefined"
+        && window.localStorage?.getItem(RETURNING_KEY) === "1"
+        ? "signin"
+        : "signup";
+    } catch {
+      return "signup";
+    }
+  });
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -53,7 +76,11 @@ export default function AuthGate({
   const [touched, setTouched] = useState(false);
   const [capsLock, setCapsLock] = useState(false);
   const [service, setService] = useState<MeResponse | null>(null);
+  /** Set the moment an account is created: the sign-in form then says so,
+   *  and the welcome toast after the first sign-in knows it is a first. */
+  const [justCreated, setJustCreated] = useState<{ username: string; claimed: boolean } | null>(null);
   const usernameRef = useRef<HTMLInputElement | null>(null);
+  const passwordRef = useRef<HTMLInputElement | null>(null);
   const fieldId = useId();
 
   const isSignup = mode === "signup";
@@ -128,19 +155,51 @@ export default function AuthGate({
     setBusy(true);
     setError(null);
     try {
-      const path = isSignup ? "/api/auth/signup" : "/api/auth/login";
-      const body = isSignup
-        ? { username: username.trim(), password, name: displayName.trim() || undefined }
-        : { username: name, password };
-      const state = await api<AppState>(path, {
+      if (isSignup) {
+        // Create the credentials, then step back and let them be used.
+        const res = await api<SignupResponse>("/api/auth/signup", {
+          method: "POST",
+          body: JSON.stringify({
+            username: username.trim(),
+            password,
+            name: displayName.trim() || undefined,
+          }),
+          timeoutMs: 30_000,
+          skipAuthRedirect: true,
+        });
+        const created = res.account?.username || name;
+        setJustCreated({ username: created, claimed: res.claimedExistingPlan === true });
+        setMode("signin");
+        setUsername(created);
+        setPassword("");
+        setConfirm("");
+        setTouched(false);
+        setCapsLock(false);
+        setBusy(false);
+        // Land the cursor where the next keystroke belongs.
+        window.setTimeout(() => passwordRef.current?.focus(), 30);
+        return;
+      }
+
+      const state = await api<AppState>("/api/auth/login", {
         method: "POST",
-        body: JSON.stringify(body),
+        body: JSON.stringify({ username: name, password }),
         timeoutMs: 30_000,
         skipAuthRedirect: true,
       });
+      try {
+        window.localStorage?.setItem(RETURNING_KEY, "1");
+      } catch {
+        /* private mode — the tab default is not worth an error */
+      }
+      // A sign-in that follows a sign-up IS the sign-up, as far as the
+      // welcome message is concerned. Compare canonical usernames: the
+      // banner shows "Nila.K", the server knows "nila.k".
+      const firstTime = !!justCreated && normalizeUsername(justCreated.username) === name;
       onAuthenticated(state, {
-        mode,
-        claimedExistingPlan: state.claimedExistingPlan === true,
+        mode: firstTime ? "signup" : "signin",
+        claimedExistingPlan:
+          (firstTime && justCreated!.claimed) || state.claimedExistingPlan === true,
       });
     } catch (err) {
       setError(
@@ -196,9 +255,19 @@ export default function AuthGate({
           </h1>
           <p className="auth-lead">
             {isSignup
-              ? "Pick a username and password. Your plan, logged hours, streak and tutor history live with the account — sign in on your phone and it is all there."
+              ? "Pick a username and password, then sign in with them. Your plan, hours, streak and tutor history live with the account — on every device."
               : "Sign in and your plan appears exactly as you left it, on any device."}
           </p>
+
+          {justCreated && !isSignup && (
+            <div className="auth-banner auth-banner-ok" role="status">
+              <IconCheck size={15} />
+              <span>
+                Account <strong>{justCreated.username}</strong> created. Sign in with it to open
+                your planner.
+              </span>
+            </div>
+          )}
 
           {offline && (
             <div className="auth-banner auth-banner-warn" role="status">
@@ -240,7 +309,7 @@ export default function AuthGate({
                   spellCheck={false}
                   inputMode="text"
                   name="username"
-                  placeholder={isSignup ? "e.g. arjun.r" : "Your username"}
+                  placeholder={isSignup ? "Pick a username" : "Your username"}
                   aria-invalid={!!usernameIssue}
                   disabled={busy}
                 />
@@ -264,6 +333,7 @@ export default function AuthGate({
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value.slice(0, 60))}
                   autoComplete="name"
+                  name="name"
                   placeholder="What the planner should call you"
                   disabled={busy}
                 />
@@ -280,6 +350,7 @@ export default function AuthGate({
                 </span>
                 <input
                   id={`${fieldId}-password`}
+                  ref={passwordRef}
                   className="input-field auth-input auth-input-password"
                   type={showPassword ? "text" : "password"}
                   value={password}

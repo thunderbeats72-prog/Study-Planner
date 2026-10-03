@@ -407,9 +407,17 @@ async function previewUser(req: Request): Promise<User> {
 /* ── Accounts ───────────────────────────────────────────────────────── */
 
 export type AccountResult = { user: User; token: string; claimedExistingPlan: boolean };
+/** Sign-up deliberately stops short of a session — see createAccount. */
+export type NewAccountResult = { user: User; claimedExistingPlan: boolean };
 
 /**
- * Create an account.
+ * Create an account — and nothing more.
+ *
+ * Creating credentials does NOT sign anybody in. The learner types the
+ * username and password they just chose into the sign-in form, which both
+ * proves the credentials work (a typo in a password manager is caught here,
+ * not a week later on their phone) and makes the two acts — "I have an
+ * account" and "I am signed in on this device" — visibly separate.
  *
  * If this browser already built a plan anonymously, the new account ADOPTS
  * that row instead of starting empty — months of lessons, logs and streak
@@ -419,7 +427,7 @@ export type AccountResult = { user: User; token: string; claimedExistingPlan: bo
 export async function createAccount(
   req: Request,
   input: { username: unknown; password: unknown; name?: unknown },
-): Promise<AccountResult> {
+): Promise<NewAccountResult> {
   await ensureAuthSchema();
 
   const usernameIssue = usernameProblem(input.username);
@@ -491,8 +499,7 @@ export async function createAccount(
       .onConflictDoNothing({ target: settings.userId });
   }
 
-  const token = await createSession(user.id, req);
-  return { user, token, claimedExistingPlan: !!claimed && !!claimed.onboarded };
+  return { user, claimedExistingPlan: !!claimed && !!claimed.onboarded };
 }
 
 /**
