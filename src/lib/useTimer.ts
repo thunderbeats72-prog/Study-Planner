@@ -25,7 +25,7 @@ function beep(freq = 880) {
 }
 
 /* =========================================================================
-   STUDY CLOCK — the attendance/time-tracking system.
+   STUDY CLOCK - the attendance/time-tracking system.
    Completely independent of the Focus Studio pomodoro timer.
 
    The clock has two different kinds of state:
@@ -521,7 +521,7 @@ export function useStudyClock(
 }
 
 /* =========================================================================
-   FOCUS TIMER — the Pomodoro / deep-work ritual in the Focus Studio.
+   FOCUS TIMER - the Pomodoro / deep-work ritual in the Focus Studio.
    Purely a countdown. It never starts the clock and the clock never
    starts it. It can optionally log its own completed focus blocks.
 ========================================================================= */

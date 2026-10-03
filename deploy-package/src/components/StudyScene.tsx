@@ -5,7 +5,7 @@ import React from "react";
 /**
  * Page illustrations for Study Planner Pro.
  *
- * One component, several variants — every scene is an inline SVG that paints
+ * One component, several variants - every scene is an inline SVG that paints
  * itself from the `--scene-*` custom properties (defined once per theme in
  * `study-planner-refresh.css`). That means each illustration automatically
  * follows the active theme (light, dark, obsidian, nebula, mint, sunset), stays

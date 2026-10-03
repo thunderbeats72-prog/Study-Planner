@@ -258,7 +258,7 @@ export default function AnalyticsView({
     };
   }, [state.sessions, totalMin, intel]);
 
-  // Ticker — a clean single-row pill strip: icon + label + aligned value.
+  // Ticker - a clean single-row pill strip: icon + label + aligned value.
   // Every value sits in the same tabular mono face so the strip reads like
   // one instrument panel instead of a wall of uppercase text.
   const tickerItems = useMemo(() => {
@@ -331,7 +331,7 @@ export default function AnalyticsView({
       <PageHead
         eyebrow="ANALYTICS DASHBOARD"
         title="Where the hours went"
-        sub="Deep data, consistency trends, subject mastery, and focus metrics — all mapped from your study sessions."
+        sub="Deep data, consistency trends, subject mastery, and focus metrics - all mapped from your study sessions."
         artLive
         art={
           /* The monitor is wired to the very numbers this page reports: the
@@ -348,7 +348,7 @@ export default function AnalyticsView({
         }
       />
 
-      {/* Ticker — single-row pill badge strip */}
+      {/* Ticker - single-row pill badge strip */}
       <Reveal>
         <div className="glass-panel tilt-card overflow-hidden py-3 px-2">
           <Marquee speed={36}>
@@ -426,7 +426,7 @@ export default function AnalyticsView({
                   }}
                 />
               </svg>
-              {/* `.ring-center` is the ring's readout slot — the same one the
+              {/* `.ring-center` is the ring's readout slot - the same one the
                   Focus timer uses: absolutely filling the figure, centred on
                   both axes. The old `absolute text-center` pair was a Tailwind
                   leftover with no positioned ancestor, so the readout fell out

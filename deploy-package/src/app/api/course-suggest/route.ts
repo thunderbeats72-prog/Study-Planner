@@ -37,7 +37,7 @@ export async function POST(req: Request) {
   try {
     /* The wizard posts the course title under `query`; this route was written
        against `courseName`. The mismatch made EVERY onboarding assessment fail
-       with 400 "Course name is required." — the learner pressed "Assess & Build
+       with 400 "Course name is required." - the learner pressed "Assess & Build
        Subjects", saw an error banner, and the subject list never changed. Both
        spellings are accepted so an older cached bundle keeps working too. */
     name = textValue(body.courseName ?? body.query ?? body.course ?? body.name, "Course name", { required: true, max: 500 });

@@ -26,7 +26,7 @@ type CreditState = {
  *
  * One credit = one tutor question answered by the cloud AI layer. The meter
  * shows today's usage as a percentage and rolls over automatically each day.
- * It is INFORMATIONAL ONLY: it never pauses, throttles or degrades tutoring —
+ * It is INFORMATIONAL ONLY: it never pauses, throttles or degrades tutoring -
  * answers keep flowing past 100%, and plan/syllabus/timer answers never
  * touch it.
  */
@@ -42,7 +42,7 @@ export default function ShigunCreditCard() {
       setState(json);
       setSoftError(null);
     } catch {
-      setSoftError("Usage can't be loaded right now — tutoring itself is unaffected.");
+      setSoftError("Usage can't be loaded right now - tutoring itself is unaffected.");
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -125,7 +125,7 @@ export default function ShigunCreditCard() {
       </div>
 
       <p className="text-[length:var(--fs-meta)] font-medium" style={{ color: "var(--text-dim)" }}>
-        Each credit is one tutor question answered by the cloud AI layer. The meter is informational only —
+        Each credit is one tutor question answered by the cloud AI layer. The meter is informational only -
         it never pauses tutoring, and never affects plan, syllabus or timer answers.
       </p>
     </div>

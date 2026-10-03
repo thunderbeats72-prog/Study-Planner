@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { sessions, subjects, tasks } from "@/db/schema";
 import { and, eq, sql } from "drizzle-orm";
-import { applyCompletionMastery, buildContext, dateFrom, fullState, getOrCreateUser, keyFrom, recomputeStreak } from "@/lib/state";
+import { applyCompletionMastery, buildContext, dateFrom, fullState, recomputeStreak } from "@/lib/state";
+import { requireUser } from "@/lib/auth";
 import { withDbGuard } from "@/lib/routeGuard";
 import { shouldAutoComplete, type CompletedTaskInfo } from "@/lib/completion";
 import {
@@ -57,7 +58,8 @@ async function postSessions(req: Request) {
     ? body.date
     : serverToday;
 
-  const key = keyFrom(req);
+  const user = await requireUser(req);
+  const key = user.userKey;
 
   // ── Preview without a database ───────────────────────────────────────────
   // The in-memory demo layer records the session and runs the SAME
@@ -99,7 +101,6 @@ async function postSessions(req: Request) {
   }
   // ── End of preview branch ────────────────────────────────────────────────
 
-  const user = await getOrCreateUser(key);
   let taskId: number | null = null;
   let subjectId: number | null = null;
 
@@ -143,7 +144,7 @@ async function postSessions(req: Request) {
           .where(and(eq(tasks.id, taskId), eq(tasks.userId, user.id)));
 
         // Auto-complete: once the logged minutes reach the planned time, the
-        // task is done — no manual "Done" tap needed (a 15-min recall studied
+        // task is done - no manual "Done" tap needed (a 15-min recall studied
         // for 28 min is complete at the 15-min mark). Only a pending task
         // flips; done/skipped are never re-marked, and if a concurrent
         // request completes it first, the conditional status update below

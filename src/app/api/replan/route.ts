@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { buildContext, dateFrom, fullState, getOrCreateUser, getSettings, keyFrom } from "@/lib/state";
+import { buildContext, dateFrom, fullState, getSettings } from "@/lib/state";
+import { requireUser } from "@/lib/auth";
 import { regeneratePlan } from "@/lib/generate";
 import { demoDataEnabled } from "@/lib/demoState";
 import { checkRateLimit } from "@/lib/rateLimit";
@@ -18,7 +19,8 @@ async function postReplan(req: Request) {
       { status: 429, headers: { "retry-after": String(limit.retryAfterSeconds) } }
     );
   }
-  const key = keyFrom(req);
+  const user = await requireUser(req);
+  const key = user.userKey;
   const localDate = dateFrom(req);
 
   // ── Preview without a database: the demo plan is already balanced. ───────
@@ -28,7 +30,6 @@ async function postReplan(req: Request) {
   }
   // ── End of preview branch ────────────────────────────────────────────────
 
-  const user = await getOrCreateUser(key);
   const settings = await getSettings(user.id);
   const stats = await regeneratePlan(user.id, settings, { fromToday: true, today: localDate });
   const state = await fullState(key);

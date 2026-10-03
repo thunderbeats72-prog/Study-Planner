@@ -1,5 +1,5 @@
 /* ============================================================
-   ANSWER SANITY GATE — "is this text actually an answer?"
+   ANSWER SANITY GATE - "is this text actually an answer?"
    ────────────────────────────────────────────────────────
    WHY THIS EXISTS
    Every leg of the chain was judged by its HTTP status alone. That is
@@ -15,8 +15,8 @@
      1. the notice was shown to the learner as if SHIGUN had written it;
      2. the leg was recorded as the one that "worked" and became STICKY,
         so every later message paid the broken relay first;
-     3. because a "cloud answer" existed, the on-device ML engine — the
-        last-resort tutor that always works — never ran at all.
+     3. because a "cloud answer" existed, the on-device ML engine - the
+        last-resort tutor that always works - never ran at all.
 
    This module is the single place that decides whether a 200 body is a
    real answer. It is imported by the server provider chain (`lib/ai.ts`),
@@ -36,7 +36,7 @@
        look like a lesson. A lesson always wins.
 ============================================================ */
 
-/** Which failure family the noise belongs to — reuses the existing error
+/** Which failure family the noise belongs to - reuses the existing error
  *  vocabulary so the cooldown tables, `/api/ai-status` output and the
  *  learner-facing notices keep working unchanged. */
 export type NoiseReason = "auth" | "rate_limit" | "provider";
@@ -47,7 +47,7 @@ export type NoiseVerdict =
 
 /** Relay boilerplate that never belongs in a lesson, whatever the topic. */
 const HARD_NOISE: { re: RegExp; reason: NoiseReason }[] = [
-  // Pollinations' budget wall — the exact notice that reached learners.
+  // Pollinations' budget wall - the exact notice that reached learners.
   { re: /raise the key budget/i, reason: "auth" },
   { re: /edit-key\?id=/i, reason: "auth" },
   { re: /api key used for this request/i, reason: "auth" },
@@ -84,7 +84,7 @@ const AI_PLUMBING =
 const ADDRESSES_USER =
   /\b(your (api|keys?|accounts?|requests?|plans?|subscription|balance|credits?|quota|usage|tier|billing|wallet|organisation|organization)|please (try again|wait|retry|contact|visit|check your|sign|log ?in)|contact (us|the administrator|whoever|your)|this request|visit (your|the) dashboard|sign (in|up) to (continue|use)|log ?in to (continue|use))\b/i;
 
-/** Ambiguous on their own — only believed next to AI plumbing, and never
+/** Ambiguous on their own - only believed next to AI plumbing, and never
  *  inside something shaped like a lesson. */
 const CONTEXT_NOISE: { re: RegExp; reason: NoiseReason }[] = [
   { re: /(reached|exceeded|exhausted|out of|depleted|ran (out|past)|over)[^\n]{0,40}(budget|quota|credits?|balance|funds|allowance|limit)/i, reason: "auth" },
@@ -96,7 +96,7 @@ const CONTEXT_NOISE: { re: RegExp; reason: NoiseReason }[] = [
 ];
 
 /** Marketing the relays staple onto an otherwise good answer. Removed
- *  rather than treated as a failure — the learner still gets the lesson.
+ *  rather than treated as a failure - the learner still gets the lesson.
  *  Anchored to the TAIL and applied only to the last 700 characters, so a
  *  `---` divider in the middle of a real lesson is never cut off. */
 const AD_BLOCKS: RegExp[] = [
@@ -124,7 +124,7 @@ function stripAdTail(input: string): string {
 
 /** Strip relay advertising from the tail of an answer. Returns `""` when
  *  nothing but advertising was there. Never removes a short-but-real
- *  reply ("Yes — start with the ledger."). */
+ *  reply ("Yes - start with the ledger."). */
 export function stripRelayAds(text: string): string {
   const input = String(text ?? "");
   const stripped = stripAdTail(input);
@@ -133,7 +133,7 @@ export function stripRelayAds(text: string): string {
 }
 
 /**
- * Does this look like teaching? A lesson has structure — a heading, a
+ * Does this look like teaching? A lesson has structure - a heading, a
  * list, or several sentences. A relay notice is one or two lines about
  * the relay. When in doubt the lesson wins: suppressing a real answer is
  * far worse than letting one odd sentence through.
@@ -141,7 +141,7 @@ export function stripRelayAds(text: string): string {
 function looksLikeLesson(text: string): boolean {
   const body = text.trim();
   if (/^\s{0,3}#{1,6}\s/m.test(body)) return true;                 // markdown heading
-  // A real list (3+ items). Counted, never `.test()`ed — a /g regex keeps
+  // A real list (3+ items). Counted, never `.test()`ed - a /g regex keeps
   // lastIndex between calls and would flip its own answer on reuse.
   if ((body.match(/^\s*(?:[-*•]|\d+[.)])\s+\S/gm) || []).length >= 3) return true;
   const sentences = body.split(/(?<=[.!?])\s+/).filter((s) => s.trim().length > 24);
@@ -152,7 +152,7 @@ function looksLikeLesson(text: string): boolean {
  * Classify one model answer.
  * Returns `{ noise: false, text }` with relay advertising stripped, or
  * `{ noise: true, reason, matched }` when the "answer" is really the
- * provider talking about itself — in which case the caller must bench the
+ * provider talking about itself - in which case the caller must bench the
  * leg and keep walking the chain instead of showing it to a learner.
  */
 export function classifyModelAnswer(raw: string | null | undefined): NoiseVerdict {

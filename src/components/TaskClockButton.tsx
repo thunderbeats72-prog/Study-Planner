@@ -12,7 +12,7 @@ import {
 } from "./icons";
 
 /**
- * The ONE clock control every task row shares — on the Overview, the
+ * The ONE clock control every task row shares - on the Overview, the
  * Planner and inside day sheets. It reflects the live session and keeps the
  * pause/resume action beside the lesson instead of making the learner hunt
  * for it in the top bar.

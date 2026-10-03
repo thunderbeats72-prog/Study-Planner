@@ -11,19 +11,71 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 
-export const users = pgTable("users", {
-  id: serial("id").primaryKey(),
-  userKey: text("user_key").notNull().unique(),
-  name: text("name").notNull().default("Learner"),
-  level: text("level").notNull().default("ug"),
-  course: text("course").notNull().default("custom"),
-  courseName: text("course_name").notNull().default("Custom Course"),
-  year: text("year").notNull().default("1"),
-  onboarded: boolean("onboarded").notNull().default(false),
-  streak: integer("streak").notNull().default(0),
-  lastStudyDate: text("last_study_date"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+/**
+ * A learner. `userKey` is the internal handle every other table joins on;
+ * `username` + `passwordHash` are the credentials the learner actually signs
+ * in with, on any number of devices.
+ *
+ * Both credential columns are NULLABLE on purpose: rows created before
+ * accounts existed (one per browser) keep working untouched, and the first
+ * time such a device signs up it ADOPTS its own row - the laptop's plan
+ * becomes the new account's plan instead of being orphaned.
+ *
+ * `username` always stores the lower-cased, comparable form (so `Sanjay`
+ * and `sanjay` are one account) while `usernameDisplay` keeps the casing
+ * the learner typed, which is what the app greets them with.
+ */
+export const users = pgTable(
+  "users",
+  {
+    id: serial("id").primaryKey(),
+    userKey: text("user_key").notNull().unique(),
+    username: text("username"),
+    usernameDisplay: text("username_display"),
+    passwordHash: text("password_hash"),
+    passwordUpdatedAt: timestamp("password_updated_at"),
+    lastLoginAt: timestamp("last_login_at"),
+    failedLogins: integer("failed_logins").notNull().default(0),
+    lockedUntil: timestamp("locked_until"),
+    name: text("name").notNull().default("Learner"),
+    level: text("level").notNull().default("ug"),
+    course: text("course").notNull().default("custom"),
+    courseName: text("course_name").notNull().default("Custom Course"),
+    year: text("year").notNull().default("1"),
+    onboarded: boolean("onboarded").notNull().default(false),
+    streak: integer("streak").notNull().default(0),
+    lastStudyDate: text("last_study_date"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("users_username_unique").on(t.username)]
+);
+
+/**
+ * One row per signed-in device. The browser only ever holds the raw token
+ * (in an HttpOnly cookie it cannot read); the database stores its SHA-256,
+ * so a leaked database dump cannot be replayed as a login.
+ *
+ * Because the row - not the browser - is the session, "sign out of all other
+ * devices" is a single DELETE, and a stolen phone can be cut off from the
+ * laptop in two taps.
+ */
+export const authSessions = pgTable(
+  "auth_sessions",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id").notNull(),
+    tokenHash: text("token_hash").notNull(),
+    device: text("device").notNull().default("Unknown device"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    lastSeenAt: timestamp("last_seen_at").notNull().defaultNow(),
+    expiresAt: timestamp("expires_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("auth_sessions_token_hash_unique").on(t.tokenHash),
+    index("auth_sessions_user_id_idx").on(t.userId),
+    index("auth_sessions_expires_at_idx").on(t.expiresAt),
+  ]
+);
 
 export const settings = pgTable(
   "settings",
@@ -99,7 +151,7 @@ export const topics = pgTable(
   (t) => [
     index("topics_user_id_idx").on(t.userId),
     index("topics_subject_id_idx").on(t.subjectId),
-    // State loader orders a subject's topics by position — this composite
+    // State loader orders a subject's topics by position - this composite
     // serves the filter AND the sort from one index.
     index("topics_subject_pos_idx").on(t.subjectId, t.position),
   ]
@@ -127,7 +179,7 @@ export const tasks = pgTable(
     index("tasks_subject_id_idx").on(t.subjectId),
     index("tasks_topic_id_idx").on(t.topicId),
     index("tasks_user_date_idx").on(t.userId, t.date),
-    // The planner's default listing is "my tasks by date then position" —
+    // The planner's default listing is "my tasks by date then position" -
     // one composite index covers it end to end.
     index("tasks_user_date_pos_idx").on(t.userId, t.date, t.position),
   ]
@@ -159,7 +211,7 @@ export const sessions = pgTable(
 /**
  * Coverage telemetry: every course-suggestion query is logged with the
  * resolution source, so we know exactly which courses users search for
- * that only get generic/LLM fallbacks — a ranked to-do list for adding
+ * that only get generic/LLM fallbacks - a ranked to-do list for adding
  * verified catalog entries where they matter most.
  */
 export const courseQueries = pgTable("course_queries", {
@@ -181,14 +233,14 @@ export const messages = pgTable(
   },
   (t) => [
     index("messages_user_id_idx").on(t.userId),
-    // Chat history is fetched ordered by id per user — composite keeps the
+    // Chat history is fetched ordered by id per user - composite keeps the
     // hot path index-only as histories grow.
     index("messages_user_id_id_idx").on(t.userId, t.id),
   ]
 );
 
 /**
- * SHIGUN credit meter — per learner, per day. One "credit" is one tutor
+ * SHIGUN credit meter - per learner, per day. One "credit" is one tutor
  * question answered (a `full` or `finalise` chat turn). The period rolls over
  * automatically each day; Settings shows the used/limit bar and offers a
  * manual reset that refills the counter and clears provider cooldowns, so a
@@ -208,6 +260,7 @@ export const shigunUsage = pgTable(
 );
 
 export type User = typeof users.$inferSelect;
+export type AuthSession = typeof authSessions.$inferSelect;
 export type Settings = typeof settings.$inferSelect;
 export type Subject = typeof subjects.$inferSelect;
 export type Topic = typeof topics.$inferSelect;

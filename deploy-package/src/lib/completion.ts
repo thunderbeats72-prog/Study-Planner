@@ -1,9 +1,9 @@
 // ============================================================
-//  STUDY PLANNER PRO — src/lib/completion.ts
+//  STUDY PLANNER PRO - src/lib/completion.ts
 //  Auto-completion rule for the study clock.
 //
 //  When the minutes actually logged for a task reach its planned
-//  minutes, the task is COMPLETE — no manual "Done" tap required.
+//  minutes, the task is COMPLETE - no manual "Done" tap required.
 //  Example: a 15-minute recall studied for 28 minutes is done the
 //  moment the 15th logged minute lands, the learner is notified,
 //  and the clock rolls forward to the next pending task.

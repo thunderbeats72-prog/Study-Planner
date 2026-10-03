@@ -85,7 +85,7 @@ export function MaskWords({
 }
 
 /* scramble-decode label (cyber/trading-dashboard style) */
-const GLYPHS = "▚▞/\\<>#*+=—";
+const GLYPHS = "▚▞/\\<>#*+=-";
 export function Scramble({
   text,
   className,

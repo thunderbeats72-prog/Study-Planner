@@ -1,23 +1,23 @@
 // ============================================================
-//  STUDY PLANNER PRO — src/lib/ml.ts  (ML v2)
+//  STUDY PLANNER PRO - src/lib/ml.ts  (ML v2)
 //  Lightweight on-device machine learning. No external services:
 //  all inference is deterministic TypeScript, trained continuously
 //  on the user's own logged history.
 //
 //  Models:
-//   1. PACE (subject)  — per-subject EWMA pace multiplier.
-//   2. PACE (cluster)  — per-topic-cluster pace: "Testing of
+//   1. PACE (subject)  - per-subject EWMA pace multiplier.
+//   2. PACE (cluster)  - per-topic-cluster pace: "Testing of
 //      Hypothesis" units can be slow for you even when the rest
 //      of Quantitative Methods is fast.
-//   3. WEEKDAY         — per-weekday completion propensity that
+//   3. WEEKDAY         - per-weekday completion propensity that
 //      shapes daily load.
-//   4. FSRS-LITE       — spaced-repetition memory model. Each
+//   4. FSRS-LITE       - spaced-repetition memory model. Each
 //      review rating (Again/Hard/Good/Easy) updates a per-topic
 //      stability; the next review lands when recall ≈ 90%.
-//   5. DECAY           — Ebbinghaus mastery decay for topics with
+//   5. DECAY           - Ebbinghaus mastery decay for topics with
 //      no FSRS history yet.
-//   6. SKIP RISK       — logistic estimate that a day's plan fails.
-//   7. TIME OF DAY     — the user's historically best focus hours.
+//   6. SKIP RISK       - logistic estimate that a day's plan fails.
+//   7. TIME OF DAY     - the user's historically best focus hours.
 // ============================================================
 
 export type TaskHistoryRow = {
@@ -101,14 +101,14 @@ const STOPWORDS = new Set([
 /**
  * Cluster key: the FIRST 2 significant title tokens (in order of
  * appearance), sorted for stability. Related units share their leading
- * stem — "Testing of Hypothesis - Proportion" and "Testing of
- * Hypothesis using ANOVA" both key to "hypothesis+testing" — while
+ * stem - "Testing of Hypothesis - Proportion" and "Testing of
+ * Hypothesis using ANOVA" both key to "hypothesis+testing" - while
  * the trailing qualifiers that differ between units are ignored.
  */
 export function clusterKey(title: string): string {
   const tokens = title
     .toLowerCase()
-    .replace(/^(recall|revise|apply|mastery cycle \d+)\s*[—:-]\s*/i, "")
+    .replace(/^(recall|revise|apply|mastery cycle \d+)\s*[:-]\s*/i, "")
     .replace(/[^a-z\s]/g, " ")
     .split(/\s+/)
     .filter((t) => t.length > 3 && !STOPWORDS.has(t));
@@ -416,7 +416,7 @@ export type ReadinessProjection = {
 
 /**
  * The daily minutes this learner ACTUALLY studies (not their stated daily
- * goal). Mean minutes per ACTIVE study day over the recent window — days
+ * goal). Mean minutes per ACTIVE study day over the recent window - days
  * they never opened the app don't dilute the estimate, because scheduling
  * only ever gains capacity from days that happen at all.
  */
@@ -469,7 +469,7 @@ export function projectReadiness(
     : 0.25; // prior spread until evidence exists
   // Capacity starts from the assumption (78% of the stated budget is real
   // study time) and shifts toward the learner's OBSERVED minutes as active
-  // study days accumulate — a 2h/day planner who really manages 47 minutes
+  // study days accumulate - a 2h/day planner who really manages 47 minutes
   // gets an honest projection built on 47, not on 120. Full trust after
   // ~10 active days of evidence.
   const assumed = Math.max(20, dailyBudgetMinutes) * 0.78;

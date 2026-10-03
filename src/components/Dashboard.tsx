@@ -60,7 +60,7 @@ import {
 
 /* One line per day, deterministic from the date key so a refresh never
    reshuffles the card and two tabs on the same day always agree. `tag` is the
-   verb the quote asks for; `who` credits it — an unattributed aphorism reads
+   verb the quote asks for; `who` credits it - an unattributed aphorism reads
    like filler. */
 const QUOTES = [
   {
@@ -410,7 +410,7 @@ export default function Dashboard({
                       )}
                       title={
                         heroLive
-                          ? "Actual study time logged — recording now"
+                          ? "Actual study time logged - recording now"
                           : "Actual time already studied and logged"
                       }
                     >
@@ -492,7 +492,7 @@ export default function Dashboard({
         </Reveal>
       )}
 
-      {/* ── 4 KPI STAT CARDS — the `.kpi-*` contract owns the grid, so the
+      {/* ── 4 KPI STAT CARDS - the `.kpi-*` contract owns the grid, so the
             2-up / 4-up behaviour and the value size come from the design
             system instead of four Tailwind breakpoint prefixes. ── */}
       <div className="kpi-grid">
@@ -635,7 +635,7 @@ export default function Dashboard({
               {!todayTasks.length && (
                 <div className="empty-state">
                   <p>
-                    Nothing planned for today — add a task or let AI re-plan.
+                    Nothing planned for today - add a task or let AI re-plan.
                   </p>
                 </div>
               )}
@@ -795,7 +795,7 @@ export default function Dashboard({
                 <span className="quote-verb">
                   <IconLeaf size={13} /> {quote.tag}
                 </span>
-                <span className="quote-who">— {quote.who}</span>
+                <span className="quote-who">- {quote.who}</span>
               </figcaption>
               <span className="quote-halo" aria-hidden="true" />
             </figure>

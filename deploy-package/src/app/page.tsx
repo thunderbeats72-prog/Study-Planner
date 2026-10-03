@@ -4,9 +4,12 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   api,
   ApiError,
+  isAuthError,
+  onUnauthorized,
   prettyDate,
   prettyLong,
   today,
+  type AccountInfo,
   type AppState,
   type MessageRow,
 } from "@/lib/client";
@@ -22,6 +25,7 @@ import { useStudySession, type StudySessionApi } from "@/lib/studySession";
 import { nextPendingTask, type CompletedTaskInfo } from "@/lib/completion";
 import { nextAction } from "@/lib/prioritization";
 import type { QuickAddPayload } from "@/lib/quickAdd";
+import AuthGate from "@/components/AuthGate";
 import Onboarding from "@/components/Onboarding";
 import Dashboard from "@/components/Dashboard";
 import PlannerView from "@/components/PlannerView";
@@ -87,14 +91,14 @@ const ZEN_MODE_LABEL: Record<TimerMode, string> = {
 /** One calm line for the bottom guidance panel, matched to the timer state. */
 function zenGuidance(timer: TimerApi): string {
   if (timer.mode === "short" || timer.mode === "long")
-    return "Rest your eyes — the break is part of the work";
+    return "Rest your eyes - the break is part of the work";
   return timer.running
-    ? "Stay with this block — one lesson at a time"
+    ? "Stay with this block - one lesson at a time"
     : "Begin when you are ready";
 }
 
 /* `dock` marks the primary destinations in the mobile bottom navigation:
-   Overview · Planner · Focus · Subjects — four evenly distributed targets.
+   Overview · Planner · Focus · Subjects - four evenly distributed targets.
    Settings is deliberately NOT docked: on phones it lives in the top app bar
    as a compact gear beside the bell and the palette, so the dock keeps four
    comfortable, uncluttered columns. Analytics keeps its route (reachable from
@@ -119,7 +123,7 @@ type Toast = {
   msg: string;
   tone: ToastTone;
   /** Optional recovery verb. Only set when the user can actually do
-   *  something about it — a retry, never a "see logs". */
+   *  something about it - a retry, never a "see logs". */
   action?: { label: string; run: () => void };
 };
 type PendingSessionLog = {
@@ -131,7 +135,7 @@ type PendingSessionLog = {
   date: string;
 };
 
-/** POST /api/sessions response — same full state, plus which task (if any)
+/** POST /api/sessions response - same full state, plus which task (if any)
  *  the server auto-completed because its logged minutes met the plan. */
 type SessionLogResponse = AppState & {
   completedTask?: CompletedTaskInfo | null;
@@ -199,8 +203,19 @@ function mergeQueuedSessionLogs(
 
 export default function Home() {
   const [state, setState] = useState<AppState | null>(null);
+  /* Who is signed in, kept beside the plan rather than inside it: every
+     mutation route answers with the whole state, but only the boot and auth
+     routes repeat the account, so holding it separately means a settings
+     save or a clock-out can never make Settings → Account forget the
+     learner's own username. */
+  const [account, setAccount] = useState<AccountInfo | null>(null);
   const [loading, setLoading] = useState(true);
-  /* v14 — the page and the direction it was entered from are one piece of
+  /* Accounts: until /api/state answers, we do not know whether anybody is
+     signed in on this device. `authRequired` is set by the 401 that answer
+     carries - and by any later 401, e.g. after this device was signed out
+     from another one - and it is the ONLY thing that paints the front door. */
+  const [authRequired, setAuthRequired] = useState(false);
+  /* v14 - the page and the direction it was entered from are one piece of
      state, written together by the nav action. The first painted frame of a
      new view therefore already knows which way to slide in, and the state
      updater stays pure. */
@@ -306,7 +321,7 @@ export default function Home() {
   };
 
   /** Structured toast: one per event, auto-dismissed, stack-safe. A notice
-   *  with a recovery action stays up longer — there is something to press. */
+   *  with a recovery action stays up longer - there is something to press. */
   const notify = useCallback(
     (m: string, tone: ToastTone = "info", action?: Toast["action"]) => {
       const id = Date.now() + Math.random();
@@ -343,17 +358,17 @@ export default function Home() {
           subjectId: next.subjectId ?? null,
         });
         notify(
-          `“${completed.title}” complete — ${completed.actualMinutes}m logged (≥ ${completed.plannedMinutes}m planned). Clocked into next: ${next.title.slice(0, 42)}`,
+          `“${completed.title}” complete - ${completed.actualMinutes}m logged (≥ ${completed.plannedMinutes}m planned). Clocked into next: ${next.title.slice(0, 42)}`,
           "success",
         );
       } else if (next) {
         notify(
-          `“${completed.title}” complete — ${completed.actualMinutes}m logged (≥ ${completed.plannedMinutes}m planned). Next up: ${next.title.slice(0, 42)}`,
+          `“${completed.title}” complete - ${completed.actualMinutes}m logged (≥ ${completed.plannedMinutes}m planned). Next up: ${next.title.slice(0, 42)}`,
           "success",
         );
       } else {
         notify(
-          `“${completed.title}” complete — ${completed.actualMinutes}m logged (≥ ${completed.plannedMinutes}m planned). All of today's tasks done!`,
+          `“${completed.title}” complete - ${completed.actualMinutes}m logged (≥ ${completed.plannedMinutes}m planned). All of today's tasks done!`,
           "success",
         );
       }
@@ -362,7 +377,7 @@ export default function Home() {
 
   const loadInitialState = useCallback(() => {
     setLoading(true);
-    api<AppState>("/api/state", { timeoutMs: 20_000 })
+    api<AppState>("/api/state", { timeoutMs: 20_000, skipAuthRedirect: true })
       .then((fresh) => {
         if (sessionQueueRef.current == null) {
           try {
@@ -373,18 +388,71 @@ export default function Home() {
             sessionQueueRef.current = [];
           }
         }
+        setAuthRequired(false);
+        if (fresh.account !== undefined) setAccount(fresh.account ?? null);
         setState(mergeQueuedSessionLogs(fresh, sessionQueueRef.current));
       })
-      .catch((error) =>
+      .catch((error) => {
+        // Nobody is signed in on this device: that is not an error, it is
+        // the sign-in screen.
+        if (isAuthError(error)) {
+          setState(null);
+          setAuthRequired(true);
+          return;
+        }
         notify(
           error instanceof ApiError
             ? error.message
             : "Could not reach the server.",
           "error",
-        ),
-      )
+        );
+      })
       .finally(() => setLoading(false));
   }, [notify]);
+
+  /**
+   * A 401 from ANY later request means the session ended elsewhere - it
+   * expired, or this device was signed out from another one. Returning to
+   * the front door beats letting every tap fail silently.
+   */
+  useEffect(() => {
+    onUnauthorized(() => {
+      setState(null);
+      setAuthRequired(true);
+      setLoading(false);
+    });
+    return () => onUnauthorized(null);
+  }, []);
+
+  /** Sign out of this device. The plan stays with the account. */
+  const signOut = useCallback(
+    async (everywhere = false) => {
+      try {
+        await api("/api/auth/logout", {
+          method: "POST",
+          body: JSON.stringify({ everywhere }),
+          timeoutMs: 12_000,
+          skipAuthRedirect: true,
+        });
+      } catch {
+        /* the cookie is cleared server-side even when the reply is lost */
+      }
+      // Queued offline minutes belong to the account that logged them -
+      // never replay them into whoever signs in on this device next.
+      try {
+        localStorage.removeItem(SESSION_QUEUE_KEY);
+      } catch {
+        /* private mode */
+      }
+      sessionQueueRef.current = [];
+      setPendingMsgs([]);
+      setAccount(null);
+      setState(null);
+      setAuthRequired(true);
+      setLoading(false);
+    },
+    [],
+  );
 
   useEffect(() => {
     const timer = window.setTimeout(loadInitialState, 0);
@@ -429,7 +497,7 @@ export default function Home() {
     // real cross-fade instead of an instant repaint. Skipped on the very
     // first paint (nothing to cross-fade from) and under reduced motion.
     // While the cross-fade runs, `.theme-switching` freezes per-element CSS
-    // colour transitions so the view transition is the ONLY animation —
+    // colour transitions so the view transition is the ONLY animation -
     // otherwise the two fades stack and the flip looks like a weird
     // double-morph instead of one clean dissolve.
     const doc = document as Document & {
@@ -513,7 +581,7 @@ export default function Home() {
     return () => document.removeEventListener("click", onClick);
   }, []);
 
-  /* v14 — advancing through the rail slides the new view in from the right,
+  /* v14 - advancing through the rail slides the new view in from the right,
      stepping back from the left. Anything that is not a rail move (an AI
      command, a re-plan landing on the Planner) travels forward. */
   const goPage = useCallback((next: Page) => {
@@ -533,7 +601,7 @@ export default function Home() {
       if (document.fullscreenElement) void document.exitFullscreen();
       else void el.requestFullscreen?.();
     } catch {
-      /* fullscreen may be blocked — Zen still works */
+      /* fullscreen may be blocked - Zen still works */
     }
   }, []);
 
@@ -674,7 +742,7 @@ export default function Home() {
     return () => window.removeEventListener("online", onOnline);
   }, [drainSessionQueue, state]);
 
-  // 1) The study clock — tracks actual studied time
+  // 1) The study clock - tracks actual studied time
   const clock = useStudyClock(logSession);
   useEffect(() => {
     clockApiRef.current = clock;
@@ -695,9 +763,9 @@ export default function Home() {
       state?.subjects.find((x) => x.id === clockSubjectId)?.name ||
       "Session";
     if (clock.running)
-      document.title = `⏱ ${mmss(clock.elapsed)} · ${title.slice(0, 30)} — ${base}`;
+      document.title = `⏱ ${mmss(clock.elapsed)} · ${title.slice(0, 30)} - ${base}`;
     else if (clock.sessionActive)
-      document.title = `⏸ ${mmss(clock.elapsed)} · paused — ${base}`;
+      document.title = `⏸ ${mmss(clock.elapsed)} · paused - ${base}`;
     else document.title = base;
   }, [
     state,
@@ -708,11 +776,11 @@ export default function Home() {
     clockSubjectId,
   ]);
 
-  // 2) Focus timer — pomodoro ritual
+  // 2) Focus timer - pomodoro ritual
   const onBlockComplete = useCallback(
     (mode: TimerMode, minutes: number) => {
       if (mode === "short" || mode === "long") {
-        notify("Break complete — back to studying.");
+        notify("Break complete - back to studying.");
         return;
       }
       notify(`Focus block completed (${minutes} min). Great job!`, "success");
@@ -731,7 +799,7 @@ export default function Home() {
 
   /* 3) ONE study session. The focus timer and the study clock are bound
      together here so that the Focus Studio, Zen, the tracker bar and the
-     command palette all drive exactly the same state — one Pause, one
+     command palette all drive exactly the same state - one Pause, one
      Clock Out, and breaks never billed as study time. */
   const pickSessionTask = useCallback(() => {
     const currentDay = today();
@@ -765,9 +833,9 @@ export default function Home() {
         notify(
           rating
             ? rating === 1
-              ? "Logged — this topic will come back sooner for another pass."
-              : "Logged — the memory model scheduled your next review."
-            : "Lesson marked done — mastery updated.",
+              ? "Logged - this topic will come back sooner for another pass."
+              : "Logged - the memory model scheduled your next review."
+            : "Lesson marked done - mastery updated.",
           "success",
         );
       }
@@ -820,14 +888,14 @@ export default function Home() {
       notify(
         scheduled
           ? `Rebalanced from today · ${scheduled} lessons scheduled.`
-          : "Schedule rebalanced from today — overdue work moved forward.",
+          : "Schedule rebalanced from today - overdue work moved forward.",
         "success",
       );
     } catch (error) {
       notify(
         apiFailureMessage(
           error,
-          "Re-plan failed — your existing schedule was left unchanged.",
+          "Re-plan failed - your existing schedule was left unchanged.",
         ),
         "error",
       );
@@ -848,7 +916,7 @@ export default function Home() {
         });
         setState(s);
         notify(
-          replanIt ? "Settings saved — schedule regenerated." : "Saved.",
+          replanIt ? "Settings saved - schedule regenerated." : "Saved.",
           "success",
         );
       } catch (error) {
@@ -957,7 +1025,7 @@ export default function Home() {
       notify(
         apiFailureMessage(
           error,
-          "Could not update the schedule — nothing was lost.",
+          "Could not update the schedule - nothing was lost.",
         ),
         "error",
       );
@@ -979,7 +1047,7 @@ export default function Home() {
       notify(
         subject
           ? `Clocked in to ${subject.name}.`
-          : "Clocked in — free session.",
+          : "Clocked in - free session.",
       );
     }
   }, [clock, notify, state]);
@@ -991,7 +1059,7 @@ export default function Home() {
     goPage("focus");
   }, [goPage, session]);
 
-  // Clock out from ANYWHERE — one handler for the tracker bar, the up-next
+  // Clock out from ANYWHERE - one handler for the tracker bar, the up-next
   // card, task rows and Zen mode. It ends the WHOLE session (focus timer
   // included), so nobody ever has to pause two timers before closing it.
   const clockOutNow = useCallback(() => {
@@ -1001,13 +1069,13 @@ export default function Home() {
     haptic([12, 30]);
     notify(
       task
-        ? `Clocked out of “${task.title.slice(0, 40)}” — minutes saved.`
-        : `Clocked out — ${minutes > 0 ? `${minutes} min saved.` : "minutes saved."}`,
+        ? `Clocked out of “${task.title.slice(0, 40)}” - minutes saved.`
+        : `Clocked out - ${minutes > 0 ? `${minutes} min saved.` : "minutes saved."}`,
       "success",
     );
   }, [clock.elapsed, clock.taskId, notify, session, state]);
 
-  /** Delete a task for real — the destructive verb behind the row's ⋯ menu.
+  /** Delete a task for real - the destructive verb behind the row's ⋯ menu.
    *  The API removes it and returns the whole fresh state, so the calendar,
    *  the day sheets, the tracker and analytics all re-render from one source
    *  instead of a local splice that could drift. If the study clock was
@@ -1048,8 +1116,8 @@ export default function Home() {
       else clock.resume();
       notify(
         session.focusOwnsClock
-          ? "Resumed — focus timer and study clock are running together."
-          : "Study clock resumed — your active minutes are recording again.",
+          ? "Resumed - focus timer and study clock are running together."
+          : "Study clock resumed - your active minutes are recording again.",
       );
       return;
     }
@@ -1061,23 +1129,23 @@ export default function Home() {
     // Already recording THIS task → never restart the clock (that used to
     // silently eat the unlogged partial minutes of the running session).
     if (clock.sessionActive && clock.taskId === taskId) {
-      notify("Already recording this lesson — the clock is running.");
+      notify("Already recording this lesson - the clock is running.");
       return;
     }
     if (clock.sessionActive) {
       clock.clockIn({ taskId, subjectId: task?.subjectId ?? null });
       notify(
-        `Switched to: ${task ? task.title.slice(0, 42) : "session"} — earlier minutes saved.`,
+        `Switched to: ${task ? task.title.slice(0, 42) : "session"} - earlier minutes saved.`,
       );
       return;
     }
     clock.clockIn({ taskId, subjectId: task?.subjectId ?? null });
     notify(
-      `Clocked in: ${task ? task.title.slice(0, 42) : "session"} — timer recording.`,
+      `Clocked in: ${task ? task.title.slice(0, 42) : "session"} - timer recording.`,
     );
   };
 
-  /** Entry point for every "Re-run Setup" button — always confirm first. */
+  /** Entry point for every "Re-run Setup" button - always confirm first. */
   const requestWizardRestart = () => {
     if (
       state?.user.onboarded &&
@@ -1090,7 +1158,7 @@ export default function Home() {
   };
   const startWizard = () => {
     setConfirmWipe(false);
-    // bank any live study time before entering the wizard — pausing the
+    // bank any live study time before entering the wizard - pausing the
     // session stops the focus timer and the clock together.
     session.pause();
     setForceWizard(true);
@@ -1166,17 +1234,17 @@ export default function Home() {
            provider chain (GEMINI_API_KEY, CEREBRAS_API_KEY, … from the
            server environment) with automatic failover, and falls back to
            the on-device engine only when every cloud leg failed. Learners
-           never enter a key — the deployment's keys work for everyone.
+           never enter a key - the deployment's keys work for everyone.
 
-           The server may walk several providers — including a bounded
+           The server may walk several providers - including a bounded
            second chance for a throttled one (AI_TIMEOUT_MS, default 30 s)
-           — plus two database round trips, so the ceiling stays generous:
+           - plus two database round trips, so the ceiling stays generous:
            a slow-but-successful answer must never be aborted into the
            "didn't get through" fallback. */
         const r = await askTutorMessage(message, { timeoutMs: 60_000 });
         const reply =
           (r.reply || "").trim() ||
-          "I'm here — try asking again about your plan or a topic from your subjects.";
+          "I'm here - try asking again about your plan or a topic from your subjects.";
         setState((prev) => {
           const incoming = r.state;
           // Never replace a real onboarded plan with the empty DB-less
@@ -1206,7 +1274,7 @@ export default function Home() {
         });
         setPendingMsgs([]);
         /* The tutor still answered (from the local engine), so this is a
-           notice with a recovery verb — not an error panel, and never the
+           notice with a recovery verb - not an error panel, and never the
            raw provider/model configuration the server logged. */
         setLastReplySource(
           r.ai?.source && r.ai.source !== "local"
@@ -1268,11 +1336,11 @@ export default function Home() {
             .filter((task) => task.status === "pending")
             .slice(0, 3);
           /* Say plainly that the *request* failed, not that the assistant is
-             broken — the two read very differently to a learner, and only one
+             broken - the two read very differently to a learner, and only one
              of them is true. */
           fallbackText = pending.length
-            ? `That message didn't get through — check your connection and send it again. Meanwhile, start with **${pending[0].title}** from today's plan.`
-            : `That message didn't get through — check your connection and send it again. You can also ask *"what should I study today?"* or *"explain [a topic from your subjects]"*.`;
+            ? `That message didn't get through - check your connection and send it again. Meanwhile, start with **${pending[0].title}** from today's plan.`
+            : `That message didn't get through - check your connection and send it again. You can also ask *"what should I study today?"* or *"explain [a topic from your subjects]"*.`;
         }
 
         const botMsg: MessageRow = {
@@ -1321,6 +1389,27 @@ export default function Home() {
     );
   }
 
+  if (authRequired) {
+    return (
+      <AuthGate
+        onAuthenticated={(fresh, info) => {
+          setAuthRequired(false);
+          setAccount(fresh.account ?? null);
+          setState(fresh);
+          goPage("dashboard");
+          notify(
+            info.claimedExistingPlan
+              ? "Signed in - the plan already on this device came with you. It is on your other devices now too."
+              : info.mode === "signup"
+                ? `Welcome, ${fresh.account?.name || fresh.account?.username || fresh.user.name}! Your plan now follows you to every device.`
+                : `Signed in as ${fresh.account?.username || fresh.user.name}.`,
+            "success",
+          );
+        }}
+      />
+    );
+  }
+
   if (!state) {
     return (
       <div className="loader-screen">
@@ -1347,7 +1436,9 @@ export default function Home() {
           goPage("dashboard");
         }}
         isRerun={state.user.onboarded}
-        initialName={state.user.onboarded ? state.user.name : ""}
+        /* The account's own name - the wizard greets with it instead of
+           asking for a name the learner already gave at sign-up. */
+        initialName={state.user.name || account?.name || ""}
         onCancel={
           state.user.onboarded ? () => setForceWizard(false) : undefined
         }
@@ -1382,7 +1473,7 @@ export default function Home() {
         ? Math.min(1, Math.max(0, timer.seconds / timer.total))
         : 0;
 
-  // The full task title, untruncated — CSS wraps it cleanly instead of
+  // The full task title, untruncated - CSS wraps it cleanly instead of
   // slicing it in JS (fixes "Principles of Marketing: Introduction…").
   const clockTaskTitle =
     state.tasks.find((x) => x.id === clock.taskId)?.title ||
@@ -1480,7 +1571,7 @@ export default function Home() {
           t,
         ).now;
         if (next) focusTask(next.id);
-        else notify("Nothing pending — enjoy the rest day.");
+        else notify("Nothing pending - enjoy the rest day.");
       },
     },
     {
@@ -1552,7 +1643,7 @@ export default function Home() {
             {state.user.streak}d
           </span>
           {/* Quick controls mirror the tracker bar's trio for phones, where
-              the tracker hides them below 640px — same popovers, same state. */}
+              the tracker hides them below 640px - same popovers, same state. */}
           <span className="mh-quick">
             <span className="quick-popover-wrap">
               <button
@@ -1582,7 +1673,7 @@ export default function Home() {
                       </strong>
                       <span>
                         {ctx.overdue > 0
-                          ? "Let's recover them — spread them out or re-plan."
+                          ? "Let's recover them - spread them out or re-plan."
                           : "You're up to date."}
                       </span>
                     </div>
@@ -1667,7 +1758,7 @@ export default function Home() {
             </span>
           </span>
 
-          {/* Settings — the dock no longer carries it on phones, so the app
+          {/* Settings - the dock no longer carries it on phones, so the app
               bar is its one door. It shares the `icon-quick-btn` treatment
               with the bell and the palette, and the three stay distinct:
               Bell = notifications, Palette = theme, Gear = settings. */}
@@ -1836,8 +1927,8 @@ export default function Home() {
 
         <main className="main-workspace" data-nav-dir={navDir}>
           {/* ── Top session bar ───────────────────────────────────────────
-              One compact row that always answers three questions — am I
-              clocked in, on what, and for how long — with the verbs beside
+              One compact row that always answers three questions - am I
+              clocked in, on what, and for how long - with the verbs beside
               them. Same state (useStudyClock) as before; only the
               presentation changed. Idle reads "NOT CLOCKED IN · Free
               session", live reads "CURRENT SESSION · <subject/task>" with a
@@ -1945,7 +2036,7 @@ export default function Home() {
                     className="btn btn-xs btn-secondary act-break"
                     onClick={session.takeBreak}
                     disabled={!clock.running}
-                    title="Start a break — break time is not logged as study time"
+                    title="Start a break - break time is not logged as study time"
                     aria-label="Start a break"
                   >
                     <IconLeaf size={12} /> <span>Break</span>
@@ -2027,7 +2118,7 @@ export default function Home() {
                           </strong>
                           <span>
                             {ctx.overdue > 0
-                              ? "Let's recover them — spread them out or re-plan."
+                              ? "Let's recover them - spread them out or re-plan."
                               : "You're up to date."}
                           </span>
                         </div>
@@ -2197,15 +2288,17 @@ export default function Home() {
           {page === "settings" && (
             <SettingsView
               state={state}
+              account={account}
               onPatch={patchSettings}
               onRestart={requestWizardRestart}
+              onSignOut={signOut}
               busy={busy}
             />
           )}
         </main>
       </div>
 
-      {/* Mobile bottom navigation — the primary page switcher on phones and
+      {/* Mobile bottom navigation - the primary page switcher on phones and
           tablets. Fixed, safe-area aware, shown only ≤ 860px via CSS.
           Exactly five primary destinations; everything else (Analytics)
           lives behind the app-bar "More" drawer. */}
@@ -2251,7 +2344,7 @@ export default function Home() {
           <ZenScene className="zen-environment" />
           <div className="zen-glow" aria-hidden="true" />
 
-          {/* TOP — one quiet control row, in normal flow (nothing to collide with). */}
+          {/* TOP - one quiet control row, in normal flow (nothing to collide with). */}
           <div className="zen-topbar">
             <button
               className="zen-ghost"
@@ -2285,7 +2378,7 @@ export default function Home() {
             </div>
           </div>
 
-          {/* CENTER — emblem · title · timer ring · actions · hint, one column
+          {/* CENTER - emblem · title · timer ring · actions · hint, one column
               with generous gaps; the timer is always the visual priority. */}
           <div className="zen-stage">
             <div className="zen-headline">
@@ -2312,7 +2405,7 @@ export default function Home() {
                   {/* The component owns its gradient: the ring is the one
                       element in Zen allowed a little colour. */}
                   {/* (v25) The ring is still the one element in Zen allowed a
-                      little colour — but the colour is the theme's accent, not
+                      little colour - but the colour is the theme's accent, not
                       a fixed violet, so the room and the ring agree. */}
                   <linearGradient
                     id="zenRingGradient"
@@ -2419,14 +2512,14 @@ export default function Home() {
             </div>
             <p className="zen-hint">
               {session.active
-                ? "One session — the timer and the study clock run together."
+                ? "One session - the timer and the study clock run together."
                 : clock.sessionActive
-                  ? "Paused — no study time is being recorded."
+                  ? "Paused - no study time is being recorded."
                   : "Start Focus begins the timer and the study clock in one tap."}
             </p>
           </div>
 
-          {/* BOTTOM — the 3-part focus guidance bar, the last flow row. */}
+          {/* BOTTOM - the 3-part focus guidance bar, the last flow row. */}
           {!zenMinimal && (
             <div className="zen-guidance">
               <div className="zen-guidance-item">
@@ -2461,8 +2554,8 @@ export default function Home() {
             <h3 className="modal-title">Start fresh with the Setup Wizard?</h3>
             <p className="modal-lead">
               Re-running setup <strong>completely wipes</strong> your current
-              course data — subjects, lessons, schedule, logged study minutes
-              and AI chat history — and rebuilds everything from scratch.
+              course data - subjects, lessons, schedule, logged study minutes
+              and AI chat history - and rebuilds everything from scratch.
             </p>
             <p className="modal-note">
               Your name and app preferences (theme, timer lengths) are kept.

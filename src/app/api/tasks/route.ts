@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { subjects, tasks, topics } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
-import { applyCompletionMastery, buildContext, dateFrom, fullState, getOrCreateUser, keyFrom } from "@/lib/state";
+import { applyCompletionMastery, buildContext, dateFrom, fullState } from "@/lib/state";
+import { requireUser } from "@/lib/auth";
 import type { ReviewRating } from "@/lib/ml";
 import {
   demoAddTask, demoDataEnabled, demoDeleteTask, demoPatchManyTasks, demoPatchTask,
@@ -33,10 +34,10 @@ async function patchTasks(req: Request) {
     return NextResponse.json({ error: payload.error, code: payload.code }, { status: payload.status });
   }
 
-  const key = keyFrom(req);
-  const user = await getOrCreateUser(key);
+  const user = await requireUser(req);
+  const key = user.userKey;
 
-  // Shared demo response builder — the in-memory preview round-trips the
+  // Shared demo response builder - the in-memory preview round-trips the
   // same { ...state, context } shape every mutation path returns.
   const demoResponse = async () => {
     const fresh = await fullState(key);
@@ -280,8 +281,8 @@ async function postTasks(req: Request) {
     const payload = validationPayload(error);
     return NextResponse.json({ error: payload.error, code: payload.code }, { status: payload.status });
   }
-  const key = keyFrom(req);
-  const user = await getOrCreateUser(key);
+  const user = await requireUser(req);
+  const key = user.userKey;
 
   let title: string;
   let date: string;
@@ -335,8 +336,8 @@ async function postTasks(req: Request) {
 export const DELETE = withDbGuard(deleteTasks);
 
 async function deleteTasks(req: Request) {
-  const key = keyFrom(req);
-  const user = await getOrCreateUser(key);
+  const user = await requireUser(req);
+  const key = user.userKey;
   let id: number;
   try { id = positiveId(new URL(req.url).searchParams.get("id"), "id") as number; }
   catch (error) {

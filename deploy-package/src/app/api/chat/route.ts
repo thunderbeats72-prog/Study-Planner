@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { messages } from "@/db/schema";
 import { desc, eq, sql } from "drizzle-orm";
-import { buildContext, dateFrom, fullState, getOrCreateUser, getSettings, keyFrom, defaultFallbackState } from "@/lib/state";
+import { buildContext, dateFrom, fullState, getSettings, keyFrom, defaultFallbackState } from "@/lib/state";
+import { requireUser } from "@/lib/auth";
+import { guardResponse } from "@/lib/routeGuard";
 import {
   callLLMDetailed, localTutor, parseCommand, tutorSystemPrompt, activeProvider,
   extractLlmAction, languageCapabilityReply, instantTutorReply, commandReply,
@@ -56,7 +58,7 @@ export function localCurriculumReply(question: string, state: GroundingState): s
   // The plan-lesson fallback may ONLY run for questions that are actually
   // about the learner's own curriculum ("today's lesson", "my weakest topic",
   // "give me practice questions"). A generic "what is X?" with no lesson
-  // overlap must never be answered with a random lesson from the plan —
+  // overlap must never be answered with a random lesson from the plan -
   // that produced wrong, unrelated replies (e.g. "what is the capital of
   // France?" answered with the current study card).
   const aboutOwnCurriculum = /(today|current|next|this|my|that|lesson|topic|subject|weakest|kamzor|practice|अभ्यास|आज|पाठ|विषय|सबक|कमज़ोर|कमजोर|आजचा|இன்றைய|నేటి|ಇಂದಿನ|ഇന്നത്തെ|આજનો|ਅੱਜ ਦਾ|ଆଜିର|आजको)/i.test(question);
@@ -68,9 +70,9 @@ export function localCurriculumReply(question: string, state: GroundingState): s
     if (topic) selected = { topic, score: 2 };
   }
   if (!selected || selected.score < 2) return null;
-  // A teach/practice verb is the usual trigger, but a STRONG name match —
+  // A teach/practice verb is the usual trigger, but a STRONG name match -
   // the question contains the full lesson title (+20), shares ≥4 significant
-  // tokens with it, or names the subject itself (+4) — teaches even without
+  // tokens with it, or names the subject itself (+4) - teaches even without
   // one. "dual aspect concept" should not need the word "explain" when the
   // learner's OWN plan has exactly that lesson: this is the on-device
   // engine's answer to concept questions whenever the cloud is silent. The
@@ -91,11 +93,11 @@ export function localCurriculumReply(question: string, state: GroundingState): s
       `Identify one assumption or boundary condition in **${topic.title}**, then explain what fails when it is violated.`,
       topic.practice || `Create and solve one exam-style problem on **${topic.title}**.`,
     ];
-    return `### Practice set — ${topic.title}\n\n${prompts.map((prompt, index) => `${index + 1}. ${prompt}`).join("\n")}\n\n**Self-check:** A strong answer should use these ideas: ${concepts.slice(0, 6).join(", ") || topic.summary}`;
+    return `### Practice set - ${topic.title}\n\n${prompts.map((prompt, index) => `${index + 1}. ${prompt}`).join("\n")}\n\n**Self-check:** A strong answer should use these ideas: ${concepts.slice(0, 6).join(", ") || topic.summary}`;
   }
 
   const sources = (topic.sources || []).slice(0, 3).map((source) =>
-    source.url ? `[${source.title}](${source.url}) — ${source.publisher}` : `${source.title} — ${source.publisher}`
+    source.url ? `[${source.title}](${source.url}) - ${source.publisher}` : `${source.title} - ${source.publisher}`
   );
   return [
     `### ${topic.title}`,
@@ -140,7 +142,7 @@ function curriculumGrounding(question: string, state: GroundingState): string {
   if (!ranked.length) return "";
   const lessons = ranked.map(({ topic, subject }) => {
     const sources = (topic.sources || []).map((source) =>
-      `${source.title} — ${source.publisher}${source.section ? `, section: ${source.section}` : ""}`
+      `${source.title} - ${source.publisher}${source.section ? `, section: ${source.section}` : ""}`
     ).join("; ");
     return [
       `Lesson: ${topic.title} (${subject?.name || "course"}, ${topic.unit}, ${topic.depth})`,
@@ -169,7 +171,7 @@ type AiAttempt = { provider: string; model: string; status: number | null; error
  */
 export function summarizeAttempts(attempts: AiAttempt[]): string {
   if (!attempts.length) {
-    return "No cloud provider is configured — the local ML engine answered. Add a GEMINI_API_KEY, CEREBRAS_API_KEY, GROQ_API_KEY, MISTRAL_API_KEY, SAMBANOVA_API_KEY, COHERE_API_KEY, or OPENROUTER_API_KEY to the deployment environment to enable cloud tutoring for every learner.";
+    return "No cloud provider is configured - the local ML engine answered. Add a GEMINI_API_KEY, CEREBRAS_API_KEY, GROQ_API_KEY, MISTRAL_API_KEY, SAMBANOVA_API_KEY, COHERE_API_KEY, or OPENROUTER_API_KEY to the deployment environment to enable cloud tutoring for every learner.";
   }
   const first = attempts[0];
   const chain = attempts
@@ -189,7 +191,7 @@ export function summarizeAttempts(attempts: AiAttempt[]): string {
     return `The AI providers did not answer in time (${chain}).${tail}`;
   }
   if (attempts.some((attempt) => attempt.error === "network")) {
-    return `This deployment cannot reach the AI providers (${chain}) — check outbound network/egress rules.${tail}`;
+    return `This deployment cannot reach the AI providers (${chain}) - check outbound network/egress rules.${tail}`;
   }
   return `The cloud tutor failed (${chain}).${tail}`;
 }
@@ -197,7 +199,7 @@ export function summarizeAttempts(attempts: AiAttempt[]): string {
 /**
  * What the learner is allowed to see when the tutor could not reach a cloud
  * model. The app already answers locally in that case, so this is a notice,
- * not a failure screen — and it must stay that way.
+ * not a failure screen - and it must stay that way.
  *
  * Contract:
  *   • no provider names, no model IDs, no environment-variable names;
@@ -211,7 +213,7 @@ export function userFacingAiNotice(
   if (!attempts.length) {
     return {
       code: "AI_LOCAL_ONLY",
-      notice: "Study assistant is running in offline mode — answers come from your own syllabus.",
+      notice: "Study assistant is running in offline mode - answers come from your own syllabus.",
       retryable: false,
     };
   }
@@ -232,7 +234,7 @@ export function userFacingAiNotice(
   if (attempts.some((attempt) => attempt.error === "auth" || attempt.error === "model")) {
     return {
       code: "AI_UNAVAILABLE",
-      notice: "AI assistant temporarily unavailable. We answered from your syllabus instead — try again shortly.",
+      notice: "AI assistant temporarily unavailable. We answered from your syllabus instead - try again shortly.",
       retryable: true,
     };
   }
@@ -271,11 +273,15 @@ export async function POST(req: Request) {
      chain (GEMINI_API_KEY, CEREBRAS_API_KEY, GROQ_API_KEY, … from the server
      environment) with automatic failover, and falls back to the on-device
      engine only when every cloud leg failed. Learners are never asked for a
-     key — whatever the deployment configured works for everyone. */
+     key - whatever the deployment configured works for everyone. */
   const runtimeKeys = parseRuntimeKeys(req.headers.get("x-ai-keys"));
   try {
     return await handleChat(req, { message: rawText, keys: runtimeKeys });
   } catch (error) {
+    // A learner who is not signed in gets the sign-in screen, not a tutor
+    // reply written against an empty plan.
+    const guarded = guardResponse(error);
+    if (guarded) return guarded;
     console.error("Chat route handleChat failed, using local tutor fallback:", error instanceof Error ? error.message : error);
     const key = keyFrom(req);
     const localDate = dateFrom(req);
@@ -354,13 +360,14 @@ type HandleChatOptions = {
 
 async function handleChat(req: Request, opts: HandleChatOptions) {
   const { message: rawText, keys: runtimeKeys } = opts;
-  const key = keyFrom(req);
+  const account = await requireUser(req);
+  const key = account.userKey;
   const text = rawText;
 
   const state = await fullState(key);
   const localDate = dateFrom(req);
   const ctx = buildContext(state, localDate);
-  /* Shigun credit is a VISIBILITY meter only — one credit per cloud-answered
+  /* Shigun credit is a VISIBILITY meter only - one credit per cloud-answered
      question, written after a real cloud answer below. It is never read as a
      gate here: a meter problem must never be able to take the tutor offline
      (the exact failure that paused cloud tutoring before). */
@@ -368,7 +375,7 @@ async function handleChat(req: Request, opts: HandleChatOptions) {
   let action = parseCommand(text);
   const languageReply = languageCapabilityReply(text);
   // "Are you connected to the AI?" / "why are you not responding?" are
-  // questions about the assistant, answered from live connectivity state —
+  // questions about the assistant, answered from live connectivity state -
   // never sent to the cloud (a model cannot know its own plumbing) and never
   // to the encyclopedia (which once answered "connect" with a quiz show).
   const statusReply = action || languageReply || !isAssistantStatusQuestion(text)
@@ -437,7 +444,7 @@ async function handleChat(req: Request, opts: HandleChatOptions) {
       } else {
         // Technical detail goes to the server log, where an operator (or
         // POST /api/ai-status) can act on it. The learner gets one calm
-        // sentence — the reply itself already came from the local tutor, so
+        // sentence - the reply itself already came from the local tutor, so
         // nothing is actually broken for them.
         console.warn("Cloud tutor unavailable, answered locally:", summarizeAttempts(result.attempts));
         const notice = userFacingAiNotice(result.attempts);
@@ -473,7 +480,7 @@ async function handleChat(req: Request, opts: HandleChatOptions) {
       // `localTutor` returns EITHER a real answer (an encyclopedia lesson, a
       // greeting, a command, a live-data reply) OR one of its generic
       // "I couldn't answer that" fallbacks. A real answer may beat a syllabus
-      // dump, but a fallback is not a answer — letting one win discarded a
+      // dump, but a fallback is not a answer - letting one win discarded a
       // real curriculum lesson and, on a keyless deployment, answering
       // "explain [topic]" with "connect an AI key" instead of teaching the
       // topic. Every generic fallback phrase is listed so none of them can
@@ -529,7 +536,7 @@ async function handleChat(req: Request, opts: HandleChatOptions) {
   }
 
   if (!finalText.trim()) {
-    finalText = "I'm here — ask me about today's plan, a topic from your subjects, or give a clock command.";
+    finalText = "I'm here - ask me about today's plan, a topic from your subjects, or give a clock command.";
   }
 
   return NextResponse.json({
@@ -548,11 +555,12 @@ async function handleChat(req: Request, opts: HandleChatOptions) {
 
 export async function DELETE(req: Request) {
   try {
-    const key = keyFrom(req);
-    const user = await getOrCreateUser(key);
+    const user = await requireUser(req);
     await db.delete(messages).where(eq(messages.userId, user.id));
     return NextResponse.json({ ok: true });
   } catch (error) {
+    const guarded = guardResponse(error);
+    if (guarded) return guarded;
     console.error("Chat clear failed:", error instanceof Error ? error.message : error);
     return NextResponse.json(
       { error: "Could not clear the chat right now. Please try again shortly.", code: "CHAT_CLEAR_FAILED" },

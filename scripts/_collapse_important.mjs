@@ -1,9 +1,9 @@
 /**
- * _collapse_important.mjs — delete dead `!important` declarations.
+ * _collapse_important.mjs - delete dead `!important` declarations.
  *
  * Same cascade logic as _collapse.mjs, but for *any* property and *across*
  * both stylesheets: when the same @media scope + selector + property carries
- * two or more `!important` declarations, exactly one can ever win — the last
+ * two or more `!important` declarations, exactly one can ever win - the last
  * one in (stylesheet, source-order), because the specificity is identical.
  * Every earlier flag is dead weight that only inflates the audit's
  * `!important` total. Deleting the losers cannot change rendering.

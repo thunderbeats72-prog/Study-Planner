@@ -20,7 +20,7 @@ type ServerStatus = {
  *
  * SHIGUN is configured exclusively through the DEPLOYMENT environment
  * (GEMINI_API_KEY, CEREBRAS_API_KEY, … on the server). Every learner on the
- * deployment shares those keys automatically — nobody pastes a key anywhere
+ * deployment shares those keys automatically - nobody pastes a key anywhere
  * in the app, and there is nothing to toggle. This card simply reports the
  * live state: which providers are connected, which one answered last, and
  * whether any leg is briefly benched (rate limit, etc.).
@@ -42,7 +42,7 @@ export default function AiCoachCard() {
         setError("Couldn't check the AI connection just now.");
       }
     } catch {
-      setError("Couldn't check the AI connection just now. Tutoring is unaffected — try refreshing.");
+      setError("Couldn't check the AI connection just now. Tutoring is unaffected - try refreshing.");
     } finally {
       setLoading(false);
       setChecking(false);
@@ -88,7 +88,7 @@ export default function AiCoachCard() {
             "Checking the deployment's AI connection…"
           ) : connected ? (
             <>
-              Cloud tutoring is <strong>connected through this deployment&apos;s own keys</strong> —{" "}
+              Cloud tutoring is <strong>connected through this deployment&apos;s own keys</strong> -{" "}
               {providers.join(", ")}. No key is ever entered in the app; every learner on this deployment
               gets the same cloud tutoring automatically.
             </>
@@ -108,8 +108,8 @@ export default function AiCoachCard() {
           Automatic failover
         </p>
         <p className="text-[length:var(--fs-meta)] font-medium leading-relaxed" style={{ color: "var(--text-dim)" }}>
-          Questions are answered by the deployment&apos;s provider chain — Gemini, Cerebras, Groq, Mistral,
-          SambaNova, Cohere, OpenRouter — in the order its keys are configured. If one provider hits a limit
+          Questions are answered by the deployment&apos;s provider chain - Gemini, Cerebras, Groq, Mistral,
+          SambaNova, Cohere, OpenRouter - in the order its keys are configured. If one provider hits a limit
           or goes down, the next one answers inside the same request. Only when every provider fails does
           Shigun answer from the on-device engine, so a question is never left unanswered.
         </p>
@@ -122,7 +122,7 @@ export default function AiCoachCard() {
             )}
             {status.lastRequest?.ok === false && (
               <p className="text-[length:var(--fs-meta)] font-medium" style={{ color: "var(--text-dim)" }}>
-                The last cloud request did not get through — the on-device engine answered. The next provider
+                The last cloud request did not get through - the on-device engine answered. The next provider
                 in the chain picks up the next question.
               </p>
             )}

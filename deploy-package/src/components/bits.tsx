@@ -17,14 +17,14 @@ import {
 import { Magnetic, MaskWords, Scramble, useInView } from "@/lib/fx";
 import { useBackClose } from "@/lib/useBackClose";
 
-/* ── Page head — the editorial block that opens every view (v25).
+/* ── Page head - the editorial block that opens every view (v25).
    It used to be a private pile of inline styles while the design system
    already owned a `.page-header / .page-title / .page-subtitle /
    .page-header-scene` contract (right-hand padding that reserves room for the
    illustration, a stacking-order fix below 860px, per-breakpoint title sizes).
    Adopting the contract is what makes the six headers behave identically from
    320px to 1920px, and it puts heading typography on the shared type scale
-   instead of a per-component clamp() — the "different redesigns" feeling came
+   instead of a per-component clamp() - the "different redesigns" feeling came
    mostly from six headers each owning their own numbers. */
 export function PageHead({
   eyebrow,
@@ -68,7 +68,7 @@ export function PageHead({
   );
 }
 
-/* ── ConfirmDialog — the one gate in front of a destructive action ────────
+/* ── ConfirmDialog - the one gate in front of a destructive action ────────
    `window.confirm()` was doing this job on the Subjects page: an OS chrome
    dialog that ignores every theme, cannot be styled, is suppressed in some
    embedded browsers, and gives no room to say what will actually be lost.
@@ -166,7 +166,7 @@ export function StatusChip({ status }: { status: string }) {
   );
 }
 
-/** Distinct glyph per task kind — mirrors the reference planner, where
+/** Distinct glyph per task kind - mirrors the reference planner, where
  *  every row leads with a small tinted icon square next to the subject
  *  dot: Lesson → book, Recall → spark, Practice → flame, Test → target,
  *  Buffer → clock. Unknown kinds fall back to a spark. */
@@ -209,7 +209,7 @@ export function KindIcon({
   );
 }
 
-/** Icon + word, never colour alone — and the colour is the same token the
+/** Icon + word, never colour alone - and the colour is the same token the
  *  card rail and the calendar dot read, so one kind always looks the same. */
 export function KindChip({
   kind,
@@ -352,11 +352,11 @@ export function StartFocusButton({
   );
 }
 
-/* ── Select — the one styled listbox every form uses ─────────────────
+/* ── Select - the one styled listbox every form uses ─────────────────
    Native <select> popups are the OS's, not ours: the blue-row Android
    spinner fought every theme and every font decision. This is a real
-   listbox — button trigger, themed popover, arrow-key / Enter / Escape /
-   Home / End support, outside-click dismiss — painted from the same
+   listbox - button trigger, themed popover, arrow-key / Enter / Escape /
+   Home / End support, outside-click dismiss - painted from the same
    semantic tokens as the rest of the chrome so it follows all themes. */
 export type SelectOption = { value: string; label: string };
 

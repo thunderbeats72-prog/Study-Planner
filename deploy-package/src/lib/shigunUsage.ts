@@ -7,7 +7,7 @@ import { todayStr } from "./planner";
  *
  *  THE METER IS INFORMATIONAL ONLY. It exists so the learner can SEE their
  *  AI usage ("x% of today's credits used"); it never blocks, throttles or
- *  degrades tutoring. Cloud answers keep flowing past the limit — the bar
+ *  degrades tutoring. Cloud answers keep flowing past the limit - the bar
  *  simply fills up and rolls over at zero the next day. Plan, syllabus and
  *  timer answers never touch it. */
 export const SHIGUN_DAILY_LIMIT = 100;
@@ -30,7 +30,7 @@ export type ShigunUsageState = {
    every single /api/chat request, which sent every question straight to
    the on-device engine and looked exactly like "the AI stopped working".
    Now the lib self-heals the table once when it can, and otherwise keeps
-   the counter in memory — a meter hiccup can never interrupt tutoring. */
+   the counter in memory - a meter hiccup can never interrupt tutoring. */
 
 const demoBuckets = new Map<number, { periodStart: string; used: number }>();
 
@@ -38,8 +38,8 @@ type HealState = "pending" | "ok" | "failed";
 const healGlobal = globalThis as typeof globalThis & { __shigunTableHeal?: HealState };
 
 /** One-time self-heal: create the table (and any later columns) when the
- *  deployed database predates the meter. Safe to run repeatedly — every
- *  statement is IF NOT EXISTS — and cached per server instance. */
+ *  deployed database predates the meter. Safe to run repeatedly - every
+ *  statement is IF NOT EXISTS - and cached per server instance. */
 async function ensureShigunTable(): Promise<boolean> {
   if (!pool) return false;
   if (healGlobal.__shigunTableHeal === "ok") return true;
@@ -62,7 +62,7 @@ async function ensureShigunTable(): Promise<boolean> {
     healGlobal.__shigunTableHeal = "ok";
     return true;
   } catch (error) {
-    // No DDL permission, or the database itself is unreachable — the
+    // No DDL permission, or the database itself is unreachable - the
     // in-memory fallback keeps the meter (and the tutor) alive.
     console.warn("Shigun usage table self-heal skipped:", error instanceof Error ? error.message : error);
     healGlobal.__shigunTableHeal = "failed";

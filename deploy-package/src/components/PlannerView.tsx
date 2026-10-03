@@ -40,7 +40,7 @@ import {
   remainingMinutes,
 } from "@/lib/studyTime";
 
-/* Two focused views — the Kanban board was retired in favour of the
+/* Two focused views - the Kanban board was retired in favour of the
    List + Calendar pair; kind is now communicated by icon, not column. */
 type View = "list" | "calendar";
 
@@ -59,7 +59,7 @@ function isCheckpointTask(task: TaskRow): boolean {
    • The calendar is ONE component that is designed for both ends of the
      range instead of a desktop grid that gets squeezed: below 900px a day
      cell carries its number, up to four kind dots and a count (indicators
-     live INSIDE the cell — nothing overflows the grid); from 900px up the
+     live INSIDE the cell - nothing overflows the grid); from 900px up the
      cells grow, gain title chips and a "+N more" tail, and the header swaps
      its stacked label for an inline month title with a kind legend.
    • Rows are the shared TaskCard, so the Planner list and the Overview's
@@ -180,7 +180,7 @@ export default function PlannerView({
   /* Week rows are built as complete 7-cell lines (leading and trailing blanks
      included) so the grid never depends on a browser's implicit placement, and
      a month that starts on Sunday is not a 6-row surprise. Kept as plain
-     derivation — 42 cells is cheaper to rebuild than to memoise. */
+     derivation - 42 cells is cheaper to rebuild than to memoise. */
   const weeks: (string | null)[][] = [];
   {
     let row: (string | null)[] = Array(firstDow).fill(null);
@@ -225,11 +225,11 @@ export default function PlannerView({
     setSelDay(today());
   };
 
-  /* Tapping a day opens that day's plan in the day sheet on every width — the
+  /* Tapping a day opens that day's plan in the day sheet on every width - the
      same interaction a phone uses. The old desktop path switched to List view
      and scrolled instead, gated by a VIEWPORT query (max-width: 900px) while
      the calendar itself is laid out by a CONTAINER query (min-width: 660px),
-     so a wide window over a compact card still redirected to List — reading
+     so a wide window over a compact card still redirected to List - reading
      as "the calendar is broken on desktop". */
   const pickDay = (dateKey: string) => {
     setSelDay(dateKey);
@@ -299,7 +299,7 @@ export default function PlannerView({
         </div>
       </Reveal>
 
-      {/* ── 1 · CALENDAR — the full month, built for every width ─────── */}
+      {/* ── 1 · CALENDAR - the full month, built for every width ─────── */}
       {view === "calendar" && (
         <Reveal>
           <section
@@ -423,7 +423,7 @@ export default function PlannerView({
                         key={dateKey}
                         onClick={() => pickDay(dateKey)}
                         aria-selected={isSel}
-                        aria-label={`${prettyLong(dateKey)} — ${dayTasks.length === 0 ? "no tasks" : `${dayTasks.length} task${dayTasks.length > 1 ? "s" : ""}${open ? `, ${open} open` : ""}`} ${isToday ? "(today)" : ""}`}
+                        aria-label={`${prettyLong(dateKey)} - ${dayTasks.length === 0 ? "no tasks" : `${dayTasks.length} task${dayTasks.length > 1 ? "s" : ""}${open ? `, ${open} open` : ""}`} ${isToday ? "(today)" : ""}`}
                         className={cn(
                           "cal-cell",
                           dayTasks.length === 0 && "is-empty",
@@ -508,7 +508,7 @@ export default function PlannerView({
         </Reveal>
       )}
 
-      {/* ── 2 · LIST — day groups of shared TaskCards ─────────────────── */}
+      {/* ── 2 · LIST - day groups of shared TaskCards ─────────────────── */}
       {view === "list" && (
         <div className="planner-list">
           {grouped.length === 0 && (
@@ -565,7 +565,7 @@ export default function PlannerView({
                           </span>
                         )}
                       </h2>
-                      {/* Same three numbers as before — now each carries the
+                      {/* Same three numbers as before - now each carries the
                           icon that says what it is, so the row is scannable
                           at a glance instead of a run of bare digits. */}
                       <p className="day-meta">
@@ -743,7 +743,7 @@ export default function PlannerView({
               })}
               {(tasksByDate.get(openDay) || []).length === 0 && (
                 <p className="day-sheet-empty">
-                  Nothing scheduled — a quiet day is allowed.
+                  Nothing scheduled - a quiet day is allowed.
                 </p>
               )}
             </div>

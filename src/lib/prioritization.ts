@@ -1,10 +1,10 @@
 // ============================================================
-//  STUDY PLANNER PRO — src/lib/prioritization.ts
+//  STUDY PLANNER PRO - src/lib/prioritization.ts
 //  One deterministic "what should I do now?" decision, shared by
 //  the Dashboard hero, the AI tutor's live plan context, the
 //  command palette, and future notification surfaces.
 //
-//  The learner never sees a score — only a label:
+//  The learner never sees a score - only a label:
 //      "Start here" · "Continue with this" · "Best next step"
 //
 //  Ordering is fully deterministic: score (desc), then date (asc),
@@ -30,7 +30,7 @@ export type PriorityReason =
   | "later";
 
 export type PrioritizedTask = TaskRow & {
-  /** Internal ranking weight — never shown to the learner. */
+  /** Internal ranking weight - never shown to the learner. */
   score: number;
   /** The dominant factor behind the rank. */
   reason: PriorityReason;
@@ -49,10 +49,10 @@ export type PrioritizeOptions = {
   remainingTodayMinutes?: number | null;
 };
 
-/** Short human phrase for each reason — used by the Dashboard and the AI. */
+/** Short human phrase for each reason - used by the Dashboard and the AI. */
 export function reasonLabel(reason: PriorityReason): string {
   switch (reason) {
-    case "overdue": return "Overdue — catch up";
+    case "overdue": return "Overdue - catch up";
     case "revision": return "Revision due";
     case "due-today": return "Due today";
     case "due-soon": return "Due soon";
@@ -139,7 +139,7 @@ export function scoreTask(
 
 /**
  * Ranks every PENDING task into a deterministic priority order.
- * Completed and skipped tasks are excluded — the plan only asks about
+ * Completed and skipped tasks are excluded - the plan only asks about
  * work that still needs doing.
  */
 export function prioritizeTasks(
@@ -195,7 +195,7 @@ export function nextAction(
 
 /**
  * Subjects tied at the lowest syllabus completion (done/total). The learner's
- * weakest subjects — used to boost their tasks in the ranking.
+ * weakest subjects - used to boost their tasks in the ranking.
  */
 export function weakestSubjectIds(
   subjects: readonly { id: number; done: number; total: number }[]

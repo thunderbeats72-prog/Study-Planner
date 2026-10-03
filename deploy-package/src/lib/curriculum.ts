@@ -63,7 +63,7 @@ const s = (
 ): SeedSubject => ({ name, units, difficulty, color });
 
 /* ============================================================
-   NMIMS CDOE MBA — SEMESTER 1 GROUND TRUTH (VERIFIED)
+   NMIMS CDOE MBA - SEMESTER 1 GROUND TRUTH (VERIFIED)
    Transcribed from official physical NMIMS CDOE textbooks.
    This catalog is the single source of truth: subjects, unit
    counts (12+12+12+16+12+12 = 76) and chapter titles are LOCKED.
@@ -198,7 +198,7 @@ export const NMIMS_SEM1_CATALOG: NmimsSubject[] = [
   },
 ];
 
-/** Exact SeedSubject array (chapters stripped) — 6 subjects, 76 units. */
+/** Exact SeedSubject array (chapters stripped) - 6 subjects, 76 units. */
 export function nmimsSem1Subjects(): SeedSubject[] {
   return NMIMS_SEM1_CATALOG.map((x) => ({
     name: x.name,
@@ -212,7 +212,7 @@ export function nmimsSem1Subjects(): SeedSubject[] {
 export function isNmimsQuery(q: string): boolean {
   const s = q || "";
   // If a DIFFERENT institution is explicitly named, this is not an
-  // NMIMS query even if it mentions "MBA marketing" — that syllabus
+  // NMIMS query even if it mentions "MBA marketing" - that syllabus
   // belongs to the named university, not the NMIMS catalog.
   if (/university|college|institute|iim\b|school of/i.test(s) && !/nmims|cdoe|nga[\s.-]?sce/i.test(s)) {
     return false;
@@ -222,7 +222,7 @@ export function isNmimsQuery(q: string): boolean {
 
 /**
  * Exact textbook chapter titles for a verified NMIMS subject, or null.
- * Uses strict normalised-name equality — never fuzzy matching — so
+ * Uses strict normalised-name equality - never fuzzy matching - so
  * "Quantitative Methods - I" can never collide with "Quantitative Aptitude".
  */
 export function getNmimsChapters(subjectName: string): string[] | null {
@@ -232,7 +232,7 @@ export function getNmimsChapters(subjectName: string): string[] | null {
 }
 
 /* ============================================================
-   CBSE / NCERT GROUND TRUTH — Classes 9 & 10 (rationalised NCERT
+   CBSE / NCERT GROUND TRUTH - Classes 9 & 10 (rationalised NCERT
    syllabus). Chapter titles transcribed from the official NCERT
    textbook contents pages (publicly published). Same lock rules
    as the NMIMS catalog: strict-equality topic resolution, never
@@ -277,7 +277,7 @@ export const CBSE_CATALOGS: Record<string, CbseSubject[]> = {
       ],
     },
     {
-      name: "English (Class 10 — First Flight & Footprints)", units: 10, difficulty: "Medium", color: "#8B5CF6",
+      name: "English (Class 10 - First Flight & Footprints)", units: 10, difficulty: "Medium", color: "#8B5CF6",
       chapters: [
         "A Letter to God / Nelson Mandela: Long Walk to Freedom",
         "Two Stories about Flying / From the Diary of Anne Frank",
@@ -291,7 +291,7 @@ export const CBSE_CATALOGS: Record<string, CbseSubject[]> = {
       ],
     },
     {
-      name: "Hindi (Class 10 — Sparsh & Sanchayan)", units: 10, difficulty: "Medium", color: "#E05252",
+      name: "Hindi (Class 10 - Sparsh & Sanchayan)", units: 10, difficulty: "Medium", color: "#E05252",
       chapters: [
         "साखी (कबीर) / पद (मीरा)", "दोहे (बिहारी) / मनुष्यता (मैथिलीशरण गुप्त)",
         "पर्वत प्रदेश में पावस / मधुर-मधुर मेरे दीपक जल",
@@ -304,9 +304,9 @@ export const CBSE_CATALOGS: Record<string, CbseSubject[]> = {
       ],
     },
     {
-      name: "Information Technology (Class 10 — CBSE 402)", units: 5, difficulty: "Easy", color: "#0D9488",
+      name: "Information Technology (Class 10 - CBSE 402)", units: 5, difficulty: "Easy", color: "#0D9488",
       chapters: [
-        "Digital Documentation (Advanced) — Word Processing",
+        "Digital Documentation (Advanced) - Word Processing",
         "Electronic Spreadsheet (Advanced)",
         "Database Management System (Base)",
         "Web Applications and Security",
@@ -347,7 +347,7 @@ export const CBSE_CATALOGS: Record<string, CbseSubject[]> = {
       ],
     },
     {
-      name: "English (Class 9 — Beehive & Moments)", units: 10, difficulty: "Easy", color: "#8B5CF6",
+      name: "English (Class 9 - Beehive & Moments)", units: 10, difficulty: "Easy", color: "#8B5CF6",
       chapters: [
         "The Fun They Had / The Sound of Music", "The Little Girl / A Truly Beautiful Mind",
         "The Snake and the Mirror / My Childhood", "Reach for the Top / Kathmandu",
@@ -360,7 +360,7 @@ export const CBSE_CATALOGS: Record<string, CbseSubject[]> = {
       ],
     },
     {
-      name: "Hindi (Class 9 — Sparsh & Sanchayan)", units: 9, difficulty: "Easy", color: "#E05252",
+      name: "Hindi (Class 9 - Sparsh & Sanchayan)", units: 9, difficulty: "Easy", color: "#E05252",
       chapters: [
         "दुख का अधिकार / एवरेस्ट: मेरी शिखर यात्रा", "तुम कब जाओगे, अतिथि / वैज्ञानिक चेतना के वाहक",
         "धर्म की आड़ / शुक्रतारे के समान",
@@ -372,11 +372,11 @@ export const CBSE_CATALOGS: Record<string, CbseSubject[]> = {
       ],
     },
     {
-      name: "Information Technology (Class 9 — CBSE 402)", units: 4, difficulty: "Easy", color: "#0D9488",
+      name: "Information Technology (Class 9 - CBSE 402)", units: 4, difficulty: "Easy", color: "#0D9488",
       chapters: [
         "Introduction to IT–ITeS Industry",
-        "Digital Documentation — Word Processing Basics",
-        "Electronic Spreadsheet — Basics",
+        "Digital Documentation - Word Processing Basics",
+        "Electronic Spreadsheet - Basics",
         "Digital Presentation + Employability Skills",
       ],
     },
@@ -410,7 +410,7 @@ export function getCbseChapters(subjectName: string): string[] | null {
 }
 
 /* ============================================================
-   AMITY ONLINE MBA — Semester 1 & 2 (subject list verified from
+   AMITY ONLINE MBA - Semester 1 & 2 (subject list verified from
    amityonline.com published syllabus). Unit counts are reasonable
    defaults pending official-material verification.
 ============================================================ */
@@ -497,7 +497,7 @@ export const COURSE_DB: Record<string, Course> = {
   },
   class_12_pcm: {
     id: "class_12_pcm",
-    name: "Class 12 — Science (PCM)",
+    name: "Class 12 - Science (PCM)",
     level: "school",
     subjects: [
       s("Physics", 14, "Hard", B),
@@ -509,7 +509,7 @@ export const COURSE_DB: Record<string, Course> = {
   },
   class_12_pcb: {
     id: "class_12_pcb",
-    name: "Class 12 — Science (PCB)",
+    name: "Class 12 - Science (PCB)",
     level: "school",
     subjects: [
       s("Physics", 14, "Hard", B),
@@ -520,7 +520,7 @@ export const COURSE_DB: Record<string, Course> = {
   },
   class_12_commerce: {
     id: "class_12_commerce",
-    name: "Class 12 — Commerce",
+    name: "Class 12 - Commerce",
     level: "school",
     subjects: [
       s("Accountancy", 12, "Hard", B),
@@ -605,7 +605,7 @@ export const COURSE_DB: Record<string, Course> = {
   },
   bba: {
     id: "bba",
-    name: "BBA — Business Administration",
+    name: "BBA - Business Administration",
     level: "ug",
     subjects: [
       s("Principles of Management", 8, "Easy", B),
@@ -629,19 +629,19 @@ export const COURSE_DB: Record<string, Course> = {
   },
   nmims_mba_sem1: {
     id: "nmims_mba_sem1",
-    name: "NMIMS CDOE MBA — Semester 1",
+    name: "NMIMS CDOE MBA - Semester 1",
     level: "pg",
     subjects: nmimsSem1Subjects(),
   },
   amity_mba_sem1: {
     id: "amity_mba_sem1",
-    name: "Amity Online MBA — Semester 1",
+    name: "Amity Online MBA - Semester 1",
     level: "pg",
     subjects: AMITY_MBA_SEM1.map((x) => ({ ...x })),
   },
   mba: {
     id: "mba",
-    name: "MBA — Master of Business Administration",
+    name: "MBA - Master of Business Administration",
     level: "pg",
     subjects: [
       s("Strategic Management", 8, "Hard", B),
@@ -738,7 +738,7 @@ export const COURSE_DB: Record<string, Course> = {
   },
   gate_cse: {
     id: "gate_cse",
-    name: "GATE — Computer Science",
+    name: "GATE - Computer Science",
     level: "competitive",
     subjects: [
       s("Algorithms & Data Structures", 10, "Hard", P),
@@ -856,7 +856,7 @@ export const TOPIC_BANK: Record<string, string[]> = {
   "science": ["Matter in our surroundings", "Atoms & molecules", "Structure of the atom", "Chemical reactions & equations", "Acids, bases & salts", "Metals & non-metals", "Carbon & its compounds", "Life processes", "Control & coordination", "Heredity & evolution", "Light: reflection & refraction", "Electricity & magnetic effects", "Sources of energy & environment"],
   "social science": ["Rise of nationalism in Europe", "Nationalism in India", "The making of a global world", "Resources & development", "Water & agriculture", "Minerals & energy resources", "Power sharing & federalism", "Democracy & diversity", "Political parties & outcomes", "Development economics", "Sectors of the Indian economy", "Money, credit & globalisation"],
   "english": ["Reading comprehension strategies", "Grammar: tenses & verbs", "Grammar: modals & voice", "Sentence transformation", "Vocabulary & word power", "Formal letter writing", "Article & report writing", "Poetry appreciation", "Prose analysis", "Speaking & listening practice"],
-  "hindi": ["गद्य खंड — पाठ अध्ययन", "पद्य खंड — कविता विश्लेषण", "व्याकरण — संधि व समास", "व्याकरण — अलंकार व रस", "अपठित गद्यांश", "पत्र लेखन", "निबंध लेखन"],
+  "hindi": ["गद्य खंड - पाठ अध्ययन", "पद्य खंड - कविता विश्लेषण", "व्याकरण - संधि व समास", "व्याकरण - अलंकार व रस", "अपठित गद्यांश", "पत्र लेखन", "निबंध लेखन"],
   "computer": ["Computer fundamentals", "Operating system basics", "Word processing", "Spreadsheets & formulas", "Presentations", "Internet & safety", "Introduction to coding"],
 
   "data structures": ["Complexity analysis & Big-O", "Arrays & strings", "Linked lists", "Stacks & queues", "Recursion & backtracking", "Trees & BST", "Heaps & priority queues", "Hashing", "Graphs: BFS/DFS", "Shortest paths & MST", "Sorting algorithms", "Searching & binary search patterns", "Greedy algorithms", "Dynamic programming", "Tries & advanced structures"],
@@ -896,7 +896,7 @@ export const TOPIC_BANK: Record<string, string[]> = {
   "geography": ["Geomorphology", "Climatology", "Oceanography", "Indian physiography", "Indian climate & monsoon", "Drainage systems", "Soils & agriculture", "Mineral & industrial geography", "Population & settlement", "Map-based practice"],
   "environment": ["Ecosystem & energy flow", "Biodiversity & hotspots", "Conservation efforts & acts", "Climate change & IPCC", "Pollution & control", "Sustainable development goals", "Environmental institutions"],
   "current affairs": ["Weekly news digest", "Government schemes tracker", "International relations", "Economy & budget updates", "Science & tech updates", "Essay structuring practice", "Answer writing practice"],
-  "law": ["Indian Contract Act — essentials", "Special contracts", "Sale of Goods Act", "Partnership & LLP", "Companies Act: incorporation", "Companies Act: management", "Negotiable Instruments Act", "Interpretation of statutes"],
+  "law": ["Indian Contract Act - essentials", "Special contracts", "Sale of Goods Act", "Partnership & LLP", "Companies Act: incorporation", "Companies Act: management", "Negotiable Instruments Act", "Interpretation of statutes"],
   "auditing": ["Nature & scope of audit", "Audit planning & documentation", "Risk assessment & internal control", "Audit evidence & sampling", "Audit of items in financial statements", "Company audit", "Audit report", "Special audits"],
   "ethical": ["Code of ethics & standards", "Professional conduct programme", "GIPS overview", "Ethics case applications"],
   "anatomy": ["General anatomy & terminology", "Upper limb", "Lower limb", "Thorax", "Abdomen", "Head & neck", "Neuroanatomy", "Histology basics", "Embryology basics"],
@@ -932,8 +932,8 @@ export const TOPIC_BANK: Record<string, string[]> = {
 
 const KIND_SUFFIX: Record<string, string> = {
   learn: "",
-  revise: " — Revision",
-  practice: " — Practice Set",
+  revise: " - Revision",
+  practice: " - Practice Set",
 };
 
 export function normalise(str: string): string {
@@ -1113,14 +1113,14 @@ const GENERIC_TEMPLATES = [
   "Core principles of {S}",
   "Classification & frameworks in {S}",
   "Analytical methods in {S}",
-  "Problem solving techniques — {S}",
+  "Problem solving techniques - {S}",
   "Applications & case studies in {S}",
   "Common mistakes & exam traps in {S}",
   "Advanced concepts in {S}",
-  "Integration with related subjects — {S}",
-  "Full syllabus consolidation — {S}",
-  "Rapid recall sheet — {S}",
-  "Previous-year question drill — {S}",
+  "Integration with related subjects - {S}",
+  "Full syllabus consolidation - {S}",
+  "Rapid recall sheet - {S}",
+  "Previous-year question drill - {S}",
 ];
 
 export function advancedTopicMetadata({
@@ -1181,11 +1181,11 @@ export function generateTopics(
   const titles: string[] = [];
   if (bank) {
     const extend = [
-      `Applied case study — ${subjectName}`,
-      `Problem set & numericals — ${subjectName}`,
-      `Previous-year questions — ${subjectName}`,
-      `Rapid revision & recall — ${subjectName}`,
-      `Integration & mock test — ${subjectName}`,
+      `Applied case study - ${subjectName}`,
+      `Problem set & numericals - ${subjectName}`,
+      `Previous-year questions - ${subjectName}`,
+      `Rapid revision & recall - ${subjectName}`,
+      `Integration & mock test - ${subjectName}`,
     ];
     for (let i = 0; i < unitCount; i++) {
       if (i < bank.length) titles.push(bank[i]);
@@ -1246,7 +1246,7 @@ function buildKeyConcepts(
   depth: GeneratedTopic["depth"]
 ): string[] {
   const titleConcepts = title
-    .split(/[:—,&/]|\band\b/i)
+    .split(/[:,&/-]|\band\b/i)
     .map((part) => part.trim())
     .filter((part) => part.length > 2)
     .slice(0, 3);
@@ -1456,8 +1456,8 @@ const RULES: Rule[] = [
     sub("English Language", 9, "Medium"), sub("General & Banking Awareness", 10, "Medium"),
     sub("Computer Aptitude", 6, "Easy")] },
   { match: /\bgate\b/i, subjects: [
-    sub("Engineering Mathematics", 9, "Hard"), sub("Core Subject — Part A", 12, "Hard"),
-    sub("Core Subject — Part B", 12, "Hard"), sub("General Aptitude", 6, "Medium"),
+    sub("Engineering Mathematics", 9, "Hard"), sub("Core Subject - Part A", 12, "Hard"),
+    sub("Core Subject - Part B", 12, "Hard"), sub("General Aptitude", 6, "Medium"),
     sub("Previous Year Problem Solving", 8, "Hard")] },
   { match: /\bcat\b|\bxat\b|\bmat\b|\bsnap\b|\bnmat\b|mba entrance/i, subjects: [
     sub("Quantitative Ability", 12, "Hard"), sub("Verbal Ability & Reading Comprehension", 10, "Hard"),
@@ -1542,11 +1542,11 @@ function nameDerived(courseName: string): SeedSubject[] {
     .trim();
   const topic = (clean || "Your Course").replace(/\b\w/g, (m) => m.toUpperCase()).slice(0, 42);
   return [
-    sub(`${topic} — Foundations`, 7, "Easy"),
-    sub(`${topic} — Core Theory`, 9, "Hard"),
-    sub(`${topic} — Techniques & Methods`, 8),
-    sub(`${topic} — Applications & Case Studies`, 7),
-    sub(`${topic} — Practice & Assessment`, 6),
+    sub(`${topic} - Foundations`, 7, "Easy"),
+    sub(`${topic} - Core Theory`, 9, "Hard"),
+    sub(`${topic} - Techniques & Methods`, 8),
+    sub(`${topic} - Applications & Case Studies`, 7),
+    sub(`${topic} - Practice & Assessment`, 6),
   ];
 }
 
@@ -1558,7 +1558,7 @@ export function synthesiseSubjects(courseName: string, level: string): SeedSubje
   // Any explicit NMIMS/CDOE query with no semester (or semester 1)
   // ALWAYS returns the verified Semester 1 catalog:
   // exactly 6 subjects, exactly 76 units (12+12+12+16+12+12), with
-  // the locked colors — bypassing every heuristic below.
+  // the locked colors - bypassing every heuristic below.
   if (isAmityQuery(q)) {
     const { sem } = detectSemester(q);
     if (sem === 2) return AMITY_MBA_SEM2.map((x) => ({ ...x }));

@@ -10,11 +10,11 @@ import React from "react";
  * a near-black room, Mint a cool green one, Sunset a warm amber one, and the
  * light themes a *light-tinted* room with dark ink (never white text on white
  * walls). That is the difference between "Zen adapts to the theme" and "a dark
- * overlay is pasted on top of the theme" — this scene used to be fixed navy +
+ * overlay is pasted on top of the theme" - this scene used to be fixed navy +
  * violet, which is why Zen looked like a different product.
  *
- * Motion classes (`zen-scene__*`) stay intentionally slow and tiny — a
- * breathing lamp halo and a leaf that barely stirs — and are switched off by
+ * Motion classes (`zen-scene__*`) stay intentionally slow and tiny - a
+ * breathing lamp halo and a leaf that barely stirs - and are switched off by
  * the `prefers-reduced-motion` guards in `ui-system.css`.
  */
 export default function ZenScene({ className = "" }: { className?: string }) {
@@ -338,7 +338,7 @@ export default function ZenScene({ className = "" }: { className?: string }) {
           />
         </g>
 
-        {/* drifting motes — the only movement that crosses the whole scene */}
+        {/* drifting motes - the only movement that crosses the whole scene */}
         <g className="zen-scene__motes" fill="var(--zen-motes)" opacity=".55">
           <circle cx="470" cy="60" r="2.4" />
           <circle cx="720" cy="42" r="1.8" />

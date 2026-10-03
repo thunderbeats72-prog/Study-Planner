@@ -1,12 +1,13 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { THEMES, type AppState } from "@/lib/client";
+import { THEMES, type AccountInfo, type AppState } from "@/lib/client";
 import {
   IconCheck, IconClose, IconDownload, IconGear, IconMoon, IconPalette,
   IconRefresh, IconSpark, IconTarget, IconTrash, IconUser, IconVolume, IconWarn,
 } from "./icons";
 import { PageHead, Select } from "./bits";
+import AccountCard from "./AccountCard";
 import AiCoachCard from "./AiCoachCard";
 import ShigunCreditCard from "./ShigunCreditCard";
 import { StudioScene } from "./Illustrations";
@@ -26,13 +27,19 @@ const THEME_SWATCH: Record<string, { bg: string; accent: string; sub: string }> 
 
 export default function SettingsView({
   state,
+  account,
   onPatch,
   onRestart,
+  onSignOut,
   busy,
 }: {
   state: AppState;
+  /** The signed-in account, or null in a database-less preview. */
+  account: AccountInfo | null;
   onPatch: (patch: Record<string, unknown>, replan?: boolean) => void;
   onRestart: () => void;
+  /** Leave this device (optionally every other one too). */
+  onSignOut: (everywhere?: boolean) => void | Promise<void>;
   busy: boolean;
 }) {
   const s = state.settings;
@@ -94,7 +101,7 @@ export default function SettingsView({
       <PageHead
         eyebrow="SETTINGS"
         title="Tune the studio"
-        sub="Personalise your pace, theme, learning style, and study rhythm — everything persists locally on this device."
+        sub="Personalise your pace, theme, learning style, and study rhythm - saved to your account, so every device you sign in on matches."
         artLive
         art={
           /* A console that mirrors the state this page writes: the active
@@ -198,6 +205,11 @@ export default function SettingsView({
           </Spot>
         </Reveal>
 
+        {/* ── 1b. ACCOUNT & SYNC ──
+            The credentials that make this plan portable: who is signed in,
+            which devices are open on it, password changes, and sign-out. */}
+        <AccountCard account={account} onSignOut={onSignOut} />
+
         {/* ── 2. APPEARANCE & THEMES CARD ── */}
         <Reveal delay={60}>
           <Spot className="glass-panel tilt-card section-card p-5 sm:p-6 space-y-4">
@@ -244,7 +256,7 @@ export default function SettingsView({
         {/* ── 2b. AI COACH / CONNECTIVITY ──
             Status only: SHIGUN runs on the deployment's own environment
             keys with automatic provider failover. Learners never enter a
-            key — this card shows the live connection state and today's AI
+            key - this card shows the live connection state and today's AI
             usage meter. */}
         <Reveal delay={70}>
           <Spot className="glass-panel tilt-card section-card p-5 sm:p-6 space-y-4">

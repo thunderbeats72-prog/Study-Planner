@@ -7,26 +7,26 @@ import { checkRateLimit, clearRateLimit } from "@/lib/rateLimit";
 import {
   getShigunUsage, resetShigunUsage, SHIGUN_DAILY_LIMIT,
 } from "@/lib/shigunUsage";
-import { getOrCreateUser, keyFrom } from "@/lib/state";
+import { requireUser } from "@/lib/auth";
 import { withDbGuard } from "@/lib/routeGuard";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
 /**
- * SHIGUN credit meter — one endpoint, two verbs.
+ * SHIGUN credit meter - one endpoint, two verbs.
  *
- * GET  — the learner's allowance for today (used/limit/remaining), plus the
+ * GET  - the learner's allowance for today (used/limit/remaining), plus the
  *        live provider/relay quota state the tutor is actually working with:
  *        which legs are on cooldown (rate-limited providers with seconds
  *        left), the last real request's health, and whether the free relay
  *        is allowed. No keys, no raw provider internals.
- * POST — `{ action: "reset" }` refills the allowance, forgets remembered
+ * POST - `{ action: "reset" }` refills the allowance, forgets remembered
  *        provider failures and clears the per-minute rate-limit bucket, so a
  *        learner whose credit is exhausted can resume tutoring immediately.
  */
 export const GET = withDbGuard(async function get(req: Request) {
-  const user = await getOrCreateUser(keyFrom(req));
+  const user = await requireUser(req);
   const usage = await getShigunUsage(user.id);
   const keys = parseRuntimeKeys(req.headers.get("x-ai-keys"));
   return NextResponse.json(payload(usage, keys), { headers: { "cache-control": "no-store" } });
@@ -50,7 +50,7 @@ export const POST = withDbGuard(async function post(req: Request) {
     );
   }
 
-  const user = await getOrCreateUser(keyFrom(req));
+  const user = await requireUser(req);
   const usage = await resetShigunUsage(user.id);
   resetAiCooldowns();
   clearRateLimit(req, "chat");
