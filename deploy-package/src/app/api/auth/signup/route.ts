@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { createAccount, publicAccount } from "@/lib/auth";
+import { createAccount, issueEmailToken, publicAccount } from "@/lib/auth";
+import { originFrom } from "@/lib/google";
+import { sendVerificationMail } from "@/lib/verificationMail";
 import { checkRateLimit } from "@/lib/rateLimit";
 import { readJsonObject, validationPayload } from "@/lib/validation";
 import { guardResponse } from "@/lib/routeGuard";
@@ -48,12 +50,28 @@ export async function POST(req: Request) {
       username: body.username,
       password: body.password,
       name: body.name,
+      email: body.email,
     });
+    /* The address they just typed gets its verification link immediately.
+       A mail failure (or a not-yet-configured mailer) never blocks account
+       creation - Settings shows the unverified state and a Resend button. */
+    let verification: { ok: boolean; dryRun?: boolean } = { ok: false };
+    try {
+      const token = await issueEmailToken(user.id, user.email!);
+      verification = await sendVerificationMail(
+        user.email!,
+        `${originFrom(req)}/api/auth/verify-email?token=${encodeURIComponent(token)}`,
+      );
+    } catch (mailError) {
+      console.warn("Verification mail at signup skipped:", mailError instanceof Error ? mailError.message : mailError);
+    }
     return NextResponse.json(
       {
         created: true,
         account: publicAccount(user),
         claimedExistingPlan,
+        verificationSent: verification.ok,
+        verificationDryRun: verification.dryRun === true,
         /* What the client should do next, said out loud. */
         next: "signin",
       },

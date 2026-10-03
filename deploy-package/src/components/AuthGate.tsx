@@ -9,8 +9,9 @@ import {
   usernameProblem,
   USERNAME_MAX,
 } from "@/lib/authRules";
+import { emailProblem } from "@/lib/emailRules";
 import {
-  IconArrowRight, IconCheck, IconLock, IconLogo, IconShield, IconSpark, IconUser, IconWarn,
+  IconArrowRight, IconCheck, IconGoogle, IconLock, IconLogo, IconMail, IconShield, IconSpark, IconUser, IconWarn,
 } from "./icons";
 import { cn } from "@/lib/cn";
 
@@ -23,12 +24,15 @@ type SignupResponse = {
   created?: boolean;
   account?: { username: string; name: string } | null;
   claimedExistingPlan?: boolean;
+  verificationSent?: boolean;
 };
 type MeResponse = {
   authenticated: boolean;
   preview?: boolean;
   accountsReady?: boolean;
   error?: string;
+  /** Google sign-in keys configured on the server: the button exists only then. */
+  googleSignIn?: boolean;
 };
 
 /**
@@ -67,6 +71,7 @@ export default function AuthGate({
     }
   });
   const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -84,6 +89,32 @@ export default function AuthGate({
   const fieldId = useId();
 
   const isSignup = mode === "signup";
+
+  useEffect(() => {
+    // A Google sign-in detour ends by dropping the learner back here with a
+    // short reason code in the address bar. Show it as a normal form error,
+    // then clean the URL so a refresh does not repeat the complaint.
+    if (typeof window === "undefined") return;
+    const search = window.location?.search || "";
+    if (!search) return;
+    const params = new URLSearchParams(search);
+    if (params.get("signin") !== "google") return;
+    const reason = params.get("reason") || "";
+    const messages: Record<string, string> = {
+      cancelled: "Google sign-in was cancelled.",
+      state_mismatch: "That Google sign-in expired before it finished. Try again.",
+      expired: "That Google sign-in expired before it finished. Try again.",
+      email_taken: "A password account already uses that Gmail address. Sign in with your username or email and password instead.",
+      email_unverified: "Google did not confirm that email address, so it cannot be used here.",
+      failed: "Google sign-in did not finish. Try again in a moment.",
+    };
+    const message = messages[reason] || "Google sign-in did not finish. Try again in a moment.";
+    void Promise.resolve().then(() => {
+      setMode("signin");
+      setError(message);
+    });
+    window.history.replaceState(null, "", window.location.pathname);
+  }, []);
 
   useEffect(() => {
     // Ask once whether accounts are even possible here (a preview without a
@@ -114,6 +145,10 @@ export default function AuthGate({
     () => (isSignup && username ? usernameProblem(username) : null),
     [isSignup, username],
   );
+  const emailIssue = useMemo(
+    () => (isSignup && email ? emailProblem(email) : null),
+    [isSignup, email],
+  );
   const passwordIssue = useMemo(
     () => (isSignup && password ? passwordProblem(password, username) : null),
     [isSignup, password, username],
@@ -138,7 +173,7 @@ export default function AuthGate({
 
     const name = normalizeUsername(username);
     if (isSignup) {
-      const issue = usernameProblem(username) || passwordProblem(password, username);
+      const issue = usernameProblem(username) || emailProblem(email) || passwordProblem(password, username);
       if (issue) {
         setError(issue);
         return;
@@ -148,7 +183,7 @@ export default function AuthGate({
         return;
       }
     } else if (!name || !password) {
-      setError("Enter your username and password.");
+      setError("Enter your username or email and password.");
       return;
     }
 
@@ -163,6 +198,7 @@ export default function AuthGate({
             username: username.trim(),
             password,
             name: displayName.trim() || undefined,
+            email: email.trim(),
           }),
           timeoutMs: 30_000,
           skipAuthRedirect: true,
@@ -263,7 +299,8 @@ export default function AuthGate({
               <IconCheck size={15} />
               <span>
                 Account <strong>{justCreated.username}</strong> created. Sign in with it to open
-                your planner.
+                your planner. A verification link is on its way to your email - the app works
+                without it, but the daily digest needs it.
               </span>
             </div>
           )}
@@ -290,7 +327,7 @@ export default function AuthGate({
           <form className="auth-form" onSubmit={submit} noValidate>
             <div className="auth-field">
               <label className="lbl" htmlFor={`${fieldId}-username`}>
-                Username
+                {isSignup ? "Username" : "Username or email"}
               </label>
               <div className="auth-input-wrap">
                 <span className="auth-input-icon" aria-hidden="true">
@@ -301,14 +338,14 @@ export default function AuthGate({
                   ref={usernameRef}
                   className="input-field auth-input"
                   value={username}
-                  onChange={(e) => setUsername(e.target.value.slice(0, USERNAME_MAX + 6))}
+                  onChange={(e) => setUsername(e.target.value.slice(0, USERNAME_MAX + 120))}
                   autoComplete="username"
                   autoCapitalize="none"
                   autoCorrect="off"
                   spellCheck={false}
-                  inputMode="text"
+                  inputMode={isSignup ? "text" : "email"}
                   name="username"
-                  placeholder={isSignup ? "Pick a username" : "Your username"}
+                  placeholder={isSignup ? "Pick a username" : "Your username or email"}
                   aria-invalid={!!usernameIssue}
                   disabled={busy}
                 />
@@ -320,6 +357,38 @@ export default function AuthGate({
                 </p>
               )}
             </div>
+
+            {isSignup && (
+              <div className="auth-field">
+                <label className="lbl" htmlFor={`${fieldId}-email`}>
+                  Email address
+                </label>
+                <div className="auth-input-wrap">
+                  <span className="auth-input-icon" aria-hidden="true">
+                    <IconMail size={15} />
+                  </span>
+                  <input
+                    id={`${fieldId}-email`}
+                    className="input-field auth-input"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value.slice(0, 165))}
+                    autoComplete="email"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    inputMode="email"
+                    name="email"
+                    type="email"
+                    placeholder="you@example.com"
+                    aria-invalid={!!emailIssue}
+                    disabled={busy}
+                  />
+                </div>
+                <p className={cn("auth-hint", emailIssue && "auth-hint-bad")}>
+                  {emailIssue || "For the daily digest and sign-in. Verified once, never shown to anyone else."}
+                </p>
+              </div>
+            )}
 
             {isSignup && (
               <div className="auth-field">
@@ -443,6 +512,24 @@ export default function AuthGate({
               )}
             </button>
           </form>
+
+          {/* Google sign-in: the server decides whether it is configured
+              (/api/auth/me → googleSignIn). Without keys there is no button
+              at all - a hidden door, never a dead one. */}
+          {service?.googleSignIn === true && !offline && !preview && (
+            <div className="auth-google">
+              <div className="auth-divider" role="separator">
+                <span>or</span>
+              </div>
+              <a className="btn btn-secondary auth-google-btn" href="/api/auth/google/start">
+                <IconGoogle size={16} />
+                Continue with Google
+              </a>
+              <p className="auth-hint auth-google-hint">
+                One account per Google email - an existing plan opens on its own.
+              </p>
+            </div>
+          )}
 
           <div className="auth-switch">
             {isSignup ? (

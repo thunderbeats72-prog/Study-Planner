@@ -8,6 +8,7 @@ import {
 } from "./icons";
 import { PageHead, Select } from "./bits";
 import AccountCard from "./AccountCard";
+import NotificationsCard from "./NotificationsCard";
 import AiCoachCard from "./AiCoachCard";
 import ShigunCreditCard from "./ShigunCreditCard";
 import { StudioScene } from "./Illustrations";
@@ -31,6 +32,7 @@ export default function SettingsView({
   onPatch,
   onRestart,
   onSignOut,
+  onAccountChange,
   busy,
 }: {
   state: AppState;
@@ -40,6 +42,8 @@ export default function SettingsView({
   onRestart: () => void;
   /** Leave this device (optionally every other one too). */
   onSignOut: (everywhere?: boolean) => void | Promise<void>;
+  /** The account changed itself (email added, username renamed, ...). */
+  onAccountChange?: (account: AccountInfo) => void;
   busy: boolean;
 }) {
   const s = state.settings;
@@ -208,7 +212,12 @@ export default function SettingsView({
         {/* ── 1b. ACCOUNT & SYNC ──
             The credentials that make this plan portable: who is signed in,
             which devices are open on it, password changes, and sign-out. */}
-        <AccountCard account={account} onSignOut={onSignOut} />
+        <AccountCard account={account} onSignOut={onSignOut} onAccountChange={onAccountChange} />
+
+        {/* ── 1c. NOTIFICATIONS ──
+            Email + digest schedule + per-type toggles + quiet hours, on one
+            card - everything the app volunteers at you, and only that. */}
+        <NotificationsCard account={account} onAccountChange={onAccountChange} />
 
         {/* ── 2. APPEARANCE & THEMES CARD ── */}
         <Reveal delay={60}>

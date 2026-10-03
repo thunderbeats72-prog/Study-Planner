@@ -41,12 +41,30 @@ import {
   sessionTokenHash, verifyPassword,
 } from "../src/lib/auth";
 import { deviceLabel, keyFrom, newUserKey, USER_KEY_RE } from "../src/lib/identity";
+import NotificationCentre from "../src/components/NotificationCentre";
+import {
+  googleStart, checkOAuthState, pkceChallenge, claimsFromPayload,
+  verifyIdToken, __testSignIdToken,
+} from "../src/lib/google";
+import { generateKeyPairSync } from "node:crypto";
 import {
   backlogFor, backlogToDate, canFitToday, dailyCapacityMinutes, pendingOnDate,
   spreadAcrossDays, suggestedRecovery, todayOverload, GENTLE_EXTRA_PER_DAY,
 } from "../src/lib/recovery";
 import { validateQuickAdd, QUICK_ADD_KINDS } from "../src/lib/quickAdd";
 import { summarizeAttempts, userFacingAiNotice, localCurriculumReply } from "../src/app/api/chat/route";
+import {
+  defaultNotificationPrefs, mergeNotificationPrefs, inQuietHours,
+  localTimeAt, validTimezone, digestDue, weeklyDue,
+  signUnsubscribe, verifyUnsubscribe, unsubscribeUrlFor,
+} from "../src/lib/notifications";
+import { emailProblem, normalizeEmail } from "../src/lib/emailRules";
+import {
+  digestSubject, digestText, digestHtml, weeklySubject, weeklyText,
+  encouragementFor, weekdayName, type DigestInput, type WeeklyInput,
+} from "../src/lib/digest";
+import { resolveMailTransport, mailTransportStatus } from "../src/lib/mailer";
+import { buildMimeMessage } from "../src/lib/mime";
 import type { TaskRow } from "../src/lib/client";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, relative } from "node:path";
@@ -2897,6 +2915,15 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
     await fill("confirm-password", "SeptemberRain24");
     await submitForm();
 
+    /* Email is required to create the account now, so a blank box stops at
+       a helpful message without a network call - the learner can simply say
+       "no email" once and it is only suggested as a reminder address. */
+    check(/Add your email address/i.test(screenText()), "An account without an email is asked for one first");
+    check(!calls.some((call) => call.url.includes("/api/auth/signup")), "…before a single request leaves the device");
+
+    await fill("email", "nila@example.com");
+    await submitForm();
+
     check(calls.some((call) => call.url.includes("/api/auth/signup")), "Submitting the form creates the account");
     check(authed === null, "Creating an account does NOT walk straight into the planner");
     check(!byName("confirm-password") && byName("password")?.props.autoComplete === "current-password",
@@ -2937,7 +2964,434 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
     else Object.assign(globalThis, { localStorage: savedLocal });
   }
 
-  console.log("\n--- 18e. Plain words: no em dashes, no slogans ---\n");
+  console.log("\n--- 18f. Email + digest content ---\n");
+  {
+    // Addresses: comparable in lower case, trimmed, one address per account.
+    check(emailProblem("Arjun@Example.com") === null, "A normal address is accepted");
+    check(emailProblem("  arjun@example.com  ") === null, "Surrounding spaces are trimmed");
+    check(emailProblem("not-an-email") !== null, "A shapeless string is rejected");
+    check(normalizeEmail("  Arjun@Example.com ") === "arjun@example.com", "Stored form is trimmed and lower-cased");
+    check(validTimezone("Asia/Kolkata") === true, "A normal IANA timezone validates");
+    check(validTimezone("Mars/Olympus_Mons") === false, "A made-up timezone is rejected");
+
+    // Quiet hours: the default 22:00-07:00 wraps midnight correctly.
+    const defaults = defaultNotificationPrefs();
+    check(defaults.quietStart === 22 && defaults.quietEnd === 7, "Quiet hours default to 22:00-07:00");
+    check(inQuietHours(23, 22, 7) && inQuietHours(6, 22, 7) && !inQuietHours(12, 22, 7),
+      "Quiet hours wrap across midnight");
+    check(!inQuietHours(10, 10, 10), "Equal start and end turns quiet hours OFF");
+    check(mergeNotificationPrefs({ digestEnabled: false }).digestEnabled === false,
+      "Notification preferences merge stored values over the defaults");
+    check(mergeNotificationPrefs("not json").sendHour === defaults.sendHour,
+      "A corrupt stored blob falls back to the defaults whole");
+
+    // Local time math stands on IANA zones, not offsets: 7am UTC is 12:30
+    // in Kolkata, and the learner's calendar date is what they see.
+    const atKolkata = localTimeAt(new Date(Date.UTC(2026, 3, 14, 7, 0)), "Asia/Kolkata");
+    check(atKolkata.hour === 12 && atKolkata.minute === 30 && atKolkata.dateStr === "2026-04-14",
+      "7:00 UTC is 12:30 in Asia/Kolkata, same calendar day");
+
+    // Digest selection: send at/after the chosen local hour, never in quiet
+    // hours, never to an unverified or unsubscribed address, never twice.
+    const gate = { hasEmail: true, emailVerified: true, emailUnsubscribed: false };
+    const neverSent = () => false;
+    const sentToday = (localDate: string) => localDate === "2026-04-14";
+    const reasonOf = (decision: ReturnType<typeof digestDue>) =>
+      decision.send ? "sent" : decision.reason;
+    const duePrefs = mergeNotificationPrefs({ digestEnabled: true, sendHour: 8, timezone: "Asia/Kolkata", quietStart: 22, quietEnd: 7 });
+    const noonKolkata = new Date(Date.UTC(2026, 3, 14, 6, 30)); // 12:00 IST 14 Apr
+    const dueDecision = digestDue(gate, duePrefs, noonKolkata, neverSent);
+    check(dueDecision.send === true, "At the chosen hour the digest is due");
+    check(dueDecision.send === true && dueDecision.localDate === "2026-04-14",
+      "…keyed to the learner's local date so the idempotency row can dedupe");
+    const earlyKolkata = new Date(Date.UTC(2026, 3, 14, 2, 0)); // 07:30 IST, before 8
+    const earlyDecision = digestDue(gate, duePrefs, earlyKolkata, neverSent);
+    check(earlyDecision.send === false && earlyDecision.reason === "before_send_hour",
+      "Before the chosen hour it stays quiet");
+    const midnightKolkata = new Date(Date.UTC(2026, 3, 14, 16, 45)); // 22:15 IST, inside quiet hours
+    const quietDecision = digestDue(gate, duePrefs, midnightKolkata, neverSent);
+    check(quietDecision.send === false && quietDecision.reason === "quiet_hours",
+      "Quiet hours block the send outright");
+    check(reasonOf(digestDue({ ...gate, emailVerified: false }, duePrefs, noonKolkata, neverSent)) === "unverified",
+      "An unverified address never receives mail");
+    check(reasonOf(digestDue({ ...gate, emailUnsubscribed: true }, duePrefs, noonKolkata, neverSent)) === "unsubscribed",
+      "An unsubscribed learner never receives mail");
+    check(reasonOf(digestDue({ ...gate, hasEmail: false }, duePrefs, noonKolkata, neverSent)) === "no_email",
+      "A legacy account with no email is skipped, not hunted");
+    const offPrefs = mergeNotificationPrefs({ digestEnabled: false });
+    check(digestDue(gate, offPrefs, noonKolkata, neverSent).send === false, "The digest being off stays off");
+    check(reasonOf(digestDue(gate, duePrefs, noonKolkata, sentToday)) === "already_sent",
+      "The ledger row for today means: nothing goes again, even at another hour");
+
+    // The weekly mail is a Sunday evening, separately opted-in, affair.
+    // Sunday 2026-04-19 18:00 IST = 12:30 UTC.
+    const weeklyPrefs = mergeNotificationPrefs({ weeklyEmailEnabled: true, timezone: "Asia/Kolkata", quietStart: 22, quietEnd: 7 });
+    const sundayEvening = new Date(Date.UTC(2026, 3, 19, 12, 30));
+    check(weeklyDue(gate, weeklyPrefs, sundayEvening, neverSent).send === true, "The weekly mail fires Sunday evening local time");
+    const weekdayNoon = new Date(Date.UTC(2026, 3, 15, 6, 30)); // Wednesday
+    check(reasonOf(weeklyDue(gate, weeklyPrefs, weekdayNoon, neverSent)) === "not_sunday", "…and only on Sunday");
+    check(reasonOf(weeklyDue(gate, mergeNotificationPrefs({ weeklyEmailEnabled: false }), sundayEvening, neverSent)) === "weekly_off",
+      "…and only when its own separate opt-in is on");
+
+    // ── The digest reads like a helpful text, not an ad ────────────────
+    const today = "2026-04-14"; // a Tuesday
+    check(weekdayName(today) === "Tuesday", "Weekday maths is locale-proof");
+    const tasks: TaskRow[] = [
+      { id: 2, userId: 1, date: "2026-04-13", subjectId: 1, topicId: null, kind: "study", title: "Costing overhaul", detail: "", plannedMinutes: 60, actualMinutes: 0, status: "pending", position: 1 },
+      { id: 1, userId: 1, date: today, subjectId: 1, topicId: null, kind: "study", title: "Marginal costing sheet", detail: "", plannedMinutes: 45, actualMinutes: 0, status: "pending", position: 1 },
+      { id: 3, userId: 1, date: today, subjectId: 2, topicId: null, kind: "study", title: "Business economics quiz", detail: "", plannedMinutes: 30, actualMinutes: 30, status: "done", position: 2 },
+    ];
+    const input: DigestInput = {
+      name: "Arjun",
+      today,
+      weekday: weekdayName(today),
+      tasks,
+      subjects: [{ id: 1, name: "Cost Accounting" }, { id: 2, name: "Economics" }],
+      sessions: [{ date: "2026-04-13", minutes: 95 }],
+      dailyHours: 2,
+      examDate: "2026-05-10",
+      streak: 5,
+      appUrl: "https://planner.example.com",
+      unsubscribeUrl: "https://planner.example.com/api/email/unsubscribe?u=7&k=all&t=sig",
+    };
+    const subject = digestSubject(input);
+    const text = digestText(input);
+    const html = digestHtml(input);
+    check(subject.startsWith("Tuesday:") && /lesson/i.test(subject),
+      "The subject leads with the weekday and the lesson count, not the brand");
+    check(/Start here:/.test(text), "The best next task is called out first in the body");
+    check(/Costing overhaul/.test(text) && /[Oo]verdue/.test(text),
+      "Leftover work from yesterday is mentioned plainly as overdue");
+    check(/Marginal costing sheet/.test(text) && /45 min/.test(text),
+      "Today's lessons and their planned minutes are listed");
+    check(/1 h 35 min|95 min/.test(text) && /Yesterday/.test(text), "Yesterday's logged minutes show up");
+    check(/Streak: 5 days/.test(text), "The streak is mentioned");
+    check(/26 days to the exam/.test(text), "Days to the exam are counted");
+    check(text.includes(input.unsubscribeUrl), "The one-click unsubscribe link is in the text");
+    check(ENCOURAGEMENT_SANITY(input), "One encouragement line, deterministic per date");
+    check(!/<[a-z]/i.test(text), "The plain-text version carries no HTML tags");
+    const restInput: DigestInput = { ...input, tasks: [], examDate: null, streak: 0, sessions: [] };
+    check(digestSubject(restInput).includes("rest day") && !/fail|shame/i.test(digestText(restInput)),
+      "A rest day is named as one and says nothing shaming");
+
+    // The HTML is structured but quiet: one card, no images, no trackers.
+    check(html.includes("href=") && html.length > 200, "The HTML render is a real linked page");
+    check(!/<img|px\.gif|track|open\.php/i.test(html), "No image pixels or tracking URLs in the HTML");
+
+    // The MIME envelope carries the one-click-unsubscribe machine headers.
+    const mime = buildMimeMessage({
+      from: "digest@planner.example.com",
+      to: "arjun@example.com",
+      subject,
+      text,
+      html,
+      unsubscribeUrl: input.unsubscribeUrl,
+    });
+    check(/List-Unsubscribe: <https:\/\/planner\.example\.com\/api\/email\/unsubscribe\?u=7&k=all&t=sig>/.test(mime),
+      "RFC 2369 List-Unsubscribe ships in the headers");
+    check(/List-Unsubscribe-Post: List-Unsubscribe=One-Click/.test(mime),
+      "RFC 8058 one-click POST ships too, so Gmail shows the button");
+    check(/Content-Type: text\/plain/i.test(mime) && /Content-Type: text\/html/i.test(mime),
+      "Every mail carries both the plain-text and the HTML alternative");
+
+    // The Sunday review totals the week honestly.
+    const weeklyInput: WeeklyInput = {
+      ...input,
+      today: "2026-04-19",
+      weekday: "Sunday",
+      sessions: [],
+      weekSessions: [
+        { date: "2026-04-14", minutes: 60 }, { date: "2026-04-15", minutes: 40 },
+        { date: "2026-04-16", minutes: 0 }, { date: "2026-04-18", minutes: 80 },
+      ],
+      weekStart: "2026-04-13",
+      weekEnd: "2026-04-19",
+      examDate: null,
+      streak: 4,
+    };
+    const weeklyBody = weeklyText(weeklyInput);
+    check(weeklySubject(weeklyInput).includes("week"), "The weekly subject names the week");
+    check(/3 h/.test(weeklyBody) && /3 study days/.test(weeklyBody),
+      "The weekly mail totals minutes across honest 'days studied'");
+    check(/Streak: 4 days/.test(weeklyBody), "The weekly mail mentions the streak");
+
+    // One-click unsubscribe: HMAC-signed, verifiable, and tamper-proof.
+    const signedUrl = unsubscribeUrlFor("https://planner.example.com/", 7, "all");
+    check(signedUrl.includes("/api/email/unsubscribe?") && signedUrl.includes("u=7"),
+      "The unsubscribe URL carries the account id");
+    const parsed = new URL(signedUrl);
+    const sig = parsed.searchParams.get("t") || "";
+    check(verifyUnsubscribe(7, "all", sig), "The signature verifies for the same account and scope");
+    check(!verifyUnsubscribe(8, "all", sig), "Swapping the account id against the signature fails");
+    check(!verifyUnsubscribe(7, "all", ""), "A stripped signature fails");
+    check(signUnsubscribe(7, "all") === signUnsubscribe(7, "all"), "Signatures are deterministic (stable links)");
+
+    // Transport selection: Gmail by default, Brevo behind ONE variable,
+    // and an honest dry run when nothing is configured.
+    const gmail = resolveMailTransport({ GMAIL_ADDRESS: "a@gmail.com", GMAIL_APP_PASSWORD: "abcd" }  as unknown as NodeJS.ProcessEnv);
+    check(gmail?.id === "gmail-smtp", "Gmail SMTP is the default when its two variables are set");
+    const brevo = resolveMailTransport({ BREVO_API_KEY: "k", BREVO_SENDER_EMAIL: "s@x.com" }  as unknown as NodeJS.ProcessEnv);
+    check(brevo?.id === "brevo", "A single BREVO_API_KEY swaps the sender");
+    const bothPreferGmail = resolveMailTransport({ GMAIL_ADDRESS: "a@gmail.com", GMAIL_APP_PASSWORD: "x", BREVO_API_KEY: "k" }  as unknown as NodeJS.ProcessEnv);
+    check(bothPreferGmail?.id === "gmail-smtp", "Gmail wins when both are present (predictable default)");
+    const dry = resolveMailTransport({}  as unknown as NodeJS.ProcessEnv);
+    check(dry?.id === "file", "With nothing set, mail goes to the local outbox file instead of a black hole");
+    check(mailTransportStatus({}  as unknown as NodeJS.ProcessEnv).toLowerCase().includes("dry run"),
+      "The Settings card says plainly when mail is a dry run");
+    const badForced = resolveMailTransport({ MAIL_TRANSPORT: "sendgrid" }  as unknown as NodeJS.ProcessEnv);
+    check(badForced === null, "An unknown transport name fails loudly, never silently");
+  }
+
+  // Sanity helper hoisted for 18f's encouragement assertion.
+  function ENCOURAGEMENT_SANITY(input2: DigestInput): boolean {
+    const a = digestText(input2);
+    const line = encouragementFor(input2.today);
+    return line.length > 10 && a.includes(line);
+  }
+
+  console.log("\n--- 18g. Google sign-in, whole round trip but offline ---\n");
+  {
+    /* The OAuth dance has four places to get hurt: the PKCE challenge, the
+       state cookie round trip, the JWT signature, and the claim checks.
+       A fake Google (real RSA key, real JWT, fake JWKS endpoint) exercises
+       all four without the network. */
+    const config = {
+      clientId: "client-123.apps.googleusercontent.com",
+      clientSecret: "secret-xyz",
+      redirectUri: "https://planner.example.com/api/auth/google/callback",
+    };
+
+    // /start: consent URL carries PKCE + state, cookies are planted tight.
+    const startReq = new Request("https://planner.example.com/api/auth/google/start");
+    const started = googleStart(startReq, config);
+    const startUrl = new URL(started.url);
+    check(startUrl.origin === "https://accounts.google.com", "The learner is sent to Google, not a proxy");
+    check(startUrl.searchParams.get("client_id") === config.clientId, "The client id travels with the redirect");
+    check(startUrl.searchParams.get("redirect_uri") === config.redirectUri, "The redirect URI matches the console entry");
+    check(startUrl.searchParams.get("code_challenge_method") === "S256", "PKCE is the S256 form");
+    check(!!startUrl.searchParams.get("state"), "A fresh state is minted each attempt");
+    check(started.cookies.length === 2 &&
+      started.cookies.every((c) => /HttpOnly/.test(c) && /SameSite=Lax/.test(c) && /Secure/.test(c) && /Path=\/api\/auth\/google/.test(c)),
+      "Both OAuth cookies are HttpOnly, Lax, Secure and scoped to the callback path");
+    const stateCookiePair = started.cookies.find((c) => c.startsWith("spp_google_state=")) || "";
+
+    // The callback: a mismatched or missing state is refused before any code
+    // exchange happens - that is the whole protection against a swapped tab.
+    const cookieHeader = stateCookiePair.split(";")[0];
+    const goodCallback = new Request("https://planner.example.com/api/auth/google/callback", {
+      headers: { cookie: cookieHeader },
+    });
+    const echoed = startUrl.searchParams.get("state");
+    check(checkOAuthState(goodCallback, echoed) === echoed, "A matching state round-trip is accepted");
+    check(checkOAuthState(goodCallback, "forged-state-value") === null, "A mismatching state is refused");
+    check(checkOAuthState(new Request("https://planner.example.com/cb"), echoed) === null,
+      "A lost state cookie is refused");
+    check(checkOAuthState(goodCallback, null) === null, "A state Google never sent back is refused");
+
+    // PKCE: the challenge is the public half of the verifier.
+    check(pkceChallenge("verifier-abc") === pkceChallenge("verifier-abc"), "PKCE challenge is deterministic");
+    check(pkceChallenge("verifier-abc") !== pkceChallenge("verifier-abd"), "Two verifiers never collide");
+    check(pkceChallenge("verifier-abc").length >= 40 && !/[+/=]/.test(pkceChallenge("verifier-abc")),
+      "The challenge is URL-safe base64");
+
+    // Claims: issuer + audience + expiry + verified email are all load-bearing.
+    const nowSec = Math.floor(Date.now() / 1000);
+    const goodPayload = {
+      iss: "https://accounts.google.com", aud: config.clientId,
+      sub: "g-sub-1", email: "nila@gmail.com", email_verified: true,
+      name: "Nila", iat: nowSec - 60, exp: nowSec + 300,
+    };
+    const claims = claimsFromPayload(goodPayload, config.clientId);
+    check(claims?.email === "nila@gmail.com" && claims.emailVerified === true,
+      "A clean payload yields verified claims");
+    check(claimsFromPayload({ ...goodPayload, aud: "someone-else.apps.googleusercontent.com" }, config.clientId) === null,
+      "A token minted for ANOTHER app is refused");
+    check(claimsFromPayload({ ...goodPayload, iss: "https://evil.example.com" }, config.clientId) === null,
+      "A token from a fake issuer is refused");
+    check(claimsFromPayload({ ...goodPayload, exp: nowSec - 600 }, config.clientId) === null,
+      "An expired token is refused");
+    const unverified = claimsFromPayload({ ...goodPayload, email_verified: false }, config.clientId);
+    check(unverified !== null && unverified.emailVerified === false,
+      "An unverified Gmail is flagged at claim level (the account layer then refuses it)");
+
+    // The full signature path: a real RSA key pair stands in for Google,
+    // and a stub fetch serves its public half as the JWKS document.
+    const pairOptions: import("node:crypto").RSAKeyPairOptions<"jwk", "jwk"> = {
+      modulusLength: 2048,
+      publicKeyEncoding: { format: "jwk", type: "spki" },
+      privateKeyEncoding: { format: "jwk", type: "pkcs8" },
+    };
+    const spawned = generateKeyPairSync("rsa", pairOptions);
+    const publicKey = spawned.publicKey as unknown as { n: string; e: string };
+    const privateKey = spawned.privateKey as unknown as Parameters<typeof __testSignIdToken>[1];
+    const kid = "suite-key-1";
+    const stubFetch = (async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ keys: [{ kty: "RSA", kid, use: "sig", alg: "RS256", n: publicKey.n, e: publicKey.e }] }),
+    })) as unknown as Parameters<typeof verifyIdToken>[2];
+    const goodJwt = __testSignIdToken(goodPayload, privateKey, kid);
+    const verifiedClaims = await verifyIdToken(goodJwt, config.clientId, stubFetch);
+    check(verifiedClaims.sub === "g-sub-1" && verifiedClaims.emailVerified,
+      "A properly signed id_token verifies end to end");
+    const tampered = goodJwt.split(".");
+    tampered[1] = Buffer.from(JSON.stringify({ ...goodPayload, email: "forged@evil.com" })).toString("base64url");
+    let tamperedRefused = false;
+    try {
+      await verifyIdToken(tampered.join("."), config.clientId, stubFetch);
+    } catch {
+      tamperedRefused = true;
+    }
+    check(tamperedRefused, "A re-written payload voids the signature and is thrown out");
+    let badKidRefused = false;
+    try {
+      await verifyIdToken(__testSignIdToken(goodPayload, privateKey, "unknown-kid"), config.clientId, stubFetch);
+    } catch {
+      badKidRefused = true;
+    }
+    check(badKidRefused, "An unknown signing key is thrown out, not trusted");
+  }
+
+  console.log("\n--- 18h. Notification centre, rendered ---\n");
+  {
+    const originalConsoleError = console.error;
+    console.error = () => {};
+    const savedFetch = globalThis.fetch;
+    const savedDocument = (globalThis as { document?: unknown }).document;
+    const savedWindow = (globalThis as { window?: unknown }).window;
+    const visibilityHandlers: (() => void)[] = [];
+    Object.assign(globalThis, {
+      window: globalThis,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      document: {
+        activeElement: null,
+        addEventListener: (name: string, handler: unknown) => {
+          if (name === "visibilitychange") visibilityHandlers.push(handler as () => void);
+        },
+        removeEventListener: () => {},
+        visibilityState: "visible",
+      },
+    });
+    /* The first poll NEVER toasts (opening a laptop after a week must not
+       scream thirty old news items at you); a notification that arrives
+       while you watch, does. So the feed starts with only the read item,
+       then a visibility refresh brings the unread one. */
+    let listIsFull = false;
+    let lastPost: { url: string; body: string } | null = null;
+    globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input);
+      const json = (payload: unknown, status = 200) =>
+        new Response(JSON.stringify(payload), { status, headers: { "content-type": "application/json" } });
+      if (init?.method === "POST") {
+        lastPost = { url, body: String(init.body || "{}") };
+        return json({ ok: true, read: 1 });
+      }
+      const oldRead = { id: 12, kind: "streak_risk", title: "Your 9-day streak is at risk", body: null, href: "focus", createdAt: new Date().toISOString(), readAt: new Date().toISOString() };
+      const freshUnread = { id: 11, kind: "plan_ready", title: "Your plan for tomorrow is ready", body: "5 lessons moved", href: "planner", createdAt: new Date().toISOString(), readAt: null };
+      const items = listIsFull ? [freshUnread, oldRead] : [oldRead];
+      return json({ items, unread: items.filter((item) => !item.readAt).length, quietNow: false });
+    }) as unknown as typeof fetch;
+
+    const toasts: string[] = [];
+    const navigated: string[] = [];
+    let centre!: TestRenderer.ReactTestRenderer;
+    await act(async () => {
+      centre = TestRenderer.create(
+        React.createElement(NotificationCentre, {
+          onNavigate: (target: string) => navigated.push(target),
+          onToast: (message: string) => toasts.push(message),
+        }),
+      );
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    console.error = originalConsoleError;
+
+    const allText = () => JSON.stringify(centre.toJSON());
+    const buttonsOf = () => centre.root.findAll((node) => node.type === "button");
+    const flat = (node: unknown): string => {
+      if (node == null) return "";
+      if (typeof node === "string" || typeof node === "number") return String(node);
+      if (Array.isArray(node)) return node.map(flat).join(" ");
+      const record = node as { props?: { children?: unknown } };
+      return flat(record.props?.children);
+    };
+    check(buttonsOf().some((node) => /notification|bell/i.test(String(node.props["aria-label"] || ""))),
+      "The header renders a labelled bell button");
+    check(toasts.length === 0, "The very first poll toasts NOTHING that was already waiting");
+    listIsFull = true;
+    await act(async () => {
+      for (const handler of visibilityHandlers) handler();
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    check(/"1"|9\+/.test(allText()), "After the arrival the unread badge shows 1 new");
+    check(toasts.some((toast) => /plan for tomorrow/.test(toast)),
+      "A notification that ARRIVES while watching surfaces as a toast once");
+    const bell = buttonsOf().find((node) => /notification|bell/i.test(String(node.props["aria-label"] || "")));
+    await act(async () => { bell?.props.onClick(); });
+    check(/plan for tomorrow is ready/.test(allText()) && /streak is at risk/.test(allText()),
+      "Opening the bell lists the stored notifications");
+    const planItem = centre.root.findAll((node) => node.type === "button")
+      .find((node) => flat(node).includes("plan for tomorrow is ready"));
+    await act(async () => { planItem?.props.onClick(); await new Promise((r) => setTimeout(r, 20)); });
+    check(lastPost !== null && /"id"\s*:\s*11/.test((lastPost as { body: string }).body),
+      "Clicking a notification marks it read on the server");
+    check(navigated.includes("planner"), "…and deep links to its page");
+    await act(async () => { centre.unmount(); });
+    globalThis.fetch = savedFetch;
+    if (savedDocument === undefined) delete (globalThis as { document?: unknown }).document;
+    else Object.assign(globalThis, { document: savedDocument });
+    if (savedWindow === undefined) delete (globalThis as { window?: unknown }).window;
+    else Object.assign(globalThis, { window: savedWindow });
+    delete (globalThis as { addEventListener?: unknown }).addEventListener;
+    delete (globalThis as { removeEventListener?: unknown }).removeEventListener;
+  }
+
+  console.log("\n--- 18i. The new routes are wired and guarded ---\n");
+  {
+    const apiDir = join(process.cwd(), "src/app/api");
+    for (const route of [
+      "notifications/route.ts", "notifications/settings/route.ts",
+      "digest/test/route.ts", "cron/digest/route.ts", "email/unsubscribe/route.ts",
+    ]) {
+      check(existsSync(join(apiDir, route)), `${route.replace("/route.ts", "")} route exists`);
+    }
+    const settingsRoute = readFileSync(join(apiDir, "notifications/settings/route.ts"), "utf8");
+    check(/requireUser\(/.test(settingsRoute), "Notification settings resolve the learner with requireUser");
+    const bellRoute = readFileSync(join(apiDir, "notifications/route.ts"), "utf8");
+    check(/requireUser\(/.test(bellRoute), "The bell's feed resolves the learner with requireUser");
+    check(/export async function POST/.test(bellRoute) && /markNotificationsRead\(/.test(bellRoute),
+      "Marking a notification read writes through the owner-scoped mark routine");
+    const cronRoute = readFileSync(join(apiDir, "cron/digest/route.ts"), "utf8");
+    check(/CRON_SECRET/.test(cronRoute) && /Bearer/.test(cronRoute),
+      "The digest endpoint refuses calls without the shared secret");
+    check(!/sessionCookie|authenticate|requireUser/.test(cronRoute),
+      "…and never asks a browser session for permission");
+    const unsubRoute = readFileSync(join(apiDir, "email/unsubscribe/route.ts"), "utf8");
+    check(/verifyUnsubscribe\(/.test(unsubRoute), "The unsubscribe link verifies its HMAC signature");
+    check(!/requireUser\(/.test(unsubRoute),
+      "Unsubscribing works WITHOUT a sign-in (one click from the email itself)");
+
+    // Login by email: the library branch exists and the screen says so.
+    const authLib = readFileSync(join(process.cwd(), "src/lib/auth.ts"), "utf8");
+    check(/loginLooksLikeEmail\(/.test(authLib), "signIn() branches on email-shaped identifiers");
+    const gateSource = readFileSync(join(process.cwd(), "src/components/AuthGate.tsx"), "utf8");
+    check(/Username or email/i.test(gateSource), "The sign-in box names both ways in");
+
+    // The ledger: one row per (user, kind, local date) makes double-sends
+    // impossible no matter how many cron runs overlap.
+    // Track: the notifications table lists every notice per account,
+    // so read state syncs across devices (18h's render test exercises the
+    // client half of that contract).
+    const schema = readFileSync(join(process.cwd(), "src/db/schema.ts"), "utf8");
+    const sentBlock = schema.slice(
+      schema.indexOf("export const notificationsSent"),
+      schema.indexOf("export const notificationsSent") + 1200,
+    );
+    check(/uniqueIndex\([^)]*\)\.on\(t\.userId, t\.kind, t\.date\)/.test(sentBlock),
+      "notifications_sent is keyed by (user, kind, local date)");
+  }
+
   {
     /* An em dash in every other sentence is the single clearest tell of
        machine-written copy, and a tagline under the logo is the second.

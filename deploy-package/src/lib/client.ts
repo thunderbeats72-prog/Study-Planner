@@ -131,6 +131,13 @@ export type AccountInfo = {
   createdAt: string | null;
   lastLoginAt: string | null;
   hasAccount: boolean;
+  /** Private to the account owner: only ever returned over their session. */
+  email: string | null;
+  emailVerified: boolean;
+  /** Google-created accounts have no password yet (Settings offers "Set one"). */
+  hasPassword: boolean;
+  googleLinked: boolean;
+  emailUnsubscribed: boolean;
 };
 export type DeviceInfo = {
   id: number;
