@@ -260,6 +260,8 @@ button,a{-webkit-tap-highlight-color:rgba(0,0,0,0)}
   .spp-url{font-size:12.5px!important;word-break:break-all!important;overflow-wrap:anywhere!important}
   .spp-foot{padding:16px 16px 20px!important;border-radius:0 0 20px 20px!important}
   .spp-foot-col{display:block!important;width:100%!important;text-align:center!important;padding:0 0 7px!important}
+  .spp-foot-col table{margin:0 auto!important}
+  .spp-foot-col table td{text-align:center!important}
   .spp-foot-mark{width:34px!important;height:34px!important;margin:0 auto!important}
   .spp-small{font-size:12px!important;line-height:1.55!important}
 }
