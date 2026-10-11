@@ -22,6 +22,7 @@ import { nextAction, reasonLabel } from "./prioritization";
 import { backlogFor, dailyCapacityMinutes, suggestedRecovery, todayOverload } from "./recovery";
 import {
   EMAIL,
+  EMAIL_CLASS,
   emailAssetBaseFromUrl,
   emailEscape,
   emailFooter,
@@ -191,14 +192,14 @@ export function digestText(input: DigestInput): string {
 function circleIcon(label: string, tone: "purple" | "red" | "blue" = "purple"): string {
   const color = tone === "red" ? "#ef476f" : tone === "blue" ? "#4b7bec" : "#6253eb";
   const bg = tone === "red" ? "#ffe8ee" : tone === "blue" ? "#eaf1ff" : "#eeeaff";
-  return `<div style="width:48px;height:48px;border-radius:999px;background:${bg};color:${color};text-align:center;line-height:48px;font-size:22px;font-weight:900">${emailEscape(label)}</div>`;
+  return `<div class="${EMAIL_CLASS.ico}" style="width:48px;height:48px;border-radius:999px;background-color:${bg};color:${color};text-align:center;line-height:48px;font-size:22px;font-weight:900">${emailEscape(label)}</div>`;
 }
 
 function taskListHtml(input: DigestInput): string {
   const esc = emailEscape;
   const f = digestFacts(input);
   if (!f.todays.length) {
-    return `<p style="${EMAIL.p}">No lessons planned - a rest day or a catch-up day.</p>`;
+    return `<p class="${EMAIL_CLASS.copy}" style="${EMAIL.p}">No lessons planned - a rest day or a catch-up day.</p>`;
   }
   return (
     `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse">` +
@@ -208,15 +209,15 @@ function taskListHtml(input: DigestInput): string {
         const border = index === 0 ? "" : "border-top:1px solid #eeeaf8;";
         return (
           `<tr>` +
-          `<td style="${border}padding:12px 8px 12px 0;width:38px;vertical-align:top">` +
-          `<div style="width:30px;height:30px;border-radius:999px;background:#efecff;color:#6253eb;text-align:center;line-height:30px;font-size:13px;font-weight:900">${index + 1}</div>` +
+          `<td class="${EMAIL_CLASS.idxCell}" style="${border}padding:12px 8px 12px 0;width:38px;vertical-align:top">` +
+          `<div class="${EMAIL_CLASS.num}" style="width:30px;height:30px;border-radius:999px;background-color:#efecff;color:#6253eb;text-align:center;line-height:30px;font-size:13px;font-weight:900">${index + 1}</div>` +
           `</td>` +
-          `<td style="${border}padding:12px 8px;vertical-align:top">` +
+          `<td class="${EMAIL_CLASS.mainCell}" style="${border}padding:12px 8px;vertical-align:top">` +
           `<div style="font-size:14px;line-height:1.45;color:#171a38;font-weight:800">${esc(task.title)}</div>` +
           (subject ? `<div style="font-size:12px;line-height:1.45;color:#777b9a;margin-top:2px">${esc(subject)}</div>` : "") +
           `</td>` +
-          `<td align="right" style="${border}padding:12px 0 12px 8px;vertical-align:top;width:82px">` +
-          `<span style="display:inline-block;border-radius:11px;background:#f0edff;color:#6253eb;padding:7px 10px;font-size:12px;line-height:1;font-weight:900;white-space:nowrap">${esc(minLabel(task.plannedMinutes))}</span>` +
+          `<td class="${EMAIL_CLASS.chipCell}" align="right" style="${border}padding:12px 0 12px 8px;vertical-align:top;width:82px">` +
+          `<span class="${EMAIL_CLASS.chip}" style="display:inline-block;border-radius:11px;background-color:#f0edff;color:#6253eb;padding:7px 10px;font-size:12px;line-height:1;font-weight:900;white-space:nowrap">${esc(minLabel(task.plannedMinutes))}</span>` +
           `</td>` +
           `</tr>`
         );
@@ -249,25 +250,25 @@ export function digestHtml(input: DigestInput): string {
 
   const startBlock = infoCard(
     `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse"><tr>` +
-      `<td style="width:62px;vertical-align:top;padding-right:14px">${circleIcon("▶")}</td>` +
+      `<td class="${EMAIL_CLASS.icoCell}" style="width:62px;vertical-align:top;padding-right:14px">${circleIcon("▶")}</td>` +
       `<td style="vertical-align:top">` +
       (f.now
-        ? `<p style="${EMAIL.p}"><span style="font-weight:900;color:#101334">Start here:</span> <span style="color:#5b4bd5;font-weight:900">${esc(f.now.title)}</span>` +
+        ? `<p class="${EMAIL_CLASS.copy}" style="${EMAIL.p}"><span style="font-weight:900;color:#101334">Start here:</span> <span style="color:#5b4bd5;font-weight:900">${esc(f.now.title)}</span>` +
           `${firstSubject ? ` <span style="color:#676b8a">(${esc(firstSubject)})</span>` : ""}` +
           ` - ${esc(minLabel(f.now.plannedMinutes))}, ${esc(reasonLabel(f.now.reason).toLowerCase())}.</p>`
-        : `<p style="${EMAIL.p}"><span style="font-weight:900;color:#101334">Start here:</span> Nothing is due right now. The plan is clear.</p>`) +
+        : `<p class="${EMAIL_CLASS.copy}" style="${EMAIL.p}"><span style="font-weight:900;color:#101334">Start here:</span> Nothing is due right now. The plan is clear.</p>`) +
       `</td></tr></table>`,
     "soft",
   );
 
   const todayBlock = infoCard(
     `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;margin-bottom:8px"><tr>` +
-      `<td style="vertical-align:middle;width:52px;padding-right:12px">${circleIcon("✓")}</td>` +
+      `<td class="${EMAIL_CLASS.icoCell}" style="vertical-align:middle;width:52px;padding-right:12px">${circleIcon("✓")}</td>` +
       `<td style="vertical-align:middle">` +
-      `<div style="${EMAIL.h2}">Today</div>` +
+      `<div class="${EMAIL_CLASS.eyebrow}" style="${EMAIL.h2}">Today</div>` +
       `<div style="font-size:16px;line-height:1.35;font-weight:900;color:#101334">${esc(todayLabel)}, ${esc(minLabel(f.plannedMinutes))} planned</div>` +
       `</td>` +
-      `<td align="right" style="vertical-align:middle"><span style="display:inline-block;border-radius:12px;background:#f0edff;color:#6253eb;padding:8px 11px;font-size:12px;line-height:1;font-weight:900">${esc(minLabel(f.plannedMinutes))}</span></td>` +
+      `<td align="right" style="vertical-align:middle"><span class="${EMAIL_CLASS.chip}" style="display:inline-block;border-radius:12px;background-color:#f0edff;color:#6253eb;padding:8px 11px;font-size:12px;line-height:1;font-weight:900">${esc(minLabel(f.plannedMinutes))}</span></td>` +
       `</tr></table>` +
       taskListHtml(input),
   );
@@ -276,31 +277,31 @@ export function digestHtml(input: DigestInput): string {
     f.backlog.count > 0
       ? infoCard(
           `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse"><tr>` +
-            `<td style="width:62px;vertical-align:top;padding-right:14px">${circleIcon("!", "red")}</td>` +
+            `<td class="${EMAIL_CLASS.icoCell}" style="width:62px;vertical-align:top;padding-right:14px">${circleIcon("!", "red")}</td>` +
             `<td style="vertical-align:top">` +
-            `<div style="${EMAIL.h2};color:#a84358">Overdue</div>` +
-            `<p style="${EMAIL.p}"><span style="font-size:18px;font-weight:900;color:#c8324f">${f.backlog.count} unfinished task${f.backlog.count === 1 ? "" : "s"} (${esc(minLabel(f.backlog.minutes))}).</span><br/>` +
+            `<div class="${EMAIL_CLASS.eyebrow}" style="${EMAIL.h2};color:#a84358">Overdue</div>` +
+            `<p class="${EMAIL_CLASS.copy}" style="${EMAIL.p}"><span style="font-size:18px;font-weight:900;color:#c8324f">${f.backlog.count} unfinished task${f.backlog.count === 1 ? "" : "s"} (${esc(minLabel(f.backlog.minutes))}).</span><br/>` +
             `<span style="color:#6f738e">${
               f.recovery
                 ? `Suggested recovery: +${f.recovery.minutesPerDay} min/day for ${f.recovery.days} day${f.recovery.days === 1 ? "" : "s"}, no cramming.`
                 : "They fit with today's plan - no extra pace needed."
             }</span></p>` +
             `</td>` +
-            `<td align="right" style="vertical-align:middle;width:142px">${illustration("overdue", assetBase)}</td>` +
+            `<td class="${EMAIL_CLASS.sideArt}" align="right" style="vertical-align:middle;width:142px">${illustration("overdue", assetBase)}</td>` +
             `</tr></table>`,
           "danger",
         )
       : "";
 
   const metricsBlock = infoCard(
-    `<div style="${EMAIL.h2}">Where you stand</div>` +
+    `<div class="${EMAIL_CLASS.eyebrow}" style="${EMAIL.h2}">Where you stand</div>` +
       `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;margin:0 -6px">` +
       `<tr>` +
       metric("Streak", `${input.streak} day${input.streak === 1 ? "" : "s"}`) +
       metric("Yesterday", f.yesterdayMinutes > 0 ? minLabel(f.yesterdayMinutes) : "none", "#4b7bec") +
       metric("Exam", f.daysLeft != null && f.daysLeft >= 0 ? `${f.daysLeft} day${f.daysLeft === 1 ? "" : "s"}` : "not set", "#5b4bd5") +
       `</tr></table>` +
-      `<p style="${EMAIL.p};margin-top:12px;color:#676b8a">${esc(encouragementFor(input.today))}</p>`,
+      `<p class="${EMAIL_CLASS.copy}" style="${EMAIL.p};margin-top:12px;color:#676b8a">${esc(encouragementFor(input.today))}</p>`,
     "blue",
   );
 
@@ -311,7 +312,7 @@ export function digestHtml(input: DigestInput): string {
     todayBlock +
     backlogBlock +
     metricsBlock +
-    `<div style="padding:4px 28px 24px">${primaryButton(input.appUrl, "Open the planner", "→")}</div>` +
+    `<div class="${EMAIL_CLASS.btnPad}" style="padding:4px 28px 24px">${primaryButton(input.appUrl, "Open the planner", "→")}</div>` +
     emailFooter("You receive this once a day because the daily digest is on for your account.", input.unsubscribeUrl, assetBase);
 
   return shell(subject, `For ${input.name}: ${statusParts.join(" · ")}`, content);
@@ -372,16 +373,16 @@ export function weeklyHtml(input: WeeklyInput): string {
 
   const upcoming = pendingNext.length
     ? infoCard(
-        `<div style="${EMAIL.h2}">Coming up</div>` +
+        `<div class="${EMAIL_CLASS.eyebrow}" style="${EMAIL.h2}">Coming up</div>` +
           `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse">` +
           pendingNext
             .map((task, index) => {
               const border = index === 0 ? "" : "border-top:1px solid #eeeaf8;";
               return (
                 `<tr>` +
-                `<td style="${border}padding:11px 10px 11px 0;width:92px;vertical-align:top;color:#6253eb;font-size:12px;line-height:1.4;font-weight:900">${esc(task.date)}</td>` +
-                `<td style="${border}padding:11px 10px;vertical-align:top;color:#171a38;font-size:14px;line-height:1.45;font-weight:800">${esc(task.title)}</td>` +
-                `<td align="right" style="${border}padding:11px 0 11px 10px;width:82px;vertical-align:top"><span style="display:inline-block;border-radius:11px;background:#f0edff;color:#6253eb;padding:7px 10px;font-size:12px;line-height:1;font-weight:900;white-space:nowrap">${esc(minLabel(task.plannedMinutes))}</span></td>` +
+                `<td class="${EMAIL_CLASS.dateCell}" style="${border}padding:11px 10px 11px 0;width:92px;vertical-align:top;color:#6253eb;font-size:12px;line-height:1.4;font-weight:900">${esc(task.date)}</td>` +
+                `<td class="${EMAIL_CLASS.mainCell}" style="${border}padding:11px 10px;vertical-align:top;color:#171a38;font-size:14px;line-height:1.45;font-weight:800">${esc(task.title)}</td>` +
+                `<td class="${EMAIL_CLASS.chipCell}" align="right" style="${border}padding:11px 0 11px 10px;width:82px;vertical-align:top"><span class="${EMAIL_CLASS.chip}" style="display:inline-block;border-radius:11px;background-color:#f0edff;color:#6253eb;padding:7px 10px;font-size:12px;line-height:1;font-weight:900;white-space:nowrap">${esc(minLabel(task.plannedMinutes))}</span></td>` +
                 `</tr>`
               );
             })
@@ -394,10 +395,10 @@ export function weeklyHtml(input: WeeklyInput): string {
     f.backlog.count > 0
       ? infoCard(
           `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse"><tr>` +
-            `<td style="width:62px;vertical-align:top;padding-right:14px">${circleIcon("!", "red")}</td>` +
+            `<td class="${EMAIL_CLASS.icoCell}" style="width:62px;vertical-align:top;padding-right:14px">${circleIcon("!", "red")}</td>` +
             `<td style="vertical-align:top">` +
-            `<div style="${EMAIL.h2};color:#a84358">Still overdue</div>` +
-            `<p style="${EMAIL.p}"><span style="font-weight:900;color:#c8324f">${f.backlog.count} task${f.backlog.count === 1 ? "" : "s"} (${esc(minLabel(f.backlog.minutes))}).</span>` +
+            `<div class="${EMAIL_CLASS.eyebrow}" style="${EMAIL.h2};color:#a84358">Still overdue</div>` +
+            `<p class="${EMAIL_CLASS.copy}" style="${EMAIL.p}"><span style="font-weight:900;color:#c8324f">${f.backlog.count} task${f.backlog.count === 1 ? "" : "s"} (${esc(minLabel(f.backlog.minutes))}).</span>` +
             (f.recovery
               ? `<br/><span style="color:#6f738e">Suggested recovery: +${f.recovery.minutesPerDay} min/day for ${f.recovery.days} day${f.recovery.days === 1 ? "" : "s"}.</span>`
               : "") +
@@ -415,7 +416,7 @@ export function weeklyHtml(input: WeeklyInput): string {
   );
 
   const metricsBlock = infoCard(
-    `<div style="${EMAIL.h2}">Week scorecard</div>` +
+    `<div class="${EMAIL_CLASS.eyebrow}" style="${EMAIL.h2}">Week scorecard</div>` +
       `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;margin:0 -6px">` +
       `<tr>` +
       metric("Logged", minLabel(minutes)) +
@@ -426,7 +427,7 @@ export function weeklyHtml(input: WeeklyInput): string {
       metric("Exam", daysToExam, "#5b4bd5") +
       metric("Backlog", `${f.backlog.count}`, f.backlog.count > 0 ? "#c8324f" : "#2f9e72") +
       `</tr></table>` +
-      `<p style="${EMAIL.p};margin-top:12px;color:#676b8a">${esc(encouragementFor(input.today))}</p>`,
+      `<p class="${EMAIL_CLASS.copy}" style="${EMAIL.p};margin-top:12px;color:#676b8a">${esc(encouragementFor(input.today))}</p>`,
     "blue",
   );
 
@@ -436,7 +437,7 @@ export function weeklyHtml(input: WeeklyInput): string {
     metricsBlock +
     backlog +
     upcoming +
-    `<div style="padding:4px 28px 24px">${primaryButton(input.appUrl, "Open the planner", "→")}</div>` +
+    `<div class="${EMAIL_CLASS.btnPad}" style="padding:4px 28px 24px">${primaryButton(input.appUrl, "Open the planner", "→")}</div>` +
     emailFooter("You receive this on Sunday evenings because the weekly summary is on for your account.", input.unsubscribeUrl, assetBase);
 
   return shell(subject, `Logged ${minLabel(minutes)} across ${days} study day${days === 1 ? "" : "s"}.`, content);

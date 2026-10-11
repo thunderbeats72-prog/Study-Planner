@@ -9,6 +9,7 @@
     "start": "next start",
     "test": "tsx scripts/test-suite.ts",
     "ui-audit": "tsx scripts/ui-audit.ts",
+    "email:preview": "tsx scripts/email-preview.ts",
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && npm run lint && npm test && tsx scripts/ui-audit.ts --budget",
