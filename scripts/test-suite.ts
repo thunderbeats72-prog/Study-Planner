@@ -63,6 +63,8 @@ import {
   digestSubject, digestText, digestHtml, weeklySubject, weeklyText,
   encouragementFor, weekdayName, type DigestInput, type WeeklyInput,
 } from "../src/lib/digest";
+import { verificationEmail } from "../src/lib/verificationMail";
+import { emailAssetBaseFromUrl } from "../src/lib/emailTheme";
 import { resolveMailTransport, mailTransportStatus } from "../src/lib/mailer";
 import { buildMimeMessage } from "../src/lib/mime";
 import type { TaskRow } from "../src/lib/client";
@@ -3079,6 +3081,82 @@ Powered by Pollinations.AI free text APIs. Support our mission to keep AI access
     check(/<img[^>]+\/email\/(study-planner-logo|email-digest-hero)\.png/i.test(html),
       "The HTML uses static app-hosted artwork for the branded template");
     check(!/px\.gif|track|open\.php|utm_/i.test(html), "No tracking pixels or tracking URLs in the HTML");
+
+    /* ── The mail fits a phone, and it wears its own logo ─────────────────
+       A learner opens a digest on a 390px screen more often than on a
+       desktop inbox, so the responsive contract is asserted the same way the
+       copy is: viewport meta + media queries + fluid artwork + a layout that
+       never asks for more width than the card has. And the mark in the header
+       must be THIS app's logo, not a stock icon that happens to be lying
+       around in public/email/. */
+    {
+      const themeSource = readFileSync(join(process.cwd(), "src/lib/emailTheme.ts"), "utf8");
+      const head = html.slice(0, html.indexOf("</head>"));
+      check(/<meta name="viewport" content="width=device-width/.test(head),
+        "The template declares a device viewport, so phones render at 1:1 instead of zooming out");
+      check(/@media *only screen and \(max-width:480px\)/.test(head) && /@media *only screen and \(max-width:374px\)/.test(head),
+        "Phone and small-phone media queries ship inside the message");
+      check(themeSource.includes("emailStyles()") && /<style type="text\/css">/.test(head),
+        "The media queries travel with the HTML, never as an external stylesheet");
+      check(/class="spp-panel" border="0" width="680"/.test(html) && /max-width:680px/.test(html),
+        "The card is 680px for Outlook's Word renderer and fluid for every browser");
+      const imgs = html.match(/<img[^>]*>/g) || [];
+      check(imgs.length > 0 && imgs.every((tag) => /max-width:100%/.test(tag) && /height:auto/.test(tag)),
+        "Every piece of artwork is fluid, so nothing forces a sideways scroll");
+      const tooWide = (html.match(/(?:[^-x])width:\s*(\d{3,4})px/g) || [])
+        .map((found) => Number(found.match(/(\d+)/)![0])).filter((px) => px > 680);
+      check(tooWide.length === 0, "Nothing in the layout demands more width than the card has", tooWide.join(", "));
+      check(/\.spp-hero-col\{display:block!important/.test(head) && /\.spp-m-col\{display:block!important/.test(head),
+        "The banner columns and the stat row both re-stack into one column on a phone");
+      check(/\.spp-btn\{display:block!important/.test(head) && /\.spp-btn-table\{width:100%!important/.test(head),
+        "The primary button becomes a full-width tap target at phone width");
+      check(/\.spp-head-rule,\.spp-foot-rule\{display:none!important/.test(head),
+        "The decorative rules are dropped rather than squeezed on a phone");
+      for (const cls of html.match(/class="([^"]*)"/g) || []) {
+        for (const name of cls.slice(8, -1).trim().split(/\s+/)) {
+          if (name.startsWith("spp-") && !themeSource.includes(`"${name}"`) && !head.includes(`.${name}`)) {
+            throw new Error(`Template uses class "${name}" with no rule behind it`);
+          }
+        }
+      }
+      check(true, "Every responsive class a template uses has a matching rule in the theme");
+
+      // The logo: the app's own mark, at retina size, under a sane weight.
+      const logoPng = readFileSync(join(process.cwd(), "public/email/study-planner-logo.png"));
+      const logoSvg = readFileSync(join(process.cwd(), "public/email/study-planner-logo.svg"), "utf8");
+      const appIcon = readFileSync(join(process.cwd(), "src/app/icon.svg"), "utf8");
+      const glyph = (src: string) =>
+        (src.match(/<path[^>]*\bd="([^"]*)"/g) || [])
+          .map((d) => (d.match(/[MmLlHhVvCcSsQqTtAaZz]/g) || []).join(""))
+          .sort()
+          .join("|");
+      check(glyph(logoSvg) === glyph(appIcon) && glyph(logoSvg).length > 0,
+        "The email logo is drawn from the app icon's own layers glyph, not a stock image");
+      check(logoPng.subarray(1, 4).toString() === "PNG" && logoPng.readUInt32BE(16) === logoPng.readUInt32BE(20) && logoPng.readUInt32BE(16) >= 128,
+        "…shipped as one square, retina-crisp PNG");
+      check(logoPng.length < 40_000, "…light enough that the message stays small", `${logoPng.length} bytes`);
+      check(/<img[^>]*study-planner-logo\.png[^>]*alt="Study Planner Pro logo"/.test(html),
+        "The header renders that logo with the brand as its alt text");
+      check(themeSource.includes('"/email/study-planner-logo.png"') && /background-color:#6253eb/.test(themeSource),
+        "When images are blocked the fallback draws the brand tile, not a generic tick");
+      const deployed = readFileSync(join(process.cwd(), "deploy-package/public/email/study-planner-logo.png"));
+      check(deployed.equals(logoPng), "The drag-and-drop deploy ships the same logo bytes");
+
+      // The verification mail is the same shell, not a second template to rot.
+      const verifyMail = verificationEmail("https://planner.example.com/api/auth/verify-email?u=7&k=x&t=y");
+      const verifyHead = verifyMail.html.slice(0, verifyMail.html.indexOf("</head>"));
+      check(/<meta name="viewport" content="width=device-width/.test(verifyHead) && /@media *only screen and \(max-width:480px\)/.test(verifyHead),
+        "The verification mail shares the responsive shell");
+      const verifyFoot = verifyMail.html.slice(verifyMail.html.indexOf('<div class="spp-foot"'));
+      check(emailAssetBaseFromUrl("http://localhost:3000/api/auth/verify-email?u=7") === "",
+        "A dev origin drops the image base, so the mail draws its CSS brand tile instead of a broken icon");
+      check(emailAssetBaseFromUrl("https://study-planner.vercel.app/planner") === "https://study-planner.vercel.app",
+        "A public deployment origin is kept, so APP_URL alone turns the PNG artwork on");
+      check(/<img[^>]*study-planner-logo\.png/.test(verifyMail.html) && /<img[^>]*study-planner-logo\.png/.test(verifyFoot),
+        "…and carries the logo in both its header and its footer");
+      check(/class="spp-url"[^>]*word-break:break-all/.test(verifyMail.html),
+        "…and wraps the long fallback link instead of overflowing the phone");
+    }
 
     // The MIME envelope carries the one-click-unsubscribe machine headers.
     const mime = buildMimeMessage({

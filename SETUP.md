@@ -258,7 +258,12 @@ Do these once, after Step 6, and everything else takes care of itself:
    in Settings -> Account.
 2. **The digest button works**: in the app open Settings -> Notifications,
    press **Send me a test digest now**, and read the email that lands (or,
-   before keys are set, read the preview the app shows).
+   before keys are set, read the preview the app shows). Open it on your
+   phone too: the layout, the Study Planner logo in the header and the
+   full-width button are all checked at phone width, and the artwork needs
+   `APP_URL` to be the public HTTPS address of the deployment. To see all
+   three mails at 700/390/320px without sending anything, run
+   `npm run email:preview` and open the folder it writes.
 3. **The clock works**: the GitHub Action run from Step 6b is green, and a
    second manual run does NOT send you another digest for the same day.
 4. **No email still works**: open the app in a private window - with none

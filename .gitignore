@@ -30,3 +30,6 @@ preview/
 
 # dry-run email outbox (written when no mail credentials are configured)
 .spp-mail-outbox
+
+# rendered email previews (npm run email:preview)
+.spp-mail-preview

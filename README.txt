@@ -296,6 +296,35 @@ Priority order is now Gemini-first (Gemini → Cerebras → Groq → Mistral →
 SambaNova → Cohere → OpenRouter), matching the key most deployments
 configure; sticky success still promotes whichever leg actually answers.
 
+v37 MAIL TEMPLATE - PHONE-FIRST LAYOUT, THE APP'S OWN LOGO (this build)
+---------------------------------------------------
+ - THE DIGEST, THE WEEKLY REVIEW AND THE VERIFICATION MAIL NOW FIT A
+   PHONE. All three render through one shell (src/lib/emailTheme.ts): a
+   680px card that is `width:100%;max-width:680px` for every browser and
+   a fixed 680 for Outlook's Word renderer, a device viewport meta, and
+   media queries at 600/480/374px that stack the banner columns, turn the
+   three-across stat row into full-width "STREAK - 5 days" rows, shrink
+   the header mark, drop the decorative rules and tighten the padding.
+   Every <img> is fluid (height:auto, max-width:100%), so no message
+   needs a sideways scroll at 320px, and the primary button becomes a
+   full-width tap target. The classes are additive: a client that ignores
+   media queries still gets the inline desktop layout it was already
+   using, so nothing that worked before can regress.
+ - THE LOGO IS THE LOGO. The header and the footer of every mail render
+   public/email/study-planner-logo.png - Study Planner Pro's own layers
+   mark, the same glyph as src/app/icon.svg - instead of the mismatched
+   calendar tile that file used to hold. When a client blocks images the
+   theme draws the same brand tile in CSS, never a generic tick.
+ - PREVIEW IT WITHOUT SENDING ANYTHING: `npm run email:preview` renders
+   the real templates into .spp-mail-preview/ (gitignored) at 700px,
+   390px and 320px side by side, so the phone layout is checkable before
+   a single mail key exists.
+ - GUARDED BY `npm test`: the viewport meta, the media queries being
+   inline in the message, fluid artwork, no block wider than the card,
+   every responsive class having a rule behind it, the logo's geometry
+   matching src/app/icon.svg, and the same logo bytes in
+   deploy-package/public/email/.
+
 v36 EMAIL + GOOGLE SIGN-IN + NOTIFICATIONS (this build)
 ---------------------------------------------------
  - EMAIL ON ACCOUNTS: sign-up now asks for an email alongside the
